@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -46,28 +46,28 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @c min_len must not exceed @v IOB_ZLEN.
  */
-void iob_pad(struct io_buffer* iobuf, size_t min_len) {
-    void* data;
-    size_t len;
-    size_t headroom;
-    signed int pad_len;
+void iob_pad ( struct io_buffer *iobuf, size_t min_len ) {
+	void *data;
+	size_t len;
+	size_t headroom;
+	signed int pad_len;
 
-    assert(min_len <= IOB_ZLEN);
+	assert ( min_len <= IOB_ZLEN );
 
-    /* Move packet data to start of I/O buffer.  This will both
-     * align the data (since I/O buffers are aligned to
-     * IOB_ALIGN) and give us sufficient space for the
-     * zero-padding
-     */
-    data = iobuf->data;
-    len = iob_len(iobuf);
-    headroom = iob_headroom(iobuf);
-    iob_push(iobuf, headroom);
-    memmove(iobuf->data, data, len);
-    iob_unput(iobuf, headroom);
+	/* Move packet data to start of I/O buffer.  This will both
+	 * align the data (since I/O buffers are aligned to
+	 * IOB_ALIGN) and give us sufficient space for the
+	 * zero-padding
+	 */
+	data = iobuf->data;
+	len = iob_len ( iobuf );
+	headroom = iob_headroom ( iobuf );
+	iob_push ( iobuf, headroom );
+	memmove ( iobuf->data, data, len );
+	iob_unput ( iobuf, headroom );
 
-    /* Pad to minimum packet length */
-    pad_len = (min_len - iob_len(iobuf));
-    if (pad_len > 0)
-        memset(iob_put(iobuf, pad_len), 0, pad_len);
+	/* Pad to minimum packet length */
+	pad_len = ( min_len - iob_len ( iobuf ) );
+	if ( pad_len > 0 )
+		memset ( iob_put ( iobuf, pad_len ), 0, pad_len );
 }

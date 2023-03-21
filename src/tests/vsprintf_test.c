@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -46,75 +46,76 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v format		Format string
  * @v ...		Arguments
  */
-static void snprintf_okx(size_t len, const char* expected, const char* file,
-                         unsigned int line, const char* fmt, ...) {
-    char actual[len];
-    size_t actual_len;
-    va_list args;
+static void snprintf_okx ( size_t len, const char *expected, const char *file,
+			   unsigned int line, const char *fmt, ... ) {
+	char actual[len];
+	size_t actual_len;
+	va_list args;
 
-    va_start(args, fmt);
-    actual_len = vsnprintf(actual, sizeof(actual), fmt, args);
-    va_end(args);
-    okx(actual_len >= strlen(expected), file, line);
-    okx(strcmp(actual, expected) == 0, file, line);
-    if (strcmp(actual, expected) != 0) {
-        DBG("SNPRINTF expected \"%s\", got \"%s\"\n",
-            expected, actual);
-    }
+	va_start ( args, fmt );
+	actual_len = vsnprintf ( actual, sizeof ( actual ), fmt, args );
+	va_end ( args );
+	okx ( actual_len >= strlen ( expected ), file, line );
+	okx ( strcmp ( actual, expected ) == 0, file, line );
+	if ( strcmp ( actual, expected ) != 0 ) {
+		DBG ( "SNPRINTF expected \"%s\", got \"%s\"\n",
+		      expected, actual );
+	}
 }
-#define snprintf_ok(len, result, format, ...)             \
-    snprintf_okx(len, result, __FILE__, __LINE__, format, \
-                 ##__VA_ARGS__)
+#define snprintf_ok( len, result, format, ... )				\
+	snprintf_okx ( len, result, __FILE__, __LINE__, format,		\
+		       ##__VA_ARGS__ )
 
 /**
  * Perform vsprintf() self-tests
  *
  */
-static void vsprintf_test_exec(void) {
-    /* Constant string */
-    snprintf_ok(16, "Testing", "Testing");
+static void vsprintf_test_exec ( void ) {
 
-    /* Constant string, truncated to fit */
-    snprintf_ok(5, "Test", "Testing");
+	/* Constant string */
+	snprintf_ok ( 16, "Testing", "Testing" );
 
-    /* Basic format specifiers */
-    snprintf_ok(16, "%", "%%");
-    snprintf_ok(16, "ABC", "%c%c%c", 'A', 'B', 'C');
-    snprintf_ok(16, "abc", "%lc%lc%lc", L'a', L'b', L'c');
-    snprintf_ok(16, "Hello world", "%s %s", "Hello", "world");
-    snprintf_ok(16, "Goodbye world", "%ls %s", L"Goodbye", "world");
-    snprintf_ok(16, "0x1234abcd", "%p", ((void*)0x1234abcd));
-    snprintf_ok(16, "0xa723", "%#x", 0xa723);
-    snprintf_ok(16, "a723", "%x", 0xa723);
-    snprintf_ok(16, "0x0000a723", "%#08x", 0xa723);
-    snprintf_ok(16, "00A723", "%06X", 0xa723);
-    snprintf_ok(16, "9876abcd", "%lx", 0x9876abcdUL);
-    snprintf_ok(16, "1234 5678", "%04llx %04llx", 0x1234ULL, 0x5678ULL);
-    snprintf_ok(16, "123", "%d", 123);
-    snprintf_ok(16, "456", "%i", 456);
-    snprintf_ok(16, " 99", "%3d", 99);
-    snprintf_ok(16, "099", "%03d", 99);
-    snprintf_ok(16, "-72", "%d", -72);
-    snprintf_ok(16, " -72", "%4d", -72);
-    snprintf_ok(16, "-072", "%04d", -72);
-    snprintf_ok(16, "4", "%zd", sizeof(uint32_t));
-    snprintf_ok(16, "123456789", "%d", 123456789);
+	/* Constant string, truncated to fit */
+	snprintf_ok ( 5, "Test", "Testing" );
 
-    /* Realistic combinations */
-    snprintf_ok(64, "DBG 0x1234 thingy at 0x0003f0c0+0x5c\n",
-                "DBG %p %s at %#08lx+%#zx\n", ((void*)0x1234),
-                "thingy", 0x3f0c0UL, ((size_t)0x5c));
-    snprintf_ok(64, "PCI 00:1f.3", "PCI %02x:%02x.%x", 0x00, 0x1f, 0x03);
-    snprintf_ok(64, "Region [1000000,3f000000)", "Region [%llx,%llx)",
-                0x1000000ULL, 0x3f000000ULL);
+	/* Basic format specifiers */
+	snprintf_ok ( 16, "%", "%%" );
+	snprintf_ok ( 16, "ABC", "%c%c%c", 'A', 'B', 'C' );
+	snprintf_ok ( 16, "abc", "%lc%lc%lc", L'a', L'b', L'c' );
+	snprintf_ok ( 16, "Hello world", "%s %s", "Hello", "world" );
+	snprintf_ok ( 16, "Goodbye world", "%ls %s", L"Goodbye", "world" );
+	snprintf_ok ( 16, "0x1234abcd", "%p", ( ( void * ) 0x1234abcd ) );
+	snprintf_ok ( 16, "0xa723", "%#x", 0xa723 );
+	snprintf_ok ( 16, "a723", "%x", 0xa723 );
+	snprintf_ok ( 16, "0x0000a723", "%#08x", 0xa723 );
+	snprintf_ok ( 16, "00A723", "%06X", 0xa723 );
+	snprintf_ok ( 16, "9876abcd", "%lx", 0x9876abcdUL );
+	snprintf_ok ( 16, "1234 5678", "%04llx %04llx", 0x1234ULL, 0x5678ULL );
+	snprintf_ok ( 16, "123", "%d", 123 );
+	snprintf_ok ( 16, "456", "%i", 456 );
+	snprintf_ok ( 16, " 99", "%3d", 99 );
+	snprintf_ok ( 16, "099", "%03d", 99 );
+	snprintf_ok ( 16, "-72", "%d", -72 );
+	snprintf_ok ( 16, " -72", "%4d", -72 );
+	snprintf_ok ( 16, "-072", "%04d", -72 );
+	snprintf_ok ( 16, "4", "%zd", sizeof ( uint32_t ) );
+	snprintf_ok ( 16, "123456789", "%d", 123456789 );
 
-    /* Null string (used for debug messages) */
-    snprintf_ok(16, "<NULL>", "%s", ((char*)NULL));
-    snprintf_ok(16, "<NULL>", "%ls", ((wchar_t*)NULL));
+	/* Realistic combinations */
+	snprintf_ok ( 64, "DBG 0x1234 thingy at 0x0003f0c0+0x5c\n",
+		      "DBG %p %s at %#08lx+%#zx\n", ( ( void * ) 0x1234 ),
+		      "thingy", 0x3f0c0UL, ( ( size_t ) 0x5c ) );
+	snprintf_ok ( 64, "PCI 00:1f.3", "PCI %02x:%02x.%x", 0x00, 0x1f, 0x03 );
+	snprintf_ok ( 64, "Region [1000000,3f000000)", "Region [%llx,%llx)",
+		      0x1000000ULL, 0x3f000000ULL );
+
+	/* Null string (used for debug messages) */
+	snprintf_ok ( 16, "<NULL>", "%s", ( ( char * ) NULL ) );
+	snprintf_ok ( 16, "<NULL>", "%ls", ( ( wchar_t * ) NULL ) );
 }
 
 /** vsprintf() self-test */
 struct self_test vsprintf_test __self_test = {
-    .name = "vsprintf",
-    .exec = vsprintf_test_exec,
+	.name = "vsprintf",
+	.exec = vsprintf_test_exec,
 };

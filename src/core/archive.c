@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <errno.h>
@@ -41,64 +41,64 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v extracted		Extracted image to fill in
  * @ret rc		Return status code
  */
-int image_extract(struct image* image, const char* name,
-                  struct image** extracted) {
-    char* dot;
-    int rc;
+int image_extract ( struct image *image, const char *name,
+		    struct image **extracted ) {
+	char *dot;
+	int rc;
 
-    /* Check that this image can be used to extract an archive image */
-    if (!(image->type && image->type->extract)) {
-        rc = -ENOTSUP;
-        goto err_unsupported;
-    }
+	/* Check that this image can be used to extract an archive image */
+	if ( ! ( image->type && image->type->extract ) ) {
+		rc = -ENOTSUP;
+		goto err_unsupported;
+	}
 
-    /* Allocate new image */
-    *extracted = alloc_image(image->uri);
-    if (!*extracted) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
+	/* Allocate new image */
+	*extracted = alloc_image ( image->uri );
+	if ( ! *extracted ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 
-    /* Set image name */
-    if ((rc = image_set_name(*extracted,
-                             (name ? name : image->name))) != 0) {
-        goto err_set_name;
-    }
+	/* Set image name */
+	if ( ( rc = image_set_name ( *extracted,
+				     ( name ? name : image->name ) ) ) != 0 ) {
+		goto err_set_name;
+	}
 
-    /* Strip any archive or compression suffix from implicit name */
-    if ((!name) && ((*extracted)->name) &&
-        ((dot = strrchr((*extracted)->name, '.')) != NULL)) {
-        *dot = '\0';
-    }
+	/* Strip any archive or compression suffix from implicit name */
+	if ( ( ! name ) && ( (*extracted)->name ) &&
+	     ( ( dot = strrchr ( (*extracted)->name, '.' ) ) != NULL ) ) {
+		*dot = '\0';
+	}
 
-    /* Try extracting archive image */
-    if ((rc = image->type->extract(image, *extracted)) != 0) {
-        DBGC(image, "IMAGE %s could not extract image: %s\n",
-             image->name, strerror(rc));
-        goto err_extract;
-    }
+	/* Try extracting archive image */
+	if ( ( rc = image->type->extract ( image, *extracted ) ) != 0 ) {
+		DBGC ( image, "IMAGE %s could not extract image: %s\n",
+		       image->name, strerror ( rc ) );
+		goto err_extract;
+	}
 
-    /* Register image */
-    if ((rc = register_image(*extracted)) != 0)
-        goto err_register;
+	/* Register image */
+	if ( ( rc = register_image ( *extracted ) ) != 0 )
+		goto err_register;
 
-    /* Propagate trust flag */
-    if (image->flags & IMAGE_TRUSTED)
-        image_trust(*extracted);
+	/* Propagate trust flag */
+	if ( image->flags & IMAGE_TRUSTED )
+		image_trust ( *extracted );
 
-    /* Drop local reference to image */
-    image_put(*extracted);
+	/* Drop local reference to image */
+	image_put ( *extracted );
 
-    return 0;
+	return 0;
 
-    unregister_image(*extracted);
-err_register:
-err_extract:
-err_set_name:
-    image_put(*extracted);
-err_alloc:
-err_unsupported:
-    return rc;
+	unregister_image ( *extracted );
+ err_register:
+ err_extract:
+ err_set_name:
+	image_put ( *extracted );
+ err_alloc:
+ err_unsupported:
+	return rc;
 }
 
 /**
@@ -107,32 +107,32 @@ err_unsupported:
  * @v image		Image
  * @ret rc		Return status code
  */
-int image_extract_exec(struct image* image) {
-    struct image* extracted;
-    int rc;
+int image_extract_exec ( struct image *image ) {
+	struct image *extracted;
+	int rc;
 
-    /* Extract image */
-    if ((rc = image_extract(image, NULL, &extracted)) != 0)
-        goto err_extract;
+	/* Extract image */
+	if ( ( rc = image_extract ( image, NULL, &extracted ) ) != 0 )
+		goto err_extract;
 
-    /* Set image command line */
-    if ((rc = image_set_cmdline(extracted, image->cmdline)) != 0)
-        goto err_set_cmdline;
+	/* Set image command line */
+	if ( ( rc = image_set_cmdline ( extracted, image->cmdline ) ) != 0 )
+		goto err_set_cmdline;
 
-    /* Set auto-unregister flag */
-    extracted->flags |= IMAGE_AUTO_UNREGISTER;
+	/* Set auto-unregister flag */
+	extracted->flags |= IMAGE_AUTO_UNREGISTER;
 
-    /* Tail-recurse into extracted image */
-    return image_exec(extracted);
+	/* Tail-recurse into extracted image */
+	return image_exec ( extracted );
 
-err_set_cmdline:
-    unregister_image(extracted);
-err_extract:
-    return rc;
+ err_set_cmdline:
+	unregister_image ( extracted );
+ err_extract:
+	return rc;
 }
 
 /* Drag in objects via image_extract() */
-REQUIRING_SYMBOL(image_extract);
+REQUIRING_SYMBOL ( image_extract );
 
 /* Drag in archive image formats */
-REQUIRE_OBJECT(config_archive);
+REQUIRE_OBJECT ( config_archive );

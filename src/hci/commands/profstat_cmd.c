@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <getopt.h>
@@ -43,7 +43,7 @@ static struct option_descriptor profstat_opts[] = {};
 
 /** "profstat" command descriptor */
 static struct command_descriptor profstat_cmd =
-    COMMAND_DESC(struct profstat_options, profstat_opts, 0, 0, NULL);
+	COMMAND_DESC ( struct profstat_options, profstat_opts, 0, 0, NULL );
 
 /**
  * The "profstat" command
@@ -52,23 +52,23 @@ static struct command_descriptor profstat_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int profstat_exec(int argc, char** argv) {
-    struct profstat_options opts;
-    int rc;
+static int profstat_exec ( int argc, char **argv ) {
+	struct profstat_options opts;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &profstat_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &profstat_cmd, &opts ) ) != 0 )
+		return rc;
 
-    profstat();
+	profstat();
 
-    return 0;
+	return 0;
 }
 
 /** Profiling commands */
 struct command profstat_commands[] __command = {
-    {
-        .name = "profstat",
-        .exec = profstat_exec,
-    },
+	{
+		.name = "profstat",
+		.exec = profstat_exec,
+	},
 };

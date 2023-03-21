@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _USR_NTPMGMT_H
-    #define _USR_NTPMGMT_H
+#define _USR_NTPMGMT_H
 
 /** @file
  *
@@ -9,8 +7,8 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-extern int ntp(const char* hostname);
+extern int ntp ( const char *hostname );
 
 #endif /* _USR_NTPMGMT_H */

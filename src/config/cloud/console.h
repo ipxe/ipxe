@@ -1,5 +1,3 @@
-#pragma once
-
 /*
  * Console configuration suitable for use in public cloud
  * environments, or any environment where direct console access is not
@@ -25,7 +23,7 @@
  * EFI firmware is likely to already be logging to the serial port.
  */
 #ifndef PLATFORM_efi
-    #define CONSOLE_SERIAL
+#define CONSOLE_SERIAL
 #endif
 
 /* Log to partition on local disk

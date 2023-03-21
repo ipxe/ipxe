@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/rsa.h>
 #include <ipxe/sha1.h>
@@ -30,33 +30,33 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** "sha1WithRSAEncryption" object identifier */
 static uint8_t oid_sha1_with_rsa_encryption[] =
-    {ASN1_OID_SHA1WITHRSAENCRYPTION};
+	{ ASN1_OID_SHA1WITHRSAENCRYPTION };
 
 /** "sha1WithRSAEncryption" OID-identified algorithm */
 struct asn1_algorithm sha1_with_rsa_encryption_algorithm __asn1_algorithm = {
-    .name = "sha1WithRSAEncryption",
-    .pubkey = &rsa_algorithm,
-    .digest = &sha1_algorithm,
-    .oid = ASN1_CURSOR(oid_sha1_with_rsa_encryption),
+	.name = "sha1WithRSAEncryption",
+	.pubkey = &rsa_algorithm,
+	.digest = &sha1_algorithm,
+	.oid = ASN1_CURSOR ( oid_sha1_with_rsa_encryption ),
 };
 
 /** SHA-1 digestInfo prefix */
 static const uint8_t rsa_sha1_prefix_data[] =
-    {RSA_DIGESTINFO_PREFIX(SHA1_DIGEST_SIZE, ASN1_OID_SHA1)};
+	{ RSA_DIGESTINFO_PREFIX ( SHA1_DIGEST_SIZE, ASN1_OID_SHA1 ) };
 
 /** SHA-1 digestInfo prefix */
 struct rsa_digestinfo_prefix rsa_sha1_prefix __rsa_digestinfo_prefix = {
-    .digest = &sha1_algorithm,
-    .data = rsa_sha1_prefix_data,
-    .len = sizeof(rsa_sha1_prefix_data),
+	.digest = &sha1_algorithm,
+	.data = rsa_sha1_prefix_data,
+	.len = sizeof ( rsa_sha1_prefix_data ),
 };
 
 /** RSA with SHA-1 signature hash algorithm */
 struct tls_signature_hash_algorithm tls_rsa_sha1 __tls_sig_hash_algorithm = {
-    .code = {
-        .signature = TLS_RSA_ALGORITHM,
-        .hash = TLS_SHA1_ALGORITHM,
-    },
-    .pubkey = &rsa_algorithm,
-    .digest = &sha1_algorithm,
+	.code = {
+		.signature = TLS_RSA_ALGORITHM,
+		.hash = TLS_SHA1_ALGORITHM,
+	},
+	.pubkey = &rsa_algorithm,
+	.digest = &sha1_algorithm,
 };

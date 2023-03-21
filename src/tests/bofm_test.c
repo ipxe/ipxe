@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdio.h>
@@ -40,59 +40,61 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** Harvest test table */
 static struct {
-    struct bofm_global_header header;
-    struct bofm_section_header en_header;
-    struct bofm_en en;
-    struct bofm_section_header done;
-} __attribute__((packed)) bofmtab_harvest = {
-    .header = {
-        .magic = BOFM_IOAA_MAGIC,
-        .action = BOFM_ACTION_HVST,
-        .version = 0x01,
-        .level = 0x01,
-        .length = sizeof(bofmtab_harvest),
-        .profile = "Harvest test profile",
-    },
-    .en_header = {
-        .magic = BOFM_EN_MAGIC,
-        .length = sizeof(bofmtab_harvest.en),
-    },
-    .en = {
-        .options = (BOFM_EN_MAP_PFA | BOFM_EN_USAGE_HARVEST | BOFM_EN_RQ_HVST_ACTIVE),
-        .mport = 1,
-    },
-    .done = {
-        .magic = BOFM_DONE_MAGIC,
-    },
+	struct bofm_global_header header;
+	struct bofm_section_header en_header;
+	struct bofm_en en;
+	struct bofm_section_header done;
+} __attribute__ (( packed )) bofmtab_harvest = {
+	.header = {
+		.magic = BOFM_IOAA_MAGIC,
+		.action = BOFM_ACTION_HVST,
+		.version = 0x01,
+		.level = 0x01,
+		.length = sizeof ( bofmtab_harvest ),
+		.profile = "Harvest test profile",
+	},
+	.en_header = {
+		.magic = BOFM_EN_MAGIC,
+		.length = sizeof ( bofmtab_harvest.en ),
+	},
+	.en = {
+		.options = ( BOFM_EN_MAP_PFA | BOFM_EN_USAGE_HARVEST |
+			     BOFM_EN_RQ_HVST_ACTIVE ),
+		.mport = 1,
+	},
+	.done = {
+		.magic = BOFM_DONE_MAGIC,
+	},
 };
 
 /** Update test table */
 static struct {
-    struct bofm_global_header header;
-    struct bofm_section_header en_header;
-    struct bofm_en en;
-    struct bofm_section_header done;
-} __attribute__((packed)) bofmtab_update = {
-    .header = {
-        .magic = BOFM_IOAA_MAGIC,
-        .action = BOFM_ACTION_UPDT,
-        .version = 0x01,
-        .level = 0x01,
-        .length = sizeof(bofmtab_update),
-        .profile = "Update test profile",
-    },
-    .en_header = {
-        .magic = BOFM_EN_MAGIC,
-        .length = sizeof(bofmtab_update.en),
-    },
-    .en = {
-        .options = (BOFM_EN_MAP_PFA | BOFM_EN_EN_A | BOFM_EN_USAGE_ENTRY),
-        .mport = 1,
-        .mac_a = {0x02, 0x00, 0x69, 0x50, 0x58, 0x45},
-    },
-    .done = {
-        .magic = BOFM_DONE_MAGIC,
-    },
+	struct bofm_global_header header;
+	struct bofm_section_header en_header;
+	struct bofm_en en;
+	struct bofm_section_header done;
+} __attribute__ (( packed )) bofmtab_update = {
+	.header = {
+		.magic = BOFM_IOAA_MAGIC,
+		.action = BOFM_ACTION_UPDT,
+		.version = 0x01,
+		.level = 0x01,
+		.length = sizeof ( bofmtab_update ),
+		.profile = "Update test profile",
+	},
+	.en_header = {
+		.magic = BOFM_EN_MAGIC,
+		.length = sizeof ( bofmtab_update.en ),
+	},
+	.en = {
+		.options = ( BOFM_EN_MAP_PFA | BOFM_EN_EN_A |
+			     BOFM_EN_USAGE_ENTRY ),
+		.mport = 1,
+		.mac_a = { 0x02, 0x00, 0x69, 0x50, 0x58, 0x45 },
+	},
+	.done = {
+		.magic = BOFM_DONE_MAGIC,
+	},
 };
 
 /**
@@ -100,73 +102,73 @@ static struct {
  *
  * @v pci		PCI device
  */
-void bofm_test(struct pci_device* pci) {
-    int bofmrc;
+void bofm_test ( struct pci_device *pci ) {
+	int bofmrc;
 
-    printf("BOFMTEST using " PCI_FMT "\n", PCI_ARGS(pci));
+	printf ( "BOFMTEST using " PCI_FMT "\n", PCI_ARGS ( pci ) );
 
-    /* Perform harvest test */
-    printf("BOFMTEST performing harvest\n");
-    bofmtab_harvest.en.busdevfn = pci->busdevfn;
-    DBG_HDA(0, &bofmtab_harvest, sizeof(bofmtab_harvest));
-    bofmrc = bofm(virt_to_user(&bofmtab_harvest), pci);
-    printf("BOFMTEST harvest result %08x\n", bofmrc);
-    if (bofmtab_harvest.en.options & BOFM_EN_HVST) {
-        printf("BOFMTEST harvested MAC address %s\n",
-               eth_ntoa(&bofmtab_harvest.en.mac_a));
-    } else {
-        printf("BOFMTEST failed to harvest a MAC address\n");
-    }
-    DBG_HDA(0, &bofmtab_harvest, sizeof(bofmtab_harvest));
+	/* Perform harvest test */
+	printf ( "BOFMTEST performing harvest\n" );
+	bofmtab_harvest.en.busdevfn = pci->busdevfn;
+	DBG_HDA ( 0, &bofmtab_harvest, sizeof ( bofmtab_harvest ) );
+	bofmrc = bofm ( virt_to_user ( &bofmtab_harvest ), pci );
+	printf ( "BOFMTEST harvest result %08x\n", bofmrc );
+	if ( bofmtab_harvest.en.options & BOFM_EN_HVST ) {
+		printf ( "BOFMTEST harvested MAC address %s\n",
+			 eth_ntoa ( &bofmtab_harvest.en.mac_a ) );
+	} else {
+		printf ( "BOFMTEST failed to harvest a MAC address\n" );
+	}
+	DBG_HDA ( 0, &bofmtab_harvest, sizeof ( bofmtab_harvest ) );
 
-    /* Perform update test */
-    printf("BOFMTEST performing update\n");
-    bofmtab_update.en.busdevfn = pci->busdevfn;
-    DBG_HDA(0, &bofmtab_update, sizeof(bofmtab_update));
-    bofmrc = bofm(virt_to_user(&bofmtab_update), pci);
-    printf("BOFMTEST update result %08x\n", bofmrc);
-    if (bofmtab_update.en.options & BOFM_EN_CSM_SUCCESS) {
-        printf("BOFMTEST updated MAC address to %s\n",
-               eth_ntoa(&bofmtab_update.en.mac_a));
-    } else {
-        printf("BOFMTEST failed to update MAC address\n");
-    }
-    DBG_HDA(0, &bofmtab_update, sizeof(bofmtab_update));
+	/* Perform update test */
+	printf ( "BOFMTEST performing update\n" );
+	bofmtab_update.en.busdevfn = pci->busdevfn;
+	DBG_HDA ( 0, &bofmtab_update, sizeof ( bofmtab_update ) );
+	bofmrc = bofm ( virt_to_user ( &bofmtab_update ), pci );
+	printf ( "BOFMTEST update result %08x\n", bofmrc );
+	if ( bofmtab_update.en.options & BOFM_EN_CSM_SUCCESS ) {
+		printf ( "BOFMTEST updated MAC address to %s\n",
+			 eth_ntoa ( &bofmtab_update.en.mac_a ) );
+	} else {
+		printf ( "BOFMTEST failed to update MAC address\n" );
+	}
+	DBG_HDA ( 0, &bofmtab_update, sizeof ( bofmtab_update ) );
 }
 
 /**
  * Perform BOFM test at initialisation time
  *
  */
-static void bofm_test_init(void) {
-    struct pci_device pci;
-    int busdevfn = -1;
-    int rc;
+static void bofm_test_init ( void ) {
+	struct pci_device pci;
+	int busdevfn = -1;
+	int rc;
 
-    /* Uncomment the following line and specify the correct PCI
-     * bus:dev.fn address in order to perform a BOFM test at
-     * initialisation time.
-     */
-    // busdevfn = PCI_BUSDEVFN ( <bus>, <dev>, <fn> );
+	/* Uncomment the following line and specify the correct PCI
+	 * bus:dev.fn address in order to perform a BOFM test at
+	 * initialisation time.
+	 */
+	// busdevfn = PCI_BUSDEVFN ( <bus>, <dev>, <fn> );
 
-    /* Skip test if no PCI bus:dev.fn is defined */
-    if (busdevfn < 0)
-        return;
+	/* Skip test if no PCI bus:dev.fn is defined */
+	if ( busdevfn < 0 )
+		return;
 
-    /* Initialise PCI device */
-    memset(&pci, 0, sizeof(pci));
-    pci_init(&pci, busdevfn);
-    if ((rc = pci_read_config(&pci)) != 0) {
-        printf("BOFMTEST could not create " PCI_FMT " device: %s\n",
-               PCI_ARGS(&pci), strerror(rc));
-        return;
-    }
+	/* Initialise PCI device */
+	memset ( &pci, 0, sizeof ( pci ) );
+	pci_init ( &pci, busdevfn );
+	if ( ( rc = pci_read_config ( &pci ) ) != 0 ) {
+		printf ( "BOFMTEST could not create " PCI_FMT " device: %s\n",
+			 PCI_ARGS ( &pci ), strerror ( rc ) );
+		return;
+	}
 
-    /* Perform test */
-    bofm_test(&pci);
+	/* Perform test */
+	bofm_test ( &pci );
 }
 
 /** BOFM test initialisation function */
-struct init_fn bofm_test_init_fn __init_fn(INIT_NORMAL) = {
-    .initialise = bofm_test_init,
+struct init_fn bofm_test_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = bofm_test_init,
 };

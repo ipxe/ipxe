@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -37,20 +37,20 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v value		Value
  * @v isqrt		Integer square root of value
  */
-unsigned long isqrt(unsigned long value) {
-    unsigned long result = 0;
-    unsigned long bit = (1UL << ((8 * sizeof(bit)) - 2));
+unsigned long isqrt ( unsigned long value ) {
+	unsigned long result = 0;
+	unsigned long bit = ( 1UL << ( ( 8 * sizeof ( bit ) ) - 2 ) );
 
-    while (bit > value)
-        bit >>= 2;
-    while (bit) {
-        if (value >= (result + bit)) {
-            value -= (result + bit);
-            result = ((result >> 1) + bit);
-        } else {
-            result >>= 1;
-        }
-        bit >>= 2;
-    }
-    return result;
+	while ( bit > value )
+		bit >>= 2;
+	while ( bit ) {
+		if ( value >= ( result + bit ) ) {
+			value -= ( result + bit );
+			result = ( ( result >> 1 ) + bit );
+		} else {
+			result >>= 1;
+		}
+		bit >>= 2;
+	}
+	return result;
 }

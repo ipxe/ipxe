@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <errno.h>
@@ -60,16 +60,16 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** CPUID setting tag register indices */
 enum cpuid_registers {
-    CPUID_EAX = 0,
-    CPUID_EBX = 1,
-    CPUID_ECX = 2,
-    CPUID_EDX = 3,
+	CPUID_EAX = 0,
+	CPUID_EBX = 1,
+	CPUID_ECX = 2,
+	CPUID_EDX = 3,
 };
 
 /** CPUID setting tag flags */
 enum cpuid_flags {
-    CPUID_LITTLE_ENDIAN = 0x00800000UL,
-    CPUID_USE_SUBFUNCTION = 0x00400000UL,
+	CPUID_LITTLE_ENDIAN = 0x00800000UL,
+	CPUID_USE_SUBFUNCTION = 0x00400000UL,
 };
 
 /**
@@ -85,12 +85,12 @@ enum cpuid_flags {
  * @v register4		Fourth register in register array (or zero, if empty)
  * @ret tag		Setting tag
  */
-#define CPUID_TAG(function, subfunction, flags, num_registers, \
-                  register1, register2, register3, register4)  \
-    ((function) | ((subfunction) << 24) | (flags) |            \
-     (((num_registers)-1) << 16) |                             \
-     ((register1) << 8) | ((register2) << 10) |                \
-     ((register3) << 12) | ((register4) << 14))
+#define CPUID_TAG( function, subfunction, flags, num_registers,		\
+		   register1, register2, register3, register4 )		\
+	( (function) | ( (subfunction) << 24 ) | (flags) |		\
+	  ( ( (num_registers) - 1 ) << 16 ) |				\
+	  ( (register1) << 8 ) | ( (register2) << 10 ) |		\
+	  ( (register3) << 12 ) | ( (register4) << 14 ) )
 
 /**
  * Extract starting function number from CPUID setting tag
@@ -98,7 +98,7 @@ enum cpuid_flags {
  * @v tag		Setting tag
  * @ret function	Starting function number
  */
-#define CPUID_FUNCTION(tag) ((tag)&0x800000ffUL)
+#define CPUID_FUNCTION( tag ) ( (tag) & 0x800000ffUL )
 
 /**
  * Extract subfunction number from CPUID setting tag
@@ -106,7 +106,7 @@ enum cpuid_flags {
  * @v tag		Setting tag
  * @ret subfunction	Subfunction number
  */
-#define CPUID_SUBFUNCTION(tag) (((tag) >> 24) & 0x7f)
+#define CPUID_SUBFUNCTION( tag ) ( ( (tag) >> 24 ) & 0x7f )
 
 /**
  * Extract register array from CPUID setting tag
@@ -114,7 +114,7 @@ enum cpuid_flags {
  * @v tag		Setting tag
  * @ret registers	Register array
  */
-#define CPUID_REGISTERS(tag) (((tag) >> 8) & 0xff)
+#define CPUID_REGISTERS( tag ) ( ( (tag) >> 8 ) & 0xff )
 
 /**
  * Extract number of registers from CPUID setting tag
@@ -122,7 +122,7 @@ enum cpuid_flags {
  * @v tag		Setting tag
  * @ret num_registers	Number of registers within register array
  */
-#define CPUID_NUM_REGISTERS(tag) ((((tag) >> 16) & 0x3) + 1)
+#define CPUID_NUM_REGISTERS( tag ) ( ( ( (tag) >> 16 ) & 0x3 ) + 1 )
 
 /** CPUID settings scope */
 static const struct settings_scope cpuid_settings_scope;
@@ -134,9 +134,10 @@ static const struct settings_scope cpuid_settings_scope;
  * @v setting		Setting
  * @ret applies		Setting applies within this settings block
  */
-static int cpuid_settings_applies(struct settings* settings __unused,
-                                  const struct setting* setting) {
-    return (setting->scope == &cpuid_settings_scope);
+static int cpuid_settings_applies ( struct settings *settings __unused,
+				    const struct setting *setting ) {
+
+	return ( setting->scope == &cpuid_settings_scope );
 }
 
 /**
@@ -148,117 +149,118 @@ static int cpuid_settings_applies(struct settings* settings __unused,
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int cpuid_settings_fetch(struct settings* settings,
-                                struct setting* setting,
-                                void* data, size_t len) {
-    uint32_t function;
-    uint32_t subfunction;
-    uint32_t num_functions;
-    uint32_t registers;
-    uint32_t num_registers;
-    uint32_t buf[4];
-    uint32_t output;
-    size_t frag_len;
-    size_t result_len = 0;
-    int rc;
+static int cpuid_settings_fetch ( struct settings *settings,
+				  struct setting *setting,
+				  void *data, size_t len ) {
+	uint32_t function;
+	uint32_t subfunction;
+	uint32_t num_functions;
+	uint32_t registers;
+	uint32_t num_registers;
+	uint32_t buf[4];
+	uint32_t output;
+	size_t frag_len;
+	size_t result_len = 0;
+	int rc;
 
-    /* Call each function in turn */
-    function = CPUID_FUNCTION(setting->tag);
-    subfunction = CPUID_SUBFUNCTION(setting->tag);
-    if (setting->tag & CPUID_USE_SUBFUNCTION) {
-        num_functions = 1;
-    } else {
-        num_functions = (subfunction + 1);
-        subfunction = 0;
-    }
-    for (; num_functions--; function++) {
-        /* Fail if this function is not supported */
-        if ((rc = cpuid_supported(function)) != 0) {
-            DBGC(settings, "CPUID function %#08x not supported: "
-                           "%s\n", function, strerror(rc));
-            return rc;
-        }
+	/* Call each function in turn */
+	function = CPUID_FUNCTION ( setting->tag );
+	subfunction = CPUID_SUBFUNCTION ( setting->tag );
+	if ( setting->tag & CPUID_USE_SUBFUNCTION ) {
+		num_functions = 1;
+	} else {
+		num_functions = ( subfunction + 1 );
+		subfunction = 0;
+	}
+	for ( ; num_functions-- ; function++ ) {
 
-        /* Issue CPUID */
-        cpuid(function, subfunction, &buf[CPUID_EAX],
-              &buf[CPUID_EBX], &buf[CPUID_ECX], &buf[CPUID_EDX]);
-        DBGC(settings, "CPUID %#08x:%x => %#08x:%#08x:%#08x:%#08x\n",
-             function, subfunction, buf[0], buf[1], buf[2], buf[3]);
+		/* Fail if this function is not supported */
+		if ( ( rc = cpuid_supported ( function ) ) != 0 ) {
+			DBGC ( settings, "CPUID function %#08x not supported: "
+			       "%s\n", function, strerror ( rc ) );
+			return rc;
+		}
 
-        /* Copy results to buffer */
-        registers = CPUID_REGISTERS(setting->tag);
-        num_registers = CPUID_NUM_REGISTERS(setting->tag);
-        for (; num_registers--; registers >>= 2) {
-            output = buf[registers & 0x3];
-            if (!(setting->tag & CPUID_LITTLE_ENDIAN))
-                output = cpu_to_be32(output);
-            frag_len = sizeof(output);
-            if (frag_len > len)
-                frag_len = len;
-            memcpy(data, &output, frag_len);
-            data += frag_len;
-            len -= frag_len;
-            result_len += sizeof(output);
-        }
-    }
+		/* Issue CPUID */
+		cpuid ( function, subfunction, &buf[CPUID_EAX],
+			&buf[CPUID_EBX], &buf[CPUID_ECX], &buf[CPUID_EDX] );
+		DBGC ( settings, "CPUID %#08x:%x => %#08x:%#08x:%#08x:%#08x\n",
+		       function, subfunction, buf[0], buf[1], buf[2], buf[3] );
 
-    /* Set type if not already specified */
-    if (!setting->type)
-        setting->type = &setting_type_hexraw;
+		/* Copy results to buffer */
+		registers = CPUID_REGISTERS ( setting->tag );
+		num_registers = CPUID_NUM_REGISTERS ( setting->tag );
+		for ( ; num_registers-- ; registers >>= 2 ) {
+			output = buf[ registers & 0x3 ];
+			if ( ! ( setting->tag & CPUID_LITTLE_ENDIAN ) )
+				output = cpu_to_be32 ( output );
+			frag_len = sizeof ( output );
+			if ( frag_len > len )
+				frag_len = len;
+			memcpy ( data, &output, frag_len );
+			data += frag_len;
+			len -= frag_len;
+			result_len += sizeof ( output );
+		}
+	}
 
-    return result_len;
+	/* Set type if not already specified */
+	if ( ! setting->type )
+		setting->type = &setting_type_hexraw;
+
+	return result_len;
 }
 
 /** CPUID settings operations */
 static struct settings_operations cpuid_settings_operations = {
-    .applies = cpuid_settings_applies,
-    .fetch = cpuid_settings_fetch,
+	.applies = cpuid_settings_applies,
+	.fetch = cpuid_settings_fetch,
 };
 
 /** CPUID settings */
 static struct settings cpuid_settings = {
-    .refcnt = NULL,
-    .siblings = LIST_HEAD_INIT(cpuid_settings.siblings),
-    .children = LIST_HEAD_INIT(cpuid_settings.children),
-    .op = &cpuid_settings_operations,
-    .default_scope = &cpuid_settings_scope,
+	.refcnt = NULL,
+	.siblings = LIST_HEAD_INIT ( cpuid_settings.siblings ),
+	.children = LIST_HEAD_INIT ( cpuid_settings.children ),
+	.op = &cpuid_settings_operations,
+	.default_scope = &cpuid_settings_scope,
 };
 
 /** Initialise CPUID settings */
-static void cpuid_settings_init(void) {
-    int rc;
+static void cpuid_settings_init ( void ) {
+	int rc;
 
-    if ((rc = register_settings(&cpuid_settings, NULL,
-                                "cpuid")) != 0) {
-        DBG("CPUID could not register settings: %s\n",
-            strerror(rc));
-        return;
-    }
+	if ( ( rc = register_settings ( &cpuid_settings, NULL,
+					"cpuid" ) ) != 0 ) {
+		DBG ( "CPUID could not register settings: %s\n",
+		      strerror ( rc ) );
+		return;
+	}
 }
 
 /** CPUID settings initialiser */
-struct init_fn cpuid_settings_init_fn __init_fn(INIT_NORMAL) = {
-    .initialise = cpuid_settings_init,
+struct init_fn cpuid_settings_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = cpuid_settings_init,
 };
 
 /** CPU vendor setting */
-const struct setting cpuvendor_setting __setting(SETTING_HOST_EXTRA,
-                                                 cpuvendor) = {
-    .name = "cpuvendor",
-    .description = "CPU vendor",
-    .tag = CPUID_TAG(CPUID_VENDOR_ID, 0, CPUID_LITTLE_ENDIAN, 3,
-                     CPUID_EBX, CPUID_EDX, CPUID_ECX, 0),
-    .type = &setting_type_string,
-    .scope = &cpuid_settings_scope,
+const struct setting cpuvendor_setting __setting ( SETTING_HOST_EXTRA,
+						   cpuvendor ) = {
+	.name = "cpuvendor",
+	.description = "CPU vendor",
+	.tag = CPUID_TAG ( CPUID_VENDOR_ID, 0, CPUID_LITTLE_ENDIAN, 3,
+			   CPUID_EBX, CPUID_EDX, CPUID_ECX, 0 ),
+	.type = &setting_type_string,
+	.scope = &cpuid_settings_scope,
 };
 
 /** CPU model setting */
-const struct setting cpumodel_setting __setting(SETTING_HOST_EXTRA,
-                                                cpumodel) = {
-    .name = "cpumodel",
-    .description = "CPU model",
-    .tag = CPUID_TAG(CPUID_MODEL, 2, CPUID_LITTLE_ENDIAN, 4,
-                     CPUID_EAX, CPUID_EBX, CPUID_ECX, CPUID_EDX),
-    .type = &setting_type_string,
-    .scope = &cpuid_settings_scope,
+const struct setting cpumodel_setting __setting ( SETTING_HOST_EXTRA,
+						  cpumodel ) = {
+	.name = "cpumodel",
+	.description = "CPU model",
+	.tag = CPUID_TAG ( CPUID_MODEL, 2, CPUID_LITTLE_ENDIAN, 4,
+			   CPUID_EAX, CPUID_EBX, CPUID_ECX, CPUID_EDX ),
+	.type = &setting_type_string,
+	.scope = &cpuid_settings_scope,
 };

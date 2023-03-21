@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   EFI VLAN Config protocol is to provide manageability interface for VLAN configuration.
 
@@ -12,16 +10,14 @@
 **/
 
 #ifndef __EFI_VLANCONFIG_PROTOCOL_H__
-    #define __EFI_VLANCONFIG_PROTOCOL_H__
+#define __EFI_VLANCONFIG_PROTOCOL_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #define EFI_VLAN_CONFIG_PROTOCOL_GUID                      \
-        {                                                      \
-            0x9e23d768, 0xd2f3, 0x4366, {                      \
-                0x9f, 0xc3, 0x3a, 0x7a, 0xba, 0x86, 0x43, 0x74 \
-            }                                                  \
-        }
+#define EFI_VLAN_CONFIG_PROTOCOL_GUID \
+  { \
+    0x9e23d768, 0xd2f3, 0x4366, {0x9f, 0xc3, 0x3a, 0x7a, 0xba, 0x86, 0x43, 0x74 } \
+  }
 
 typedef struct _EFI_VLAN_CONFIG_PROTOCOL EFI_VLAN_CONFIG_PROTOCOL;
 
@@ -29,8 +25,8 @@ typedef struct _EFI_VLAN_CONFIG_PROTOCOL EFI_VLAN_CONFIG_PROTOCOL;
 /// EFI_VLAN_FIND_DATA
 ///
 typedef struct {
-    UINT16 VlanId;  ///< Vlan Identifier.
-    UINT8 Priority; ///< Priority of this VLAN.
+  UINT16    VlanId;           ///< Vlan Identifier.
+  UINT8     Priority;         ///< Priority of this VLAN.
 } EFI_VLAN_FIND_DATA;
 
 /**
@@ -64,10 +60,13 @@ typedef struct {
   @retval EFI_OUT_OF_RESOURCES   There is not enough system memory to perform the registration.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_SET)(
-    IN EFI_VLAN_CONFIG_PROTOCOL* This,
-    IN UINT16 VlanId,
-    IN UINT8 Priority);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_VLAN_CONFIG_SET)(
+  IN  EFI_VLAN_CONFIG_PROTOCOL     *This,
+  IN  UINT16                       VlanId,
+  IN  UINT8                        Priority
+  );
 
 /**
   Find configuration information for specified VLAN or all configured VLANs.
@@ -88,11 +87,14 @@ typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_SET)(
   @retval EFI_NOT_FOUND          No matching VLAN is found.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_FIND)(
-    IN EFI_VLAN_CONFIG_PROTOCOL* This,
-    IN UINT16* VlanId OPTIONAL,
-    OUT UINT16* NumberOfVlan,
-    OUT EFI_VLAN_FIND_DATA** Entries);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_VLAN_CONFIG_FIND)(
+  IN  EFI_VLAN_CONFIG_PROTOCOL     *This,
+  IN  UINT16                       *VlanId  OPTIONAL,
+  OUT UINT16                       *NumberOfVlan,
+  OUT EFI_VLAN_FIND_DATA           **Entries
+  );
 
 /**
   Remove the configured VLAN device.
@@ -111,9 +113,12 @@ typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_FIND)(
   @retval EFI_NOT_FOUND          The to-be-removed VLAN does not exist.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_REMOVE)(
-    IN EFI_VLAN_CONFIG_PROTOCOL* This,
-    IN UINT16 VlanId);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_VLAN_CONFIG_REMOVE)(
+  IN  EFI_VLAN_CONFIG_PROTOCOL     *This,
+  IN  UINT16                       VlanId
+  );
 
 ///
 /// EFI_VLAN_CONFIG_PROTOCOL
@@ -121,11 +126,11 @@ typedef EFI_STATUS(EFIAPI* EFI_VLAN_CONFIG_REMOVE)(
 /// VLAN tagging implementation is IEEE802.1Q.
 ///
 struct _EFI_VLAN_CONFIG_PROTOCOL {
-    EFI_VLAN_CONFIG_SET Set;
-    EFI_VLAN_CONFIG_FIND Find;
-    EFI_VLAN_CONFIG_REMOVE Remove;
+  EFI_VLAN_CONFIG_SET       Set;
+  EFI_VLAN_CONFIG_FIND      Find;
+  EFI_VLAN_CONFIG_REMOVE    Remove;
 };
 
-extern EFI_GUID gEfiVlanConfigProtocolGuid;
+extern EFI_GUID  gEfiVlanConfigProtocolGuid;
 
 #endif

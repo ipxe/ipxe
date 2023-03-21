@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -40,11 +40,11 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @ret time		Time, in seconds
  */
-static time_t linux_now(void) {
-    struct timeval now;
+static time_t linux_now ( void ) {
+	struct timeval now;
 
-    linux_gettimeofday(&now, NULL);
-    return now.tv_sec;
+	linux_gettimeofday ( &now, NULL );
+	return now.tv_sec;
 }
 
-PROVIDE_TIME(linux, time_now, linux_now);
+PROVIDE_TIME ( linux, time_now, linux_now );

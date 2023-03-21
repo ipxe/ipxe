@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <stdlib.h>
@@ -59,51 +59,51 @@ static struct xfer_metadata dummy_metadata;
  * @v args		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int xfer_vredirect(struct interface* intf, int type, va_list args) {
-    struct interface tmp = INTF_INIT(null_intf_desc);
-    struct interface* dest;
-    xfer_vredirect_TYPE(void*)* op =
-        intf_get_dest_op_no_passthru(intf, xfer_vredirect, &dest);
-    void* object = intf_object(dest);
-    int rc;
+int xfer_vredirect ( struct interface *intf, int type, va_list args ) {
+	struct interface tmp = INTF_INIT ( null_intf_desc );
+	struct interface *dest;
+	xfer_vredirect_TYPE ( void * ) *op =
+		intf_get_dest_op_no_passthru ( intf, xfer_vredirect, &dest );
+	void *object = intf_object ( dest );
+	int rc;
 
-    DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " redirect\n",
-         INTF_INTF_DBG(intf, dest));
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " redirect\n",
+	       INTF_INTF_DBG ( intf, dest ) );
 
-    if (op) {
-        rc = op(object, type, args);
-    } else {
-        /* Default is to reopen the interface as instructed,
-         * then send xfer_window_changed() messages to both
-         * new child and parent interfaces.  Since our
-         * original child interface is likely to be closed and
-         * unplugged as a result of the call to
-         * xfer_vreopen(), we create a temporary interface in
-         * order to be able to send xfer_window_changed() to
-         * the parent.
-         *
-         * If redirection fails, then send intf_close() to the
-         * parent interface.
-         */
-        intf_plug(&tmp, dest);
-        rc = xfer_vreopen(dest, type, args);
-        if (rc == 0) {
-            xfer_window_changed(dest);
-            xfer_window_changed(&tmp);
-        } else {
-            intf_close(&tmp, rc);
-        }
-        intf_unplug(&tmp);
-    }
+	if ( op ) {
+		rc = op ( object, type, args );
+	} else {
+		/* Default is to reopen the interface as instructed,
+		 * then send xfer_window_changed() messages to both
+		 * new child and parent interfaces.  Since our
+		 * original child interface is likely to be closed and
+		 * unplugged as a result of the call to
+		 * xfer_vreopen(), we create a temporary interface in
+		 * order to be able to send xfer_window_changed() to
+		 * the parent.
+		 *
+		 * If redirection fails, then send intf_close() to the
+		 * parent interface.
+		 */
+		intf_plug ( &tmp, dest );
+		rc = xfer_vreopen ( dest, type, args );
+		if ( rc == 0 ) {
+			xfer_window_changed ( dest );
+			xfer_window_changed ( &tmp );
+		} else {
+			intf_close ( &tmp, rc );
+		}
+		intf_unplug ( &tmp );
+	}
 
-    if (rc != 0) {
-        DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " redirect "
-                             "failed: %s\n", INTF_INTF_DBG(intf, dest),
-             strerror(rc));
-    }
+	if ( rc != 0 ) {
+		DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " redirect "
+		       "failed: %s\n", INTF_INTF_DBG ( intf, dest ),
+		       strerror ( rc ) );
+	}
 
-    intf_put(dest);
-    return rc;
+	intf_put ( dest );
+	return rc;
 }
 
 /**
@@ -112,22 +112,22 @@ int xfer_vredirect(struct interface* intf, int type, va_list args) {
  * @v intf		Data transfer interface
  * @ret len		Length of window
  */
-size_t xfer_window(struct interface* intf) {
-    struct interface* dest;
-    xfer_window_TYPE(void*)* op =
-        intf_get_dest_op(intf, xfer_window, &dest);
-    void* object = intf_object(dest);
-    size_t len;
+size_t xfer_window ( struct interface *intf ) {
+	struct interface *dest;
+	xfer_window_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, xfer_window, &dest );
+	void *object = intf_object ( dest );
+	size_t len;
 
-    if (op) {
-        len = op(object);
-    } else {
-        /* Default is to provide an unlimited window */
-        len = ~((size_t)0);
-    }
+	if ( op ) {
+		len = op ( object );
+	} else {
+		/* Default is to provide an unlimited window */
+		len = ~( ( size_t ) 0 );
+	}
 
-    intf_put(dest);
-    return len;
+	intf_put ( dest );
+	return len;
 }
 
 /**
@@ -142,8 +142,9 @@ size_t xfer_window(struct interface* intf) {
  * assume that the flow control window will have changed without
  * generating an xfer_window_changed() message.
  */
-void xfer_window_changed(struct interface* intf) {
-    intf_poke(intf, xfer_window_changed);
+void xfer_window_changed ( struct interface *intf ) {
+
+	intf_poke ( intf, xfer_window_changed );
 }
 
 /**
@@ -153,32 +154,32 @@ void xfer_window_changed(struct interface* intf) {
  * @v len		I/O buffer payload length
  * @ret iobuf		I/O buffer
  */
-struct io_buffer* xfer_alloc_iob(struct interface* intf, size_t len) {
-    struct interface* dest;
-    xfer_alloc_iob_TYPE(void*)* op =
-        intf_get_dest_op(intf, xfer_alloc_iob, &dest);
-    void* object = intf_object(dest);
-    struct io_buffer* iobuf;
+struct io_buffer * xfer_alloc_iob ( struct interface *intf, size_t len ) {
+	struct interface *dest;
+	xfer_alloc_iob_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, xfer_alloc_iob, &dest );
+	void *object = intf_object ( dest );
+	struct io_buffer *iobuf;
 
-    DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " alloc_iob %zd\n",
-         INTF_INTF_DBG(intf, dest), len);
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " alloc_iob %zd\n",
+	       INTF_INTF_DBG ( intf, dest ), len );
 
-    if (op) {
-        iobuf = op(object, len);
-    } else {
-        /* Default is to allocate an I/O buffer with no
-         * reserved space.
-         */
-        iobuf = alloc_iob(len);
-    }
+	if ( op ) {
+		iobuf = op ( object, len );
+	} else {
+		/* Default is to allocate an I/O buffer with no
+		 * reserved space.
+		 */
+		iobuf = alloc_iob ( len );
+	}
 
-    if (!iobuf) {
-        DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " alloc_iob "
-                             "failed\n", INTF_INTF_DBG(intf, dest));
-    }
+	if ( ! iobuf ) {
+		DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " alloc_iob "
+		       "failed\n", INTF_INTF_DBG ( intf, dest ) );
+	}
 
-    intf_put(dest);
-    return iobuf;
+	intf_put ( dest );
+	return iobuf;
 }
 
 /**
@@ -189,33 +190,34 @@ struct io_buffer* xfer_alloc_iob(struct interface* intf, size_t len) {
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-int xfer_deliver(struct interface* intf,
-                 struct io_buffer* iobuf,
-                 struct xfer_metadata* meta) {
-    struct interface* dest;
-    xfer_deliver_TYPE(void*)* op =
-        intf_get_dest_op(intf, xfer_deliver, &dest);
-    void* object = intf_object(dest);
-    int rc;
+int xfer_deliver ( struct interface *intf,
+		   struct io_buffer *iobuf,
+		   struct xfer_metadata *meta ) {
+	struct interface *dest;
+	xfer_deliver_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, xfer_deliver, &dest );
+	void *object = intf_object ( dest );
+	int rc;
 
-    DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " deliver %zd\n",
-         INTF_INTF_DBG(intf, dest), iob_len(iobuf));
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " deliver %zd\n",
+	       INTF_INTF_DBG ( intf, dest ), iob_len ( iobuf ) );
 
-    if (op) {
-        rc = op(object, iobuf, meta);
-    } else {
-        /* Default is to discard the I/O buffer */
-        free_iob(iobuf);
-        rc = -EPIPE;
-    }
+	if ( op ) {
+		rc = op ( object, iobuf, meta );
+	} else {
+		/* Default is to discard the I/O buffer */
+		free_iob ( iobuf );
+		rc = -EPIPE;
+	}
 
-    if (rc != 0) {
-        DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " deliver failed: %s\n",
-             INTF_INTF_DBG(intf, dest), strerror(rc));
-    }
+	if ( rc != 0 ) {
+		DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT
+		       " deliver failed: %s\n",
+		       INTF_INTF_DBG ( intf, dest ), strerror ( rc ) );
+	}
 
-    intf_put(dest);
-    return rc;
+	intf_put ( dest );
+	return rc;
 }
 
 /*****************************************************************************
@@ -232,14 +234,14 @@ int xfer_deliver(struct interface* intf,
  * @v ...		Remaining arguments depend upon location type
  * @ret rc		Return status code
  */
-int xfer_redirect(struct interface* intf, int type, ...) {
-    va_list args;
-    int rc;
+int xfer_redirect ( struct interface *intf, int type, ... ) {
+	va_list args;
+	int rc;
 
-    va_start(args, type);
-    rc = xfer_vredirect(intf, type, args);
-    va_end(args);
-    return rc;
+	va_start ( args, type );
+	rc = xfer_vredirect ( intf, type, args );
+	va_end ( args );
+	return rc;
 }
 
 /**
@@ -249,8 +251,8 @@ int xfer_redirect(struct interface* intf, int type, ...) {
  * @v iobuf		Datagram I/O buffer
  * @ret rc		Return status code
  */
-int xfer_deliver_iob(struct interface* intf, struct io_buffer* iobuf) {
-    return xfer_deliver(intf, iobuf, &dummy_metadata);
+int xfer_deliver_iob ( struct interface *intf, struct io_buffer *iobuf ) {
+	return xfer_deliver ( intf, iobuf, &dummy_metadata );
 }
 
 /**
@@ -262,16 +264,16 @@ int xfer_deliver_iob(struct interface* intf, struct io_buffer* iobuf) {
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-int xfer_deliver_raw_meta(struct interface* intf, const void* data,
-                          size_t len, struct xfer_metadata* meta) {
-    struct io_buffer* iobuf;
+int xfer_deliver_raw_meta ( struct interface *intf, const void *data,
+			    size_t len, struct xfer_metadata *meta ) {
+	struct io_buffer *iobuf;
 
-    iobuf = xfer_alloc_iob(intf, len);
-    if (!iobuf)
-        return -ENOMEM;
+	iobuf = xfer_alloc_iob ( intf, len );
+	if ( ! iobuf )
+		return -ENOMEM;
 
-    memcpy(iob_put(iobuf, len), data, len);
-    return xfer_deliver(intf, iobuf, meta);
+	memcpy ( iob_put ( iobuf, len ), data, len );
+	return xfer_deliver ( intf, iobuf, meta );
 }
 
 /**
@@ -282,8 +284,8 @@ int xfer_deliver_raw_meta(struct interface* intf, const void* data,
  * @v len		Length of data
  * @ret rc		Return status code
  */
-int xfer_deliver_raw(struct interface* intf, const void* data, size_t len) {
-    return xfer_deliver_raw_meta(intf, data, len, &dummy_metadata);
+int xfer_deliver_raw ( struct interface *intf, const void *data, size_t len ) {
+	return xfer_deliver_raw_meta ( intf, data, len, &dummy_metadata );
 }
 
 /**
@@ -294,30 +296,30 @@ int xfer_deliver_raw(struct interface* intf, const void* data, size_t len) {
  * @v args		Arguments corresponding to the format string
  * @ret rc		Return status code
  */
-int xfer_vprintf(struct interface* intf, const char* format,
-                 va_list args) {
-    va_list args_tmp;
-    char* buf;
-    int len;
-    int rc;
+int xfer_vprintf ( struct interface *intf, const char *format,
+		   va_list args ) {
+	va_list args_tmp;
+	char *buf;
+	int len;
+	int rc;
 
-    /* Create temporary string */
-    va_copy(args_tmp, args);
-    len = vasprintf(&buf, format, args);
-    va_end(args_tmp);
-    if (len < 0) {
-        rc = len;
-        goto err_asprintf;
-    }
+	/* Create temporary string */
+	va_copy ( args_tmp, args );
+	len = vasprintf ( &buf, format, args );
+	va_end ( args_tmp );
+	if ( len < 0 ) {
+		rc = len;
+		goto err_asprintf;
+	}
 
-    /* Transmit string */
-    if ((rc = xfer_deliver_raw(intf, buf, len)) != 0)
-        goto err_deliver;
+	/* Transmit string */
+	if ( ( rc = xfer_deliver_raw ( intf, buf, len ) ) != 0 )
+		goto err_deliver;
 
-err_deliver:
-    free(buf);
-err_asprintf:
-    return rc;
+ err_deliver:
+	free ( buf );
+ err_asprintf:
+	return rc;
 }
 
 /**
@@ -328,14 +330,14 @@ err_asprintf:
  * @v ...		Arguments corresponding to the format string
  * @ret rc		Return status code
  */
-int xfer_printf(struct interface* intf, const char* format, ...) {
-    va_list args;
-    int rc;
+int xfer_printf ( struct interface *intf, const char *format, ... ) {
+	va_list args;
+	int rc;
 
-    va_start(args, format);
-    rc = xfer_vprintf(intf, format, args);
-    va_end(args);
-    return rc;
+	va_start ( args, format );
+	rc = xfer_vprintf ( intf, format, args );
+	va_end ( args );
+	return rc;
 }
 
 /**
@@ -345,22 +347,22 @@ int xfer_printf(struct interface* intf, const char* format, ...) {
  * @v offset		Offset to new position
  * @ret rc		Return status code
  */
-int xfer_seek(struct interface* intf, off_t offset) {
-    struct io_buffer* iobuf;
-    struct xfer_metadata meta = {
-        .flags = XFER_FL_ABS_OFFSET,
-        .offset = offset,
-    };
+int xfer_seek ( struct interface *intf, off_t offset ) {
+	struct io_buffer *iobuf;
+	struct xfer_metadata meta = {
+		.flags = XFER_FL_ABS_OFFSET,
+		.offset = offset,
+	};
 
-    DBGC(INTF_COL(intf), "INTF " INTF_FMT " seek to %ld\n",
-         INTF_DBG(intf), offset);
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " seek to %ld\n",
+	       INTF_DBG ( intf ), offset );
 
-    /* Allocate and send a zero-length data buffer */
-    iobuf = xfer_alloc_iob(intf, 0);
-    if (!iobuf)
-        return -ENOMEM;
+	/* Allocate and send a zero-length data buffer */
+	iobuf = xfer_alloc_iob ( intf, 0 );
+	if ( ! iobuf )
+		return -ENOMEM;
 
-    return xfer_deliver(intf, iobuf, &meta);
+	return xfer_deliver ( intf, iobuf, &meta );
 }
 
 /**
@@ -371,25 +373,25 @@ int xfer_seek(struct interface* intf, off_t offset) {
  * @v len		Length of data
  * @ret rc		Return status code
  */
-int xfer_check_order(struct xfer_metadata* meta, size_t* pos, size_t len) {
-    size_t new_pos;
+int xfer_check_order ( struct xfer_metadata *meta, size_t *pos, size_t len ) {
+	size_t new_pos;
 
-    /* Allow out-of-order zero-length packets (as used by xfer_seek()) */
-    if (len == 0)
-        return 0;
+	/* Allow out-of-order zero-length packets (as used by xfer_seek()) */
+	if ( len == 0 )
+		return 0;
 
-    /* Calculate position of this delivery */
-    new_pos = *pos;
-    if (meta->flags & XFER_FL_ABS_OFFSET)
-        new_pos = 0;
-    new_pos += meta->offset;
+	/* Calculate position of this delivery */
+	new_pos = *pos;
+	if ( meta->flags & XFER_FL_ABS_OFFSET )
+		new_pos = 0;
+	new_pos += meta->offset;
 
-    /* Fail if delivery position is not equal to current position */
-    if (new_pos != *pos)
-        return -EPROTO;
+	/* Fail if delivery position is not equal to current position */
+	if ( new_pos != *pos )
+		return -EPROTO;
 
-    /* Update current position */
-    *pos += len;
+	/* Update current position */
+	*pos += len;
 
-    return 0;
+	return 0;
 }

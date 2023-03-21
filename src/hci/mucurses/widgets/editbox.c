@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <assert.h>
@@ -47,17 +47,17 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v width		Width
  * @v flags		Flags
  */
-void init_editbox(struct edit_box* box, char* buf, size_t len,
-                  WINDOW* win, unsigned int row, unsigned int col,
-                  unsigned int width, unsigned int flags) {
-    memset(box, 0, sizeof(*box));
-    init_editstring(&box->string, buf, len);
-    box->string.cursor = strlen(buf);
-    box->win = (win ? win : stdscr);
-    box->row = row;
-    box->col = col;
-    box->width = width;
-    box->flags = flags;
+void init_editbox ( struct edit_box *box, char *buf, size_t len,
+		    WINDOW *win, unsigned int row, unsigned int col,
+		    unsigned int width, unsigned int flags ) {
+	memset ( box, 0, sizeof ( *box ) );
+	init_editstring ( &box->string, buf, len );
+	box->string.cursor = strlen ( buf );
+	box->win = ( win ? win : stdscr );
+	box->row = row;
+	box->col = col;
+	box->width = width;
+	box->flags = flags;
 }
 
 /**
@@ -66,42 +66,42 @@ void init_editbox(struct edit_box* box, char* buf, size_t len,
  * @v box		Editable text box widget
  *
  */
-void draw_editbox(struct edit_box* box) {
-    size_t width = box->width;
-    char buf[width + 1];
-    signed int cursor_offset, underflow, overflow, first;
-    size_t len;
+void draw_editbox ( struct edit_box *box ) {
+	size_t width = box->width;
+	char buf[ width + 1 ];
+	signed int cursor_offset, underflow, overflow, first;
+	size_t len;
 
-    /* Adjust starting offset so that cursor remains within box */
-    cursor_offset = (box->string.cursor - box->first);
-    underflow = (EDITBOX_MIN_CHARS - cursor_offset);
-    overflow = (cursor_offset - (width - 1));
-    first = box->first;
-    if (underflow > 0) {
-        first -= underflow;
-        if (first < 0)
-            first = 0;
-    } else if (overflow > 0) {
-        first += overflow;
-    }
-    box->first = first;
-    cursor_offset = (box->string.cursor - first);
+	/* Adjust starting offset so that cursor remains within box */
+	cursor_offset = ( box->string.cursor - box->first );
+	underflow = ( EDITBOX_MIN_CHARS - cursor_offset );
+	overflow = ( cursor_offset - ( width - 1 ) );
+	first = box->first;
+	if ( underflow > 0 ) {
+		first -= underflow;
+		if ( first < 0 )
+			first = 0;
+	} else if ( overflow > 0 ) {
+		first += overflow;
+	}
+	box->first = first;
+	cursor_offset = ( box->string.cursor - first );
 
-    /* Construct underscore-padded string portion */
-    memset(buf, '_', width);
-    buf[width] = '\0';
-    len = (strlen(box->string.buf) - first);
-    if (len > width)
-        len = width;
-    if (box->flags & EDITBOX_STARS) {
-        memset(buf, '*', len);
-    } else {
-        memcpy(buf, (box->string.buf + first), len);
-    }
+	/* Construct underscore-padded string portion */
+	memset ( buf, '_', width );
+	buf[width] = '\0';
+	len = ( strlen ( box->string.buf ) - first );
+	if ( len > width )
+		len = width;
+	if ( box->flags & EDITBOX_STARS ) {
+		memset ( buf, '*', len );
+	} else {
+		memcpy ( buf, ( box->string.buf + first ), len );
+	}
 
-    /* Print box content and move cursor */
-    if (!box->win)
-        box->win = stdscr;
-    mvwprintw(box->win, box->row, box->col, "%s", buf);
-    wmove(box->win, box->row, (box->col + cursor_offset));
+	/* Print box content and move cursor */
+	if ( ! box->win )
+		box->win = stdscr;
+	mvwprintw ( box->win, box->row, box->col, "%s", buf );
+	wmove ( box->win, box->row, ( box->col + cursor_offset ) );
 }

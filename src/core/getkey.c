@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ctype.h>
 #include <ipxe/console.h>
@@ -36,7 +36,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  */
 
-#define GETKEY_TIMEOUT (TICKS_PER_SEC / 4)
+#define GETKEY_TIMEOUT ( TICKS_PER_SEC / 4 )
 
 /**
  * Read character from console if available within timeout period
@@ -44,17 +44,17 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v timeout		Timeout period, in ticks (0=indefinite)
  * @ret character	Character read from console
  */
-static int getchar_timeout(unsigned long timeout) {
-    unsigned long start = currticks();
+static int getchar_timeout ( unsigned long timeout ) {
+	unsigned long start = currticks();
 
-    while ((timeout == 0) || ((currticks() - start) < timeout)) {
-        step();
-        if (iskey())
-            return getchar();
-        cpu_nap();
-    }
+	while ( ( timeout == 0 ) || ( ( currticks() - start ) < timeout ) ) {
+		step();
+		if ( iskey() )
+			return getchar();
+		cpu_nap();
+	}
 
-    return -1;
+	return -1;
 }
 
 /**
@@ -68,29 +68,29 @@ static int getchar_timeout(unsigned long timeout) {
  * will return "special" keys (e.g. cursor keys) as a series of
  * characters forming an ANSI escape sequence.
  */
-int getkey(unsigned long timeout) {
-    int character;
-    unsigned int n = 0;
+int getkey ( unsigned long timeout ) {
+	int character;
+	unsigned int n = 0;
 
-    character = getchar_timeout(timeout);
-    if (character != ESC)
-        return character;
+	character = getchar_timeout ( timeout );
+	if ( character != ESC )
+		return character;
 
-    character = getchar_timeout(GETKEY_TIMEOUT);
-    if (character < 0)
-        return ESC;
+	character = getchar_timeout ( GETKEY_TIMEOUT );
+	if ( character < 0 )
+		return ESC;
 
-    if (isalpha(character))
-        return (toupper(character) - 'A' + 1);
+	if ( isalpha ( character ) )
+		return ( toupper ( character ) - 'A' + 1 );
 
-    while ((character = getchar_timeout(GETKEY_TIMEOUT)) >= 0) {
-        if (isdigit(character)) {
-            n = ((n * 10) + (character - '0'));
-            continue;
-        }
-        if (character >= 0x40)
-            return KEY_ANSI(n, character);
-    }
+	while ( ( character = getchar_timeout ( GETKEY_TIMEOUT ) ) >= 0 ) {
+		if ( isdigit ( character ) ) {
+			n = ( ( n * 10 ) + ( character - '0' ) );
+			continue;
+		}
+		if ( character >= 0x40 )
+			return KEY_ANSI ( n, character );
+	}
 
-    return ESC;
+	return ESC;
 }

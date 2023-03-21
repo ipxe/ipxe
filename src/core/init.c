@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/device.h>
 #include <ipxe/console.h>
@@ -37,7 +37,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 static int started = 0;
 
 /** Colour for debug messages */
-#define colour table_start(INIT_FNS)
+#define colour table_start ( INIT_FNS )
 
 /**
  * Initialise iPXE
@@ -49,12 +49,12 @@ static int started = 0;
  * There is, by definition, no counterpart to this function on the
  * shutdown path.
  */
-void initialise(void) {
-    struct init_fn* init_fn;
+void initialise ( void ) {
+	struct init_fn *init_fn;
 
-    /* Call registered initialisation functions */
-    for_each_table_entry(init_fn, INIT_FNS)
-        init_fn->initialise();
+	/* Call registered initialisation functions */
+	for_each_table_entry ( init_fn, INIT_FNS )
+		init_fn->initialise ();
 }
 
 /**
@@ -64,23 +64,23 @@ void initialise(void) {
  * probing devices.  You may call startup() and shutdown() multiple
  * times (as is done via the PXE API when PXENV_START_UNDI is used).
  */
-void startup(void) {
-    struct startup_fn* startup_fn;
+void startup ( void ) {
+	struct startup_fn *startup_fn;
 
-    if (started)
-        return;
+	if ( started )
+		return;
 
-    /* Call registered startup functions */
-    for_each_table_entry(startup_fn, STARTUP_FNS) {
-        if (startup_fn->startup) {
-            DBGC(colour, "INIT startup %s...\n",
-                 startup_fn->name);
-            startup_fn->startup();
-        }
-    }
+	/* Call registered startup functions */
+	for_each_table_entry ( startup_fn, STARTUP_FNS ) {
+		if ( startup_fn->startup ) {
+			DBGC ( colour, "INIT startup %s...\n",
+			       startup_fn->name );
+			startup_fn->startup();
+		}
+	}
 
-    started = 1;
-    DBGC(colour, "INIT startup complete\n");
+	started = 1;
+	DBGC ( colour, "INIT startup complete\n" );
 }
 
 /**
@@ -95,24 +95,24 @@ void startup(void) {
  * Call this function only once, before either exiting main() or
  * starting up a non-returnable image.
  */
-void shutdown(int flags) {
-    struct startup_fn* startup_fn;
+void shutdown ( int flags ) {
+	struct startup_fn *startup_fn;
 
-    if (!started)
-        return;
+	if ( ! started )
+		return;
 
-    /* Call registered shutdown functions (in reverse order) */
-    for_each_table_entry_reverse(startup_fn, STARTUP_FNS) {
-        if (startup_fn->shutdown) {
-            DBGC(colour, "INIT shutdown %s...\n",
-                 startup_fn->name);
-            startup_fn->shutdown(flags);
-        }
-    }
+	/* Call registered shutdown functions (in reverse order) */
+	for_each_table_entry_reverse ( startup_fn, STARTUP_FNS ) {
+		if ( startup_fn->shutdown ) {
+			DBGC ( colour, "INIT shutdown %s...\n",
+			       startup_fn->name );
+			startup_fn->shutdown ( flags );
+		}
+	}
 
-    /* Reset console */
-    console_reset();
+	/* Reset console */
+	console_reset();
 
-    started = 0;
-    DBGC(colour, "INIT shutdown complete\n");
+	started = 0;
+	DBGC ( colour, "INIT shutdown complete\n" );
 }

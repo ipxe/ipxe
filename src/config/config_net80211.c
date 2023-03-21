@@ -15,7 +15,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <config/general.h>
 
@@ -32,7 +32,7 @@ PROVIDE_REQUIRING_SYMBOL();
  *
  */
 #ifdef IWMGMT_CMD
-REQUIRE_OBJECT(iwmgmt_cmd);
+REQUIRE_OBJECT ( iwmgmt_cmd );
 #endif
 
 /*
@@ -40,7 +40,7 @@ REQUIRE_OBJECT(iwmgmt_cmd);
  *
  */
 #ifdef ERRMSG_80211
-REQUIRE_OBJECT(wireless_errors);
+REQUIRE_OBJECT ( wireless_errors );
 #endif
 
 /*
@@ -48,15 +48,15 @@ REQUIRE_OBJECT(wireless_errors);
  *
  */
 #ifdef CRYPTO_80211_WEP
-REQUIRE_OBJECT(wep);
+REQUIRE_OBJECT ( wep );
 #endif
 
 #ifdef CRYPTO_80211_WPA2
-    #define CRYPTO_80211_WPA
-REQUIRE_OBJECT(wpa_ccmp);
+#define CRYPTO_80211_WPA
+REQUIRE_OBJECT ( wpa_ccmp );
 #endif
 
 #ifdef CRYPTO_80211_WPA
-REQUIRE_OBJECT(wpa_psk);
-REQUIRE_OBJECT(wpa_tkip);
+REQUIRE_OBJECT ( wpa_psk );
+REQUIRE_OBJECT ( wpa_tkip );
 #endif

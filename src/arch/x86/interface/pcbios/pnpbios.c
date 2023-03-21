@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <string.h>
@@ -37,24 +37,24 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** PnP BIOS structure */
 struct pnp_bios {
-    /** Signature
-     *
-     * Must be equal to @c PNP_BIOS_SIGNATURE
-     */
-    uint32_t signature;
-    /** Version as BCD (e.g. 1.0 is 0x10) */
-    uint8_t version;
-    /** Length of this structure */
-    uint8_t length;
-    /** System capabilities */
-    uint16_t control;
-    /** Checksum */
-    uint8_t checksum;
-} __attribute__((packed));
+	/** Signature
+	 *
+	 * Must be equal to @c PNP_BIOS_SIGNATURE
+	 */
+	uint32_t signature;
+	/** Version as BCD (e.g. 1.0 is 0x10) */
+	uint8_t version;
+	/** Length of this structure */
+	uint8_t length;
+	/** System capabilities */
+	uint16_t control;
+	/** Checksum */
+	uint8_t checksum;
+} __attribute__ (( packed ));
 
 /** Signature for a PnP BIOS structure */
 #define PNP_BIOS_SIGNATURE \
-    (('$' << 0) + ('P' << 8) + ('n' << 16) + ('P' << 24))
+	( ( '$' << 0 ) + ( 'P' << 8 ) + ( 'n' << 16 ) + ( 'P' << 24 ) )
 
 /**
  * Test address for PnP BIOS structure
@@ -62,32 +62,32 @@ struct pnp_bios {
  * @v offset		Offset within BIOS segment to test
  * @ret rc		Return status code
  */
-static int is_pnp_bios(unsigned int offset) {
-    union {
-        struct pnp_bios pnp_bios;
-        uint8_t bytes[256]; /* 256 is maximum length possible */
-    } u;
-    size_t len;
-    unsigned int i;
-    uint8_t sum = 0;
+static int is_pnp_bios ( unsigned int offset ) {
+	union {
+		struct pnp_bios pnp_bios;
+		uint8_t bytes[256]; /* 256 is maximum length possible */
+	} u;
+	size_t len;
+	unsigned int i;
+	uint8_t sum = 0;
 
-    /* Read start of header and verify signature */
-    copy_from_real(&u.pnp_bios, BIOS_SEG, offset, sizeof(u.pnp_bios));
-    if (u.pnp_bios.signature != PNP_BIOS_SIGNATURE)
-        return -EINVAL;
+	/* Read start of header and verify signature */
+	copy_from_real ( &u.pnp_bios, BIOS_SEG, offset, sizeof ( u.pnp_bios ));
+	if ( u.pnp_bios.signature != PNP_BIOS_SIGNATURE )
+		return -EINVAL;
 
-    /* Read whole header and verify checksum */
-    len = u.pnp_bios.length;
-    copy_from_real(&u.bytes, BIOS_SEG, offset, len);
-    for (i = 0; i < len; i++) {
-        sum += u.bytes[i];
-    }
-    if (sum != 0)
-        return -EINVAL;
+	/* Read whole header and verify checksum */
+	len = u.pnp_bios.length;
+	copy_from_real ( &u.bytes, BIOS_SEG, offset, len );
+	for ( i = 0 ; i < len ; i++ ) {
+		sum += u.bytes[i];
+	}
+	if ( sum != 0 )
+		return -EINVAL;
 
-    DBG("Found PnP BIOS at %04x:%04x\n", BIOS_SEG, offset);
+	DBG ( "Found PnP BIOS at %04x:%04x\n", BIOS_SEG, offset );
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -98,17 +98,17 @@ static int is_pnp_bios(unsigned int offset) {
  * The PnP BIOS structure will be at BIOS_SEG:pnp_offset.  If no PnP
  * BIOS is found, -1 is returned.
  */
-int find_pnp_bios(void) {
-    static int pnp_offset = 0;
+int find_pnp_bios ( void ) {
+	static int pnp_offset = 0;
 
-    if (pnp_offset)
-        return pnp_offset;
+	if ( pnp_offset )
+		return pnp_offset;
 
-    for (pnp_offset = 0; pnp_offset < 0x10000; pnp_offset += 0x10) {
-        if (is_pnp_bios(pnp_offset) == 0)
-            return pnp_offset;
-    }
+	for ( pnp_offset = 0 ; pnp_offset < 0x10000 ; pnp_offset += 0x10 ) {
+		if ( is_pnp_bios ( pnp_offset ) == 0 )
+			return pnp_offset;
+	}
 
-    pnp_offset = -1;
-    return pnp_offset;
+	pnp_offset = -1;
+	return pnp_offset;
 }

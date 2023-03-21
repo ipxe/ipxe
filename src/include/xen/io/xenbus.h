@@ -1,5 +1,3 @@
-#pragma once
-
 /* SPDX-License-Identifier: MIT */
 /*****************************************************************************
  * xenbus.h
@@ -10,9 +8,9 @@
  */
 
 #ifndef _XEN_PUBLIC_IO_XENBUS_H
-    #define _XEN_PUBLIC_IO_XENBUS_H
+#define _XEN_PUBLIC_IO_XENBUS_H
 
-FILE_LICENCE(MIT);
+FILE_LICENCE ( MIT );
 
 /*
  * The state of either end of the Xenbus, i.e. the current communication
@@ -21,36 +19,36 @@ FILE_LICENCE(MIT);
  * layers.
  */
 enum xenbus_state {
-    XenbusStateUnknown = 0,
+    XenbusStateUnknown       = 0,
 
-    XenbusStateInitialising = 1,
+    XenbusStateInitialising  = 1,
 
     /*
      * InitWait: Finished early initialisation but waiting for information
      * from the peer or hotplug scripts.
      */
-    XenbusStateInitWait = 2,
+    XenbusStateInitWait      = 2,
 
     /*
      * Initialised: Waiting for a connection from the peer.
      */
-    XenbusStateInitialised = 3,
+    XenbusStateInitialised   = 3,
 
-    XenbusStateConnected = 4,
+    XenbusStateConnected     = 4,
 
     /*
      * Closing: The device is being closed due to an error or an unplug event.
      */
-    XenbusStateClosing = 5,
+    XenbusStateClosing       = 5,
 
-    XenbusStateClosed = 6,
+    XenbusStateClosed        = 6,
 
     /*
      * Reconfiguring: The device is being reconfigured.
      */
     XenbusStateReconfiguring = 7,
 
-    XenbusStateReconfigured = 8
+    XenbusStateReconfigured  = 8
 };
 typedef enum xenbus_state XenbusState;
 

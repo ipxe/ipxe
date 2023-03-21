@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef STUB_MLXUTILS_INCLUDE_PUBLIC_PCI_H_
-    #define STUB_MLXUTILS_INCLUDE_PUBLIC_PCI_H_
+#define STUB_MLXUTILS_INCLUDE_PUBLIC_PCI_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -22,57 +20,64 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
-    #include "mlx_utils.h"
+#include "mlx_utils.h"
 
 typedef enum {
-    MlxPciWidthUint8 = 0,
-    MlxPciWidthUint16,
-    MlxPciWidthUint32,
-    MlxPciWidthUint64,
+			  MlxPciWidthUint8      = 0,
+			  MlxPciWidthUint16,
+			  MlxPciWidthUint32,
+			  MlxPciWidthUint64,
 } mlx_pci_width;
 
 mlx_status
 mlx_pci_init(
-    IN mlx_utils* utils);
+			IN mlx_utils *utils
+			);
 
 mlx_status
 mlx_pci_teardown(
-    IN mlx_utils* utils);
+			IN mlx_utils *utils
+			);
 
 mlx_status
 mlx_pci_read(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint32 offset,
-    IN mlx_uintn count,
-    OUT mlx_void* buffer);
+			IN mlx_utils *utils,
+			IN mlx_pci_width width,
+			IN mlx_uint32 offset,
+			IN mlx_uintn count,
+			OUT mlx_void *buffer
+			);
 
 mlx_status
 mlx_pci_write(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint32 offset,
-    IN mlx_uintn count,
-    IN mlx_void* buffer);
+			IN mlx_utils *utils,
+			IN mlx_pci_width width,
+			IN mlx_uint32 offset,
+			IN mlx_uintn count,
+			IN mlx_void *buffer
+			);
 
 mlx_status
 mlx_pci_mem_read(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint8 bar_index,
-    IN mlx_uint64 offset,
-    IN mlx_uintn count,
-    OUT mlx_void* buffer);
+				IN mlx_utils *utils,
+				IN mlx_pci_width width,
+				IN mlx_uint8 bar_index,
+				IN mlx_uint64 offset,
+				IN mlx_uintn count,
+				OUT mlx_void *buffer
+				);
 
 mlx_status
 mlx_pci_mem_write(
-    IN mlx_utils* utils,
-    IN mlx_pci_width width,
-    IN mlx_uint8 bar_index,
-    IN mlx_uint64 offset,
-    IN mlx_uintn count,
-    IN mlx_void* buffer);
+				IN mlx_utils *utils,
+				IN mlx_pci_width width,
+				IN mlx_uint8 bar_index,
+				IN mlx_uint64 offset,
+				IN mlx_uintn count,
+				IN mlx_void *buffer
+				);
+
 
 #endif /* STUB_MLXUTILS_INCLUDE_PUBLIC_PCI_H_ */

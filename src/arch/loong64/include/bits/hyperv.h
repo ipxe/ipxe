@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _BITS_HYPERV_H
-    #define _BITS_HYPERV_H
+#define _BITS_HYPERV_H
 
 /** @file
  *
@@ -9,6 +7,6 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #endif /* _BITS_HYPERV_H */

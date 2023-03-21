@@ -49,12 +49,12 @@
  *
  * The driver was finished before Intel got the NDA out of the closet.
  *
- * Datasheet is now published and available from
+ * Datasheet is now published and available from 
  * ftp://download.intel.com/design/network/manuals/8255X_OpenSDM.pdf
  *    - Michael Brown
  * */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 /*
  * General Theory of Operation
@@ -124,36 +124,37 @@ FILE_LICENCE(GPL2_OR_LATER);
  * the Linux kernel initialization for the eepro100.
  */
 static struct ifec_cfg ifec_cfg = {
-    .status = 0,
-    .command = CmdConfigure | CmdSuspend,
-    .link = 0,                         /* Filled in later */
-    .byte = {22,                       /* How many bytes in this array */
-             (TX_FIFO << 4) | RX_FIFO, /* Rx & Tx FIFO limits */
-             0, 0,                     /* Adaptive Interframe Spacing */
-             RX_DMA_COUNT,             /* Rx DMA max byte count */
-             TX_DMA_COUNT + 0x80,      /* Tx DMA max byte count */
-             0x32,                     /* Many bits. */
-             0x03,                     /* Discard short receive & Underrun retries */
-             1,                        /* 1=Use MII  0=Use AUI */
-             0,
-             0x2E, /* NSAI, Preamble length, & Loopback*/
-             0,    /* Linear priority */
-             0x60, /* L PRI MODE & Interframe spacing */
-             0, 0xf2,
-             0x48, /* Promiscuous, Broadcast disable, CRS & CDT */
-             0, 0x40,
-             0xf2, /* Stripping, Padding, Receive CRC Transfer */
-             0x80, /* 0x40=Force full-duplex, 0x80=Allowfull-duplex*/
-             0x3f, /* Multiple IA */
-             0x0D} /* Multicast all */
+	.status  = 0,
+	.command = CmdConfigure | CmdSuspend,
+	.link    = 0,        /* Filled in later */
+	.byte = { 22,        /* How many bytes in this array */
+	          ( TX_FIFO << 4 ) | RX_FIFO,  /* Rx & Tx FIFO limits */
+	          0, 0,                        /* Adaptive Interframe Spacing */
+	          RX_DMA_COUNT,                /* Rx DMA max byte count */
+	          TX_DMA_COUNT + 0x80,         /* Tx DMA max byte count */
+	          0x32,      /* Many bits. */
+	          0x03,      /* Discard short receive & Underrun retries */
+	          1,         /* 1=Use MII  0=Use AUI */
+	          0,
+	          0x2E,      /* NSAI, Preamble length, & Loopback*/
+	          0,         /* Linear priority */
+	          0x60,      /* L PRI MODE & Interframe spacing */
+	          0, 0xf2,
+	          0x48,      /* Promiscuous, Broadcast disable, CRS & CDT */
+	          0, 0x40,
+	          0xf2,      /* Stripping, Padding, Receive CRC Transfer */
+	          0x80,      /* 0x40=Force full-duplex, 0x80=Allowfull-duplex*/
+	          0x3f,      /* Multiple IA */
+	          0x0D }     /* Multicast all */
 };
 
 static struct net_device_operations ifec_operations = {
-    .open = ifec_net_open,
-    .close = ifec_net_close,
-    .transmit = ifec_net_transmit,
-    .poll = ifec_net_poll,
-    .irq = ifec_net_irq};
+	.open     = ifec_net_open,
+	.close    = ifec_net_close,
+	.transmit = ifec_net_transmit,
+	.poll     = ifec_net_poll,
+	.irq      = ifec_net_irq
+};
 
 /******************* iPXE PCI Device Driver API functions ********************/
 
@@ -167,62 +168,62 @@ static struct net_device_operations ifec_operations = {
  * This function is called very early on, while iPXE is initializing.
  * This is a iPXE PCI Device Driver API function.
  */
-static int ifec_pci_probe(struct pci_device* pci)
+static int ifec_pci_probe ( struct pci_device *pci )
 {
-    struct net_device* netdev;
-    struct ifec_private* priv;
-    int rc;
+	struct net_device *netdev;
+	struct ifec_private *priv;
+	int rc;
 
-    DBGP("ifec_pci_probe: ");
+	DBGP ( "ifec_pci_probe: " );
 
-    if (pci->ioaddr == 0)
-        return -EINVAL;
+	if ( pci->ioaddr == 0 )
+		return -EINVAL;
 
-    netdev = alloc_etherdev(sizeof(*priv));
-    if (!netdev)
-        return -ENOMEM;
+	netdev = alloc_etherdev ( sizeof(*priv) );
+	if ( !netdev )
+		return -ENOMEM;
 
-    netdev_init(netdev, &ifec_operations);
-    priv = netdev->priv;
+	netdev_init ( netdev, &ifec_operations );
+	priv = netdev->priv;
 
-    pci_set_drvdata(pci, netdev);
-    netdev->dev = &pci->dev;
+	pci_set_drvdata ( pci, netdev );
+	netdev->dev = &pci->dev;
 
-    /* enable bus master, etc */
-    adjust_pci_device(pci);
+	/* enable bus master, etc */
+	adjust_pci_device( pci );
 
-    DBGP("pci ");
+	DBGP ( "pci " );
 
-    memset(priv, 0, sizeof(*priv));
-    priv->ioaddr = pci->ioaddr;
+	memset ( priv, 0, sizeof(*priv) );
+	priv->ioaddr = pci->ioaddr;
 
-    ifec_reset(netdev);
-    DBGP("reset ");
+	ifec_reset ( netdev );
+	DBGP ( "reset " );
 
-    ifec_init_eeprom(netdev);
+	ifec_init_eeprom ( netdev );
 
-    /* read MAC address */
-    nvs_read(&priv->eeprom.nvs, EEPROM_ADDR_MAC_0, netdev->hw_addr,
-             ETH_ALEN);
-    /* read mdio_register */
-    nvs_read(&priv->eeprom.nvs, EEPROM_ADDR_MDIO_REGISTER,
-             &priv->mdio_register, 2);
+	/* read MAC address */
+	nvs_read ( &priv->eeprom.nvs, EEPROM_ADDR_MAC_0, netdev->hw_addr,
+		   ETH_ALEN );
+	/* read mdio_register */
+	nvs_read ( &priv->eeprom.nvs, EEPROM_ADDR_MDIO_REGISTER,
+		   &priv->mdio_register, 2 );
 
-    if ((rc = register_netdev(netdev)) != 0)
-        goto error;
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto error;
 
-    netdev_link_up(netdev);
+	netdev_link_up ( netdev );
 
-    DBGP("ints\n");
+	DBGP ( "ints\n" );
 
-    return 0;
+	return 0;
 
 error:
-    ifec_reset(netdev);
-    netdev_nullify(netdev);
-    netdev_put(netdev);
+	ifec_reset     ( netdev );
+	netdev_nullify ( netdev );
+	netdev_put     ( netdev );
 
-    return rc;
+	return rc;
 }
 
 /*
@@ -232,16 +233,16 @@ error:
  *
  * This is a PCI Device Driver API function.
  */
-static void ifec_pci_remove(struct pci_device* pci)
+static void ifec_pci_remove ( struct pci_device *pci )
 {
-    struct net_device* netdev = pci_get_drvdata(pci);
+	struct net_device *netdev = pci_get_drvdata ( pci );
 
-    DBGP("ifec_pci_remove\n");
+	DBGP ( "ifec_pci_remove\n" );
 
-    unregister_netdev(netdev);
-    ifec_reset(netdev);
-    netdev_nullify(netdev);
-    netdev_put(netdev);
+	unregister_netdev ( netdev );
+	ifec_reset        ( netdev );
+	netdev_nullify    ( netdev );
+	netdev_put        ( netdev );
 }
 
 /****************** iPXE Network Device Driver API functions *****************/
@@ -253,30 +254,30 @@ static void ifec_pci_remove(struct pci_device* pci)
  *
  * This is a iPXE Network Device Driver API function.
  */
-static void ifec_net_close(struct net_device* netdev)
+static void ifec_net_close ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long ioaddr = priv->ioaddr;
-    unsigned short intr_status;
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	unsigned short intr_status;
 
-    DBGP("ifec_net_close\n");
+	DBGP ( "ifec_net_close\n" );
 
-    /* disable interrupts */
-    ifec_net_irq(netdev, 0);
+	/* disable interrupts */
+	ifec_net_irq ( netdev, 0 );
 
-    /* Ack & clear ints */
-    intr_status = inw(ioaddr + SCBStatus);
-    outw(intr_status, ioaddr + SCBStatus);
-    inw(ioaddr + SCBStatus);
+	/* Ack & clear ints */
+	intr_status = inw ( ioaddr + SCBStatus );
+	outw ( intr_status, ioaddr + SCBStatus );
+	inw ( ioaddr + SCBStatus );
 
-    ifec_reset(netdev);
+	ifec_reset ( netdev );
 
-    /* Free any resources */
-    ifec_free(netdev);
+	/* Free any resources */
+	ifec_free ( netdev );
 }
 
 /* Interrupts to be masked */
-#define INTERRUPT_MASK (SCBMaskEarlyRx | SCBMaskFlowCtl)
+#define INTERRUPT_MASK	( SCBMaskEarlyRx | SCBMaskFlowCtl )
 
 /*
  * Enable or disable IRQ masking.
@@ -286,14 +287,14 @@ static void ifec_net_close(struct net_device* netdev)
  *
  * This is a iPXE Network Driver API function.
  */
-static void ifec_net_irq(struct net_device* netdev, int enable)
+static void ifec_net_irq ( struct net_device *netdev, int enable )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long ioaddr = priv->ioaddr;
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
 
-    DBGP("ifec_net_irq\n");
+	DBGP ( "ifec_net_irq\n" );
 
-    outw(enable ? INTERRUPT_MASK : SCBMaskAll, ioaddr + SCBCmd);
+	outw ( enable ? INTERRUPT_MASK : SCBMaskAll, ioaddr + SCBCmd );
 }
 
 /*
@@ -305,86 +306,86 @@ static void ifec_net_irq(struct net_device* netdev, int enable)
  * This enables tx and rx on the device.
  * This is a iPXE Network Device Driver API function.
  */
-static int ifec_net_open(struct net_device* netdev)
+static int ifec_net_open ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    struct ifec_ias* ias = NULL;
-    struct ifec_cfg* cfg = NULL;
-    int i, options;
-    int rc = -ENOMEM;
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_ias *ias = NULL;
+	struct ifec_cfg *cfg = NULL;
+	int i, options;
+	int rc = -ENOMEM;
 
-    DBGP("ifec_net_open: ");
+	DBGP ( "ifec_net_open: " );
 
-    /* Ensure interrupts are disabled. */
-    ifec_net_irq(netdev, 0);
+	/* Ensure interrupts are disabled. */
+	ifec_net_irq ( netdev, 0 );
 
-    /* Initialize Command Unit and Receive Unit base addresses. */
-    ifec_scb_cmd(netdev, 0, RUAddrLoad);
-    ifec_scb_cmd(netdev, virt_to_bus(&priv->stats), CUStatsAddr);
-    ifec_scb_cmd(netdev, 0, CUCmdBase);
+	/* Initialize Command Unit and Receive Unit base addresses. */
+	ifec_scb_cmd ( netdev, 0, RUAddrLoad );
+	ifec_scb_cmd ( netdev, virt_to_bus ( &priv->stats ), CUStatsAddr );
+	ifec_scb_cmd ( netdev, 0, CUCmdBase );
 
-    /* Initialize both rings */
-    if ((rc = ifec_rx_setup(netdev)) != 0)
-        goto error;
-    if ((rc = ifec_tx_setup(netdev)) != 0)
-        goto error;
+	/* Initialize both rings */
+	if ( ( rc = ifec_rx_setup ( netdev ) ) != 0 )
+		goto error;
+	if ( ( rc = ifec_tx_setup ( netdev ) ) != 0 )
+		goto error;
 
-    /* Initialize MDIO */
-    options = 0x00; /* 0x40 = 10mbps half duplex, 0x00 = Autosense */
-    ifec_mdio_setup(netdev, options);
+	/* Initialize MDIO */
+	options = 0x00; /* 0x40 = 10mbps half duplex, 0x00 = Autosense */
+	ifec_mdio_setup ( netdev, options );
 
-    /* Prepare MAC address w/ Individual Address Setup (ias) command.*/
-    ias = malloc_phys(sizeof(*ias), CB_ALIGN);
-    if (!ias) {
-        rc = -ENOMEM;
-        goto error;
-    }
-    ias->command = CmdIASetup;
-    ias->status = 0;
-    memcpy(ias->ia, netdev->ll_addr, ETH_ALEN);
+	/* Prepare MAC address w/ Individual Address Setup (ias) command.*/
+	ias = malloc_phys ( sizeof ( *ias ), CB_ALIGN );
+	if ( !ias ) {
+		rc = -ENOMEM;
+		goto error;
+	}
+	ias->command      = CmdIASetup;
+	ias->status       = 0;
+	memcpy ( ias->ia, netdev->ll_addr, ETH_ALEN );
 
-    /* Prepare operating parameters w/ a configure command. */
-    cfg = malloc_phys(sizeof(*cfg), CB_ALIGN);
-    if (!cfg) {
-        rc = -ENOMEM;
-        goto error;
-    }
-    memcpy(cfg, &ifec_cfg, sizeof(*cfg));
-    cfg->link = virt_to_bus(priv->tcbs);
-    cfg->byte[19] = (options & 0x10) ? 0xC0 : 0x80;
-    ias->link = virt_to_bus(cfg);
+	/* Prepare operating parameters w/ a configure command. */
+	cfg = malloc_phys ( sizeof ( *cfg ), CB_ALIGN );
+	if ( !cfg ) {
+		rc = -ENOMEM;
+		goto error;
+	}
+	memcpy ( cfg, &ifec_cfg, sizeof ( *cfg ) );
+	cfg->link     = virt_to_bus ( priv->tcbs );
+	cfg->byte[19] = ( options & 0x10 ) ? 0xC0 : 0x80;
+	ias->link     = virt_to_bus ( cfg );
 
-    /* Issue the ias and configure commands. */
-    ifec_scb_cmd(netdev, virt_to_bus(ias), CUStart);
-    ifec_scb_cmd_wait(netdev);
-    priv->configured = 1;
+	/* Issue the ias and configure commands. */
+	ifec_scb_cmd ( netdev, virt_to_bus ( ias ), CUStart );
+	ifec_scb_cmd_wait ( netdev );
+	priv->configured = 1;
 
-    /* Wait up to 10 ms for configuration to initiate */
-    for (i = 10; i && !cfg->status; i--)
-        mdelay(1);
-    if (!cfg->status) {
-        DBG("Failed to initiate!\n");
-        goto error;
-    }
-    free_phys(ias, sizeof(*ias));
-    free_phys(cfg, sizeof(*cfg));
-    DBG2("cfg ");
+	/* Wait up to 10 ms for configuration to initiate */
+	for ( i = 10; i && !cfg->status; i-- )
+		mdelay ( 1 );
+	if ( ! cfg->status ) {
+		DBG ( "Failed to initiate!\n" );
+		goto error;
+	}
+	free_phys ( ias, sizeof ( *ias ) );
+	free_phys ( cfg, sizeof ( *cfg ) );
+	DBG2 ( "cfg " );
 
-    /* Enable rx by sending ring address to card */
-    if (priv->rfds[0] != NULL) {
-        ifec_scb_cmd(netdev, virt_to_bus(priv->rfds[0]), RUStart);
-        ifec_scb_cmd_wait(netdev);
-    }
-    DBG2("rx_start\n");
+	/* Enable rx by sending ring address to card */
+	if ( priv->rfds[0] != NULL ) {
+		ifec_scb_cmd ( netdev, virt_to_bus( priv->rfds[0] ), RUStart );
+		ifec_scb_cmd_wait ( netdev );
+	}
+	DBG2 ( "rx_start\n" );
 
-    return 0;
+	return 0;
 
 error:
-    free_phys(cfg, sizeof(*cfg));
-    free_phys(ias, sizeof(*ias));
-    ifec_free(netdev);
-    ifec_reset(netdev);
-    return rc;
+	free_phys ( cfg, sizeof ( *cfg ) );
+	free_phys ( ias, sizeof ( *ias ) );
+	ifec_free ( netdev );
+	ifec_reset ( netdev );
+	return rc;
 }
 
 /*
@@ -396,31 +397,31 @@ error:
  * transmitted packets and to allow the driver to check for received packets.
  * This is a iPXE Network Device Driver API function.
  */
-static void ifec_net_poll(struct net_device* netdev)
+static void ifec_net_poll ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned short intr_status;
+	struct ifec_private *priv = netdev->priv;
+	unsigned short intr_status;
 
-    DBGP("ifec_net_poll\n");
+	DBGP ( "ifec_net_poll\n" );
 
-    /* acknowledge interrupts ASAP */
-    intr_status = inw(priv->ioaddr + SCBStatus);
-    outw(intr_status, priv->ioaddr + SCBStatus);
-    inw(priv->ioaddr + SCBStatus);
+	/* acknowledge interrupts ASAP */
+	intr_status = inw ( priv->ioaddr + SCBStatus );
+	outw ( intr_status, priv->ioaddr + SCBStatus );
+	inw ( priv->ioaddr + SCBStatus );
 
-    DBG2("poll - status: 0x%04X\n", intr_status);
+	DBG2 ( "poll - status: 0x%04X\n", intr_status );
 
-    /* anything to do here? */
-    if ((intr_status & (~INTERRUPT_MASK)) == 0)
-        return;
+	/* anything to do here? */
+	if ( ( intr_status & ( ~INTERRUPT_MASK ) ) == 0 )
+		return;
 
-    /* process received and transmitted packets */
-    ifec_tx_process(netdev);
-    ifec_rx_process(netdev);
+	/* process received and transmitted packets */
+	ifec_tx_process ( netdev );
+	ifec_rx_process ( netdev );
 
-    ifec_check_ru_status(netdev, intr_status);
+	ifec_check_ru_status ( netdev, intr_status );
 
-    return;
+	return;
 }
 
 /*
@@ -432,46 +433,46 @@ static void ifec_net_poll(struct net_device* netdev)
  *
  * This is a iPXE Network Driver API function.
  */
-static int ifec_net_transmit(struct net_device* netdev,
-                             struct io_buffer* iobuf)
+static int ifec_net_transmit ( struct net_device *netdev,
+                               struct io_buffer *iobuf )
 {
-    struct ifec_private* priv = netdev->priv;
-    struct ifec_tcb* tcb = priv->tcb_head->next;
-    unsigned long ioaddr = priv->ioaddr;
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_tcb *tcb = priv->tcb_head->next;
+	unsigned long ioaddr = priv->ioaddr;
 
-    DBGP("ifec_net_transmit\n");
+	DBGP ( "ifec_net_transmit\n" );
 
-    /* Wait for TCB to become available. */
-    if (tcb->status || tcb->iob) {
-        DBG("TX overflow\n");
-        return -ENOBUFS;
-    }
+	/* Wait for TCB to become available. */
+	if ( tcb->status || tcb->iob ) {
+		DBG ( "TX overflow\n" );
+		return -ENOBUFS;
+	}
 
-    DBG2("transmitting packet (%zd bytes). status = %hX, cmd=%hX\n",
-         iob_len(iobuf), tcb->status, inw(ioaddr + SCBCmd));
+	DBG2 ( "transmitting packet (%zd bytes). status = %hX, cmd=%hX\n",
+		iob_len ( iobuf ), tcb->status, inw ( ioaddr + SCBCmd ) );
 
-    tcb->command = CmdSuspend | CmdTx | CmdTxFlex;
-    tcb->count = 0x01208000;
-    tcb->tbd_addr0 = virt_to_bus(iobuf->data);
-    tcb->tbd_size0 = 0x3FFF & iob_len(iobuf);
-    tcb->iob = iobuf;
+	tcb->command   = CmdSuspend | CmdTx | CmdTxFlex;
+	tcb->count     = 0x01208000;
+	tcb->tbd_addr0 = virt_to_bus ( iobuf->data );
+	tcb->tbd_size0 = 0x3FFF & iob_len ( iobuf );
+	tcb->iob = iobuf;
 
-    ifec_tx_wake(netdev);
+	ifec_tx_wake ( netdev );
 
-    /* Append to end of ring. */
-    priv->tcb_head = tcb;
+	/* Append to end of ring. */
+	priv->tcb_head = tcb;
 
-    return 0;
+	return 0;
 }
 
 /*************************** Local support functions *************************/
 
 /* Define what each GPIO Pin does */
 static const uint16_t ifec_ee_bits[] = {
-    [SPI_BIT_SCLK] = EE_SHIFT_CLK,
-    [SPI_BIT_MOSI] = EE_DATA_WRITE,
-    [SPI_BIT_MISO] = EE_DATA_READ,
-    [SPI_BIT_SS(0)] = EE_ENB,
+	[SPI_BIT_SCLK]	= EE_SHIFT_CLK,
+	[SPI_BIT_MOSI]	= EE_DATA_WRITE,
+	[SPI_BIT_MISO]	= EE_DATA_READ,
+	[SPI_BIT_SS(0)]	= EE_ENB,
 };
 
 /*
@@ -481,21 +482,21 @@ static const uint16_t ifec_ee_bits[] = {
  * @v basher		Bitbash device
  * @v bit_id		Line to be read
  */
-static int ifec_spi_read_bit(struct bit_basher* basher,
-                             unsigned int bit_id)
+static int ifec_spi_read_bit ( struct bit_basher *basher,
+			       unsigned int bit_id )
 {
-    struct ifec_private* priv =
-        container_of(basher, struct ifec_private, spi.basher);
-    unsigned long ee_addr = priv->ioaddr + CSREeprom;
-    unsigned int ret = 0;
-    uint16_t mask;
+	struct ifec_private *priv =
+		container_of ( basher, struct ifec_private, spi.basher );
+	unsigned long ee_addr = priv->ioaddr + CSREeprom;
+	unsigned int ret = 0;
+	uint16_t mask;
 
-    DBGP("ifec_spi_read_bit\n");
+	DBGP ( "ifec_spi_read_bit\n" );
 
-    mask = ifec_ee_bits[bit_id];
-    ret = inw(ee_addr);
+	mask = ifec_ee_bits[bit_id];
+	ret = inw (ee_addr);
 
-    return (ret & mask) ? 1 : 0;
+	return ( ret & mask ) ? 1 : 0;
 }
 
 /*
@@ -506,29 +507,29 @@ static int ifec_spi_read_bit(struct bit_basher* basher,
  * @v bit_id		Line to write to
  * @v data		Value to write
  */
-static void ifec_spi_write_bit(struct bit_basher* basher,
-                               unsigned int bit_id,
-                               unsigned long data)
+static void ifec_spi_write_bit ( struct bit_basher *basher,
+				 unsigned int bit_id,
+				 unsigned long data )
 {
-    struct ifec_private* priv =
-        container_of(basher, struct ifec_private, spi.basher);
-    unsigned long ee_addr = priv->ioaddr + CSREeprom;
-    short val;
-    uint16_t mask = ifec_ee_bits[bit_id];
+	struct ifec_private *priv =
+		container_of ( basher, struct ifec_private, spi.basher );
+	unsigned long ee_addr = priv->ioaddr + CSREeprom;
+	short val;
+	uint16_t mask = ifec_ee_bits[bit_id];
 
-    DBGP("ifec_spi_write_bit\n");
+	DBGP ( "ifec_spi_write_bit\n" );
 
-    val = inw(ee_addr);
-    val &= ~mask;
-    val |= data & mask;
+	val = inw ( ee_addr );
+	val &= ~mask;
+	val |= data & mask;
 
-    outw(val, ee_addr);
+	outw ( val, ee_addr );
 }
 
 /* set function pointer to SPI read- and write-bit functions */
 static struct bit_basher_operations ifec_basher_ops = {
-    .read = ifec_spi_read_bit,
-    .write = ifec_spi_write_bit,
+	.read = ifec_spi_read_bit,
+	.write = ifec_spi_write_bit,
 };
 
 /*
@@ -536,29 +537,29 @@ static struct bit_basher_operations ifec_basher_ops = {
  *
  * @v netdev		Network device
  */
-static void ifec_init_eeprom(struct net_device* netdev)
+static void ifec_init_eeprom ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
+	struct ifec_private *priv = netdev->priv;
 
-    DBGP("ifec_init_eeprom\n");
+	DBGP ( "ifec_init_eeprom\n" );
 
-    priv->spi.basher.op = &ifec_basher_ops;
-    priv->spi.bus.mode = SPI_MODE_THREEWIRE;
-    init_spi_bit_basher(&priv->spi);
+	priv->spi.basher.op = &ifec_basher_ops;
+	priv->spi.bus.mode = SPI_MODE_THREEWIRE;
+	init_spi_bit_basher ( &priv->spi );
 
-    priv->eeprom.bus = &priv->spi.bus;
+	priv->eeprom.bus = &priv->spi.bus;
 
-    /* init as 93c46(93c14 compatible) first, to set the command len,
-     * block size and word len. Needs to be set for address len detection.
-     */
-    init_at93c46(&priv->eeprom, 16);
+	/* init as 93c46(93c14 compatible) first, to set the command len,
+	 * block size and word len. Needs to be set for address len detection.
+	 */
+	init_at93c46 ( &priv->eeprom, 16 );
 
-    /* detect address length, */
-    threewire_detect_address_len(&priv->eeprom);
+	/* detect address length, */
+	threewire_detect_address_len ( &priv->eeprom );
 
-    /* address len == 8 means 93c66 instead of 93c46 */
-    if (priv->eeprom.address_len == 8)
-        init_at93c66(&priv->eeprom, 16);
+	/* address len == 8 means 93c66 instead of 93c46 */
+	if ( priv->eeprom.address_len == 8 )
+		init_at93c66 ( &priv->eeprom, 16 );
 }
 
 /*
@@ -567,30 +568,30 @@ static void ifec_init_eeprom(struct net_device* netdev)
  * This probably reads a register in the "physical media interface chip".
  * -- REW
  */
-static int ifec_mdio_read(struct net_device* netdev, int phy_id,
-                          int location)
+static int ifec_mdio_read ( struct net_device *netdev, int phy_id,
+                                                       int location )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long ioaddr = priv->ioaddr;
-    int val;
-    int boguscnt = 64 * 4; /* <64 usec. to complete, typ 27 ticks */
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	int val;
+	int boguscnt = 64*4;     /* <64 usec. to complete, typ 27 ticks */
 
-    DBGP("ifec_mdio_read\n");
+	DBGP ( "ifec_mdio_read\n" );
 
-    outl(0x08000000 | (location << 16) | (phy_id << 21),
-         ioaddr + CSRCtrlMDI);
-    do {
-        udelay(16);
+	outl ( 0x08000000 | ( location << 16 ) | ( phy_id << 21 ),
+	       ioaddr + CSRCtrlMDI );
+	do {
+		udelay ( 16 );
 
-        val = inl(ioaddr + CSRCtrlMDI);
+		val = inl ( ioaddr + CSRCtrlMDI );
 
-        if (--boguscnt < 0) {
-            DBG(" ifec_mdio_read() time out with val = %X.\n",
-                val);
-            break;
-        }
-    } while (!(val & 0x10000000));
-    return val & 0xffff;
+		if ( --boguscnt < 0 ) {
+			DBG ( " ifec_mdio_read() time out with val = %X.\n",
+			         val );
+			break;
+		}
+	} while (! ( val & 0x10000000 ) );
+	return val & 0xffff;
 }
 
 /*
@@ -599,28 +600,30 @@ static int ifec_mdio_read(struct net_device* netdev, int phy_id,
  * @v netdev 		Network device
  * @v options		MDIO options
  */
-static void ifec_mdio_setup(struct net_device* netdev, int options)
+static void ifec_mdio_setup ( struct net_device *netdev, int options )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned short mdio_register = priv->mdio_register;
+	struct ifec_private *priv = netdev->priv;
+	unsigned short mdio_register = priv->mdio_register;
 
-    DBGP("ifec_mdio_setup\n");
+	DBGP ( "ifec_mdio_setup\n" );
 
-    if (((mdio_register >> 8) & 0x3f) == DP83840 || ((mdio_register >> 8) & 0x3f) == DP83840A) {
-        int mdi_reg23 = ifec_mdio_read(netdev, mdio_register & 0x1f, 23) | 0x0422;
-        if (CONGENB)
-            mdi_reg23 |= 0x0100;
-        DBG2("DP83840 specific setup, setting register 23 to "
-             "%hX.\n", mdi_reg23);
-        ifec_mdio_write(netdev, mdio_register & 0x1f, 23, mdi_reg23);
-    }
-    DBG2("dp83840 ");
-    if (options != 0) {
-        ifec_mdio_write(netdev, mdio_register & 0x1f, 0,
-                        ((options & 0x20) ? 0x2000 : 0) |
-                            ((options & 0x10) ? 0x0100 : 0));
-        DBG2("set mdio_register. ");
-    }
+	if (   ( (mdio_register>>8) & 0x3f ) == DP83840
+	    || ( (mdio_register>>8) & 0x3f ) == DP83840A ) {
+		int mdi_reg23 = ifec_mdio_read ( netdev, mdio_register
+						  & 0x1f, 23 ) | 0x0422;
+		if (CONGENB)
+			mdi_reg23 |= 0x0100;
+		DBG2 ( "DP83840 specific setup, setting register 23 to "
+		                                         "%hX.\n", mdi_reg23 );
+		ifec_mdio_write ( netdev, mdio_register & 0x1f, 23, mdi_reg23 );
+	}
+	DBG2 ( "dp83840 " );
+	if ( options != 0 ) {
+		ifec_mdio_write ( netdev, mdio_register & 0x1f, 0,
+		                           ( (options & 0x20) ? 0x2000 : 0 ) |
+		                           ( (options & 0x10) ? 0x0100 : 0 ) );
+		DBG2 ( "set mdio_register. " );
+	}
 }
 
 /*
@@ -629,29 +632,29 @@ static void ifec_mdio_setup(struct net_device* netdev, int options)
  * This probably writes to the "physical media interface chip".
  * -- REW
  */
-static int ifec_mdio_write(struct net_device* netdev,
-                           int phy_id, int location, int value)
+static int ifec_mdio_write ( struct net_device *netdev,
+                             int phy_id, int location, int value )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long ioaddr = priv->ioaddr;
-    int val;
-    int boguscnt = 64 * 4; /* <64 usec. to complete, typ 27 ticks */
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	int val;
+	int boguscnt = 64*4;     /* <64 usec. to complete, typ 27 ticks */
 
-    DBGP("ifec_mdio_write\n");
+	DBGP ( "ifec_mdio_write\n" );
 
-    outl(0x04000000 | (location << 16) | (phy_id << 21) | value,
-         ioaddr + CSRCtrlMDI);
-    do {
-        udelay(16);
+	outl ( 0x04000000 | ( location << 16 ) | ( phy_id << 21 ) | value,
+	       ioaddr + CSRCtrlMDI );
+	do {
+		udelay ( 16 );
 
-        val = inl(ioaddr + CSRCtrlMDI);
-        if (--boguscnt < 0) {
-            DBG(" ifec_mdio_write() time out with val = %X.\n",
-                val);
-            break;
-        }
-    } while (!(val & 0x10000000));
-    return val & 0xffff;
+		val = inl ( ioaddr + CSRCtrlMDI );
+		if ( --boguscnt < 0 ) {
+			DBG ( " ifec_mdio_write() time out with val = %X.\n",
+			      val );
+			break;
+		}
+	} while (! ( val & 0x10000000 ) );
+	return val & 0xffff;
 }
 
 /*
@@ -659,25 +662,25 @@ static int ifec_mdio_write(struct net_device* netdev,
  *
  * @v netdev		Network device
  */
-static void ifec_reset(struct net_device* netdev)
+static void ifec_reset ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long ioaddr = priv->ioaddr;
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
 
-    DBGP("ifec_reset\n");
+	DBGP ( "ifec_reset\n" );
 
-    /* do partial reset first */
-    outl(PortPartialReset, ioaddr + CSRPort);
-    inw(ioaddr + SCBStatus);
-    udelay(20);
+	/* do partial reset first */
+	outl ( PortPartialReset, ioaddr + CSRPort );
+	inw ( ioaddr + SCBStatus );
+	udelay ( 20 );
 
-    /* full reset */
-    outl(PortReset, ioaddr + CSRPort);
-    inw(ioaddr + SCBStatus);
-    udelay(20);
+	/* full reset */
+	outl ( PortReset, ioaddr + CSRPort );
+	inw ( ioaddr + SCBStatus );
+	udelay ( 20 );
 
-    /* disable interrupts again */
-    ifec_net_irq(netdev, 0);
+	/* disable interrupts again */
+	ifec_net_irq ( netdev, 0 );
 }
 
 /*
@@ -685,24 +688,24 @@ static void ifec_reset(struct net_device* netdev)
  *
  * @v netdev		Network device
  */
-static void ifec_free(struct net_device* netdev)
+static void ifec_free ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev_priv(netdev);
-    int i;
+	struct ifec_private *priv = netdev_priv ( netdev );
+	int i;
 
-    DBGP("ifec_free\n");
+	DBGP ( "ifec_free\n" );
 
-    /* free all allocated receive io_buffers */
-    for (i = 0; i < RFD_COUNT; i++) {
-        free_iob(priv->rx_iobs[i]);
-        priv->rx_iobs[i] = NULL;
-        priv->rfds[i] = NULL;
-    }
+	/* free all allocated receive io_buffers */
+	for ( i = 0; i < RFD_COUNT; i++ ) {
+		free_iob ( priv->rx_iobs[i] );
+		priv->rx_iobs[i] = NULL;
+		priv->rfds[i] = NULL;
+	}
 
-    /* free TX ring buffer */
-    free_phys(priv->tcbs, TX_RING_BYTES);
+	/* free TX ring buffer */
+	free_phys ( priv->tcbs, TX_RING_BYTES );
 
-    priv->tcbs = NULL;
+	priv->tcbs = NULL;
 }
 
 /*
@@ -712,16 +715,16 @@ static void ifec_free(struct net_device* netdev)
  * @v command		Command word
  * @v link   		Link value
  */
-static void ifec_rfd_init(struct ifec_rfd* rfd, s16 command, u32 link)
+static void ifec_rfd_init ( struct ifec_rfd *rfd, s16 command, u32 link )
 {
-    DBGP("ifec_rfd_init\n");
+	DBGP ( "ifec_rfd_init\n" );
 
-    rfd->status = 0;
-    rfd->command = command;
-    rfd->rx_buf_addr = 0xFFFFFFFF;
-    rfd->count = 0;
-    rfd->size = RFD_PACKET_LEN;
-    rfd->link = link;
+	rfd->status      = 0;
+	rfd->command     = command;
+	rfd->rx_buf_addr = 0xFFFFFFFF;
+	rfd->count       = 0;
+	rfd->size        = RFD_PACKET_LEN;
+	rfd->link        = link;
 }
 
 /*
@@ -729,18 +732,18 @@ static void ifec_rfd_init(struct ifec_rfd* rfd, s16 command, u32 link)
  *
  * @v netdev		Network device
  */
-static void ifec_reprime_ru(struct net_device* netdev)
+static void ifec_reprime_ru ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    int cur_rx = priv->cur_rx;
-
-    DBGP("ifec_reprime_ru\n");
-
-    if (priv->rfds[cur_rx] != NULL) {
-        ifec_scb_cmd(netdev, virt_to_bus(priv->rfds[cur_rx]),
-                     RUStart);
-        ifec_scb_cmd_wait(netdev);
-    }
+	struct ifec_private *priv = netdev->priv;
+	int cur_rx = priv->cur_rx;
+	
+	DBGP ( "ifec_reprime_ru\n" );
+	
+	if ( priv->rfds[cur_rx] != NULL ) {
+		ifec_scb_cmd ( netdev, virt_to_bus ( priv->rfds[cur_rx] ),
+			       RUStart );
+		ifec_scb_cmd_wait ( netdev );
+	}
 }
 
 /*
@@ -748,87 +751,87 @@ static void ifec_reprime_ru(struct net_device* netdev)
  *
  * @v netdev		Network device
  */
-static void ifec_check_ru_status(struct net_device* netdev,
-                                 unsigned short intr_status)
+static void ifec_check_ru_status ( struct net_device *netdev,
+				   unsigned short intr_status )
 {
-    struct ifec_private* priv = netdev->priv;
+	struct ifec_private *priv = netdev->priv;
 
-    DBGP("ifec_check_ru_status\n");
+	DBGP ( "ifec_check_ru_status\n" );
 
-    /*
-     * The chip may have suspended reception for various reasons.
-     * Check for that, and re-prime it should this be the case.
-     */
-    switch ((intr_status >> 2) & 0xf) {
-        case 0: /* Idle */
-        case 4: /* Ready */
-            break;
-        case 1:  /* Suspended */
-        case 2:  /* No resources (RFDs) */
-        case 9:  /* Suspended with no more RBDs */
-        case 10: /* No resources due to no RBDs */
-        case 12: /* Ready with no RBDs */
-            DBG("ifec_net_poll: RU reprimed.\n");
-            ifec_reprime_ru(netdev);
-            break;
-        default:
-            /* reserved values */
-            DBG("ifec_net_poll: RU state anomaly: %i\n",
-                (inw(priv->ioaddr + SCBStatus) >> 2) & 0xf);
-            break;
-    }
+	/*
+	* The chip may have suspended reception for various reasons.
+	* Check for that, and re-prime it should this be the case.
+	*/
+	switch ( ( intr_status >> 2 ) & 0xf ) {
+		case 0:  /* Idle */
+		case 4:  /* Ready */
+			break;
+		case 1:  /* Suspended */
+		case 2:  /* No resources (RFDs) */
+		case 9:  /* Suspended with no more RBDs */
+		case 10: /* No resources due to no RBDs */
+		case 12: /* Ready with no RBDs */
+			DBG ( "ifec_net_poll: RU reprimed.\n" );
+			ifec_reprime_ru ( netdev );
+			break;
+		default:
+			/* reserved values */
+			DBG ( "ifec_net_poll: RU state anomaly: %i\n",
+			      ( inw ( priv->ioaddr + SCBStatus ) >> 2 ) & 0xf );
+			break;
+	}
 }
 
-#define RFD_STATUS (RFD_OK | RFDRxCol | RFDRxErr | RFDShort | \
-                    RFDDMAOverrun | RFDNoBufs | RFDCRCError)
+#define RFD_STATUS ( RFD_OK | RFDRxCol | RFDRxErr | RFDShort | \
+		     RFDDMAOverrun | RFDNoBufs | RFDCRCError )
 /*
  * Looks for received packets in the rx ring, reports success or error to
  * the core accordingly. Starts reallocation of rx ring.
  *
  * @v netdev		Network device
  */
-static void ifec_rx_process(struct net_device* netdev)
+static void ifec_rx_process ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    int cur_rx = priv->cur_rx;
-    struct io_buffer* iob = priv->rx_iobs[cur_rx];
-    struct ifec_rfd* rfd = priv->rfds[cur_rx];
-    unsigned int rx_len;
-    s16 status;
+	struct ifec_private *priv   = netdev->priv;
+	int cur_rx = priv->cur_rx;
+	struct io_buffer *iob = priv->rx_iobs[cur_rx];
+	struct ifec_rfd *rfd = priv->rfds[cur_rx];
+	unsigned int rx_len;
+	s16 status;
 
-    DBGP("ifec_rx_process\n");
+	DBGP ( "ifec_rx_process\n" );
 
-    /* Process any received packets */
-    while (iob && rfd && (status = rfd->status)) {
-        rx_len = rfd->count & RFDMaskCount;
+	/* Process any received packets */
+	while ( iob && rfd && ( status = rfd->status ) ) {
+		rx_len = rfd->count & RFDMaskCount;
 
-        DBG2("Got a packet: Len = %d, cur_rx = %d.\n", rx_len,
-             cur_rx);
-        DBGIO_HD((void*)rfd->packet, 0x30);
+		DBG2 ( "Got a packet: Len = %d, cur_rx = %d.\n", rx_len,
+		       cur_rx );
+		DBGIO_HD ( (void*)rfd->packet, 0x30 );
 
-        if ((status & (RFD_STATUS & ~RFDShort)) != RFD_OK) {
-            DBG("Corrupted packet received. "
-                "Status = %#08hx\n", status);
-            netdev_rx_err(netdev, iob, -EINVAL);
-        } else {
-            /* Hand off the packet to the network subsystem */
-            iob_put(iob, rx_len);
-            DBG2("Received packet: %p, len: %d\n", iob, rx_len);
-            netdev_rx(netdev, iob);
-        }
+		if ( ( status & ( RFD_STATUS & ~RFDShort ) ) != RFD_OK ) {
+			DBG ( "Corrupted packet received. "
+			      "Status = %#08hx\n", status );
+			netdev_rx_err ( netdev, iob, -EINVAL );
+		} else {
+			/* Hand off the packet to the network subsystem */
+			iob_put ( iob, rx_len );
+			DBG2 ( "Received packet: %p, len: %d\n", iob, rx_len );
+			netdev_rx ( netdev, iob );
+		}
 
-        /* make sure we don't reuse this RFD */
-        priv->rx_iobs[cur_rx] = NULL;
-        priv->rfds[cur_rx] = NULL;
+		/* make sure we don't reuse this RFD */
+		priv->rx_iobs[cur_rx] = NULL;
+		priv->rfds[cur_rx] = NULL;
 
-        /* Next RFD */
-        priv->cur_rx = (cur_rx + 1) % RFD_COUNT;
-        cur_rx = priv->cur_rx;
-        iob = priv->rx_iobs[cur_rx];
-        rfd = priv->rfds[cur_rx];
-    }
+		/* Next RFD */
+		priv->cur_rx = ( cur_rx + 1 ) % RFD_COUNT;
+		cur_rx = priv->cur_rx;
+		iob = priv->rx_iobs[cur_rx];
+		rfd = priv->rfds[cur_rx];
+	}
 
-    ifec_refill_rx_ring(netdev);
+	ifec_refill_rx_ring ( netdev );
 }
 
 /*
@@ -841,27 +844,27 @@ static void ifec_rx_process(struct net_device* netdev)
  * @v link		Pointer to ned RFD
  * @ret rc		0 on success, negative on failure
  */
-static int ifec_get_rx_desc(struct net_device* netdev, int cur, int cmd,
-                            int link)
+static int ifec_get_rx_desc ( struct net_device *netdev, int cur, int cmd,
+			      int link )
 {
-    struct ifec_private* priv = netdev->priv;
-    struct ifec_rfd* rfd = priv->rfds[cur];
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_rfd *rfd  = priv->rfds[cur];
 
-    DBGP("ifec_get_rx_desc\n");
+	DBGP ( "ifec_get_rx_desc\n" );
 
-    priv->rx_iobs[cur] = alloc_iob(sizeof(*rfd));
-    if (!priv->rx_iobs[cur]) {
-        DBG("alloc_iob failed. desc. nr: %d\n", cur);
-        priv->rfds[cur] = NULL;
-        return -ENOMEM;
-    }
+	priv->rx_iobs[cur] = alloc_iob ( sizeof ( *rfd ) );
+	if ( ! priv->rx_iobs[cur] ) {
+		DBG ( "alloc_iob failed. desc. nr: %d\n", cur );
+		priv->rfds[cur] = NULL;
+		return -ENOMEM;
+	}
 
-    /* Initialize new tail. */
-    priv->rfds[cur] = priv->rx_iobs[cur]->data;
-    ifec_rfd_init(priv->rfds[cur], cmd, link);
-    iob_reserve(priv->rx_iobs[cur], RFD_HEADER_LEN);
+	/* Initialize new tail. */
+	priv->rfds[cur] = priv->rx_iobs[cur]->data;
+	ifec_rfd_init ( priv->rfds[cur], cmd, link );
+	iob_reserve ( priv->rx_iobs[cur], RFD_HEADER_LEN );
 
-    return 0;
+	return 0;
 }
 
 /*
@@ -869,37 +872,38 @@ static int ifec_get_rx_desc(struct net_device* netdev, int cur, int cmd,
  *
  * @v netdev		Network device
  */
-static void ifec_refill_rx_ring(struct net_device* netdev)
+static void ifec_refill_rx_ring ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    int i, cur_rx;
-    unsigned short intr_status;
+	struct ifec_private *priv = netdev->priv;
+	int i, cur_rx;
+	unsigned short intr_status;
 
-    DBGP("ifec_refill_rx_ring\n");
+	DBGP ( "ifec_refill_rx_ring\n" );
 
-    for (i = 0; i < RFD_COUNT; i++) {
-        cur_rx = (priv->cur_rx + i) % RFD_COUNT;
-        /* only refill if empty */
-        if (priv->rfds[cur_rx] != NULL ||
-            priv->rx_iobs[cur_rx] != NULL)
-            continue;
+	for ( i = 0; i < RFD_COUNT; i++ ) {
+		cur_rx = ( priv->cur_rx + i ) % RFD_COUNT;
+		/* only refill if empty */
+		if ( priv->rfds[cur_rx] != NULL ||
+		     priv->rx_iobs[cur_rx] != NULL )
+			continue;
 
-        DBG2("refilling RFD %d\n", cur_rx);
+		DBG2 ( "refilling RFD %d\n", cur_rx );
 
-        if (ifec_get_rx_desc(netdev, cur_rx,
-                             CmdSuspend | CmdEndOfList, 0) == 0) {
-            if (i > 0) {
-                int prev_rx = (((cur_rx + RFD_COUNT) - 1) % RFD_COUNT);
-                struct ifec_rfd* rfd = priv->rfds[prev_rx];
+		if ( ifec_get_rx_desc ( netdev, cur_rx,
+		     CmdSuspend | CmdEndOfList, 0 ) == 0 ) {
+			if ( i > 0 ) {
+				int prev_rx = ( ( ( cur_rx + RFD_COUNT ) - 1 )
+						% RFD_COUNT );
+				struct ifec_rfd *rfd = priv->rfds[prev_rx];
 
-                rfd->command = 0;
-                rfd->link = virt_to_bus(priv->rfds[cur_rx]);
-            }
-        }
-    }
+				rfd->command = 0;
+				rfd->link = virt_to_bus ( priv->rfds[cur_rx] );
+			}
+		}
+	}
 
-    intr_status = inw(priv->ioaddr + SCBStatus);
-    ifec_check_ru_status(netdev, intr_status);
+	intr_status = inw ( priv->ioaddr + SCBStatus );
+	ifec_check_ru_status ( netdev, intr_status );
 }
 
 /*
@@ -908,23 +912,23 @@ static void ifec_refill_rx_ring(struct net_device* netdev)
  * @v netdev  		Device of rx ring.
  * @ret rc    		Non-zero if error occurred
  */
-static int ifec_rx_setup(struct net_device* netdev)
+static int ifec_rx_setup ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    int i;
+	struct ifec_private *priv = netdev->priv;
+	int i;
 
-    DBGP("ifec_rx_setup\n");
+	DBGP ( "ifec_rx_setup\n" );
 
-    priv->cur_rx = 0;
+	priv->cur_rx = 0;
 
-    /* init values for ifec_refill_rx_ring() */
-    for (i = 0; i < RFD_COUNT; i++) {
-        priv->rfds[i] = NULL;
-        priv->rx_iobs[i] = NULL;
-    }
-    ifec_refill_rx_ring(netdev);
+	/* init values for ifec_refill_rx_ring() */
+	for ( i = 0; i < RFD_COUNT; i++ ) {
+		priv->rfds[i] = NULL;
+		priv->rx_iobs[i] = NULL;
+	}
+	ifec_refill_rx_ring ( netdev );
 
-    return 0;
+	return 0;
 }
 
 /*
@@ -935,20 +939,20 @@ static int ifec_rx_setup(struct net_device* netdev)
  * @v cmd   		Command to issue.
  * @ret rc  		Non-zero if command not issued.
  */
-static int ifec_scb_cmd(struct net_device* netdev, u32 ptr, u8 cmd)
+static int ifec_scb_cmd ( struct net_device *netdev, u32 ptr, u8 cmd )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long ioaddr = priv->ioaddr;
-    int rc;
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	int rc;
 
-    DBGP("ifec_scb_cmd\n");
+	DBGP ( "ifec_scb_cmd\n" );
 
-    rc = ifec_scb_cmd_wait(netdev); /* Wait until ready */
-    if (!rc) {
-        outl(ptr, ioaddr + SCBPointer);
-        outb(cmd, ioaddr + SCBCmd); /* Issue command */
-    }
-    return rc;
+	rc = ifec_scb_cmd_wait ( netdev );	/* Wait until ready */
+	if ( !rc ) {
+		outl ( ptr, ioaddr + SCBPointer );
+		outb ( cmd, ioaddr + SCBCmd );		/* Issue command */
+	}
+	return rc;
 }
 
 /*
@@ -957,20 +961,20 @@ static int ifec_scb_cmd(struct net_device* netdev, u32 ptr, u8 cmd)
  * @v cmd_ioaddr	I/O address of command register.
  * @ret rc      	Non-zero if command timed out.
  */
-static int ifec_scb_cmd_wait(struct net_device* netdev)
+static int ifec_scb_cmd_wait ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long cmd_ioaddr = priv->ioaddr + SCBCmd;
-    int rc, wait = CU_CMD_TIMEOUT;
+	struct ifec_private *priv = netdev->priv;
+	unsigned long cmd_ioaddr = priv->ioaddr + SCBCmd;
+	int rc, wait = CU_CMD_TIMEOUT;
 
-    DBGP("ifec_scb_cmd_wait\n");
+	DBGP ( "ifec_scb_cmd_wait\n" );
 
-    for (; wait && (rc = inb(cmd_ioaddr)); wait--)
-        udelay(1);
+	for ( ; wait && ( rc = inb ( cmd_ioaddr ) ); wait-- )
+		udelay ( 1 );
 
-    if (!wait)
-        DBG("ifec_scb_cmd_wait timeout!\n");
-    return rc;
+	if ( !wait )
+		DBG ( "ifec_scb_cmd_wait timeout!\n" );
+	return rc;
 }
 
 /*
@@ -978,32 +982,32 @@ static int ifec_scb_cmd_wait(struct net_device* netdev)
  *
  * @v netdev    	Network device.
  */
-static void ifec_tx_process(struct net_device* netdev)
+static void ifec_tx_process ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    struct ifec_tcb* tcb = priv->tcb_tail;
-    s16 status;
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_tcb *tcb = priv->tcb_tail;
+	s16 status;
 
-    DBGP("ifec_tx_process\n");
+	DBGP ( "ifec_tx_process\n" );
 
-    /* Check status of transmitted packets */
-    while ((status = tcb->status) && tcb->iob) {
-        if (status & TCB_U) {
-            /* report error to iPXE */
-            DBG("ifec_tx_process : tx error!\n ");
-            netdev_tx_complete_err(netdev, tcb->iob, -EINVAL);
-        } else {
-            /* report successful transmit */
-            netdev_tx_complete(netdev, tcb->iob);
-        }
-        DBG2("tx completion\n");
+	/* Check status of transmitted packets */
+	while ( ( status = tcb->status ) && tcb->iob ) {
+		if ( status & TCB_U ) {
+			/* report error to iPXE */
+			DBG ( "ifec_tx_process : tx error!\n " );
+			netdev_tx_complete_err ( netdev, tcb->iob, -EINVAL );
+		} else {
+			/* report successful transmit */
+			netdev_tx_complete ( netdev, tcb->iob );
+		}
+		DBG2 ( "tx completion\n" );
 
-        tcb->iob = NULL;
-        tcb->status = 0;
+		tcb->iob = NULL;
+		tcb->status = 0;
 
-        priv->tcb_tail = tcb->next; /* Next TCB */
-        tcb = tcb->next;
-    }
+		priv->tcb_tail = tcb->next;	/* Next TCB */
+		tcb = tcb->next;
+	}
 }
 
 /*
@@ -1012,40 +1016,40 @@ static void ifec_tx_process(struct net_device* netdev)
  * @v netdev    	Network device.
  * @ret rc      	Non-zero if error occurred.
  */
-static int ifec_tx_setup(struct net_device* netdev)
+static int ifec_tx_setup ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    struct ifec_tcb* tcb;
-    int i;
+	struct ifec_private *priv = netdev->priv;
+	struct ifec_tcb *tcb;
+	int i;
 
-    DBGP("ifec_tx_setup\n");
+	DBGP ( "ifec_tx_setup\n" );
 
-    /* allocate tx ring */
-    priv->tcbs = malloc_phys(TX_RING_BYTES, CB_ALIGN);
-    if (!priv->tcbs) {
-        DBG("TX-ring allocation failed\n");
-        return -ENOMEM;
-    }
+	/* allocate tx ring */
+	priv->tcbs = malloc_phys ( TX_RING_BYTES, CB_ALIGN );
+	if ( !priv->tcbs ) {
+		DBG ( "TX-ring allocation failed\n" );
+		return -ENOMEM;
+	}
 
-    tcb = priv->tcb_tail = priv->tcbs;
-    priv->tx_curr = priv->tx_tail = 0;
-    priv->tx_cnt = 0;
+	tcb = priv->tcb_tail = priv->tcbs;
+	priv->tx_curr = priv->tx_tail = 0;
+	priv->tx_cnt = 0;
 
-    for (i = 0; i < TCB_COUNT; i++, tcb++) {
-        tcb->status = 0;
-        tcb->count = 0x01208000;
-        tcb->iob = NULL;
-        tcb->tbda_addr = virt_to_bus(&tcb->tbd_addr0);
-        tcb->link = virt_to_bus(tcb + 1);
-        tcb->next = tcb + 1;
-    }
-    /* We point tcb_head at the last TCB, so the first ifec_net_transmit()
-     * will use the first (head->next) TCB to transmit. */
-    priv->tcb_head = --tcb;
-    tcb->link = virt_to_bus(priv->tcbs);
-    tcb->next = priv->tcbs;
-
-    return 0;
+	for ( i = 0; i < TCB_COUNT; i++, tcb++ ) {
+		tcb->status    = 0;
+		tcb->count     = 0x01208000;
+		tcb->iob       = NULL;
+		tcb->tbda_addr = virt_to_bus ( &tcb->tbd_addr0 );
+		tcb->link      = virt_to_bus ( tcb + 1 );
+		tcb->next      = tcb + 1;
+	}
+	/* We point tcb_head at the last TCB, so the first ifec_net_transmit()
+	 * will use the first (head->next) TCB to transmit. */
+	priv->tcb_head = --tcb;
+	tcb->link = virt_to_bus ( priv->tcbs );
+	tcb->next = priv->tcbs;
+	
+	return 0;
 }
 
 /*
@@ -1065,79 +1069,79 @@ static int ifec_tx_setup(struct net_device* netdev)
  *   erasing the previous CmdSuspend, without the possibility of an intervening
  *   delay.
  */
-void ifec_tx_wake(struct net_device* netdev)
+void ifec_tx_wake ( struct net_device *netdev )
 {
-    struct ifec_private* priv = netdev->priv;
-    unsigned long ioaddr = priv->ioaddr;
-    struct ifec_tcb* tcb = priv->tcb_head->next;
+	struct ifec_private *priv = netdev->priv;
+	unsigned long ioaddr = priv->ioaddr;
+	struct ifec_tcb *tcb = priv->tcb_head->next;
 
-    DBGP("ifec_tx_wake\n");
+	DBGP ( "ifec_tx_wake\n" );
 
-    /* For the special case of the first transmit, we issue a START. The
-     * card won't RESUME after the configure command. */
-    if (priv->configured) {
-        priv->configured = 0;
-        ifec_scb_cmd(netdev, virt_to_bus(tcb), CUStart);
-        ifec_scb_cmd_wait(netdev);
-        return;
-    }
+	/* For the special case of the first transmit, we issue a START. The
+	 * card won't RESUME after the configure command. */
+	if ( priv->configured ) {
+		priv->configured = 0;
+		ifec_scb_cmd ( netdev, virt_to_bus ( tcb ), CUStart );
+		ifec_scb_cmd_wait ( netdev );
+		return;
+	}
 
-    /* Resume if suspended. */
-    switch ((inw(ioaddr + SCBStatus) >> 6) & 0x3) {
-        case 0: /* Idle - We should not reach this state. */
-            DBG2("ifec_tx_wake: tx idle!\n");
-            ifec_scb_cmd(netdev, virt_to_bus(tcb), CUStart);
-            ifec_scb_cmd_wait(netdev);
-            return;
-        case 1: /* Suspended */
-            DBG2("s");
-            break;
-        default: /* Active */
-            DBG2("a");
-    }
-    ifec_scb_cmd_wait(netdev);
-    outl(0, ioaddr + SCBPointer);
-    priv->tcb_head->command &= ~CmdSuspend;
-    /* Immediately issue Resume command */
-    outb(CUResume, ioaddr + SCBCmd);
-    ifec_scb_cmd_wait(netdev);
+	/* Resume if suspended. */
+	switch ( ( inw ( ioaddr + SCBStatus ) >> 6 ) & 0x3 ) {
+	case 0:  /* Idle - We should not reach this state. */
+		DBG2 ( "ifec_tx_wake: tx idle!\n" );
+		ifec_scb_cmd ( netdev, virt_to_bus ( tcb ), CUStart );
+		ifec_scb_cmd_wait ( netdev );
+		return;
+	case 1:  /* Suspended */
+		DBG2 ( "s" );
+		break;
+	default: /* Active */
+		DBG2 ( "a" );
+	}
+	ifec_scb_cmd_wait ( netdev );
+	outl ( 0, ioaddr + SCBPointer );
+	priv->tcb_head->command &= ~CmdSuspend;
+	/* Immediately issue Resume command */
+	outb ( CUResume, ioaddr + SCBCmd );
+	ifec_scb_cmd_wait ( netdev );
 }
 
 /*********************************************************************/
 
 static struct pci_device_id ifec_nics[] = {
-    PCI_ROM(0x8086, 0x1029, "id1029", "Intel EtherExpressPro100 ID1029", 0),
-    PCI_ROM(0x8086, 0x1030, "id1030", "Intel EtherExpressPro100 ID1030", 0),
-    PCI_ROM(0x8086, 0x1031, "82801cam", "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
-    PCI_ROM(0x8086, 0x1032, "eepro100-1032", "Intel PRO/100 VE Network Connection", 0),
-    PCI_ROM(0x8086, 0x1033, "eepro100-1033", "Intel PRO/100 VM Network Connection", 0),
-    PCI_ROM(0x8086, 0x1034, "eepro100-1034", "Intel PRO/100 VM Network Connection", 0),
-    PCI_ROM(0x8086, 0x1035, "eepro100-1035", "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
-    PCI_ROM(0x8086, 0x1036, "eepro100-1036", "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
-    PCI_ROM(0x8086, 0x1037, "eepro100-1037", "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
-    PCI_ROM(0x8086, 0x1038, "id1038", "Intel PRO/100 VM Network Connection", 0),
-    PCI_ROM(0x8086, 0x1039, "82562et", "Intel PRO100 VE 82562ET", 0),
-    PCI_ROM(0x8086, 0x103a, "id103a", "Intel Corporation 82559 InBusiness 10/100", 0),
-    PCI_ROM(0x8086, 0x103b, "82562etb", "Intel PRO100 VE 82562ETB", 0),
-    PCI_ROM(0x8086, 0x103c, "eepro100-103c", "Intel PRO/100 VM Network Connection", 0),
-    PCI_ROM(0x8086, 0x103d, "eepro100-103d", "Intel PRO/100 VE Network Connection", 0),
-    PCI_ROM(0x8086, 0x103e, "eepro100-103e", "Intel PRO/100 VM Network Connection", 0),
-    PCI_ROM(0x8086, 0x1051, "prove", "Intel PRO/100 VE Network Connection", 0),
-    PCI_ROM(0x8086, 0x1059, "82551qm", "Intel PRO/100 M Mobile Connection", 0),
-    PCI_ROM(0x8086, 0x1209, "82559er", "Intel EtherExpressPro100 82559ER", 0),
-    PCI_ROM(0x8086, 0x1227, "82865", "Intel 82865 EtherExpress PRO/100A", 0),
-    PCI_ROM(0x8086, 0x1228, "82556", "Intel 82556 EtherExpress PRO/100 Smart", 0),
-    PCI_ROM(0x8086, 0x1229, "eepro100", "Intel EtherExpressPro100", 0),
-    PCI_ROM(0x8086, 0x2449, "82562em", "Intel EtherExpressPro100 82562EM", 0),
-    PCI_ROM(0x8086, 0x2459, "82562-1", "Intel 82562 based Fast Ethernet Connection", 0),
-    PCI_ROM(0x8086, 0x245d, "82562-2", "Intel 82562 based Fast Ethernet Connection", 0),
-    PCI_ROM(0x8086, 0x1050, "82562ez", "Intel 82562EZ Network Connection", 0),
-    PCI_ROM(0x8086, 0x1065, "82562-3", "Intel 82562 based Fast Ethernet Connection", 0),
-    PCI_ROM(0x8086, 0x5200, "eepro100-5200", "Intel EtherExpress PRO/100 Intelligent Server", 0),
-    PCI_ROM(0x8086, 0x5201, "eepro100-5201", "Intel EtherExpress PRO/100 Intelligent Server", 0),
-    PCI_ROM(0x8086, 0x1092, "82562-3", "Intel Pro/100 VE Network", 0),
-    PCI_ROM(0x8086, 0x27dc, "eepro100-27dc", "Intel 82801G (ICH7) Chipset Ethernet Controller", 0),
-    PCI_ROM(0x8086, 0x10fe, "82552", "Intel 82552 10/100 Network Connection", 0),
+PCI_ROM(0x8086, 0x1029, "id1029",        "Intel EtherExpressPro100 ID1029", 0),
+PCI_ROM(0x8086, 0x1030, "id1030",        "Intel EtherExpressPro100 ID1030", 0),
+PCI_ROM(0x8086, 0x1031, "82801cam",      "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
+PCI_ROM(0x8086, 0x1032, "eepro100-1032", "Intel PRO/100 VE Network Connection", 0),
+PCI_ROM(0x8086, 0x1033, "eepro100-1033", "Intel PRO/100 VM Network Connection", 0),
+PCI_ROM(0x8086, 0x1034, "eepro100-1034", "Intel PRO/100 VM Network Connection", 0),
+PCI_ROM(0x8086, 0x1035, "eepro100-1035", "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
+PCI_ROM(0x8086, 0x1036, "eepro100-1036", "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
+PCI_ROM(0x8086, 0x1037, "eepro100-1037", "Intel 82801CAM (ICH3) Chipset Ethernet Controller", 0),
+PCI_ROM(0x8086, 0x1038, "id1038",        "Intel PRO/100 VM Network Connection", 0),
+PCI_ROM(0x8086, 0x1039, "82562et",       "Intel PRO100 VE 82562ET", 0),
+PCI_ROM(0x8086, 0x103a, "id103a",        "Intel Corporation 82559 InBusiness 10/100", 0),
+PCI_ROM(0x8086, 0x103b, "82562etb",      "Intel PRO100 VE 82562ETB", 0),
+PCI_ROM(0x8086, 0x103c, "eepro100-103c", "Intel PRO/100 VM Network Connection", 0),
+PCI_ROM(0x8086, 0x103d, "eepro100-103d", "Intel PRO/100 VE Network Connection", 0),
+PCI_ROM(0x8086, 0x103e, "eepro100-103e", "Intel PRO/100 VM Network Connection", 0),
+PCI_ROM(0x8086, 0x1051, "prove",         "Intel PRO/100 VE Network Connection", 0),
+PCI_ROM(0x8086, 0x1059, "82551qm",       "Intel PRO/100 M Mobile Connection", 0),
+PCI_ROM(0x8086, 0x1209, "82559er",       "Intel EtherExpressPro100 82559ER", 0),
+PCI_ROM(0x8086, 0x1227, "82865",         "Intel 82865 EtherExpress PRO/100A", 0),
+PCI_ROM(0x8086, 0x1228, "82556",         "Intel 82556 EtherExpress PRO/100 Smart", 0),
+PCI_ROM(0x8086, 0x1229, "eepro100",      "Intel EtherExpressPro100", 0),
+PCI_ROM(0x8086, 0x2449, "82562em",       "Intel EtherExpressPro100 82562EM", 0),
+PCI_ROM(0x8086, 0x2459, "82562-1",       "Intel 82562 based Fast Ethernet Connection", 0),
+PCI_ROM(0x8086, 0x245d, "82562-2",       "Intel 82562 based Fast Ethernet Connection", 0),
+PCI_ROM(0x8086, 0x1050, "82562ez",       "Intel 82562EZ Network Connection", 0),
+PCI_ROM(0x8086, 0x1065, "82562-3",       "Intel 82562 based Fast Ethernet Connection", 0),
+PCI_ROM(0x8086, 0x5200, "eepro100-5200", "Intel EtherExpress PRO/100 Intelligent Server", 0),
+PCI_ROM(0x8086, 0x5201, "eepro100-5201", "Intel EtherExpress PRO/100 Intelligent Server", 0),
+PCI_ROM(0x8086, 0x1092, "82562-3",       "Intel Pro/100 VE Network", 0),
+PCI_ROM(0x8086, 0x27dc, "eepro100-27dc", "Intel 82801G (ICH7) Chipset Ethernet Controller", 0),
+PCI_ROM(0x8086, 0x10fe, "82552",         "Intel 82552 10/100 Network Connection", 0),
 };
 
 /* Cards with device ids 0x1030 to 0x103F, 0x2449, 0x2459 or 0x245D might need
@@ -1145,10 +1149,11 @@ static struct pci_device_id ifec_nics[] = {
  * 2003/03/17 gbaum */
 
 struct pci_driver ifec_driver __pci_driver = {
-    .ids = ifec_nics,
-    .id_count = (sizeof(ifec_nics) / sizeof(ifec_nics[0])),
-    .probe = ifec_pci_probe,
-    .remove = ifec_pci_remove};
+	.ids      = ifec_nics,
+	.id_count = ( sizeof (ifec_nics) / sizeof (ifec_nics[0]) ),
+	.probe    = ifec_pci_probe,
+	.remove   = ifec_pci_remove
+};
 
 /*
  * Local variables:

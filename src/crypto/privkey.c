@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -46,44 +46,44 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /* Allow private key to be overridden if not explicitly specified */
 #ifdef PRIVATE_KEY
-    #define ALLOW_KEY_OVERRIDE 0
+#define ALLOW_KEY_OVERRIDE 0
 #else
-    #define ALLOW_KEY_OVERRIDE 1
+#define ALLOW_KEY_OVERRIDE 1
 #endif
 
 /* Raw private key data */
 extern char private_key_data[];
 extern char private_key_len[];
-__asm__(".section \".rodata\", \"a\", " PROGBITS "\n\t"
-        "\nprivate_key_data:\n\t"
+__asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"
+	  "\nprivate_key_data:\n\t"
 #ifdef PRIVATE_KEY
-        ".incbin \"" PRIVATE_KEY "\"\n\t"
+	  ".incbin \"" PRIVATE_KEY "\"\n\t"
 #endif /* PRIVATE_KEY */
-        ".size private_key_data, ( . - private_key_data )\n\t"
-        ".equ private_key_len, ( . - private_key_data )\n\t"
-        ".previous\n\t");
+	  ".size private_key_data, ( . - private_key_data )\n\t"
+	  ".equ private_key_len, ( . - private_key_data )\n\t"
+	  ".previous\n\t" );
 
 /** Private key */
 struct private_key private_key = {
-    .refcnt = REF_INIT(ref_no_free),
-    .builder = {
-        .data = private_key_data,
-        .len = ((size_t)private_key_len),
-    },
+	.refcnt = REF_INIT ( ref_no_free ),
+	.builder = {
+		.data = private_key_data,
+		.len = ( ( size_t ) private_key_len ),
+	},
 };
 
 /** Default private key */
 static struct asn1_cursor default_private_key = {
-    .data = private_key_data,
-    .len = ((size_t)private_key_len),
+	.data = private_key_data,
+	.len = ( ( size_t ) private_key_len ),
 };
 
 /** Private key setting */
-static struct setting privkey_setting __setting(SETTING_CRYPTO, privkey) = {
-    .name = "privkey",
-    .description = "Private key",
-    .tag = DHCP_EB_KEY,
-    .type = &setting_type_hex,
+static struct setting privkey_setting __setting ( SETTING_CRYPTO, privkey ) = {
+	.name = "privkey",
+	.description = "Private key",
+	.tag = DHCP_EB_KEY,
+	.type = &setting_type_hex,
 };
 
 /**
@@ -91,12 +91,12 @@ static struct setting privkey_setting __setting(SETTING_CRYPTO, privkey) = {
  *
  * @v refcnt		Reference counter
  */
-void privkey_free(struct refcnt* refcnt) {
-    struct private_key* key =
-        container_of(refcnt, struct private_key, refcnt);
+void privkey_free ( struct refcnt *refcnt ) {
+	struct private_key *key =
+		container_of ( refcnt, struct private_key, refcnt );
 
-    free(key->builder.data);
-    free(key);
+	free ( key->builder.data );
+	free ( key );
 }
 
 /**
@@ -104,41 +104,42 @@ void privkey_free(struct refcnt* refcnt) {
  *
  * @ret rc		Return status code
  */
-static int privkey_apply_settings(void) {
-    static void* key_data = NULL;
-    int len;
+static int privkey_apply_settings ( void ) {
+	static void *key_data = NULL;
+	int len;
 
-    /* Allow private key to be overridden only if not explicitly
-     * specified at build time.
-     */
-    if (ALLOW_KEY_OVERRIDE) {
-        /* Restore default private key */
-        memcpy(&private_key.builder, &default_private_key,
-               sizeof(private_key.builder));
+	/* Allow private key to be overridden only if not explicitly
+	 * specified at build time.
+	 */
+	if ( ALLOW_KEY_OVERRIDE ) {
 
-        /* Fetch new private key, if any */
-        free(key_data);
-        if ((len = fetch_raw_setting_copy(NULL, &privkey_setting,
-                                          &key_data)) >= 0) {
-            private_key.builder.data = key_data;
-            private_key.builder.len = len;
-        }
-    }
+		/* Restore default private key */
+		memcpy ( &private_key.builder, &default_private_key,
+			 sizeof ( private_key.builder ) );
 
-    /* Debug */
-    if (private_key.builder.len) {
-        DBGC(&private_key, "PRIVKEY using %s private key:\n",
-             (key_data ? "external" : "built-in"));
-        DBGC_HDA(&private_key, 0, private_key.builder.data,
-                 private_key.builder.len);
-    } else {
-        DBGC(&private_key, "PRIVKEY has no private key\n");
-    }
+		/* Fetch new private key, if any */
+		free ( key_data );
+		if ( ( len = fetch_raw_setting_copy ( NULL, &privkey_setting,
+						      &key_data ) ) >= 0 ) {
+			private_key.builder.data = key_data;
+			private_key.builder.len = len;
+		}
+	}
 
-    return 0;
+	/* Debug */
+	if ( private_key.builder.len ) {
+		DBGC ( &private_key, "PRIVKEY using %s private key:\n",
+		       ( key_data ? "external" : "built-in" ) );
+		DBGC_HDA ( &private_key, 0, private_key.builder.data,
+			   private_key.builder.len );
+	} else {
+		DBGC ( &private_key, "PRIVKEY has no private key\n" );
+	}
+
+	return 0;
 }
 
 /** Private key settings applicator */
 struct settings_applicator privkey_applicator __settings_applicator = {
-    .apply = privkey_apply_settings,
+	.apply = privkey_apply_settings,
 };

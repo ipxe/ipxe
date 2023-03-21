@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -42,10 +42,10 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 
-FEATURE(FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1);
+FEATURE ( FEATURE_IMAGE, "PXE", DHCP_EB_FEATURE_PXE, 1 );
 
 /** PXE command line */
-const char* pxe_cmdline;
+const char *pxe_cmdline;
 
 /**
  * Execute PXE image
@@ -53,61 +53,61 @@ const char* pxe_cmdline;
  * @v image		PXE image
  * @ret rc		Return status code
  */
-static int pxe_exec(struct image* image) {
-    userptr_t buffer = real_to_user(0, 0x7c00);
-    struct net_device* netdev;
-    int rc;
+static int pxe_exec ( struct image *image ) {
+	userptr_t buffer = real_to_user ( 0, 0x7c00 );
+	struct net_device *netdev;
+	int rc;
 
-    /* Verify and prepare segment */
-    if ((rc = prep_segment(buffer, image->len, image->len)) != 0) {
-        DBGC(image, "IMAGE %p could not prepare segment: %s\n",
-             image, strerror(rc));
-        return rc;
-    }
+	/* Verify and prepare segment */
+	if ( ( rc = prep_segment ( buffer, image->len, image->len ) ) != 0 ) {
+		DBGC ( image, "IMAGE %p could not prepare segment: %s\n",
+		       image, strerror ( rc ) );
+		return rc;
+	}
 
-    /* Copy image to segment */
-    memcpy_user(buffer, 0, image->data, 0, image->len);
+	/* Copy image to segment */
+	memcpy_user ( buffer, 0, image->data, 0, image->len );
 
-    /* Arbitrarily pick the most recently opened network device */
-    if ((netdev = last_opened_netdev()) == NULL) {
-        DBGC(image, "IMAGE %p could not locate PXE net device\n",
-             image);
-        return -ENODEV;
-    }
-    netdev_get(netdev);
+	/* Arbitrarily pick the most recently opened network device */
+	if ( ( netdev = last_opened_netdev() ) == NULL ) {
+		DBGC ( image, "IMAGE %p could not locate PXE net device\n",
+		       image );
+		return -ENODEV;
+	}
+	netdev_get ( netdev );
 
-    /* Activate PXE */
-    pxe_activate(netdev);
+	/* Activate PXE */
+	pxe_activate ( netdev );
 
-    /* Construct fake DHCP packets */
-    pxe_fake_cached_info();
+	/* Construct fake DHCP packets */
+	pxe_fake_cached_info();
 
-    /* Set PXE command line */
-    pxe_cmdline = image->cmdline;
+	/* Set PXE command line */
+	pxe_cmdline = image->cmdline;
 
-    /* Reset console since PXE NBP will probably use it */
-    console_reset();
+	/* Reset console since PXE NBP will probably use it */
+	console_reset();
 
-    /* Disable IRQ, if applicable */
-    if (netdev_irq_supported(netdev) && netdev->dev->desc.irq)
-        disable_irq(netdev->dev->desc.irq);
+	/* Disable IRQ, if applicable */
+	if ( netdev_irq_supported ( netdev ) && netdev->dev->desc.irq )
+		disable_irq ( netdev->dev->desc.irq );
 
-    /* Start PXE NBP */
-    rc = pxe_start_nbp();
+	/* Start PXE NBP */
+	rc = pxe_start_nbp();
 
-    /* Clear PXE command line */
-    pxe_cmdline = NULL;
+	/* Clear PXE command line */
+	pxe_cmdline = NULL;
 
-    /* Deactivate PXE */
-    pxe_deactivate();
+	/* Deactivate PXE */
+	pxe_deactivate();
 
-    /* Try to reopen network device.  Ignore errors, since the NBP
-     * may have called PXENV_STOP_UNDI.
-     */
-    netdev_open(netdev);
-    netdev_put(netdev);
+	/* Try to reopen network device.  Ignore errors, since the NBP
+	 * may have called PXENV_STOP_UNDI.
+	 */
+	netdev_open ( netdev );
+	netdev_put ( netdev );
 
-    return rc;
+	return rc;
 }
 
 /**
@@ -116,22 +116,23 @@ static int pxe_exec(struct image* image) {
  * @v image		PXE file
  * @ret rc		Return status code
  */
-int pxe_probe(struct image* image) {
-    /* Images too large to fit in base memory cannot be PXE
-     * images.  We include this check to help prevent unrecognised
-     * images from being marked as PXE images, since PXE images
-     * have no signature we can check against.
-     */
-    if (image->len > (0xa0000 - 0x7c00))
-        return -ENOEXEC;
+int pxe_probe ( struct image *image ) {
 
-    /* Rejecting zero-length images is also useful, since these
-     * end up looking to the user like bugs in iPXE.
-     */
-    if (!image->len)
-        return -ENOEXEC;
+	/* Images too large to fit in base memory cannot be PXE
+	 * images.  We include this check to help prevent unrecognised
+	 * images from being marked as PXE images, since PXE images
+	 * have no signature we can check against.
+	 */
+	if ( image->len > ( 0xa0000 - 0x7c00 ) )
+		return -ENOEXEC;
 
-    return 0;
+	/* Rejecting zero-length images is also useful, since these
+	 * end up looking to the user like bugs in iPXE.
+	 */
+	if ( ! image->len )
+		return -ENOEXEC;
+
+	return 0;
 }
 
 /**
@@ -140,39 +141,39 @@ int pxe_probe(struct image* image) {
  * @v image		PXE file
  * @ret rc		Return status code
  */
-int pxe_probe_no_mz(struct image* image) {
-    uint16_t magic;
-    int rc;
+int pxe_probe_no_mz ( struct image *image ) {
+	uint16_t magic;
+	int rc;
 
-    /* Probe PXE image */
-    if ((rc = pxe_probe(image)) != 0)
-        return rc;
+	/* Probe PXE image */
+	if ( ( rc = pxe_probe ( image ) ) != 0 )
+		return rc;
 
-    /* Reject image with an "MZ" signature which may indicate an
-     * EFI image incorrectly handed out to a BIOS system.
-     */
-    if (image->len >= sizeof(magic)) {
-        copy_from_user(&magic, image->data, 0, sizeof(magic));
-        if (magic == cpu_to_le16(EFI_IMAGE_DOS_SIGNATURE)) {
-            DBGC(image, "IMAGE %p may be an EFI image\n",
-                 image);
-            return -ENOTTY;
-        }
-    }
+	/* Reject image with an "MZ" signature which may indicate an
+	 * EFI image incorrectly handed out to a BIOS system.
+	 */
+	if ( image->len >= sizeof ( magic ) ) {
+		copy_from_user ( &magic, image->data, 0, sizeof ( magic ) );
+		if ( magic == cpu_to_le16 ( EFI_IMAGE_DOS_SIGNATURE ) ) {
+			DBGC ( image, "IMAGE %p may be an EFI image\n",
+			       image );
+			return -ENOTTY;
+		}
+	}
 
-    return 0;
+	return 0;
 }
 
 /** PXE image type */
-struct image_type pxe_image_type[] __image_type(PROBE_PXE) = {
-    {
-        .name = "PXE-NBP",
-        .probe = pxe_probe_no_mz,
-        .exec = pxe_exec,
-    },
-    {
-        .name = "PXE-NBP (may be EFI?)",
-        .probe = pxe_probe,
-        .exec = pxe_exec,
-    },
+struct image_type pxe_image_type[] __image_type ( PROBE_PXE ) = {
+	{
+		.name = "PXE-NBP",
+		.probe = pxe_probe_no_mz,
+		.exec = pxe_exec,
+	},
+	{
+		.name = "PXE-NBP (may be EFI?)",
+		.probe = pxe_probe,
+		.exec = pxe_exec,
+	},
 };

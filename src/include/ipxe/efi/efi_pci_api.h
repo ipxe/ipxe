@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef _IPXE_EFI_PCI_API_H
-    #define _IPXE_EFI_PCI_API_H
+#define _IPXE_EFI_PCI_API_H
 
 /** @file
  *
@@ -9,30 +7,30 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #ifdef PCIAPI_EFI
-        #define PCIAPI_PREFIX_efi
-    #else
-        #define PCIAPI_PREFIX_efi __efi_
-    #endif
+#ifdef PCIAPI_EFI
+#define PCIAPI_PREFIX_efi
+#else
+#define PCIAPI_PREFIX_efi __efi_
+#endif
 
-    /* EFI PCI width codes defined by EFI spec */
-    #define EFIPCI_WIDTH_BYTE 0
-    #define EFIPCI_WIDTH_WORD 1
-    #define EFIPCI_WIDTH_DWORD 2
+/* EFI PCI width codes defined by EFI spec */
+#define EFIPCI_WIDTH_BYTE 0
+#define EFIPCI_WIDTH_WORD 1
+#define EFIPCI_WIDTH_DWORD 2
 
-    #define EFIPCI_LOCATION(_offset, _width) \
-        ((_offset) | ((_width) << 16))
-    #define EFIPCI_OFFSET(_location) ((_location)&0xffff)
-    #define EFIPCI_WIDTH(_location) ((_location) >> 16)
+#define EFIPCI_LOCATION( _offset, _width ) \
+	( (_offset) | ( (_width) << 16 ) )
+#define EFIPCI_OFFSET( _location ) ( (_location) & 0xffff )
+#define EFIPCI_WIDTH( _location ) ( (_location) >> 16 )
 
 struct pci_device;
 
-extern int efipci_read(struct pci_device* pci, unsigned long location,
-                       void* value);
-extern int efipci_write(struct pci_device* pci, unsigned long location,
-                        unsigned long value);
+extern int efipci_read ( struct pci_device *pci, unsigned long location,
+			 void *value );
+extern int efipci_write ( struct pci_device *pci, unsigned long location,
+			  unsigned long value );
 
 /**
  * Find next PCI bus:dev.fn address range in system
@@ -41,10 +39,11 @@ extern int efipci_write(struct pci_device* pci, unsigned long location,
  * @v range		PCI bus:dev.fn address range to fill in
  */
 static inline __always_inline void
-PCIAPI_INLINE(efi, pci_discover)(uint32_t busdevfn __unused,
-                                 struct pci_range* range) {
-    /* EFI does not want us to scan the PCI bus ourselves */
-    range->count = 0;
+PCIAPI_INLINE ( efi, pci_discover ) ( uint32_t busdevfn __unused,
+				      struct pci_range *range ) {
+
+	/* EFI does not want us to scan the PCI bus ourselves */
+	range->count = 0;
 }
 
 /**
@@ -56,13 +55,13 @@ PCIAPI_INLINE(efi, pci_discover)(uint32_t busdevfn __unused,
  * @ret rc	Return status code
  */
 static inline __always_inline int
-PCIAPI_INLINE(efi, pci_read_config_byte)(struct pci_device* pci,
-                                         unsigned int where,
-                                         uint8_t* value) {
-    *value = 0xff;
-    return efipci_read(pci,
-                       EFIPCI_LOCATION(where, EFIPCI_WIDTH_BYTE),
-                       value);
+PCIAPI_INLINE ( efi, pci_read_config_byte ) ( struct pci_device *pci,
+					      unsigned int where,
+					      uint8_t *value ) {
+	*value = 0xff;
+	return efipci_read ( pci,
+			     EFIPCI_LOCATION ( where, EFIPCI_WIDTH_BYTE ),
+			     value );
 }
 
 /**
@@ -74,13 +73,13 @@ PCIAPI_INLINE(efi, pci_read_config_byte)(struct pci_device* pci,
  * @ret rc	Return status code
  */
 static inline __always_inline int
-PCIAPI_INLINE(efi, pci_read_config_word)(struct pci_device* pci,
-                                         unsigned int where,
-                                         uint16_t* value) {
-    *value = 0xffff;
-    return efipci_read(pci,
-                       EFIPCI_LOCATION(where, EFIPCI_WIDTH_WORD),
-                       value);
+PCIAPI_INLINE ( efi, pci_read_config_word ) ( struct pci_device *pci,
+					      unsigned int where,
+					      uint16_t *value ) {
+	*value = 0xffff;
+	return efipci_read ( pci,
+			     EFIPCI_LOCATION ( where, EFIPCI_WIDTH_WORD ),
+			     value );
 }
 
 /**
@@ -92,13 +91,13 @@ PCIAPI_INLINE(efi, pci_read_config_word)(struct pci_device* pci,
  * @ret rc	Return status code
  */
 static inline __always_inline int
-PCIAPI_INLINE(efi, pci_read_config_dword)(struct pci_device* pci,
-                                          unsigned int where,
-                                          uint32_t* value) {
-    *value = 0xffffffffUL;
-    return efipci_read(pci,
-                       EFIPCI_LOCATION(where, EFIPCI_WIDTH_DWORD),
-                       value);
+PCIAPI_INLINE ( efi, pci_read_config_dword ) ( struct pci_device *pci,
+					       unsigned int where,
+					       uint32_t *value ) {
+	*value = 0xffffffffUL;
+	return efipci_read ( pci,
+			     EFIPCI_LOCATION ( where, EFIPCI_WIDTH_DWORD ),
+			     value );
 }
 
 /**
@@ -110,12 +109,12 @@ PCIAPI_INLINE(efi, pci_read_config_dword)(struct pci_device* pci,
  * @ret rc	Return status code
  */
 static inline __always_inline int
-PCIAPI_INLINE(efi, pci_write_config_byte)(struct pci_device* pci,
-                                          unsigned int where,
-                                          uint8_t value) {
-    return efipci_write(pci,
-                        EFIPCI_LOCATION(where, EFIPCI_WIDTH_BYTE),
-                        value);
+PCIAPI_INLINE ( efi, pci_write_config_byte ) ( struct pci_device *pci,
+					       unsigned int where,
+					       uint8_t value ) {
+	return efipci_write ( pci,
+			      EFIPCI_LOCATION ( where, EFIPCI_WIDTH_BYTE ),
+			      value );
 }
 
 /**
@@ -127,12 +126,12 @@ PCIAPI_INLINE(efi, pci_write_config_byte)(struct pci_device* pci,
  * @ret rc	Return status code
  */
 static inline __always_inline int
-PCIAPI_INLINE(efi, pci_write_config_word)(struct pci_device* pci,
-                                          unsigned int where,
-                                          uint16_t value) {
-    return efipci_write(pci,
-                        EFIPCI_LOCATION(where, EFIPCI_WIDTH_WORD),
-                        value);
+PCIAPI_INLINE ( efi, pci_write_config_word ) ( struct pci_device *pci,
+					       unsigned int where,
+					       uint16_t value ) {
+	return efipci_write ( pci,
+			      EFIPCI_LOCATION ( where, EFIPCI_WIDTH_WORD ),
+			      value );
 }
 
 /**
@@ -144,12 +143,12 @@ PCIAPI_INLINE(efi, pci_write_config_word)(struct pci_device* pci,
  * @ret rc	Return status code
  */
 static inline __always_inline int
-PCIAPI_INLINE(efi, pci_write_config_dword)(struct pci_device* pci,
-                                           unsigned int where,
-                                           uint32_t value) {
-    return efipci_write(pci,
-                        EFIPCI_LOCATION(where, EFIPCI_WIDTH_DWORD),
-                        value);
+PCIAPI_INLINE ( efi, pci_write_config_dword ) ( struct pci_device *pci,
+						unsigned int where,
+						uint32_t value ) {
+	return efipci_write ( pci,
+			      EFIPCI_LOCATION ( where, EFIPCI_WIDTH_DWORD ),
+			      value );
 }
 
 #endif /* _IPXE_EFI_PCI_API_H */

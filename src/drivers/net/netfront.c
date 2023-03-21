@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -45,22 +45,22 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  */
 
 /* Disambiguate the various error causes */
-#define EIO_NETIF_RSP_ERROR \
-    __einfo_error(EINFO_EIO_NETIF_RSP_ERROR)
-#define EINFO_EIO_NETIF_RSP_ERROR                \
-    __einfo_uniqify(EINFO_EIO, -NETIF_RSP_ERROR, \
-                    "Unspecified network error")
-#define EIO_NETIF_RSP_DROPPED \
-    __einfo_error(EINFO_EIO_NETIF_RSP_DROPPED)
-#define EINFO_EIO_NETIF_RSP_DROPPED                \
-    __einfo_uniqify(EINFO_EIO, -NETIF_RSP_DROPPED, \
-                    "Packet dropped")
-#define EIO_NETIF_RSP(status)          \
-    EUNIQ(EINFO_EIO, (-(status)&0x1f), \
-          EIO_NETIF_RSP_ERROR, EIO_NETIF_RSP_DROPPED)
+#define EIO_NETIF_RSP_ERROR						\
+	__einfo_error ( EINFO_EIO_NETIF_RSP_ERROR )
+#define EINFO_EIO_NETIF_RSP_ERROR					\
+	__einfo_uniqify ( EINFO_EIO, -NETIF_RSP_ERROR,			\
+			  "Unspecified network error" )
+#define EIO_NETIF_RSP_DROPPED						\
+	__einfo_error ( EINFO_EIO_NETIF_RSP_DROPPED )
+#define EINFO_EIO_NETIF_RSP_DROPPED					\
+	__einfo_uniqify ( EINFO_EIO, -NETIF_RSP_DROPPED,		\
+			  "Packet dropped" )
+#define EIO_NETIF_RSP( status )						\
+	EUNIQ ( EINFO_EIO, ( -(status) & 0x1f ),			\
+		EIO_NETIF_RSP_ERROR, EIO_NETIF_RSP_DROPPED )
 
 /** List of netfront devices */
-static LIST_HEAD(netfront_devices);
+static LIST_HEAD ( netfront_devices );
 
 /******************************************************************************
  *
@@ -75,46 +75,47 @@ static LIST_HEAD(netfront_devices);
  * @v netfront		Netfront device
  * @ret rc		Return status code
  */
-static int netfront_reset(struct netfront_nic* netfront) {
-    struct xen_device* xendev = netfront->xendev;
-    int state;
-    int rc;
+static int netfront_reset ( struct netfront_nic *netfront ) {
+	struct xen_device *xendev = netfront->xendev;
+	int state;
+	int rc;
 
-    /* Get current backend state */
-    if ((state = xenbus_backend_state(xendev)) < 0) {
-        rc = state;
-        DBGC(netfront, "NETFRONT %s could not read backend state: "
-                       "%s\n", xendev->key, strerror(rc));
-        return rc;
-    }
+	/* Get current backend state */
+	if ( ( state = xenbus_backend_state ( xendev ) ) < 0 ) {
+		rc = state;
+		DBGC ( netfront, "NETFRONT %s could not read backend state: "
+		       "%s\n", xendev->key, strerror ( rc ) );
+		return rc;
+	}
 
-    /* If the backend is not already in InitWait, then mark
-     * frontend as Closed to shut down the backend.
-     */
-    if (state != XenbusStateInitWait) {
-        /* Set state to Closed */
-        xenbus_set_state(xendev, XenbusStateClosed);
+	/* If the backend is not already in InitWait, then mark
+	 * frontend as Closed to shut down the backend.
+	 */
+	if ( state != XenbusStateInitWait ) {
 
-        /* Wait for backend to reach Closed */
-        if ((rc = xenbus_backend_wait(xendev,
-                                      XenbusStateClosed)) != 0) {
-            DBGC(netfront, "NETFRONT %s backend did not reach "
-                           "Closed: %s\n", xendev->key, strerror(rc));
-            return rc;
-        }
-    }
+		/* Set state to Closed */
+		xenbus_set_state ( xendev, XenbusStateClosed );
 
-    /* Reset state to Initialising */
-    xenbus_set_state(xendev, XenbusStateInitialising);
+		/* Wait for backend to reach Closed */
+		if ( ( rc = xenbus_backend_wait ( xendev,
+						  XenbusStateClosed ) ) != 0 ) {
+			DBGC ( netfront, "NETFRONT %s backend did not reach "
+			       "Closed: %s\n", xendev->key, strerror ( rc ) );
+			return rc;
+		}
+	}
 
-    /* Wait for backend to reach InitWait */
-    if ((rc = xenbus_backend_wait(xendev, XenbusStateInitWait)) != 0) {
-        DBGC(netfront, "NETFRONT %s backend did not reach InitWait: "
-                       "%s\n", xendev->key, strerror(rc));
-        return rc;
-    }
+	/* Reset state to Initialising */
+	xenbus_set_state ( xendev, XenbusStateInitialising );
 
-    return 0;
+	/* Wait for backend to reach InitWait */
+	if ( ( rc = xenbus_backend_wait ( xendev, XenbusStateInitWait ) ) != 0){
+		DBGC ( netfront, "NETFRONT %s backend did not reach InitWait: "
+		       "%s\n", xendev->key, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -124,38 +125,38 @@ static int netfront_reset(struct netfront_nic* netfront) {
  * @v hw_addr		Hardware address to fill in
  * @ret rc		Return status code
  */
-static int netfront_read_mac(struct netfront_nic* netfront, void* hw_addr) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    char* mac;
-    int len;
-    int rc;
+static int netfront_read_mac ( struct netfront_nic *netfront, void *hw_addr ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	char *mac;
+	int len;
+	int rc;
 
-    /* Fetch MAC address */
-    if ((rc = xenstore_read(xen, &mac, xendev->key, "mac", NULL)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not read MAC address: %s\n",
-             xendev->key, strerror(rc));
-        goto err_xenstore_read;
-    }
-    DBGC2(netfront, "NETFRONT %s has MAC address \"%s\"\n",
-          xendev->key, mac);
+	/* Fetch MAC address */
+	if ( ( rc = xenstore_read ( xen, &mac, xendev->key, "mac", NULL ) )!=0){
+		DBGC ( netfront, "NETFRONT %s could not read MAC address: %s\n",
+		       xendev->key, strerror ( rc ) );
+		goto err_xenstore_read;
+	}
+	DBGC2 ( netfront, "NETFRONT %s has MAC address \"%s\"\n",
+		xendev->key, mac );
 
-    /* Decode MAC address */
-    len = hex_decode(':', mac, hw_addr, ETH_ALEN);
-    if (len < 0) {
-        rc = len;
-        DBGC(netfront, "NETFRONT %s could not decode MAC address "
-                       "\"%s\": %s\n", xendev->key, mac, strerror(rc));
-        goto err_decode;
-    }
+	/* Decode MAC address */
+	len = hex_decode ( ':', mac, hw_addr, ETH_ALEN );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( netfront, "NETFRONT %s could not decode MAC address "
+		       "\"%s\": %s\n", xendev->key, mac, strerror ( rc ) );
+		goto err_decode;
+	}
 
-    /* Success */
-    rc = 0;
+	/* Success */
+	rc = 0;
 
-err_decode:
-    free(mac);
-err_xenstore_read:
-    return rc;
+ err_decode:
+	free ( mac );
+ err_xenstore_read:
+	return rc;
 }
 
 /**
@@ -166,21 +167,21 @@ err_xenstore_read:
  * @v num		Numeric value
  * @ret rc		Return status code
  */
-static int netfront_write_num(struct netfront_nic* netfront,
-                              const char* subkey, unsigned long num) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    int rc;
+static int netfront_write_num ( struct netfront_nic *netfront,
+				const char *subkey, unsigned long num ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	int rc;
 
-    /* Write value */
-    if ((rc = xenstore_write_num(xen, num, xendev->key, subkey,
-                                 NULL)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not set %s=\"%ld\": %s\n",
-             xendev->key, subkey, num, strerror(rc));
-        return rc;
-    }
+	/* Write value */
+	if ( ( rc = xenstore_write_num ( xen, num, xendev->key, subkey,
+					 NULL ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not set %s=\"%ld\": %s\n",
+		       xendev->key, subkey, num, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -191,9 +192,10 @@ static int netfront_write_num(struct netfront_nic* netfront,
  * @v num		Numeric value
  * @ret rc		Return status code
  */
-static int netfront_write_flag(struct netfront_nic* netfront,
-                               const char* subkey) {
-    return netfront_write_num(netfront, subkey, 1);
+static int netfront_write_flag ( struct netfront_nic *netfront,
+				 const char *subkey ) {
+
+	return netfront_write_num ( netfront, subkey, 1 );
 }
 
 /**
@@ -203,19 +205,19 @@ static int netfront_write_flag(struct netfront_nic* netfront,
  * @v subkey		Subkey
  * @ret rc		Return status code
  */
-static int netfront_rm(struct netfront_nic* netfront, const char* subkey) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    int rc;
+static int netfront_rm ( struct netfront_nic *netfront, const char *subkey ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	int rc;
 
-    /* Remove value */
-    if ((rc = xenstore_rm(xen, xendev->key, subkey, NULL)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not delete %s: %s\n",
-             xendev->key, subkey, strerror(rc));
-        return rc;
-    }
+	/* Remove value */
+	if ( ( rc = xenstore_rm ( xen, xendev->key, subkey, NULL ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not delete %s: %s\n",
+		       xendev->key, subkey, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /******************************************************************************
@@ -231,40 +233,40 @@ static int netfront_rm(struct netfront_nic* netfront, const char* subkey) {
  * @v netfront		Netfront device
  * @ret rc		Return status code
  */
-static int netfront_create_event(struct netfront_nic* netfront) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    struct evtchn_alloc_unbound alloc_unbound;
-    struct evtchn_close close;
-    int xenrc;
-    int rc;
+static int netfront_create_event ( struct netfront_nic *netfront ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	struct evtchn_alloc_unbound alloc_unbound;
+	struct evtchn_close close;
+	int xenrc;
+	int rc;
 
-    /* Allocate event */
-    alloc_unbound.dom = DOMID_SELF;
-    alloc_unbound.remote_dom = xendev->backend_id;
-    if ((xenrc = xenevent_alloc_unbound(xen, &alloc_unbound)) != 0) {
-        rc = -EXEN(xenrc);
-        DBGC(netfront, "NETFRONT %s could not allocate event: %s\n",
-             xendev->key, strerror(rc));
-        goto err_alloc_unbound;
-    }
-    netfront->event.port = alloc_unbound.port;
+	/* Allocate event */
+	alloc_unbound.dom = DOMID_SELF;
+	alloc_unbound.remote_dom = xendev->backend_id;
+	if ( ( xenrc = xenevent_alloc_unbound ( xen, &alloc_unbound ) ) != 0 ) {
+		rc = -EXEN ( xenrc );
+		DBGC ( netfront, "NETFRONT %s could not allocate event: %s\n",
+		       xendev->key, strerror ( rc ) );
+		goto err_alloc_unbound;
+	}
+	netfront->event.port = alloc_unbound.port;
 
-    /* Publish event channel */
-    if ((rc = netfront_write_num(netfront, "event-channel",
-                                 netfront->event.port)) != 0)
-        goto err_write_num;
+	/* Publish event channel */
+	if ( ( rc = netfront_write_num ( netfront, "event-channel",
+					 netfront->event.port ) ) != 0 )
+		goto err_write_num;
 
-    DBGC(netfront, "NETFRONT %s event-channel=\"%d\"\n",
-         xendev->key, netfront->event.port);
-    return 0;
+	DBGC ( netfront, "NETFRONT %s event-channel=\"%d\"\n",
+	       xendev->key, netfront->event.port );
+	return 0;
 
-    netfront_rm(netfront, "event-channel");
-err_write_num:
-    close.port = netfront->event.port;
-    xenevent_close(xen, &close);
-err_alloc_unbound:
-    return rc;
+	netfront_rm ( netfront, "event-channel" );
+ err_write_num:
+	close.port = netfront->event.port;
+	xenevent_close ( xen, &close );
+ err_alloc_unbound:
+	return rc;
 }
 
 /**
@@ -273,22 +275,22 @@ err_alloc_unbound:
  * @v netfront		Netfront device
  * @ret rc		Return status code
  */
-static inline __attribute__((always_inline)) int
-netfront_send_event(struct netfront_nic* netfront) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    int xenrc;
-    int rc;
+static inline __attribute__ (( always_inline )) int
+netfront_send_event ( struct netfront_nic *netfront ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	int xenrc;
+	int rc;
 
-    /* Send event */
-    if ((xenrc = xenevent_send(xen, &netfront->event)) != 0) {
-        rc = -EXEN(xenrc);
-        DBGC(netfront, "NETFRONT %s could not send event: %s\n",
-             xendev->key, strerror(rc));
-        return rc;
-    }
+	/* Send event */
+	if ( ( xenrc = xenevent_send ( xen, &netfront->event ) ) != 0 ) {
+		rc = -EXEN ( xenrc );
+		DBGC ( netfront, "NETFRONT %s could not send event: %s\n",
+		       xendev->key, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -296,17 +298,17 @@ netfront_send_event(struct netfront_nic* netfront) {
  *
  * @v netfront		Netfront device
  */
-static void netfront_destroy_event(struct netfront_nic* netfront) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    struct evtchn_close close;
+static void netfront_destroy_event ( struct netfront_nic *netfront ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	struct evtchn_close close;
 
-    /* Unpublish event channel */
-    netfront_rm(netfront, "event-channel");
+	/* Unpublish event channel */
+	netfront_rm ( netfront, "event-channel" );
 
-    /* Close event channel */
-    close.port = netfront->event.port;
-    xenevent_close(xen, &close);
+	/* Close event channel */
+	close.port = netfront->event.port;
+	xenevent_close ( xen, &close );
 }
 
 /******************************************************************************
@@ -323,54 +325,54 @@ static void netfront_destroy_event(struct netfront_nic* netfront) {
  * @v ring		Descriptor ring
  * @ret rc		Return status code
  */
-static int netfront_create_ring(struct netfront_nic* netfront,
-                                struct netfront_ring* ring) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    physaddr_t addr;
-    unsigned int i;
-    int rc;
+static int netfront_create_ring ( struct netfront_nic *netfront,
+				  struct netfront_ring *ring ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	physaddr_t addr;
+	unsigned int i;
+	int rc;
 
-    /* Initialise buffer ID ring */
-    for (i = 0; i < ring->count; i++) {
-        ring->ids[i] = i;
-        assert(ring->iobufs[i] == NULL);
-    }
-    ring->id_prod = 0;
-    ring->id_cons = 0;
+	/* Initialise buffer ID ring */
+	for ( i = 0 ; i < ring->count ; i++ ) {
+		ring->ids[i] = i;
+		assert ( ring->iobufs[i] == NULL );
+	}
+	ring->id_prod = 0;
+	ring->id_cons = 0;
 
-    /* Allocate and initialise shared ring */
-    ring->sring.raw = malloc_phys(PAGE_SIZE, PAGE_SIZE);
-    if (!ring->sring.raw) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
+	/* Allocate and initialise shared ring */
+	ring->sring.raw = malloc_phys ( PAGE_SIZE, PAGE_SIZE );
+	if ( ! ring->sring.raw ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 
-    /* Grant access to shared ring */
-    addr = virt_to_phys(ring->sring.raw);
-    if ((rc = xengrant_permit_access(xen, ring->ref, xendev->backend_id,
-                                     0, addr)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not permit access to "
-                       "%#08lx: %s\n", xendev->key, addr, strerror(rc));
-        goto err_permit_access;
-    }
+	/* Grant access to shared ring */
+	addr = virt_to_phys ( ring->sring.raw );
+	if ( ( rc = xengrant_permit_access ( xen, ring->ref, xendev->backend_id,
+					     0, addr ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not permit access to "
+		       "%#08lx: %s\n", xendev->key, addr, strerror ( rc ) );
+		goto err_permit_access;
+	}
 
-    /* Publish shared ring reference */
-    if ((rc = netfront_write_num(netfront, ring->ref_key,
-                                 ring->ref)) != 0)
-        goto err_write_num;
+	/* Publish shared ring reference */
+	if ( ( rc = netfront_write_num ( netfront, ring->ref_key,
+					 ring->ref ) ) != 0 )
+		goto err_write_num;
 
-    DBGC(netfront, "NETFRONT %s %s=\"%d\" [%08lx,%08lx)\n", xendev->key,
-         ring->ref_key, ring->ref, addr, (addr + PAGE_SIZE));
-    return 0;
+	DBGC ( netfront, "NETFRONT %s %s=\"%d\" [%08lx,%08lx)\n", xendev->key,
+	       ring->ref_key, ring->ref, addr, ( addr + PAGE_SIZE ) );
+	return 0;
 
-    netfront_rm(netfront, ring->ref_key);
-err_write_num:
-    xengrant_invalidate(xen, ring->ref);
-err_permit_access:
-    free_phys(ring->sring.raw, PAGE_SIZE);
-err_alloc:
-    return rc;
+	netfront_rm ( netfront, ring->ref_key );
+ err_write_num:
+	xengrant_invalidate ( xen, ring->ref );
+ err_permit_access:
+	free_phys ( ring->sring.raw, PAGE_SIZE );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -387,43 +389,43 @@ err_alloc:
  * The caller is responsible for ensuring that there is space in the
  * ring.
  */
-static int netfront_push(struct netfront_nic* netfront,
-                         struct netfront_ring* ring, physaddr_t addr,
-                         struct io_buffer* iobuf, uint16_t* id,
-                         grant_ref_t* ref) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    unsigned int next_id;
-    unsigned int next_ref;
-    int rc;
+static int netfront_push ( struct netfront_nic *netfront,
+			   struct netfront_ring *ring, physaddr_t addr,
+			   struct io_buffer *iobuf, uint16_t *id,
+			   grant_ref_t *ref ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	unsigned int next_id;
+	unsigned int next_ref;
+	int rc;
 
-    /* Sanity check */
-    assert(!netfront_ring_is_full(ring));
+	/* Sanity check */
+	assert ( ! netfront_ring_is_full ( ring ) );
 
-    /* Allocate buffer ID */
-    next_id = ring->ids[ring->id_prod & (ring->count - 1)];
-    next_ref = ring->refs[next_id];
+	/* Allocate buffer ID */
+	next_id = ring->ids[ ring->id_prod & ( ring->count - 1 ) ];
+	next_ref = ring->refs[next_id];
 
-    /* Grant access to page containing address */
-    if ((rc = xengrant_permit_access(xen, next_ref, xendev->backend_id,
-                                     0, addr)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not permit access to "
-                       "%#08lx: %s\n", xendev->key, addr, strerror(rc));
-        return rc;
-    }
+	/* Grant access to page containing address */
+	if ( ( rc = xengrant_permit_access ( xen, next_ref, xendev->backend_id,
+					     0, addr ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not permit access to "
+		       "%#08lx: %s\n", xendev->key, addr, strerror ( rc ) );
+		return rc;
+	}
 
-    /* Store associated I/O buffer, if any */
-    assert(ring->iobufs[next_id] == NULL);
-    ring->iobufs[next_id] = iobuf;
+	/* Store associated I/O buffer, if any */
+	assert ( ring->iobufs[next_id] == NULL );
+	ring->iobufs[next_id] = iobuf;
 
-    /* Consume buffer ID */
-    ring->id_prod++;
+	/* Consume buffer ID */
+	ring->id_prod++;
 
-    /* Return buffer ID and grant reference */
-    *id = next_id;
-    *ref = next_ref;
+	/* Return buffer ID and grant reference */
+	*id = next_id;
+	*ref = next_ref;
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -434,27 +436,27 @@ static int netfront_push(struct netfront_nic* netfront,
  * @v id		Buffer ID
  * @ret iobuf		Associated I/O buffer, if any
  */
-static struct io_buffer* netfront_pull(struct netfront_nic* netfront,
-                                       struct netfront_ring* ring,
-                                       unsigned int id) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    struct io_buffer* iobuf;
+static struct io_buffer * netfront_pull ( struct netfront_nic *netfront,
+					  struct netfront_ring *ring,
+					  unsigned int id ) {
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	struct io_buffer *iobuf;
 
-    /* Sanity check */
-    assert(id < ring->count);
+	/* Sanity check */
+	assert ( id < ring->count );
 
-    /* Revoke access from I/O buffer page */
-    xengrant_invalidate(xen, ring->refs[id]);
+	/* Revoke access from I/O buffer page */
+	xengrant_invalidate ( xen, ring->refs[id] );
 
-    /* Retrieve I/O buffer */
-    iobuf = ring->iobufs[id];
-    ring->iobufs[id] = NULL;
+	/* Retrieve I/O buffer */
+	iobuf = ring->iobufs[id];
+	ring->iobufs[id] = NULL;
 
-    /* Free buffer ID */
-    ring->ids[(ring->id_cons++) & (ring->count - 1)] = id;
+	/* Free buffer ID */
+	ring->ids[ ( ring->id_cons++ ) & ( ring->count - 1 ) ] = id;
 
-    return iobuf;
+	return iobuf;
 }
 
 /**
@@ -464,31 +466,31 @@ static struct io_buffer* netfront_pull(struct netfront_nic* netfront,
  * @v ring		Descriptor ring
  * @v discard		Method used to discard outstanding buffer, or NULL
  */
-static void netfront_destroy_ring(struct netfront_nic* netfront,
-                                  struct netfront_ring* ring,
-                                  void (*discard)(struct io_buffer*)) {
-    struct xen_device* xendev = netfront->xendev;
-    struct xen_hypervisor* xen = xendev->xen;
-    struct io_buffer* iobuf;
-    unsigned int id;
+static void netfront_destroy_ring ( struct netfront_nic *netfront,
+				    struct netfront_ring *ring,
+				    void ( * discard ) ( struct io_buffer * ) ){
+	struct xen_device *xendev = netfront->xendev;
+	struct xen_hypervisor *xen = xendev->xen;
+	struct io_buffer *iobuf;
+	unsigned int id;
 
-    /* Flush any outstanding buffers */
-    while (!netfront_ring_is_empty(ring)) {
-        id = ring->ids[ring->id_cons & (ring->count - 1)];
-        iobuf = netfront_pull(netfront, ring, id);
-        if (discard)
-            discard(iobuf);
-    }
+	/* Flush any outstanding buffers */
+	while ( ! netfront_ring_is_empty ( ring ) ) {
+		id = ring->ids[ ring->id_cons & ( ring->count - 1 ) ];
+		iobuf = netfront_pull ( netfront, ring, id );
+		if ( discard )
+			discard ( iobuf );
+	}
 
-    /* Unpublish shared ring reference */
-    netfront_rm(netfront, ring->ref_key);
+	/* Unpublish shared ring reference */
+	netfront_rm ( netfront, ring->ref_key );
 
-    /* Revoke access from shared ring */
-    xengrant_invalidate(xen, ring->ref);
+	/* Revoke access from shared ring */
+	xengrant_invalidate ( xen, ring->ref );
 
-    /* Free page */
-    free_phys(ring->sring.raw, PAGE_SIZE);
-    ring->sring.raw = NULL;
+	/* Free page */
+	free_phys ( ring->sring.raw, PAGE_SIZE );
+	ring->sring.raw = NULL;
 }
 
 /**
@@ -496,15 +498,15 @@ static void netfront_destroy_ring(struct netfront_nic* netfront,
  *
  * @v netfront		Netfront device
  */
-static void netfront_discard(struct netfront_nic* netfront) {
-    struct io_buffer* iobuf;
-    struct io_buffer* tmp;
+static void netfront_discard ( struct netfront_nic *netfront ) {
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
 
-    /* Discard all buffers in the list */
-    list_for_each_entry_safe(iobuf, tmp, &netfront->rx_partial, list) {
-        list_del(&iobuf->list);
-        free_iob(iobuf);
-    }
+	/* Discard all buffers in the list */
+	list_for_each_entry_safe ( iobuf, tmp, &netfront->rx_partial, list ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+	}
 }
 
 /******************************************************************************
@@ -519,51 +521,52 @@ static void netfront_discard(struct netfront_nic* netfront) {
  *
  * @v netdev		Network device
  */
-static void netfront_refill_rx(struct net_device* netdev) {
-    struct netfront_nic* netfront = netdev->priv;
-    struct xen_device* xendev = netfront->xendev;
-    struct io_buffer* iobuf;
-    struct netif_rx_request* request;
-    unsigned int refilled = 0;
-    physaddr_t addr;
-    int notify;
-    int rc;
+static void netfront_refill_rx ( struct net_device *netdev ) {
+	struct netfront_nic *netfront = netdev->priv;
+	struct xen_device *xendev = netfront->xendev;
+	struct io_buffer *iobuf;
+	struct netif_rx_request *request;
+	unsigned int refilled = 0;
+	physaddr_t addr;
+	int notify;
+	int rc;
 
-    /* Refill ring */
-    while (netfront_ring_fill(&netfront->rx) < NETFRONT_RX_FILL) {
-        /* Allocate I/O buffer */
-        iobuf = alloc_iob(PAGE_SIZE);
-        if (!iobuf) {
-            /* Wait for next refill */
-            break;
-        }
-        addr = virt_to_phys(iobuf->data);
+	/* Refill ring */
+	while ( netfront_ring_fill ( &netfront->rx ) < NETFRONT_RX_FILL ) {
 
-        /* Add to descriptor ring */
-        request = RING_GET_REQUEST(&netfront->rx_fring,
-                                   netfront->rx_fring.req_prod_pvt);
-        if ((rc = netfront_push(netfront, &netfront->rx, addr,
-                                iobuf, &request->id,
-                                &request->gref)) != 0) {
-            netdev_rx_err(netdev, iobuf, rc);
-            break;
-        }
-        DBGC2(netfront, "NETFRONT %s RX id %d ref %d is %#08lx+%zx\n",
-              xendev->key, request->id, request->gref, addr,
-              iob_tailroom(iobuf));
+		/* Allocate I/O buffer */
+		iobuf = alloc_iob ( PAGE_SIZE );
+		if ( ! iobuf ) {
+			/* Wait for next refill */
+			break;
+		}
+		addr = virt_to_phys ( iobuf->data );
 
-        /* Move to next descriptor */
-        netfront->rx_fring.req_prod_pvt++;
-        refilled++;
-    }
+		/* Add to descriptor ring */
+		request = RING_GET_REQUEST ( &netfront->rx_fring,
+					     netfront->rx_fring.req_prod_pvt );
+		if ( ( rc = netfront_push ( netfront, &netfront->rx, addr,
+					    iobuf, &request->id,
+					    &request->gref ) ) != 0 ) {
+			netdev_rx_err ( netdev, iobuf, rc );
+			break;
+		}
+		DBGC2 ( netfront, "NETFRONT %s RX id %d ref %d is %#08lx+%zx\n",
+			xendev->key, request->id, request->gref, addr,
+			iob_tailroom ( iobuf ) );
 
-    /* Push new descriptors and notify backend if applicable */
-    if (refilled) {
-        RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&netfront->rx_fring,
-                                            notify);
-        if (notify)
-            netfront_send_event(netfront);
-    }
+		/* Move to next descriptor */
+		netfront->rx_fring.req_prod_pvt++;
+		refilled++;
+	}
+
+	/* Push new descriptors and notify backend if applicable */
+	if ( refilled ) {
+		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY ( &netfront->rx_fring,
+						      notify );
+		if ( notify )
+			netfront_send_event ( netfront );
+	}
 }
 
 /**
@@ -572,95 +575,95 @@ static void netfront_refill_rx(struct net_device* netdev) {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-static int netfront_open(struct net_device* netdev) {
-    struct netfront_nic* netfront = netdev->priv;
-    struct xen_device* xendev = netfront->xendev;
-    int rc;
+static int netfront_open ( struct net_device *netdev ) {
+	struct netfront_nic *netfront = netdev->priv;
+	struct xen_device *xendev = netfront->xendev;
+	int rc;
 
-    /* Ensure device is in a suitable initial state */
-    if ((rc = netfront_reset(netfront)) != 0)
-        goto err_reset;
+	/* Ensure device is in a suitable initial state */
+	if ( ( rc = netfront_reset ( netfront ) ) != 0 )
+		goto err_reset;
 
-    /* Create transmit descriptor ring */
-    if ((rc = netfront_create_ring(netfront, &netfront->tx)) != 0)
-        goto err_create_tx;
-    SHARED_RING_INIT(netfront->tx_sring);
-    FRONT_RING_INIT(&netfront->tx_fring, netfront->tx_sring, PAGE_SIZE);
-    assert(RING_SIZE(&netfront->tx_fring) >= netfront->tx.count);
+	/* Create transmit descriptor ring */
+	if ( ( rc = netfront_create_ring ( netfront, &netfront->tx ) ) != 0 )
+		goto err_create_tx;
+	SHARED_RING_INIT ( netfront->tx_sring );
+	FRONT_RING_INIT ( &netfront->tx_fring, netfront->tx_sring, PAGE_SIZE );
+	assert ( RING_SIZE ( &netfront->tx_fring ) >= netfront->tx.count );
 
-    /* Create receive descriptor ring */
-    if ((rc = netfront_create_ring(netfront, &netfront->rx)) != 0)
-        goto err_create_rx;
-    SHARED_RING_INIT(netfront->rx_sring);
-    FRONT_RING_INIT(&netfront->rx_fring, netfront->rx_sring, PAGE_SIZE);
-    assert(RING_SIZE(&netfront->rx_fring) >= netfront->rx.count);
+	/* Create receive descriptor ring */
+	if ( ( rc = netfront_create_ring ( netfront, &netfront->rx ) ) != 0 )
+		goto err_create_rx;
+	SHARED_RING_INIT ( netfront->rx_sring );
+	FRONT_RING_INIT ( &netfront->rx_fring, netfront->rx_sring, PAGE_SIZE );
+	assert ( RING_SIZE ( &netfront->rx_fring ) >= netfront->rx.count );
 
-    /* Create event channel */
-    if ((rc = netfront_create_event(netfront)) != 0)
-        goto err_create_event;
+	/* Create event channel */
+	if ( ( rc = netfront_create_event ( netfront ) ) != 0 )
+		goto err_create_event;
 
-    /* "Request" the rx-copy feature.  Current versions of
-     * xen_netback.ko will fail silently if this parameter is not
-     * present.
-     */
-    if ((rc = netfront_write_flag(netfront, "request-rx-copy")) != 0)
-        goto err_request_rx_copy;
+	/* "Request" the rx-copy feature.  Current versions of
+	 * xen_netback.ko will fail silently if this parameter is not
+	 * present.
+	 */
+	if ( ( rc = netfront_write_flag ( netfront, "request-rx-copy" ) ) != 0 )
+		goto err_request_rx_copy;
 
-    /* Inform backend that we can support scatter-gather */
-    if ((rc = netfront_write_flag(netfront, "feature-sg")) != 0)
-        goto err_feature_sg;
+	/* Inform backend that we can support scatter-gather */
+	if ( ( rc = netfront_write_flag ( netfront, "feature-sg" ) ) != 0 )
+		goto err_feature_sg;
 
-    /* Disable checksum offload, since we will always do the work anyway */
-    if ((rc = netfront_write_flag(netfront,
-                                  "feature-no-csum-offload")) != 0)
-        goto err_feature_no_csum_offload;
+	/* Disable checksum offload, since we will always do the work anyway */
+	if ( ( rc = netfront_write_flag ( netfront,
+					  "feature-no-csum-offload" ) ) != 0 )
+		goto err_feature_no_csum_offload;
 
-    /* Inform backend that we will send notifications for RX requests */
-    if ((rc = netfront_write_flag(netfront,
-                                  "feature-rx-notify")) != 0)
-        goto err_feature_rx_notify;
+	/* Inform backend that we will send notifications for RX requests */
+	if ( ( rc = netfront_write_flag ( netfront,
+					  "feature-rx-notify" ) ) != 0 )
+		goto err_feature_rx_notify;
 
-    /* Set state to Connected */
-    if ((rc = xenbus_set_state(xendev, XenbusStateConnected)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not set state=\"%d\": %s\n",
-             xendev->key, XenbusStateConnected, strerror(rc));
-        goto err_set_state;
-    }
+	/* Set state to Connected */
+	if ( ( rc = xenbus_set_state ( xendev, XenbusStateConnected ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not set state=\"%d\": %s\n",
+		       xendev->key, XenbusStateConnected, strerror ( rc ) );
+		goto err_set_state;
+	}
 
-    /* Wait for backend to connect */
-    if ((rc = xenbus_backend_wait(xendev, XenbusStateConnected)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not connect to backend: "
-                       "%s\n", xendev->key, strerror(rc));
-        goto err_backend_wait;
-    }
+	/* Wait for backend to connect */
+	if ( ( rc = xenbus_backend_wait ( xendev, XenbusStateConnected ) ) !=0){
+		DBGC ( netfront, "NETFRONT %s could not connect to backend: "
+		       "%s\n", xendev->key, strerror ( rc ) );
+		goto err_backend_wait;
+	}
 
-    /* Refill receive descriptor ring */
-    netfront_refill_rx(netdev);
+	/* Refill receive descriptor ring */
+	netfront_refill_rx ( netdev );
 
-    /* Set link up */
-    netdev_link_up(netdev);
+	/* Set link up */
+	netdev_link_up ( netdev );
 
-    return 0;
+	return 0;
 
-err_backend_wait:
-    netfront_reset(netfront);
-err_set_state:
-    netfront_rm(netfront, "feature-rx-notify");
-err_feature_rx_notify:
-    netfront_rm(netfront, "feature-no-csum-offload");
-err_feature_no_csum_offload:
-    netfront_rm(netfront, "feature-sg");
-err_feature_sg:
-    netfront_rm(netfront, "request-rx-copy");
-err_request_rx_copy:
-    netfront_destroy_event(netfront);
-err_create_event:
-    netfront_destroy_ring(netfront, &netfront->rx, NULL);
-err_create_rx:
-    netfront_destroy_ring(netfront, &netfront->tx, NULL);
-err_create_tx:
-err_reset:
-    return rc;
+ err_backend_wait:
+	netfront_reset ( netfront );
+ err_set_state:
+	netfront_rm ( netfront, "feature-rx-notify" );
+ err_feature_rx_notify:
+	netfront_rm ( netfront, "feature-no-csum-offload" );
+ err_feature_no_csum_offload:
+	netfront_rm ( netfront, "feature-sg" );
+ err_feature_sg:
+	netfront_rm ( netfront, "request-rx-copy" );
+ err_request_rx_copy:
+	netfront_destroy_event ( netfront );
+ err_create_event:
+	netfront_destroy_ring ( netfront, &netfront->rx, NULL );
+ err_create_rx:
+	netfront_destroy_ring ( netfront, &netfront->tx, NULL );
+ err_create_tx:
+ err_reset:
+	return rc;
 }
 
 /**
@@ -668,50 +671,50 @@ err_reset:
  *
  * @v netdev		Network device
  */
-static void netfront_close(struct net_device* netdev) {
-    struct netfront_nic* netfront = netdev->priv;
-    struct xen_device* xendev = netfront->xendev;
-    int rc;
+static void netfront_close ( struct net_device *netdev ) {
+	struct netfront_nic *netfront = netdev->priv;
+	struct xen_device *xendev = netfront->xendev;
+	int rc;
 
-    /* Reset devic, thereby ensuring that grant references are no
-     * longer in use, etc.
-     */
-    if ((rc = netfront_reset(netfront)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not disconnect from "
-                       "backend: %s\n", xendev->key, strerror(rc));
-        /* Things will probably go _very_ badly wrong if this
-         * happens, since it means the backend may still write
-         * to the outstanding RX buffers that we are about to
-         * free.  The best we can do is report the error via
-         * the link status, but there's a good chance the
-         * machine will crash soon.
-         */
-        netdev_link_err(netdev, rc);
-    } else {
-        netdev_link_down(netdev);
-    }
+	/* Reset devic, thereby ensuring that grant references are no
+	 * longer in use, etc.
+	 */
+	if ( ( rc = netfront_reset ( netfront ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not disconnect from "
+		       "backend: %s\n", xendev->key, strerror ( rc ) );
+		/* Things will probably go _very_ badly wrong if this
+		 * happens, since it means the backend may still write
+		 * to the outstanding RX buffers that we are about to
+		 * free.  The best we can do is report the error via
+		 * the link status, but there's a good chance the
+		 * machine will crash soon.
+		 */
+		netdev_link_err ( netdev, rc );
+	} else {
+		netdev_link_down ( netdev );
+	}
 
-    /* Delete flags */
-    netfront_rm(netfront, "feature-rx-notify");
-    netfront_rm(netfront, "feature-no-csum-offload");
-    netfront_rm(netfront, "feature-sg");
-    netfront_rm(netfront, "request-rx-copy");
+	/* Delete flags */
+	netfront_rm ( netfront, "feature-rx-notify" );
+	netfront_rm ( netfront, "feature-no-csum-offload" );
+	netfront_rm ( netfront, "feature-sg" );
+	netfront_rm ( netfront, "request-rx-copy" );
 
-    /* Destroy event channel */
-    netfront_destroy_event(netfront);
+	/* Destroy event channel */
+	netfront_destroy_event ( netfront );
 
-    /* Discard any partially received I/O buffers */
-    netfront_discard(netfront);
+	/* Discard any partially received I/O buffers */
+	netfront_discard ( netfront );
 
-    /* Destroy receive descriptor ring, freeing any outstanding
-     * I/O buffers.
-     */
-    netfront_destroy_ring(netfront, &netfront->rx, free_iob);
+	/* Destroy receive descriptor ring, freeing any outstanding
+	 * I/O buffers.
+	 */
+	netfront_destroy_ring ( netfront, &netfront->rx, free_iob );
 
-    /* Destroy transmit descriptor ring.  Leave any outstanding
-     * I/O buffers to be freed by netdev_tx_flush().
-     */
-    netfront_destroy_ring(netfront, &netfront->tx, NULL);
+	/* Destroy transmit descriptor ring.  Leave any outstanding
+	 * I/O buffers to be freed by netdev_tx_flush().
+	 */
+	netfront_destroy_ring ( netfront, &netfront->tx, NULL );
 }
 
 /**
@@ -721,75 +724,76 @@ static void netfront_close(struct net_device* netdev) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int netfront_transmit(struct net_device* netdev,
-                             struct io_buffer* iobuf) {
-    struct netfront_nic* netfront = netdev->priv;
-    struct xen_device* xendev = netfront->xendev;
-    struct netif_tx_request* request;
-    physaddr_t addr;
-    size_t len;
-    size_t remaining;
-    size_t frag_len;
-    unsigned int offset;
-    unsigned int count;
-    unsigned int more;
-    int notify;
-    int rc;
+static int netfront_transmit ( struct net_device *netdev,
+			       struct io_buffer *iobuf ) {
+	struct netfront_nic *netfront = netdev->priv;
+	struct xen_device *xendev = netfront->xendev;
+	struct netif_tx_request *request;
+	physaddr_t addr;
+	size_t len;
+	size_t remaining;
+	size_t frag_len;
+	unsigned int offset;
+	unsigned int count;
+	unsigned int more;
+	int notify;
+	int rc;
 
-    /* Calculate number of page buffers required */
-    addr = virt_to_phys(iobuf->data);
-    len = iob_len(iobuf);
-    offset = (addr & (PAGE_SIZE - 1));
-    count = ((offset + len + PAGE_SIZE - 1) / PAGE_SIZE);
+	/* Calculate number of page buffers required */
+	addr = virt_to_phys ( iobuf->data );
+	len = iob_len ( iobuf );
+	offset = ( addr & ( PAGE_SIZE - 1 ) );
+	count = ( ( offset + len + PAGE_SIZE - 1 ) / PAGE_SIZE );
 
-    /* Check that we have space in the ring */
-    if (netfront_ring_space(&netfront->tx) < count) {
-        DBGC(netfront, "NETFRONT %s out of transmit descriptors\n",
-             xendev->key);
-        return -ENOBUFS;
-    }
+	/* Check that we have space in the ring */
+	if ( netfront_ring_space ( &netfront->tx ) < count ) {
+		DBGC ( netfront, "NETFRONT %s out of transmit descriptors\n",
+		       xendev->key );
+		return -ENOBUFS;
+	}
 
-    /* Add to descriptor ring */
-    remaining = len;
-    while (remaining) {
-        /* Calculate length of this fragment */
-        frag_len = (PAGE_SIZE - offset);
-        if (frag_len >= remaining) {
-            frag_len = remaining;
-            more = 0;
-        } else {
-            more = NETTXF_more_data;
-        }
+	/* Add to descriptor ring */
+	remaining = len;
+	while ( remaining ) {
 
-        /* Populate request */
-        request = RING_GET_REQUEST(&netfront->tx_fring,
-                                   netfront->tx_fring.req_prod_pvt);
-        if ((rc = netfront_push(netfront, &netfront->tx, addr,
-                                (more ? NULL : iobuf),
-                                &request->id,
-                                &request->gref)) != 0) {
-            return rc;
-        }
-        request->flags = (NETTXF_data_validated | more);
-        request->offset = offset;
-        request->size = ((remaining == len) ? len : frag_len);
-        DBGC2(netfront, "NETFRONT %s TX id %d ref %d is "
-                        "%#08lx+%zx%s\n", xendev->key, request->id,
-              request->gref, addr, frag_len, (more ? "..." : ""));
+		/* Calculate length of this fragment */
+		frag_len = ( PAGE_SIZE - offset );
+		if ( frag_len >= remaining ) {
+			frag_len = remaining;
+			more = 0;
+		} else {
+			more = NETTXF_more_data;
+		}
 
-        /* Move to next descriptor */
-        netfront->tx_fring.req_prod_pvt++;
-        addr += frag_len;
-        remaining -= frag_len;
-        offset = 0;
-    }
+		/* Populate request */
+		request = RING_GET_REQUEST ( &netfront->tx_fring,
+					     netfront->tx_fring.req_prod_pvt );
+		if ( ( rc = netfront_push ( netfront, &netfront->tx, addr,
+					    ( more ? NULL : iobuf ),
+					    &request->id,
+					    &request->gref ) ) != 0 ) {
+			return rc;
+		}
+		request->flags = ( NETTXF_data_validated | more );
+		request->offset = offset;
+		request->size = ( ( remaining == len ) ? len : frag_len );
+		DBGC2 ( netfront, "NETFRONT %s TX id %d ref %d is "
+			"%#08lx+%zx%s\n", xendev->key, request->id,
+			request->gref, addr, frag_len, ( more ? "..." : "" ) );
 
-    /* Push new descriptors and notify backend if applicable */
-    RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&netfront->tx_fring, notify);
-    if (notify)
-        netfront_send_event(netfront);
+		/* Move to next descriptor */
+		netfront->tx_fring.req_prod_pvt++;
+		addr += frag_len;
+		remaining -= frag_len;
+		offset = 0;
+	}
 
-    return 0;
+	/* Push new descriptors and notify backend if applicable */
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY ( &netfront->tx_fring, notify );
+	if ( notify )
+		netfront_send_event ( netfront );
+
+	return 0;
 }
 
 /**
@@ -797,36 +801,37 @@ static int netfront_transmit(struct net_device* netdev,
  *
  * @v netdev		Network device
  */
-static void netfront_poll_tx(struct net_device* netdev) {
-    struct netfront_nic* netfront = netdev->priv;
-    struct xen_device* xendev = netfront->xendev;
-    struct netif_tx_response* response;
-    struct io_buffer* iobuf;
-    int status;
-    int rc;
+static void netfront_poll_tx ( struct net_device *netdev ) {
+	struct netfront_nic *netfront = netdev->priv;
+	struct xen_device *xendev = netfront->xendev;
+	struct netif_tx_response *response;
+	struct io_buffer *iobuf;
+	int status;
+	int rc;
 
-    /* Consume any unconsumed responses */
-    while (RING_HAS_UNCONSUMED_RESPONSES(&netfront->tx_fring)) {
-        /* Get next response */
-        response = RING_GET_RESPONSE(&netfront->tx_fring,
-                                     netfront->tx_fring.rsp_cons++);
+	/* Consume any unconsumed responses */
+	while ( RING_HAS_UNCONSUMED_RESPONSES ( &netfront->tx_fring ) ) {
 
-        /* Retrieve from descriptor ring */
-        iobuf = netfront_pull(netfront, &netfront->tx, response->id);
-        status = response->status;
-        if (status >= NETIF_RSP_OKAY) {
-            DBGC2(netfront, "NETFRONT %s TX id %d complete\n",
-                  xendev->key, response->id);
-            if (iobuf)
-                netdev_tx_complete(netdev, iobuf);
-        } else {
-            rc = -EIO_NETIF_RSP(status);
-            DBGC2(netfront, "NETFRONT %s TX id %d error %d: %s\n",
-                  xendev->key, response->id, status,
-                  strerror(rc));
-            netdev_tx_complete_err(netdev, iobuf, rc);
-        }
-    }
+		/* Get next response */
+		response = RING_GET_RESPONSE ( &netfront->tx_fring,
+					       netfront->tx_fring.rsp_cons++ );
+
+		/* Retrieve from descriptor ring */
+		iobuf = netfront_pull ( netfront, &netfront->tx, response->id );
+		status = response->status;
+		if ( status >= NETIF_RSP_OKAY ) {
+			DBGC2 ( netfront, "NETFRONT %s TX id %d complete\n",
+				xendev->key, response->id );
+			if ( iobuf )
+				netdev_tx_complete ( netdev, iobuf );
+		} else {
+			rc = -EIO_NETIF_RSP ( status );
+			DBGC2 ( netfront, "NETFRONT %s TX id %d error %d: %s\n",
+				xendev->key, response->id, status,
+				strerror ( rc ) );
+			netdev_tx_complete_err ( netdev, iobuf, rc );
+		}
+	}
 }
 
 /**
@@ -834,65 +839,66 @@ static void netfront_poll_tx(struct net_device* netdev) {
  *
  * @v netdev		Network device
  */
-static void netfront_poll_rx(struct net_device* netdev) {
-    struct netfront_nic* netfront = netdev->priv;
-    struct xen_device* xendev = netfront->xendev;
-    struct netif_rx_response* response;
-    struct io_buffer* iobuf;
-    int status;
-    int more;
-    size_t len;
-    int rc;
+static void netfront_poll_rx ( struct net_device *netdev ) {
+	struct netfront_nic *netfront = netdev->priv;
+	struct xen_device *xendev = netfront->xendev;
+	struct netif_rx_response *response;
+	struct io_buffer *iobuf;
+	int status;
+	int more;
+	size_t len;
+	int rc;
 
-    /* Consume any unconsumed responses */
-    while (RING_HAS_UNCONSUMED_RESPONSES(&netfront->rx_fring)) {
-        /* Get next response */
-        response = RING_GET_RESPONSE(&netfront->rx_fring,
-                                     netfront->rx_fring.rsp_cons++);
+	/* Consume any unconsumed responses */
+	while ( RING_HAS_UNCONSUMED_RESPONSES ( &netfront->rx_fring ) ) {
 
-        /* Retrieve from descriptor ring */
-        iobuf = netfront_pull(netfront, &netfront->rx, response->id);
-        status = response->status;
-        more = (response->flags & NETRXF_more_data);
+		/* Get next response */
+		response = RING_GET_RESPONSE ( &netfront->rx_fring,
+					       netfront->rx_fring.rsp_cons++ );
 
-        /* Report errors */
-        if (status < 0) {
-            rc = -EIO_NETIF_RSP(status);
-            DBGC2(netfront, "NETFRONT %s RX id %d error %d: %s\n",
-                  xendev->key, response->id, status,
-                  strerror(rc));
-            netfront_discard(netfront);
-            netdev_rx_err(netdev, iobuf, rc);
-            continue;
-        }
+		/* Retrieve from descriptor ring */
+		iobuf = netfront_pull ( netfront, &netfront->rx, response->id );
+		status = response->status;
+		more = ( response->flags & NETRXF_more_data );
 
-        /* Add to partial receive list */
-        len = status;
-        iob_reserve(iobuf, response->offset);
-        iob_put(iobuf, len);
-        DBGC2(netfront, "NETFRONT %s RX id %d complete "
-                        "%#08lx+%zx%s\n", xendev->key, response->id,
-              virt_to_phys(iobuf->data), len,
-              (more ? "..." : ""));
-        list_add_tail(&iobuf->list, &netfront->rx_partial);
+		/* Report errors */
+		if ( status < 0 ) {
+			rc = -EIO_NETIF_RSP ( status );
+			DBGC2 ( netfront, "NETFRONT %s RX id %d error %d: %s\n",
+				xendev->key, response->id, status,
+				strerror ( rc ) );
+			netfront_discard ( netfront );
+			netdev_rx_err ( netdev, iobuf, rc );
+			continue;
+		}
 
-        /* Wait until complete packet has been received */
-        if (more)
-            continue;
+		/* Add to partial receive list */
+		len = status;
+		iob_reserve ( iobuf, response->offset );
+		iob_put ( iobuf, len );
+		DBGC2 ( netfront, "NETFRONT %s RX id %d complete "
+			"%#08lx+%zx%s\n", xendev->key, response->id,
+			virt_to_phys ( iobuf->data ), len,
+			( more ? "..." : "" ) );
+		list_add_tail ( &iobuf->list, &netfront->rx_partial );
 
-        /* Reassemble complete packet */
-        iobuf = iob_concatenate(&netfront->rx_partial);
-        if (!iobuf) {
-            DBGC2(netfront, "NETFRONT %s RX reassembly failed\n",
-                  xendev->key);
-            netfront_discard(netfront);
-            netdev_rx_err(netdev, NULL, -ENOMEM);
-            continue;
-        }
+		/* Wait until complete packet has been received */
+		if ( more )
+			continue;
 
-        /* Hand off to network stack */
-        netdev_rx(netdev, iobuf);
-    }
+		/* Reassemble complete packet */
+		iobuf = iob_concatenate ( &netfront->rx_partial );
+		if ( ! iobuf ) {
+			DBGC2 ( netfront, "NETFRONT %s RX reassembly failed\n",
+				xendev->key );
+			netfront_discard ( netfront );
+			netdev_rx_err ( netdev, NULL, -ENOMEM );
+			continue;
+		}
+
+		/* Hand off to network stack */
+		netdev_rx ( netdev, iobuf );
+	}
 }
 
 /**
@@ -900,23 +906,24 @@ static void netfront_poll_rx(struct net_device* netdev) {
  *
  * @v netdev		Network device
  */
-static void netfront_poll(struct net_device* netdev) {
-    /* Poll for TX completions */
-    netfront_poll_tx(netdev);
+static void netfront_poll ( struct net_device *netdev ) {
 
-    /* Poll for RX completions */
-    netfront_poll_rx(netdev);
+	/* Poll for TX completions */
+	netfront_poll_tx ( netdev );
 
-    /* Refill RX descriptor ring */
-    netfront_refill_rx(netdev);
+	/* Poll for RX completions */
+	netfront_poll_rx ( netdev );
+
+	/* Refill RX descriptor ring */
+	netfront_refill_rx ( netdev );
 }
 
 /** Network device operations */
 static struct net_device_operations netfront_operations = {
-    .open = netfront_open,
-    .close = netfront_close,
-    .transmit = netfront_transmit,
-    .poll = netfront_poll,
+	.open		= netfront_open,
+	.close		= netfront_close,
+	.transmit	= netfront_transmit,
+	.poll		= netfront_poll,
 };
 
 /******************************************************************************
@@ -932,78 +939,78 @@ static struct net_device_operations netfront_operations = {
  * @v xendev		Xen device
  * @ret rc		Return status code
  */
-static int netfront_probe(struct xen_device* xendev) {
-    struct xen_hypervisor* xen = xendev->xen;
-    struct net_device* netdev;
-    struct netfront_nic* netfront;
-    int rc;
+static int netfront_probe ( struct xen_device *xendev ) {
+	struct xen_hypervisor *xen = xendev->xen;
+	struct net_device *netdev;
+	struct netfront_nic *netfront;
+	int rc;
 
-    /* Allocate and initialise structure */
-    netdev = alloc_etherdev(sizeof(*netfront));
-    if (!netdev) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
-    netdev_init(netdev, &netfront_operations);
-    netdev->dev = &xendev->dev;
-    netfront = netdev->priv;
-    netfront->xendev = xendev;
-    netfront->netdev = netdev;
-    INIT_LIST_HEAD(&netfront->rx_partial);
-    DBGC(netfront, "NETFRONT %s backend=\"%s\" in domain %ld\n",
-         xendev->key, xendev->backend, xendev->backend_id);
+	/* Allocate and initialise structure */
+	netdev = alloc_etherdev ( sizeof ( *netfront ) );
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	netdev_init ( netdev, &netfront_operations );
+	netdev->dev = &xendev->dev;
+	netfront = netdev->priv;
+	netfront->xendev = xendev;
+	netfront->netdev = netdev;
+	INIT_LIST_HEAD ( &netfront->rx_partial );
+	DBGC ( netfront, "NETFRONT %s backend=\"%s\" in domain %ld\n",
+	       xendev->key, xendev->backend, xendev->backend_id );
 
-    /* Allocate grant references and initialise descriptor rings */
-    if ((rc = xengrant_alloc(xen, netfront->refs,
-                             NETFRONT_REF_COUNT)) != 0) {
-        DBGC(netfront, "NETFRONT %s could not allocate grant "
-                       "references: %s\n", xendev->key, strerror(rc));
-        goto err_grant_alloc;
-    }
-    netfront_init_ring(&netfront->tx, "tx-ring-ref",
-                       netfront->refs[NETFRONT_REF_TX_RING],
-                       NETFRONT_NUM_TX_DESC, netfront->tx_iobufs,
-                       &netfront->refs[NETFRONT_REF_TX_BASE],
-                       netfront->tx_ids);
-    netfront_init_ring(&netfront->rx, "rx-ring-ref",
-                       netfront->refs[NETFRONT_REF_RX_RING],
-                       NETFRONT_NUM_RX_DESC, netfront->rx_iobufs,
-                       &netfront->refs[NETFRONT_REF_RX_BASE],
-                       netfront->rx_ids);
+	/* Allocate grant references and initialise descriptor rings */
+	if ( ( rc = xengrant_alloc ( xen, netfront->refs,
+				     NETFRONT_REF_COUNT ) ) != 0 ) {
+		DBGC ( netfront, "NETFRONT %s could not allocate grant "
+		       "references: %s\n", xendev->key, strerror ( rc ) );
+		goto err_grant_alloc;
+	}
+	netfront_init_ring ( &netfront->tx, "tx-ring-ref",
+			     netfront->refs[NETFRONT_REF_TX_RING],
+			     NETFRONT_NUM_TX_DESC, netfront->tx_iobufs,
+			     &netfront->refs[NETFRONT_REF_TX_BASE],
+			     netfront->tx_ids );
+	netfront_init_ring ( &netfront->rx, "rx-ring-ref",
+			     netfront->refs[NETFRONT_REF_RX_RING],
+			     NETFRONT_NUM_RX_DESC, netfront->rx_iobufs,
+			     &netfront->refs[NETFRONT_REF_RX_BASE],
+			     netfront->rx_ids );
 
-    /* Fetch MAC address */
-    if ((rc = netfront_read_mac(netfront, netdev->hw_addr)) != 0)
-        goto err_read_mac;
+	/* Fetch MAC address */
+	if ( ( rc = netfront_read_mac ( netfront, netdev->hw_addr ) ) != 0 )
+		goto err_read_mac;
 
-    /* Reset device.  Ignore failures; allow the device to be
-     * registered so that reset errors can be observed by the user
-     * when attempting to open the device.
-     */
-    netfront_reset(netfront);
+	/* Reset device.  Ignore failures; allow the device to be
+	 * registered so that reset errors can be observed by the user
+	 * when attempting to open the device.
+	 */
+	netfront_reset ( netfront );
 
-    /* Register network device */
-    if ((rc = register_netdev(netdev)) != 0)
-        goto err_register_netdev;
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto err_register_netdev;
 
-    /* Set initial link state */
-    netdev_link_down(netdev);
+	/* Set initial link state */
+	netdev_link_down ( netdev );
 
-    /* Add to list of netfront devices */
-    list_add_tail(&netfront->list, &netfront_devices);
+	/* Add to list of netfront devices */
+	list_add_tail ( &netfront->list, &netfront_devices );
 
-    xen_set_drvdata(xendev, netdev);
-    return 0;
+	xen_set_drvdata ( xendev, netdev );
+	return 0;
 
-    list_del(&netfront->list);
-    unregister_netdev(netdev);
-err_register_netdev:
-err_read_mac:
-    xengrant_free(xen, netfront->refs, NETFRONT_REF_COUNT);
-err_grant_alloc:
-    netdev_nullify(netdev);
-    netdev_put(netdev);
-err_alloc:
-    return rc;
+	list_del ( &netfront->list );
+	unregister_netdev ( netdev );
+ err_register_netdev:
+ err_read_mac:
+	xengrant_free ( xen, netfront->refs, NETFRONT_REF_COUNT );
+ err_grant_alloc:
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -1011,31 +1018,31 @@ err_alloc:
  *
  * @v xendev		Xen device
  */
-static void netfront_remove(struct xen_device* xendev) {
-    struct net_device* netdev = xen_get_drvdata(xendev);
-    struct netfront_nic* netfront = netdev->priv;
-    struct xen_hypervisor* xen = xendev->xen;
+static void netfront_remove ( struct xen_device *xendev ) {
+	struct net_device *netdev = xen_get_drvdata ( xendev );
+	struct netfront_nic *netfront = netdev->priv;
+	struct xen_hypervisor *xen = xendev->xen;
 
-    /* Remove from list of netfront devices */
-    list_del(&netfront->list);
+	/* Remove from list of netfront devices */
+	list_del ( &netfront->list );
 
-    /* Unregister network device */
-    unregister_netdev(netdev);
+	/* Unregister network device */
+	unregister_netdev ( netdev );
 
-    /* Free resources */
-    xengrant_free(xen, netfront->refs, NETFRONT_REF_COUNT);
+	/* Free resources */
+	xengrant_free ( xen, netfront->refs, NETFRONT_REF_COUNT );
 
-    /* Free network device */
-    netdev_nullify(netdev);
-    netdev_put(netdev);
+	/* Free network device */
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
 }
 
 /** Xen netfront driver */
 struct xen_driver netfront_driver __xen_driver = {
-    .name = "netfront",
-    .type = "vif",
-    .probe = netfront_probe,
-    .remove = netfront_remove,
+	.name = "netfront",
+	.type = "vif",
+	.probe = netfront_probe,
+	.remove = netfront_remove,
 };
 
 /******************************************************************************
@@ -1051,27 +1058,27 @@ struct xen_driver netfront_driver __xen_driver = {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-static int netfront_net_probe(struct net_device* netdev) {
-    struct netfront_nic* netfront;
+static int netfront_net_probe ( struct net_device *netdev ) {
+	struct netfront_nic *netfront;
 
-    /* Inhibit emulated PCI devices matching an existing netfront device */
-    list_for_each_entry(netfront, &netfront_devices, list) {
-        if ((netdev->dev != netfront->netdev->dev) &&
-            (netdev->ll_protocol->ll_addr_len == ETH_ALEN) &&
-            (memcmp(netdev->hw_addr, netfront->netdev->hw_addr,
-                    ETH_ALEN) == 0)) {
-            DBGC(netfront, "NETFRONT %s inhibiting emulated %s "
-                           "%s\n", netfront->xendev->key,
-                 netdev->dev->driver_name, netdev->dev->name);
-            return -EEXIST;
-        }
-    }
+	/* Inhibit emulated PCI devices matching an existing netfront device */
+	list_for_each_entry ( netfront, &netfront_devices, list ) {
+		if ( ( netdev->dev != netfront->netdev->dev ) &&
+		     ( netdev->ll_protocol->ll_addr_len == ETH_ALEN ) &&
+		     ( memcmp ( netdev->hw_addr, netfront->netdev->hw_addr,
+				ETH_ALEN ) == 0 ) ) {
+			DBGC ( netfront, "NETFRONT %s inhibiting emulated %s "
+			       "%s\n", netfront->xendev->key,
+			       netdev->dev->driver_name, netdev->dev->name );
+			return -EEXIST;
+		}
+	}
 
-    return 0;
+	return 0;
 }
 
 /** Emulated PCI device inhibitor driver */
 struct net_driver netfront_net_driver __net_driver = {
-    .name = "netfront",
-    .probe = netfront_net_probe,
+	.name = "netfront",
+	.probe = netfront_net_probe,
 };

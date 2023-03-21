@@ -1,21 +1,19 @@
-#pragma once
-
 #ifndef _STDINT_H
-    #define _STDINT_H
+#define _STDINT_H
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    /*
-     * This is a standard predefined macro on all gcc's I've seen. It's
-     * important that we define size_t in the same way as the compiler,
-     * because that's what it's expecting when it checks %zd/%zx printf
-     * format specifiers.
-     */
-    #ifndef __SIZE_TYPE__
-        #define __SIZE_TYPE__ unsigned long /* safe choice on most systems */
-    #endif
+/*
+ * This is a standard predefined macro on all gcc's I've seen. It's
+ * important that we define size_t in the same way as the compiler,
+ * because that's what it's expecting when it checks %zd/%zx printf
+ * format specifiers.
+ */
+#ifndef __SIZE_TYPE__
+#define __SIZE_TYPE__ unsigned long /* safe choice on most systems */
+#endif
 
-    #include <bits/stdint.h>
+#include <bits/stdint.h>
 
 typedef int8_t s8;
 typedef uint8_t u8;

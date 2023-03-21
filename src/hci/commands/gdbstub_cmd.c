@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <errno.h>
@@ -44,20 +44,21 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @ret trans		GDB transport
  * @ret rc		Return status code
  */
-static int parse_gdb_transport(const char* text,
-                               struct gdb_transport** trans) {
-    /* Sanity check */
-    assert(text != NULL);
+static int parse_gdb_transport ( const char *text,
+				 struct gdb_transport **trans ) {
 
-    /* Find transport */
-    *trans = find_gdb_transport(text);
-    if (!*trans) {
-        printf("\"%s\": no such transport (is it compiled in?)\n",
-               text);
-        return -ENOTSUP;
-    }
+	/* Sanity check */
+	assert ( text != NULL );
 
-    return 0;
+	/* Find transport */
+	*trans = find_gdb_transport ( text );
+	if ( ! *trans ) {
+		printf ( "\"%s\": no such transport (is it compiled in?)\n",
+			 text );
+		return -ENOTSUP;
+	}
+
+	return 0;
 }
 
 /** "gdbstub" options */
@@ -68,8 +69,8 @@ static struct option_descriptor gdbstub_opts[] = {};
 
 /** "gdbstub" command descriptor */
 static struct command_descriptor gdbstub_cmd =
-    COMMAND_DESC(struct gdbstub_options, gdbstub_opts, 1, MAX_ARGUMENTS,
-                 "<transport> [<options>...]");
+	COMMAND_DESC ( struct gdbstub_options, gdbstub_opts, 1, MAX_ARGUMENTS,
+		       "<transport> [<options>...]" );
 
 /**
  * The "gdbstub" command
@@ -78,37 +79,37 @@ static struct command_descriptor gdbstub_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int gdbstub_exec(int argc, char** argv) {
-    struct gdbstub_options opts;
-    struct gdb_transport* trans;
-    int rc;
+static int gdbstub_exec ( int argc, char **argv ) {
+	struct gdbstub_options opts;
+	struct gdb_transport *trans;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &gdbstub_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &gdbstub_cmd, &opts ) ) != 0 )
+		return rc;
 
-    /* Parse transport name */
-    if ((rc = parse_gdb_transport(argv[optind++], &trans)) != 0)
-        return rc;
+	/* Parse transport name */
+	if ( ( rc = parse_gdb_transport ( argv[optind++], &trans ) ) != 0 )
+		return rc;
 
-    /* Initialise transport */
-    if (trans->init) {
-        if ((rc = trans->init(argc - optind,
-                              &argv[optind])) != 0) {
-            return rc;
-        }
-    }
+	/* Initialise transport */
+	if ( trans->init ) {
+		if ( ( rc = trans->init ( argc - optind,
+					  &argv[optind] ) ) != 0 ) {
+			return rc;
+		}
+	}
 
-    /* Enter GDB stub */
-    gdbstub_start(trans);
+	/* Enter GDB stub */
+	gdbstub_start ( trans );
 
-    return 0;
+	return 0;
 }
 
 /** GDB stub commands */
 struct command gdbstub_commands[] __command = {
-    {
-        .name = "gdbstub",
-        .exec = gdbstub_exec,
-    },
+	{
+		.name = "gdbstub",
+		.exec = gdbstub_exec,
+	},
 };

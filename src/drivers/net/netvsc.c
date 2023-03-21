@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -49,39 +49,40 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v len		Length of data
  * @ret rc		Return status code
  */
-static int netvsc_control(struct netvsc_device* netvsc, unsigned int xrid,
-                          const void* data, size_t len) {
-    uint64_t xid = (NETVSC_BASE_XID + xrid);
-    unsigned int i;
-    int rc;
+static int netvsc_control ( struct netvsc_device *netvsc, unsigned int xrid,
+			    const void *data, size_t len ) {
+	uint64_t xid = ( NETVSC_BASE_XID + xrid );
+	unsigned int i;
+	int rc;
 
-    /* Send control message */
-    if ((rc = vmbus_send_control(netvsc->vmdev, xid, data, len)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not send control message: %s\n",
-             netvsc->name, strerror(rc));
-        return rc;
-    }
+	/* Send control message */
+	if ( ( rc = vmbus_send_control ( netvsc->vmdev, xid, data, len ) ) !=0){
+		DBGC ( netvsc, "NETVSC %s could not send control message: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
 
-    /* Record transaction ID */
-    netvsc->wait_xrid = xrid;
+	/* Record transaction ID */
+	netvsc->wait_xrid = xrid;
 
-    /* Wait for operation to complete */
-    for (i = 0; i < NETVSC_MAX_WAIT_MS; i++) {
-        /* Check for completion */
-        if (!netvsc->wait_xrid)
-            return netvsc->wait_rc;
+	/* Wait for operation to complete */
+	for ( i = 0 ; i < NETVSC_MAX_WAIT_MS ; i++ ) {
 
-        /* Poll VMBus device */
-        vmbus_poll(netvsc->vmdev);
+		/* Check for completion */
+		if ( ! netvsc->wait_xrid )
+			return netvsc->wait_rc;
 
-        /* Delay for 1ms */
-        mdelay(1);
-    }
+		/* Poll VMBus device */
+		vmbus_poll ( netvsc->vmdev );
 
-    DBGC(netvsc, "NETVSC %s timed out waiting for XRID %d\n",
-         netvsc->name, xrid);
-    vmbus_dump_channel(netvsc->vmdev);
-    return -ETIMEDOUT;
+		/* Delay for 1ms */
+		mdelay ( 1 );
+	}
+
+	DBGC ( netvsc, "NETVSC %s timed out waiting for XRID %d\n",
+	       netvsc->name, xrid );
+	vmbus_dump_channel ( netvsc->vmdev );
+	return -ETIMEDOUT;
 }
 
 /**
@@ -92,9 +93,9 @@ static int netvsc_control(struct netvsc_device* netvsc, unsigned int xrid,
  * @v len		Length of data
  * @ret rc		Return status code
  */
-static int netvsc_completed(struct netvsc_device* netvsc __unused,
-                            const void* data __unused, size_t len __unused) {
-    return 0;
+static int netvsc_completed ( struct netvsc_device *netvsc __unused,
+			      const void *data __unused, size_t len __unused ) {
+	return 0;
 }
 
 /**
@@ -103,25 +104,25 @@ static int netvsc_completed(struct netvsc_device* netvsc __unused,
  * @v netvsc		NetVSC device
  * @ret rc		Return status code
  */
-static int netvsc_initialise(struct netvsc_device* netvsc) {
-    struct netvsc_init_message msg;
-    int rc;
+static int netvsc_initialise ( struct netvsc_device *netvsc ) {
+	struct netvsc_init_message msg;
+	int rc;
 
-    /* Construct message */
-    memset(&msg, 0, sizeof(msg));
-    msg.header.type = cpu_to_le32(NETVSC_INIT_MSG);
-    msg.min = cpu_to_le32(NETVSC_VERSION_1);
-    msg.max = cpu_to_le32(NETVSC_VERSION_1);
+	/* Construct message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.header.type = cpu_to_le32 ( NETVSC_INIT_MSG );
+	msg.min = cpu_to_le32 ( NETVSC_VERSION_1 );
+	msg.max = cpu_to_le32 ( NETVSC_VERSION_1 );
 
-    /* Send message and wait for completion */
-    if ((rc = netvsc_control(netvsc, NETVSC_INIT_XRID, &msg,
-                             sizeof(msg))) != 0) {
-        DBGC(netvsc, "NETVSC %s could not initialise: %s\n",
-             netvsc->name, strerror(rc));
-        return rc;
-    }
+	/* Send message and wait for completion */
+	if ( ( rc = netvsc_control ( netvsc, NETVSC_INIT_XRID, &msg,
+				     sizeof ( msg ) ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not initialise: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -133,29 +134,29 @@ static int netvsc_initialise(struct netvsc_device* netvsc) {
  * @ret rc		Return status code
  */
 static int
-netvsc_initialised(struct netvsc_device* netvsc, const void* data,
-                   size_t len) {
-    const struct netvsc_init_completion* cmplt = data;
+netvsc_initialised ( struct netvsc_device *netvsc, const void *data,
+		     size_t len ) {
+	const struct netvsc_init_completion *cmplt = data;
 
-    /* Check completion */
-    if (len < sizeof(*cmplt)) {
-        DBGC(netvsc, "NETVSC %s underlength initialisation "
-                     "completion (%zd bytes)\n", netvsc->name, len);
-        return -EINVAL;
-    }
-    if (cmplt->header.type != cpu_to_le32(NETVSC_INIT_CMPLT)) {
-        DBGC(netvsc, "NETVSC %s unexpected initialisation completion "
-                     "type %d\n", netvsc->name,
-             le32_to_cpu(cmplt->header.type));
-        return -EPROTO;
-    }
-    if (cmplt->status != cpu_to_le32(NETVSC_OK)) {
-        DBGC(netvsc, "NETVSC %s initialisation failure status %d\n",
-             netvsc->name, le32_to_cpu(cmplt->status));
-        return -EPROTO;
-    }
+	/* Check completion */
+	if ( len < sizeof ( *cmplt ) ) {
+		DBGC ( netvsc, "NETVSC %s underlength initialisation "
+		       "completion (%zd bytes)\n", netvsc->name, len );
+		return -EINVAL;
+	}
+	if ( cmplt->header.type != cpu_to_le32 ( NETVSC_INIT_CMPLT ) ) {
+		DBGC ( netvsc, "NETVSC %s unexpected initialisation completion "
+		       "type %d\n", netvsc->name,
+		       le32_to_cpu ( cmplt->header.type ) );
+		return -EPROTO;
+	}
+	if ( cmplt->status != cpu_to_le32 ( NETVSC_OK ) ) {
+		DBGC ( netvsc, "NETVSC %s initialisation failure status %d\n",
+		       netvsc->name, le32_to_cpu ( cmplt->status ) );
+		return -EPROTO;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -164,25 +165,25 @@ netvsc_initialised(struct netvsc_device* netvsc, const void* data,
  * @v netvsc		NetVSC device
  * @ret rc		Return status code
  */
-static int netvsc_ndis_version(struct netvsc_device* netvsc) {
-    struct netvsc_ndis_version_message msg;
-    int rc;
+static int netvsc_ndis_version ( struct netvsc_device *netvsc ) {
+	struct netvsc_ndis_version_message msg;
+	int rc;
 
-    /* Construct message */
-    memset(&msg, 0, sizeof(msg));
-    msg.header.type = cpu_to_le32(NETVSC_NDIS_VERSION_MSG);
-    msg.major = cpu_to_le32(NETVSC_NDIS_MAJOR);
-    msg.minor = cpu_to_le32(NETVSC_NDIS_MINOR);
+	/* Construct message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.header.type = cpu_to_le32 ( NETVSC_NDIS_VERSION_MSG );
+	msg.major = cpu_to_le32 ( NETVSC_NDIS_MAJOR );
+	msg.minor = cpu_to_le32 ( NETVSC_NDIS_MINOR );
 
-    /* Send message and wait for completion */
-    if ((rc = netvsc_control(netvsc, NETVSC_NDIS_VERSION_XRID,
-                             &msg, sizeof(msg))) != 0) {
-        DBGC(netvsc, "NETVSC %s could not set NDIS version: %s\n",
-             netvsc->name, strerror(rc));
-        return rc;
-    }
+	/* Send message and wait for completion */
+	if ( ( rc = netvsc_control ( netvsc, NETVSC_NDIS_VERSION_XRID,
+				     &msg, sizeof ( msg ) ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not set NDIS version: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -192,26 +193,26 @@ static int netvsc_ndis_version(struct netvsc_device* netvsc) {
  * @v buffer		Data buffer
  * @ret rc		Return status code
  */
-static int netvsc_establish_buffer(struct netvsc_device* netvsc,
-                                   struct netvsc_buffer* buffer) {
-    struct netvsc_establish_buffer_message msg;
-    int rc;
+static int netvsc_establish_buffer ( struct netvsc_device *netvsc,
+				     struct netvsc_buffer *buffer ) {
+	struct netvsc_establish_buffer_message msg;
+	int rc;
 
-    /* Construct message */
-    memset(&msg, 0, sizeof(msg));
-    msg.header.type = cpu_to_le32(buffer->establish_type);
-    msg.gpadl = cpu_to_le32(buffer->gpadl);
-    msg.pageset = buffer->pages.pageset; /* Already protocol-endian */
+	/* Construct message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.header.type = cpu_to_le32 ( buffer->establish_type );
+	msg.gpadl = cpu_to_le32 ( buffer->gpadl );
+	msg.pageset = buffer->pages.pageset; /* Already protocol-endian */
 
-    /* Send message and wait for completion */
-    if ((rc = netvsc_control(netvsc, buffer->establish_xrid, &msg,
-                             sizeof(msg))) != 0) {
-        DBGC(netvsc, "NETVSC %s could not establish buffer: %s\n",
-             netvsc->name, strerror(rc));
-        return rc;
-    }
+	/* Send message and wait for completion */
+	if ( ( rc = netvsc_control ( netvsc, buffer->establish_xrid, &msg,
+				     sizeof ( msg ) ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not establish buffer: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -222,28 +223,28 @@ static int netvsc_establish_buffer(struct netvsc_device* netvsc,
  * @v len		Length of data
  * @ret rc		Return status code
  */
-static int netvsc_rx_established_buffer(struct netvsc_device* netvsc,
-                                        const void* data, size_t len) {
-    const struct netvsc_rx_establish_buffer_completion* cmplt = data;
+static int netvsc_rx_established_buffer ( struct netvsc_device *netvsc,
+					  const void *data, size_t len ) {
+	const struct netvsc_rx_establish_buffer_completion *cmplt = data;
 
-    /* Check completion */
-    if (len < sizeof(*cmplt)) {
-        DBGC(netvsc, "NETVSC %s underlength buffer completion (%zd "
-                     "bytes)\n", netvsc->name, len);
-        return -EINVAL;
-    }
-    if (cmplt->header.type != cpu_to_le32(NETVSC_RX_ESTABLISH_CMPLT)) {
-        DBGC(netvsc, "NETVSC %s unexpected buffer completion type "
-                     "%d\n", netvsc->name, le32_to_cpu(cmplt->header.type));
-        return -EPROTO;
-    }
-    if (cmplt->status != cpu_to_le32(NETVSC_OK)) {
-        DBGC(netvsc, "NETVSC %s buffer failure status %d\n",
-             netvsc->name, le32_to_cpu(cmplt->status));
-        return -EPROTO;
-    }
+	/* Check completion */
+	if ( len < sizeof ( *cmplt ) ) {
+		DBGC ( netvsc, "NETVSC %s underlength buffer completion (%zd "
+		       "bytes)\n", netvsc->name, len );
+		return -EINVAL;
+	}
+	if ( cmplt->header.type != cpu_to_le32 ( NETVSC_RX_ESTABLISH_CMPLT ) ) {
+		DBGC ( netvsc, "NETVSC %s unexpected buffer completion type "
+		       "%d\n", netvsc->name, le32_to_cpu ( cmplt->header.type));
+		return -EPROTO;
+	}
+	if ( cmplt->status != cpu_to_le32 ( NETVSC_OK ) ) {
+		DBGC ( netvsc, "NETVSC %s buffer failure status %d\n",
+		       netvsc->name, le32_to_cpu ( cmplt->status ) );
+		return -EPROTO;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -253,34 +254,34 @@ static int netvsc_rx_established_buffer(struct netvsc_device* netvsc,
  * @v buffer		Data buffer
  * @ret rc		Return status code
  */
-static int netvsc_revoke_buffer(struct netvsc_device* netvsc,
-                                struct netvsc_buffer* buffer) {
-    struct netvsc_revoke_buffer_message msg;
-    int rc;
+static int netvsc_revoke_buffer ( struct netvsc_device *netvsc,
+				  struct netvsc_buffer *buffer ) {
+	struct netvsc_revoke_buffer_message msg;
+	int rc;
 
-    /* If the buffer's GPADL is obsolete (i.e. was created before
-     * the most recent Hyper-V reset), then we will never receive
-     * a response to the revoke message.  Since the GPADL is
-     * already destroyed as far as the hypervisor is concerned, no
-     * further action is required.
-     */
-    if (netvsc_is_obsolete(netvsc))
-        return 0;
+	/* If the buffer's GPADL is obsolete (i.e. was created before
+	 * the most recent Hyper-V reset), then we will never receive
+	 * a response to the revoke message.  Since the GPADL is
+	 * already destroyed as far as the hypervisor is concerned, no
+	 * further action is required.
+	 */
+	if ( netvsc_is_obsolete ( netvsc ) )
+		return 0;
 
-    /* Construct message */
-    memset(&msg, 0, sizeof(msg));
-    msg.header.type = cpu_to_le32(buffer->revoke_type);
-    msg.pageset = buffer->pages.pageset; /* Already protocol-endian */
+	/* Construct message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.header.type = cpu_to_le32 ( buffer->revoke_type );
+	msg.pageset = buffer->pages.pageset; /* Already protocol-endian */
 
-    /* Send message and wait for completion */
-    if ((rc = netvsc_control(netvsc, buffer->revoke_xrid,
-                             &msg, sizeof(msg))) != 0) {
-        DBGC(netvsc, "NETVSC %s could not revoke buffer: %s\n",
-             netvsc->name, strerror(rc));
-        return rc;
-    }
+	/* Send message and wait for completion */
+	if ( ( rc = netvsc_control ( netvsc, buffer->revoke_xrid,
+				     &msg, sizeof ( msg ) ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not revoke buffer: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -292,15 +293,15 @@ static int netvsc_revoke_buffer(struct netvsc_device* netvsc,
  * @v len		Length of data
  * @ret rc		Return status code
  */
-static int netvsc_recv_control(struct vmbus_device* vmdev, uint64_t xid,
-                               const void* data, size_t len) {
-    struct rndis_device* rndis = vmbus_get_drvdata(vmdev);
-    struct netvsc_device* netvsc = rndis->priv;
+static int netvsc_recv_control ( struct vmbus_device *vmdev, uint64_t xid,
+				 const void *data, size_t len ) {
+	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
+	struct netvsc_device *netvsc = rndis->priv;
 
-    DBGC(netvsc, "NETVSC %s received unsupported control packet "
-                 "(%08llx):\n", netvsc->name, xid);
-    DBGC_HDA(netvsc, 0, data, len);
-    return -ENOTSUP;
+	DBGC ( netvsc, "NETVSC %s received unsupported control packet "
+	       "(%08llx):\n", netvsc->name, xid );
+	DBGC_HDA ( netvsc, 0, data, len );
+	return -ENOTSUP;
 }
 
 /**
@@ -313,53 +314,53 @@ static int netvsc_recv_control(struct vmbus_device* vmdev, uint64_t xid,
  * @v list		List of I/O buffers
  * @ret rc		Return status code
  */
-static int netvsc_recv_data(struct vmbus_device* vmdev, uint64_t xid,
-                            const void* data, size_t len,
-                            struct list_head* list) {
-    struct rndis_device* rndis = vmbus_get_drvdata(vmdev);
-    struct netvsc_device* netvsc = rndis->priv;
-    const struct netvsc_rndis_message* msg = data;
-    struct io_buffer* iobuf;
-    struct io_buffer* tmp;
-    int rc;
+static int netvsc_recv_data ( struct vmbus_device *vmdev, uint64_t xid,
+			      const void *data, size_t len,
+			      struct list_head *list ) {
+	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
+	struct netvsc_device *netvsc = rndis->priv;
+	const struct netvsc_rndis_message *msg = data;
+	struct io_buffer *iobuf;
+	struct io_buffer *tmp;
+	int rc;
 
-    /* Sanity check */
-    if (len < sizeof(*msg)) {
-        DBGC(netvsc, "NETVSC %s received underlength RNDIS packet "
-                     "(%zd bytes)\n", netvsc->name, len);
-        rc = -EINVAL;
-        goto err_sanity;
-    }
-    if (msg->header.type != cpu_to_le32(NETVSC_RNDIS_MSG)) {
-        DBGC(netvsc, "NETVSC %s received unexpected RNDIS packet "
-                     "type %d\n", netvsc->name,
-             le32_to_cpu(msg->header.type));
-        rc = -EINVAL;
-        goto err_sanity;
-    }
+	/* Sanity check */
+	if ( len < sizeof ( *msg ) ) {
+		DBGC ( netvsc, "NETVSC %s received underlength RNDIS packet "
+		       "(%zd bytes)\n", netvsc->name, len );
+		rc = -EINVAL;
+		goto err_sanity;
+	}
+	if ( msg->header.type != cpu_to_le32 ( NETVSC_RNDIS_MSG ) ) {
+		DBGC ( netvsc, "NETVSC %s received unexpected RNDIS packet "
+		       "type %d\n", netvsc->name,
+		       le32_to_cpu ( msg->header.type ) );
+		rc = -EINVAL;
+		goto err_sanity;
+	}
 
-    /* Send completion back to host */
-    if ((rc = vmbus_send_completion(vmdev, xid, NULL, 0)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not send completion: %s\n",
-             netvsc->name, strerror(rc));
-        goto err_completion;
-    }
+	/* Send completion back to host */
+	if ( ( rc = vmbus_send_completion ( vmdev, xid, NULL, 0 ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not send completion: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		goto err_completion;
+	}
 
-    /* Hand off to RNDIS */
-    list_for_each_entry_safe(iobuf, tmp, list, list) {
-        list_del(&iobuf->list);
-        rndis_rx(rndis, iob_disown(iobuf));
-    }
+	/* Hand off to RNDIS */
+	list_for_each_entry_safe ( iobuf, tmp, list, list ) {
+		list_del ( &iobuf->list );
+		rndis_rx ( rndis, iob_disown ( iobuf ) );
+	}
 
-    return 0;
+	return 0;
 
-err_completion:
-err_sanity:
-    list_for_each_entry_safe(iobuf, tmp, list, list) {
-        list_del(&iobuf->list);
-        free_iob(iobuf);
-    }
-    return rc;
+ err_completion:
+ err_sanity:
+	list_for_each_entry_safe ( iobuf, tmp, list, list ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+	}
+	return rc;
 }
 
 /**
@@ -371,55 +372,56 @@ err_sanity:
  * @v len		Length of data
  * @ret rc		Return status code
  */
-static int netvsc_recv_completion(struct vmbus_device* vmdev, uint64_t xid,
-                                  const void* data, size_t len) {
-    struct rndis_device* rndis = vmbus_get_drvdata(vmdev);
-    struct netvsc_device* netvsc = rndis->priv;
-    struct io_buffer* iobuf;
-    int (*completion)(struct netvsc_device * netvsc,
-                      const void* data, size_t len);
-    unsigned int xrid = (xid - NETVSC_BASE_XID);
-    unsigned int tx_id;
-    int rc;
+static int netvsc_recv_completion ( struct vmbus_device *vmdev, uint64_t xid,
+				    const void *data, size_t len ) {
+	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
+	struct netvsc_device *netvsc = rndis->priv;
+	struct io_buffer *iobuf;
+	int ( * completion ) ( struct netvsc_device *netvsc,
+			       const void *data, size_t len );
+	unsigned int xrid = ( xid - NETVSC_BASE_XID );
+	unsigned int tx_id;
+	int rc;
 
-    /* Handle transmit completion, if applicable */
-    tx_id = (xrid - NETVSC_TX_BASE_XRID);
-    if ((tx_id < NETVSC_TX_NUM_DESC) &&
-        ((iobuf = netvsc->tx.iobufs[tx_id]) != NULL)) {
-        /* Free buffer ID */
-        netvsc->tx.iobufs[tx_id] = NULL;
-        netvsc->tx.ids[(netvsc->tx.id_cons++) &
-                       (netvsc->tx.count - 1)] = tx_id;
+	/* Handle transmit completion, if applicable */
+	tx_id = ( xrid - NETVSC_TX_BASE_XRID );
+	if ( ( tx_id < NETVSC_TX_NUM_DESC ) &&
+	     ( ( iobuf = netvsc->tx.iobufs[tx_id] ) != NULL ) ) {
 
-        /* Hand back to RNDIS */
-        rndis_tx_complete(rndis, iobuf);
-        return 0;
-    }
+		/* Free buffer ID */
+		netvsc->tx.iobufs[tx_id] = NULL;
+		netvsc->tx.ids[ ( netvsc->tx.id_cons++ ) &
+				( netvsc->tx.count - 1 ) ] = tx_id;
 
-    /* Otherwise determine completion handler */
-    if (xrid == NETVSC_INIT_XRID) {
-        completion = netvsc_initialised;
-    } else if (xrid == NETVSC_RX_ESTABLISH_XRID) {
-        completion = netvsc_rx_established_buffer;
-    } else if ((netvsc->wait_xrid != 0) &&
-               (xrid == netvsc->wait_xrid)) {
-        completion = netvsc_completed;
-    } else {
-        DBGC(netvsc, "NETVSC %s received unexpected completion "
-                     "(%08llx)\n", netvsc->name, xid);
-        return -EPIPE;
-    }
+		/* Hand back to RNDIS */
+		rndis_tx_complete ( rndis, iobuf );
+		return 0;
+	}
 
-    /* Hand off to completion handler */
-    rc = completion(netvsc, data, len);
+	/* Otherwise determine completion handler */
+	if ( xrid == NETVSC_INIT_XRID ) {
+		completion = netvsc_initialised;
+	} else if ( xrid == NETVSC_RX_ESTABLISH_XRID ) {
+		completion = netvsc_rx_established_buffer;
+	} else if ( ( netvsc->wait_xrid != 0 ) &&
+		    ( xrid == netvsc->wait_xrid ) ) {
+		completion = netvsc_completed;
+	} else {
+		DBGC ( netvsc, "NETVSC %s received unexpected completion "
+		       "(%08llx)\n", netvsc->name, xid );
+		return -EPIPE;
+	}
 
-    /* Record completion handler result if applicable */
-    if (xrid == netvsc->wait_xrid) {
-        netvsc->wait_xrid = 0;
-        netvsc->wait_rc = rc;
-    }
+	/* Hand off to completion handler */
+	rc = completion ( netvsc, data, len );
 
-    return rc;
+	/* Record completion handler result if applicable */
+	if ( xrid == netvsc->wait_xrid ) {
+		netvsc->wait_xrid = 0;
+		netvsc->wait_rc = rc;
+	}
+
+	return rc;
 }
 
 /**
@@ -429,22 +431,22 @@ static int netvsc_recv_completion(struct vmbus_device* vmdev, uint64_t xid,
  * @v xid		Transaction ID
  * @ret rc		Return status code
  */
-static int netvsc_recv_cancellation(struct vmbus_device* vmdev,
-                                    uint64_t xid) {
-    struct rndis_device* rndis = vmbus_get_drvdata(vmdev);
-    struct netvsc_device* netvsc = rndis->priv;
+static int netvsc_recv_cancellation ( struct vmbus_device *vmdev,
+				      uint64_t xid ) {
+	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
+	struct netvsc_device *netvsc = rndis->priv;
 
-    DBGC(netvsc, "NETVSC %s received unsupported cancellation packet "
-                 "(%08llx):\n", netvsc->name, xid);
-    return -ENOTSUP;
+	DBGC ( netvsc, "NETVSC %s received unsupported cancellation packet "
+	       "(%08llx):\n", netvsc->name, xid );
+	return -ENOTSUP;
 }
 
 /** VMBus channel operations */
 static struct vmbus_channel_operations netvsc_channel_operations = {
-    .recv_control = netvsc_recv_control,
-    .recv_data = netvsc_recv_data,
-    .recv_completion = netvsc_recv_completion,
-    .recv_cancellation = netvsc_recv_cancellation,
+	.recv_control = netvsc_recv_control,
+	.recv_data = netvsc_recv_data,
+	.recv_completion = netvsc_recv_completion,
+	.recv_cancellation = netvsc_recv_cancellation,
 };
 
 /**
@@ -452,13 +454,13 @@ static struct vmbus_channel_operations netvsc_channel_operations = {
  *
  * @v rndis		RNDIS device
  */
-static void netvsc_poll(struct rndis_device* rndis) {
-    struct netvsc_device* netvsc = rndis->priv;
-    struct vmbus_device* vmdev = netvsc->vmdev;
+static void netvsc_poll ( struct rndis_device *rndis ) {
+	struct netvsc_device *netvsc = rndis->priv;
+	struct vmbus_device *vmdev = netvsc->vmdev;
 
-    /* Poll VMBus device */
-    while (vmbus_has_data(vmdev))
-        vmbus_poll(vmdev);
+	/* Poll VMBus device */
+	while ( vmbus_has_data ( vmdev ) )
+		vmbus_poll ( vmdev );
 }
 
 /**
@@ -471,57 +473,58 @@ static void netvsc_poll(struct rndis_device* rndis) {
  * If this method returns success then the RNDIS device must
  * eventually report completion via rndis_tx_complete().
  */
-static int netvsc_transmit(struct rndis_device* rndis,
-                           struct io_buffer* iobuf) {
-    struct netvsc_device* netvsc = rndis->priv;
-    struct rndis_header* header = iobuf->data;
-    struct netvsc_rndis_message msg;
-    unsigned int tx_id;
-    unsigned int xrid;
-    uint64_t xid;
-    int rc;
+static int netvsc_transmit ( struct rndis_device *rndis,
+			     struct io_buffer *iobuf ) {
+	struct netvsc_device *netvsc = rndis->priv;
+	struct rndis_header *header = iobuf->data;
+	struct netvsc_rndis_message msg;
+	unsigned int tx_id;
+	unsigned int xrid;
+	uint64_t xid;
+	int rc;
 
-    /* If the device is obsolete (i.e. was opened before the most
-     * recent Hyper-V reset), then we will never receive transmit
-     * completions.  Fail transmissions immediately to minimise
-     * the delay in closing and reopening the device.
-     */
-    if (netvsc_is_obsolete(netvsc))
-        return -EPIPE;
+	/* If the device is obsolete (i.e. was opened before the most
+	 * recent Hyper-V reset), then we will never receive transmit
+	 * completions.  Fail transmissions immediately to minimise
+	 * the delay in closing and reopening the device.
+	 */
+	if ( netvsc_is_obsolete ( netvsc ) )
+		return -EPIPE;
 
-    /* Sanity check */
-    assert(iob_len(iobuf) >= sizeof(*header));
-    assert(iob_len(iobuf) == le32_to_cpu(header->len));
+	/* Sanity check */
+	assert ( iob_len ( iobuf ) >= sizeof ( *header ) );
+	assert ( iob_len ( iobuf ) == le32_to_cpu ( header->len ) );
 
-    /* Check that we have space in the transmit ring */
-    if (netvsc_ring_is_full(&netvsc->tx))
-        return rndis_tx_defer(rndis, iobuf);
+	/* Check that we have space in the transmit ring */
+	if ( netvsc_ring_is_full ( &netvsc->tx ) )
+		return rndis_tx_defer ( rndis, iobuf );
 
-    /* Allocate buffer ID and calculate transaction ID */
-    tx_id = netvsc->tx.ids[netvsc->tx.id_prod & (netvsc->tx.count - 1)];
-    assert(netvsc->tx.iobufs[tx_id] == NULL);
-    xrid = (NETVSC_TX_BASE_XRID + tx_id);
-    xid = (NETVSC_BASE_XID + xrid);
+	/* Allocate buffer ID and calculate transaction ID */
+	tx_id = netvsc->tx.ids[ netvsc->tx.id_prod & ( netvsc->tx.count - 1 ) ];
+	assert ( netvsc->tx.iobufs[tx_id] == NULL );
+	xrid = ( NETVSC_TX_BASE_XRID + tx_id );
+	xid = ( NETVSC_BASE_XID + xrid );
 
-    /* Construct message */
-    memset(&msg, 0, sizeof(msg));
-    msg.header.type = cpu_to_le32(NETVSC_RNDIS_MSG);
-    msg.channel = ((header->type == cpu_to_le32(RNDIS_PACKET_MSG)) ? NETVSC_RNDIS_DATA : NETVSC_RNDIS_CONTROL);
-    msg.buffer = cpu_to_le32(NETVSC_RNDIS_NO_BUFFER);
+	/* Construct message */
+	memset ( &msg, 0, sizeof ( msg ) );
+	msg.header.type = cpu_to_le32 ( NETVSC_RNDIS_MSG );
+	msg.channel = ( ( header->type == cpu_to_le32 ( RNDIS_PACKET_MSG ) ) ?
+			NETVSC_RNDIS_DATA : NETVSC_RNDIS_CONTROL );
+	msg.buffer = cpu_to_le32 ( NETVSC_RNDIS_NO_BUFFER );
 
-    /* Send message */
-    if ((rc = vmbus_send_data(netvsc->vmdev, xid, &msg, sizeof(msg),
-                              iobuf)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not send RNDIS message: %s\n",
-             netvsc->name, strerror(rc));
-        return rc;
-    }
+	/* Send message */
+	if ( ( rc = vmbus_send_data ( netvsc->vmdev, xid, &msg, sizeof ( msg ),
+				      iobuf ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not send RNDIS message: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
 
-    /* Store I/O buffer and consume buffer ID */
-    netvsc->tx.iobufs[tx_id] = iobuf;
-    netvsc->tx.id_prod++;
+	/* Store I/O buffer and consume buffer ID */
+	netvsc->tx.iobufs[tx_id] = iobuf;
+	netvsc->tx.id_prod++;
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -531,21 +534,21 @@ static int netvsc_transmit(struct rndis_device* rndis,
  * @v iobuf		I/O buffer
  * @v tx_id		Transmission ID
  */
-static void netvsc_cancel_transmit(struct netvsc_device* netvsc,
-                                   struct io_buffer* iobuf,
-                                   unsigned int tx_id) {
-    unsigned int xrid;
-    uint64_t xid;
+static void netvsc_cancel_transmit ( struct netvsc_device *netvsc,
+				     struct io_buffer *iobuf,
+				     unsigned int tx_id ) {
+	unsigned int xrid;
+	uint64_t xid;
 
-    /* Send cancellation */
-    xrid = (NETVSC_TX_BASE_XRID + tx_id);
-    xid = (NETVSC_BASE_XID + xrid);
-    DBGC(netvsc, "NETVSC %s cancelling transmission %#x\n",
-         netvsc->name, tx_id);
-    vmbus_send_cancellation(netvsc->vmdev, xid);
+	/* Send cancellation */
+	xrid = ( NETVSC_TX_BASE_XRID + tx_id );
+	xid = ( NETVSC_BASE_XID + xrid );
+	DBGC ( netvsc, "NETVSC %s cancelling transmission %#x\n",
+	       netvsc->name, tx_id );
+	vmbus_send_cancellation ( netvsc->vmdev, xid );
 
-    /* Report back to RNDIS */
-    rndis_tx_complete_err(netvsc->rndis, iobuf, -ECANCELED);
+	/* Report back to RNDIS */
+	rndis_tx_complete_err ( netvsc->rndis, iobuf, -ECANCELED );
 }
 
 /**
@@ -555,19 +558,19 @@ static void netvsc_cancel_transmit(struct netvsc_device* netvsc,
  * @v ring		Descriptor ring
  * @ret rc		Return status code
  */
-static int netvsc_create_ring(struct netvsc_device* netvsc __unused,
-                              struct netvsc_ring* ring) {
-    unsigned int i;
+static int netvsc_create_ring ( struct netvsc_device *netvsc __unused,
+				struct netvsc_ring *ring ) {
+	unsigned int i;
 
-    /* Initialise buffer ID ring */
-    for (i = 0; i < ring->count; i++) {
-        ring->ids[i] = i;
-        assert(ring->iobufs[i] == NULL);
-    }
-    ring->id_prod = 0;
-    ring->id_cons = 0;
+	/* Initialise buffer ID ring */
+	for ( i = 0 ; i < ring->count ; i++ ) {
+		ring->ids[i] = i;
+		assert ( ring->iobufs[i] == NULL );
+	}
+	ring->id_prod = 0;
+	ring->id_cons = 0;
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -577,27 +580,27 @@ static int netvsc_create_ring(struct netvsc_device* netvsc __unused,
  * @v ring		Descriptor ring
  * @v discard		Method used to discard outstanding buffer, or NULL
  */
-static void netvsc_destroy_ring(struct netvsc_device* netvsc,
-                                struct netvsc_ring* ring,
-                                void (*discard)(struct netvsc_device*,
-                                                struct io_buffer*,
-                                                unsigned int)) {
-    struct io_buffer* iobuf;
-    unsigned int i;
+static void netvsc_destroy_ring ( struct netvsc_device *netvsc,
+				  struct netvsc_ring *ring,
+				  void ( * discard ) ( struct netvsc_device *,
+						       struct io_buffer *,
+						       unsigned int ) ) {
+	struct io_buffer *iobuf;
+	unsigned int i;
 
-    /* Flush any outstanding buffers */
-    for (i = 0; i < ring->count; i++) {
-        iobuf = ring->iobufs[i];
-        if (!iobuf)
-            continue;
-        ring->iobufs[i] = NULL;
-        ring->ids[(ring->id_cons++) & (ring->count - 1)] = i;
-        if (discard)
-            discard(netvsc, iobuf, i);
-    }
+	/* Flush any outstanding buffers */
+	for ( i = 0 ; i < ring->count ; i++ ) {
+		iobuf = ring->iobufs[i];
+		if ( ! iobuf )
+			continue;
+		ring->iobufs[i] = NULL;
+		ring->ids[ ( ring->id_cons++ ) & ( ring->count - 1 ) ] = i;
+		if ( discard )
+			discard ( netvsc, iobuf, i );
+	}
 
-    /* Sanity check */
-    assert(netvsc_ring_is_empty(ring));
+	/* Sanity check */
+	assert ( netvsc_ring_is_empty ( ring ) );
 }
 
 /**
@@ -609,24 +612,24 @@ static void netvsc_destroy_ring(struct netvsc_device* netvsc,
  * @v len		Length within page set
  * @ret rc		Return status code
  */
-static int netvsc_buffer_copy(struct vmbus_xfer_pages* pages, void* data,
-                              size_t offset, size_t len) {
-    struct netvsc_buffer* buffer =
-        container_of(pages, struct netvsc_buffer, pages);
+static int netvsc_buffer_copy ( struct vmbus_xfer_pages *pages, void *data,
+				size_t offset, size_t len ) {
+	struct netvsc_buffer *buffer =
+		container_of ( pages, struct netvsc_buffer, pages );
 
-    /* Sanity check */
-    if ((offset > buffer->len) || (len > (buffer->len - offset)))
-        return -ERANGE;
+	/* Sanity check */
+	if ( ( offset > buffer->len ) || ( len > ( buffer->len - offset ) ) )
+		return -ERANGE;
 
-    /* Copy data from buffer */
-    copy_from_user(data, buffer->data, offset, len);
+	/* Copy data from buffer */
+	copy_from_user ( data, buffer->data, offset, len );
 
-    return 0;
+	return 0;
 }
 
 /** Transfer page set operations */
 static struct vmbus_xfer_pages_operations netvsc_xfer_pages_operations = {
-    .copy = netvsc_buffer_copy,
+	.copy = netvsc_buffer_copy,
 };
 
 /**
@@ -636,47 +639,47 @@ static struct vmbus_xfer_pages_operations netvsc_xfer_pages_operations = {
  * @v buffer		Data buffer
  * @ret rc		Return status code
  */
-static int netvsc_create_buffer(struct netvsc_device* netvsc,
-                                struct netvsc_buffer* buffer) {
-    struct vmbus_device* vmdev = netvsc->vmdev;
-    int gpadl;
-    int rc;
+static int netvsc_create_buffer ( struct netvsc_device *netvsc,
+				  struct netvsc_buffer *buffer ) {
+	struct vmbus_device *vmdev = netvsc->vmdev;
+	int gpadl;
+	int rc;
 
-    /* Allocate receive buffer */
-    buffer->data = umalloc(buffer->len);
-    if (!buffer->data) {
-        DBGC(netvsc, "NETVSC %s could not allocate %zd-byte buffer\n",
-             netvsc->name, buffer->len);
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
+	/* Allocate receive buffer */
+	buffer->data = umalloc ( buffer->len );
+	if ( ! buffer->data ) {
+		DBGC ( netvsc, "NETVSC %s could not allocate %zd-byte buffer\n",
+		       netvsc->name, buffer->len );
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 
-    /* Establish GPA descriptor list */
-    gpadl = vmbus_establish_gpadl(vmdev, buffer->data, buffer->len);
-    if (gpadl < 0) {
-        rc = gpadl;
-        DBGC(netvsc, "NETVSC %s could not establish GPADL: %s\n",
-             netvsc->name, strerror(rc));
-        goto err_establish_gpadl;
-    }
-    buffer->gpadl = gpadl;
+	/* Establish GPA descriptor list */
+	gpadl = vmbus_establish_gpadl ( vmdev, buffer->data, buffer->len );
+	if ( gpadl < 0 ) {
+		rc = gpadl;
+		DBGC ( netvsc, "NETVSC %s could not establish GPADL: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		goto err_establish_gpadl;
+	}
+	buffer->gpadl = gpadl;
 
-    /* Register transfer page set */
-    if ((rc = vmbus_register_pages(vmdev, &buffer->pages)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not register transfer pages: "
-                     "%s\n", netvsc->name, strerror(rc));
-        goto err_register_pages;
-    }
+	/* Register transfer page set */
+	if ( ( rc = vmbus_register_pages ( vmdev, &buffer->pages ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not register transfer pages: "
+		       "%s\n", netvsc->name, strerror ( rc ) );
+		goto err_register_pages;
+	}
 
-    return 0;
+	return 0;
 
-    vmbus_unregister_pages(vmdev, &buffer->pages);
-err_register_pages:
-    vmbus_gpadl_teardown(vmdev, gpadl);
-err_establish_gpadl:
-    ufree(buffer->data);
-err_alloc:
-    return rc;
+	vmbus_unregister_pages ( vmdev, &buffer->pages );
+ err_register_pages:
+	vmbus_gpadl_teardown ( vmdev, gpadl );
+ err_establish_gpadl:
+	ufree ( buffer->data );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -685,28 +688,28 @@ err_alloc:
  * @v netvsc		NetVSC device
  * @v buffer		Data buffer
  */
-static void netvsc_destroy_buffer(struct netvsc_device* netvsc,
-                                  struct netvsc_buffer* buffer) {
-    struct vmbus_device* vmdev = netvsc->vmdev;
-    int rc;
+static void netvsc_destroy_buffer ( struct netvsc_device *netvsc,
+				    struct netvsc_buffer *buffer ) {
+	struct vmbus_device *vmdev = netvsc->vmdev;
+	int rc;
 
-    /* Unregister transfer pages */
-    vmbus_unregister_pages(vmdev, &buffer->pages);
+	/* Unregister transfer pages */
+	vmbus_unregister_pages ( vmdev, &buffer->pages );
 
-    /* Tear down GPA descriptor list */
-    if ((rc = vmbus_gpadl_teardown(vmdev, buffer->gpadl)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not tear down GPADL: %s\n",
-             netvsc->name, strerror(rc));
-        /* Death is imminent.  The host may well continue to
-         * write to the data buffer.  The best we can do is
-         * leak memory for now and hope that the host doesn't
-         * write to this region after we load an OS.
-         */
-        return;
-    }
+	/* Tear down GPA descriptor list */
+	if ( ( rc = vmbus_gpadl_teardown ( vmdev, buffer->gpadl ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not tear down GPADL: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		/* Death is imminent.  The host may well continue to
+		 * write to the data buffer.  The best we can do is
+		 * leak memory for now and hope that the host doesn't
+		 * write to this region after we load an OS.
+		 */
+		return;
+	}
 
-    /* Free buffer */
-    ufree(buffer->data);
+	/* Free buffer */
+	ufree ( buffer->data );
 }
 
 /**
@@ -715,49 +718,49 @@ static void netvsc_destroy_buffer(struct netvsc_device* netvsc,
  * @v rndis		RNDIS device
  * @ret rc		Return status code
  */
-static int netvsc_open(struct rndis_device* rndis) {
-    struct netvsc_device* netvsc = rndis->priv;
-    int rc;
+static int netvsc_open ( struct rndis_device *rndis ) {
+	struct netvsc_device *netvsc = rndis->priv;
+	int rc;
 
-    /* Initialise receive buffer */
-    if ((rc = netvsc_create_buffer(netvsc, &netvsc->rx)) != 0)
-        goto err_create_rx;
+	/* Initialise receive buffer */
+	if ( ( rc = netvsc_create_buffer ( netvsc, &netvsc->rx ) ) != 0 )
+		goto err_create_rx;
 
-    /* Open channel */
-    if ((rc = vmbus_open(netvsc->vmdev, &netvsc_channel_operations,
-                         PAGE_SIZE, PAGE_SIZE, NETVSC_MTU)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not open VMBus: %s\n",
-             netvsc->name, strerror(rc));
-        goto err_vmbus_open;
-    }
+	/* Open channel */
+	if ( ( rc = vmbus_open ( netvsc->vmdev, &netvsc_channel_operations,
+				 PAGE_SIZE, PAGE_SIZE, NETVSC_MTU ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not open VMBus: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		goto err_vmbus_open;
+	}
 
-    /* Initialise communication with NetVSP */
-    if ((rc = netvsc_initialise(netvsc)) != 0)
-        goto err_initialise;
-    if ((rc = netvsc_ndis_version(netvsc)) != 0)
-        goto err_ndis_version;
+	/* Initialise communication with NetVSP */
+	if ( ( rc = netvsc_initialise ( netvsc ) ) != 0 )
+		goto err_initialise;
+	if ( ( rc = netvsc_ndis_version ( netvsc ) ) != 0 )
+		goto err_ndis_version;
 
-    /* Initialise transmit ring */
-    if ((rc = netvsc_create_ring(netvsc, &netvsc->tx)) != 0)
-        goto err_create_tx;
+	/* Initialise transmit ring */
+	if ( ( rc = netvsc_create_ring ( netvsc, &netvsc->tx ) ) != 0 )
+		goto err_create_tx;
 
-    /* Establish receive buffer */
-    if ((rc = netvsc_establish_buffer(netvsc, &netvsc->rx)) != 0)
-        goto err_establish_rx;
+	/* Establish receive buffer */
+	if ( ( rc = netvsc_establish_buffer ( netvsc, &netvsc->rx ) ) != 0 )
+		goto err_establish_rx;
 
-    return 0;
+	return 0;
 
-    netvsc_revoke_buffer(netvsc, &netvsc->rx);
-err_establish_rx:
-    netvsc_destroy_ring(netvsc, &netvsc->tx, NULL);
-err_create_tx:
-err_ndis_version:
-err_initialise:
-    vmbus_close(netvsc->vmdev);
-err_vmbus_open:
-    netvsc_destroy_buffer(netvsc, &netvsc->rx);
-err_create_rx:
-    return rc;
+	netvsc_revoke_buffer ( netvsc, &netvsc->rx );
+ err_establish_rx:
+	netvsc_destroy_ring ( netvsc, &netvsc->tx, NULL );
+ err_create_tx:
+ err_ndis_version:
+ err_initialise:
+	vmbus_close ( netvsc->vmdev );
+ err_vmbus_open:
+	netvsc_destroy_buffer ( netvsc, &netvsc->rx );
+ err_create_rx:
+	return rc;
 }
 
 /**
@@ -765,28 +768,28 @@ err_create_rx:
  *
  * @v rndis		RNDIS device
  */
-static void netvsc_close(struct rndis_device* rndis) {
-    struct netvsc_device* netvsc = rndis->priv;
+static void netvsc_close ( struct rndis_device *rndis ) {
+	struct netvsc_device *netvsc = rndis->priv;
 
-    /* Revoke receive buffer */
-    netvsc_revoke_buffer(netvsc, &netvsc->rx);
+	/* Revoke receive buffer */
+	netvsc_revoke_buffer ( netvsc, &netvsc->rx );
 
-    /* Destroy transmit ring */
-    netvsc_destroy_ring(netvsc, &netvsc->tx, netvsc_cancel_transmit);
+	/* Destroy transmit ring */
+	netvsc_destroy_ring ( netvsc, &netvsc->tx, netvsc_cancel_transmit );
 
-    /* Close channel */
-    vmbus_close(netvsc->vmdev);
+	/* Close channel */
+	vmbus_close ( netvsc->vmdev );
 
-    /* Destroy receive buffer */
-    netvsc_destroy_buffer(netvsc, &netvsc->rx);
+	/* Destroy receive buffer */
+	netvsc_destroy_buffer ( netvsc, &netvsc->rx );
 }
 
 /** RNDIS operations */
 static struct rndis_operations netvsc_operations = {
-    .open = netvsc_open,
-    .close = netvsc_close,
-    .transmit = netvsc_transmit,
-    .poll = netvsc_poll,
+	.open = netvsc_open,
+	.close = netvsc_close,
+	.transmit = netvsc_transmit,
+	.poll = netvsc_poll,
 };
 
 /**
@@ -795,46 +798,46 @@ static struct rndis_operations netvsc_operations = {
  * @v vmdev		VMBus device
  * @ret rc		Return status code
  */
-static int netvsc_probe(struct vmbus_device* vmdev) {
-    struct netvsc_device* netvsc;
-    struct rndis_device* rndis;
-    int rc;
+static int netvsc_probe ( struct vmbus_device *vmdev ) {
+	struct netvsc_device *netvsc;
+	struct rndis_device *rndis;
+	int rc;
 
-    /* Allocate and initialise structure */
-    rndis = alloc_rndis(sizeof(*netvsc));
-    if (!rndis) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
-    rndis_init(rndis, &netvsc_operations);
-    rndis->netdev->dev = &vmdev->dev;
-    netvsc = rndis->priv;
-    netvsc->vmdev = vmdev;
-    netvsc->rndis = rndis;
-    netvsc->name = vmdev->dev.name;
-    netvsc_init_ring(&netvsc->tx, NETVSC_TX_NUM_DESC,
-                     netvsc->tx_iobufs, netvsc->tx_ids);
-    netvsc_init_buffer(&netvsc->rx, NETVSC_RX_BUF_PAGESET,
-                       &netvsc_xfer_pages_operations,
-                       NETVSC_RX_ESTABLISH_MSG, NETVSC_RX_ESTABLISH_XRID,
-                       NETVSC_RX_REVOKE_MSG, NETVSC_RX_REVOKE_XRID,
-                       NETVSC_RX_BUF_LEN);
-    vmbus_set_drvdata(vmdev, rndis);
+	/* Allocate and initialise structure */
+	rndis = alloc_rndis ( sizeof ( *netvsc ) );
+	if ( ! rndis ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	rndis_init ( rndis, &netvsc_operations );
+	rndis->netdev->dev = &vmdev->dev;
+	netvsc = rndis->priv;
+	netvsc->vmdev = vmdev;
+	netvsc->rndis = rndis;
+	netvsc->name = vmdev->dev.name;
+	netvsc_init_ring ( &netvsc->tx, NETVSC_TX_NUM_DESC,
+			   netvsc->tx_iobufs, netvsc->tx_ids );
+	netvsc_init_buffer ( &netvsc->rx, NETVSC_RX_BUF_PAGESET,
+			     &netvsc_xfer_pages_operations,
+			     NETVSC_RX_ESTABLISH_MSG, NETVSC_RX_ESTABLISH_XRID,
+			     NETVSC_RX_REVOKE_MSG, NETVSC_RX_REVOKE_XRID,
+			     NETVSC_RX_BUF_LEN );
+	vmbus_set_drvdata ( vmdev, rndis );
 
-    /* Register RNDIS device */
-    if ((rc = register_rndis(rndis)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not register: %s\n",
-             netvsc->name, strerror(rc));
-        goto err_register;
-    }
+	/* Register RNDIS device */
+	if ( ( rc = register_rndis ( rndis ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not register: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		goto err_register;
+	}
 
-    return 0;
+	return 0;
 
-    unregister_rndis(rndis);
-err_register:
-    free_rndis(rndis);
-err_alloc:
-    return rc;
+	unregister_rndis ( rndis );
+ err_register:
+	free_rndis ( rndis );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -843,27 +846,27 @@ err_alloc:
  * @v vmdev		VMBus device
  * @ret rc		Return status code
  */
-static int netvsc_reset(struct vmbus_device* vmdev) {
-    struct rndis_device* rndis = vmbus_get_drvdata(vmdev);
-    struct netvsc_device* netvsc = rndis->priv;
-    struct net_device* netdev = rndis->netdev;
-    int rc;
+static int netvsc_reset ( struct vmbus_device *vmdev ) {
+	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
+	struct netvsc_device *netvsc = rndis->priv;
+	struct net_device *netdev = rndis->netdev;
+	int rc;
 
-    /* A closed device holds no NetVSC (or RNDIS) state, so there
-     * is nothing to reset.
-     */
-    if (!netdev_is_open(netdev))
-        return 0;
+	/* A closed device holds no NetVSC (or RNDIS) state, so there
+	 * is nothing to reset.
+	 */
+	if ( ! netdev_is_open ( netdev ) )
+		return 0;
 
-    /* Close and reopen device to reset any stale state */
-    netdev_close(netdev);
-    if ((rc = netdev_open(netdev)) != 0) {
-        DBGC(netvsc, "NETVSC %s could not reopen: %s\n",
-             netvsc->name, strerror(rc));
-        return rc;
-    }
+	/* Close and reopen device to reset any stale state */
+	netdev_close ( netdev );
+	if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
+		DBGC ( netvsc, "NETVSC %s could not reopen: %s\n",
+		       netvsc->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -871,22 +874,22 @@ static int netvsc_reset(struct vmbus_device* vmdev) {
  *
  * @v vmdev		VMBus device
  */
-static void netvsc_remove(struct vmbus_device* vmdev) {
-    struct rndis_device* rndis = vmbus_get_drvdata(vmdev);
+static void netvsc_remove ( struct vmbus_device *vmdev ) {
+	struct rndis_device *rndis = vmbus_get_drvdata ( vmdev );
 
-    /* Unregister RNDIS device */
-    unregister_rndis(rndis);
+	/* Unregister RNDIS device */
+	unregister_rndis ( rndis );
 
-    /* Free RNDIS device */
-    free_rndis(rndis);
+	/* Free RNDIS device */
+	free_rndis ( rndis );
 }
 
 /** NetVSC driver */
 struct vmbus_driver netvsc_driver __vmbus_driver = {
-    .name = "netvsc",
-    .type = VMBUS_TYPE(0xf8615163, 0xdf3e, 0x46c5, 0x913f,
-                       0xf2, 0xd2, 0xf9, 0x65, 0xed, 0x0e),
-    .probe = netvsc_probe,
-    .reset = netvsc_reset,
-    .remove = netvsc_remove,
+	.name = "netvsc",
+	.type = VMBUS_TYPE ( 0xf8615163, 0xdf3e, 0x46c5, 0x913f,
+			     0xf2, 0xd2, 0xf9, 0x65, 0xed, 0x0e ),
+	.probe = netvsc_probe,
+	.reset = netvsc_reset,
+	.remove = netvsc_remove,
 };

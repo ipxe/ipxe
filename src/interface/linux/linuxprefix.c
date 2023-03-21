@@ -27,11 +27,12 @@
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-int __asmcall _linux_start(int argc, char** argv) {
-    /* Store command-line arguments */
-    linux_argc = argc;
-    linux_argv = argv;
+int __asmcall _linux_start ( int argc, char **argv ) {
 
-    /* Run iPXE */
-    return main();
+	/* Store command-line arguments */
+	linux_argc = argc;
+	linux_argv = argv;
+
+	/* Run iPXE */
+	return main();
 }

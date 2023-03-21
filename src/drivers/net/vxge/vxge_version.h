@@ -1,5 +1,3 @@
-#pragma once
-
 /*
  * vxge-version.h: iPXE driver for Neterion Inc's X3100 Series 10GbE
  *              PCIe I/O Virtualized Server Adapter.
@@ -18,25 +16,25 @@ FILE_LICENCE(GPL2_ONLY);
 
 #ifndef VXGE_VERSION_H
 
-    #define VXGE_VERSION_H
+#define VXGE_VERSION_H
 
-    /* ipxe vxge driver version fields.
-     * Note: Each field must be a nibble size
-     */
-    #define VXGE_VERSION_MAJOR 3
-    #define VXGE_VERSION_MINOR 5
-    #define VXGE_VERSION_FIX 0
-    #define VXGE_VERSION_BUILD 1
+/* ipxe vxge driver version fields.
+ * Note: Each field must be a nibble size
+ */
+#define VXGE_VERSION_MAJOR	3
+#define VXGE_VERSION_MINOR	5
+#define VXGE_VERSION_FIX	0
+#define VXGE_VERSION_BUILD	1
 
-    #define VXGE_FW_VER(major, minor, build) \
-        (((major) << 16) + ((minor) << 8) + (build))
+#define VXGE_FW_VER(major, minor, build) \
+	(((major) << 16) + ((minor) << 8) + (build))
 
-    /* Certified FW version. */
-    #define VXGE_CERT_FW_VER_MAJOR 1
-    #define VXGE_CERT_FW_VER_MINOR 6
-    #define VXGE_CERT_FW_VER_BUILD 0
+/* Certified FW version. */
+#define VXGE_CERT_FW_VER_MAJOR	1
+#define VXGE_CERT_FW_VER_MINOR	6
+#define VXGE_CERT_FW_VER_BUILD	0
 
-    #define VXGE_CERT_FW_VER VXGE_FW_VER(VXGE_CERT_FW_VER_MAJOR, \
-                                         VXGE_CERT_FW_VER_MINOR, VXGE_CERT_FW_VER_BUILD)
+#define VXGE_CERT_FW_VER 	VXGE_FW_VER(VXGE_CERT_FW_VER_MAJOR, 	\
+				VXGE_CERT_FW_VER_MINOR,	VXGE_CERT_FW_VER_BUILD)
 
 #endif

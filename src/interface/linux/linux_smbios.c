@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
 #include <ipxe/linux_api.h>
@@ -29,7 +29,7 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 /** SMBIOS entry point filename */
 static const char smbios_entry_filename[] =
-    "/sys/firmware/dmi/tables/smbios_entry_point";
+	"/sys/firmware/dmi/tables/smbios_entry_point";
 
 /** SMBIOS filename */
 static const char smbios_filename[] = "/sys/firmware/dmi/tables/DMI";
@@ -43,84 +43,85 @@ static userptr_t smbios_data;
  * @v smbios		SMBIOS entry point descriptor structure to fill in
  * @ret rc		Return status code
  */
-static int linux_find_smbios(struct smbios* smbios) {
-    struct smbios3_entry* smbios3_entry;
-    struct smbios_entry* smbios_entry;
-    userptr_t entry;
-    void* data;
-    int len;
-    int rc;
+static int linux_find_smbios ( struct smbios *smbios ) {
+	struct smbios3_entry *smbios3_entry;
+	struct smbios_entry *smbios_entry;
+	userptr_t entry;
+	void *data;
+	int len;
+	int rc;
 
-    /* Read entry point file */
-    len = linux_sysfs_read(smbios_entry_filename, &entry);
-    if (len < 0) {
-        rc = len;
-        DBGC(smbios, "SMBIOS could not read %s: %s\n",
-             smbios_entry_filename, strerror(rc));
-        goto err_entry;
-    }
-    data = user_to_virt(entry, 0);
-    smbios3_entry = data;
-    smbios_entry = data;
-    if ((len >= ((int)sizeof(*smbios3_entry))) &&
-        (smbios3_entry->signature == SMBIOS3_SIGNATURE)) {
-        smbios->version = SMBIOS_VERSION(smbios3_entry->major,
-                                         smbios3_entry->minor);
-    } else if ((len >= ((int)sizeof(*smbios_entry))) &&
-               (smbios_entry->signature == SMBIOS_SIGNATURE)) {
-        smbios->version = SMBIOS_VERSION(smbios_entry->major,
-                                         smbios_entry->minor);
-    } else {
-        DBGC(smbios, "SMBIOS invalid entry point %s:\n",
-             smbios_entry_filename);
-        DBGC_HDA(smbios, 0, data, len);
-        rc = -EINVAL;
-        goto err_version;
-    }
+	/* Read entry point file */
+	len = linux_sysfs_read ( smbios_entry_filename, &entry );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smbios, "SMBIOS could not read %s: %s\n",
+		       smbios_entry_filename, strerror ( rc ) );
+		goto err_entry;
+	}
+	data = user_to_virt ( entry, 0 );
+	smbios3_entry = data;
+	smbios_entry = data;
+	if ( ( len >= ( ( int ) sizeof ( *smbios3_entry ) ) ) &&
+	     ( smbios3_entry->signature == SMBIOS3_SIGNATURE ) ) {
+		smbios->version = SMBIOS_VERSION ( smbios3_entry->major,
+						   smbios3_entry->minor );
+	} else if ( ( len >= ( ( int ) sizeof ( *smbios_entry ) ) ) &&
+		    ( smbios_entry->signature == SMBIOS_SIGNATURE ) ) {
+		smbios->version = SMBIOS_VERSION ( smbios_entry->major,
+						   smbios_entry->minor );
+	} else {
+		DBGC ( smbios, "SMBIOS invalid entry point %s:\n",
+		       smbios_entry_filename );
+		DBGC_HDA ( smbios, 0, data, len );
+		rc = -EINVAL;
+		goto err_version;
+	}
 
-    /* Read SMBIOS file */
-    len = linux_sysfs_read(smbios_filename, &smbios_data);
-    if (len < 0) {
-        rc = len;
-        DBGC(smbios, "SMBIOS could not read %s: %s\n",
-             smbios_filename, strerror(rc));
-        goto err_read;
-    }
+	/* Read SMBIOS file */
+	len = linux_sysfs_read ( smbios_filename, &smbios_data );
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( smbios, "SMBIOS could not read %s: %s\n",
+		       smbios_filename, strerror ( rc ) );
+		goto err_read;
+	}
 
-    /* Populate SMBIOS descriptor */
-    smbios->address = smbios_data;
-    smbios->len = len;
-    smbios->count = 0;
+	/* Populate SMBIOS descriptor */
+	smbios->address = smbios_data;
+	smbios->len = len;
+	smbios->count = 0;
 
-    /* Free entry point */
-    ufree(entry);
+	/* Free entry point */
+	ufree ( entry );
 
-    return 0;
+	return 0;
 
-    ufree(smbios_data);
-err_read:
-err_version:
-    ufree(entry);
-err_entry:
-    return rc;
+	ufree ( smbios_data );
+ err_read:
+ err_version:
+	ufree ( entry );
+ err_entry:
+	return rc;
 }
 
 /**
  * Free cached SMBIOS data
  *
  */
-static void linux_smbios_shutdown(int booting __unused) {
-    /* Clear SMBIOS data pointer */
-    smbios_clear();
+static void linux_smbios_shutdown ( int booting __unused ) {
 
-    /* Free SMBIOS data */
-    ufree(smbios_data);
+	/* Clear SMBIOS data pointer */
+	smbios_clear();
+
+	/* Free SMBIOS data */
+	ufree ( smbios_data );
 }
 
 /** SMBIOS shutdown function */
-struct startup_fn linux_smbios_startup_fn __startup_fn(STARTUP_NORMAL) = {
-    .name = "linux_smbios",
-    .shutdown = linux_smbios_shutdown,
+struct startup_fn linux_smbios_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "linux_smbios",
+	.shutdown = linux_smbios_shutdown,
 };
 
-PROVIDE_SMBIOS(linux, find_smbios, linux_find_smbios);
+PROVIDE_SMBIOS ( linux, find_smbios, linux_find_smbios );

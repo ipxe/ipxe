@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef CONFIG_SERIAL_H
-    #define CONFIG_SERIAL_H
+#define CONFIG_SERIAL_H
 
 /** @file
  *
@@ -13,25 +11,25 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
-    #define COMCONSOLE COM1 /* I/O port address */
+#define	COMCONSOLE	COM1		/* I/O port address */
 
-    /* Keep settings from a previous user of the serial port (e.g. lilo or
-     * LinuxBIOS), ignoring COMSPEED, COMDATA, COMPARITY and COMSTOP.
-     */
-    #undef COMPRESERVE
+/* Keep settings from a previous user of the serial port (e.g. lilo or
+ * LinuxBIOS), ignoring COMSPEED, COMDATA, COMPARITY and COMSTOP.
+ */
+#undef	COMPRESERVE
 
-    #ifndef COMPRESERVE
-        #define COMSPEED 115200 /* Baud rate */
-        #define COMDATA 8       /* Data bits */
-        #define COMPARITY 0     /* Parity: 0=None, 1=Odd, 2=Even */
-        #define COMSTOP 1       /* Stop bits */
-    #endif
+#ifndef COMPRESERVE
+#define	COMSPEED	115200		/* Baud rate */
+#define	COMDATA		8		/* Data bits */
+#define	COMPARITY	0		/* Parity: 0=None, 1=Odd, 2=Even */
+#define	COMSTOP		1		/* Stop bits */
+#endif
 
-    #include <config/named.h>
-    #include NAMED_CONFIG(serial.h)
-    #include <config/local/serial.h>
-    #include LOCAL_NAMED_CONFIG(serial.h)
+#include <config/named.h>
+#include NAMED_CONFIG(serial.h)
+#include <config/local/serial.h>
+#include LOCAL_NAMED_CONFIG(serial.h)
 
 #endif /* CONFIG_SERIAL_H */

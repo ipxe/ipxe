@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -46,50 +46,52 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v file		Test code file
  * @v line		Test code line
  */
-void asn1_okx(struct asn1_test* test, const char* file, unsigned int line) {
-    struct digest_algorithm* digest = &asn1_test_digest_algorithm;
-    struct asn1_cursor* cursor;
-    uint8_t ctx[digest->ctxsize];
-    uint8_t out[ASN1_TEST_DIGEST_SIZE];
-    unsigned int i;
-    size_t offset;
-    int next;
+void asn1_okx ( struct asn1_test *test, const char *file, unsigned int line ) {
+	struct digest_algorithm *digest = &asn1_test_digest_algorithm;
+	struct asn1_cursor *cursor;
+	uint8_t ctx[digest->ctxsize];
+	uint8_t out[ASN1_TEST_DIGEST_SIZE];
+	unsigned int i;
+	size_t offset;
+	int next;
 
-    /* Sanity check */
-    assert(sizeof(out) == digest->digestsize);
+	/* Sanity check */
+	assert ( sizeof ( out ) == digest->digestsize );
 
-    /* Correct image data pointer */
-    test->image->data = virt_to_user((void*)test->image->data);
+	/* Correct image data pointer */
+	test->image->data = virt_to_user ( ( void * ) test->image->data );
 
-    /* Check that image is detected as correct type */
-    okx(register_image(test->image) == 0, file, line);
-    okx(test->image->type == test->type, file, line);
+	/* Check that image is detected as correct type */
+	okx ( register_image ( test->image ) == 0, file, line );
+	okx ( test->image->type == test->type, file, line );
 
-    /* Check that all ASN.1 objects can be extracted */
-    for (offset = 0, i = 0; i < test->count; offset = next, i++) {
-        /* Extract ASN.1 object */
-        next = image_asn1(test->image, offset, &cursor);
-        okx(next >= 0, file, line);
-        okx(((size_t)next) > offset, file, line);
-        if (next > 0) {
-            /* Calculate digest of ASN.1 object */
-            digest_init(digest, ctx);
-            digest_update(digest, ctx, cursor->data,
-                          cursor->len);
-            digest_final(digest, ctx, out);
+	/* Check that all ASN.1 objects can be extracted */
+	for ( offset = 0, i = 0 ; i < test->count ; offset = next, i++ ) {
 
-            /* Compare against expected digest */
-            okx(memcmp(out, test->expected[i].digest,
-                       sizeof(out)) == 0, file, line);
+		/* Extract ASN.1 object */
+		next = image_asn1 ( test->image, offset, &cursor );
+		okx ( next >= 0, file, line );
+		okx ( ( ( size_t ) next ) > offset, file, line );
+		if ( next > 0 ) {
 
-            /* Free ASN.1 object */
-            free(cursor);
-        }
-    }
+			/* Calculate digest of ASN.1 object */
+			digest_init ( digest, ctx );
+			digest_update ( digest, ctx, cursor->data,
+					cursor->len );
+			digest_final ( digest, ctx, out );
 
-    /* Check that we have reached the end of the image */
-    okx(offset == test->image->len, file, line);
+			/* Compare against expected digest */
+			okx ( memcmp ( out, test->expected[i].digest,
+				       sizeof ( out ) ) == 0, file, line );
 
-    /* Unregister image */
-    unregister_image(test->image);
+			/* Free ASN.1 object */
+			free ( cursor );
+		}
+	}
+
+	/* Check that we have reached the end of the image */
+	okx ( offset == test->image->len, file, line );
+
+	/* Unregister image */
+	unregister_image ( test->image );
 }

@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <ipxe/crypto.h>
@@ -43,38 +43,38 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /* Allow trusted certificates to be overridden if not explicitly specified */
 #ifdef TRUSTED
-    #define ALLOW_TRUST_OVERRIDE 0
+#define ALLOW_TRUST_OVERRIDE 0
 #else
-    #define ALLOW_TRUST_OVERRIDE 1
+#define ALLOW_TRUST_OVERRIDE 1
 #endif
 
 /* Use iPXE root CA if no trusted certificates are explicitly specified */
 #ifndef TRUSTED
-    #define TRUSTED                                                     \
-        /* iPXE root CA */                                              \
-        0x9f, 0xaf, 0x71, 0x7b, 0x7f, 0x8c, 0xa2, 0xf9, 0x3c, 0x25,     \
-            0x6c, 0x79, 0xf8, 0xac, 0x55, 0x91, 0x89, 0x5d, 0x66, 0xd1, \
-            0xff, 0x3b, 0xee, 0x63, 0x97, 0xa7, 0x0d, 0x29, 0xc6, 0x5e, \
-            0xed, 0x1a,
+#define TRUSTED								\
+	/* iPXE root CA */						\
+	0x9f, 0xaf, 0x71, 0x7b, 0x7f, 0x8c, 0xa2, 0xf9, 0x3c, 0x25,	\
+	0x6c, 0x79, 0xf8, 0xac, 0x55, 0x91, 0x89, 0x5d, 0x66, 0xd1,	\
+	0xff, 0x3b, 0xee, 0x63, 0x97, 0xa7, 0x0d, 0x29, 0xc6, 0x5e,	\
+	0xed, 0x1a,
 #endif
 
 /** Root certificate fingerprints */
-static const uint8_t fingerprints[] = {TRUSTED};
+static const uint8_t fingerprints[] = { TRUSTED };
 
 /** Root certificate fingerprint setting */
-static struct setting trust_setting __setting(SETTING_CRYPTO, trust) = {
-    .name = "trust",
-    .description = "Trusted root certificate fingerprints",
-    .tag = DHCP_EB_TRUST,
-    .type = &setting_type_hex,
+static struct setting trust_setting __setting ( SETTING_CRYPTO, trust ) = {
+	.name = "trust",
+	.description = "Trusted root certificate fingerprints",
+	.tag = DHCP_EB_TRUST,
+	.type = &setting_type_hex,
 };
 
 /** Root certificates */
 struct x509_root root_certificates = {
-    .refcnt = REF_INIT(ref_no_free),
-    .digest = &sha256_algorithm,
-    .count = (sizeof(fingerprints) / FINGERPRINT_LEN),
-    .fingerprints = fingerprints,
+	.refcnt = REF_INIT ( ref_no_free ),
+	.digest = &sha256_algorithm,
+	.count = ( sizeof ( fingerprints ) / FINGERPRINT_LEN ),
+	.fingerprints = fingerprints,
 };
 
 /**
@@ -93,36 +93,37 @@ struct x509_root root_certificates = {
  * options) to specify the trusted root certificate without requiring
  * a rebuild.
  */
-static void rootcert_init(void) {
-    static int initialised;
-    void* external = NULL;
-    int len;
+static void rootcert_init ( void ) {
+	static int initialised;
+	void *external = NULL;
+	int len;
 
-    /* Allow trusted root certificates to be overridden only if
-     * not explicitly specified at build time.
-     */
-    if (ALLOW_TRUST_OVERRIDE && (!initialised)) {
-        /* Fetch copy of "trust" setting, if it exists.  This
-         * memory will never be freed.
-         */
-        if ((len = fetch_raw_setting_copy(NULL, &trust_setting,
-                                          &external)) >= 0) {
-            root_certificates.fingerprints = external;
-            root_certificates.count = (len / FINGERPRINT_LEN);
-        }
+	/* Allow trusted root certificates to be overridden only if
+	 * not explicitly specified at build time.
+	 */
+	if ( ALLOW_TRUST_OVERRIDE && ( ! initialised ) ) {
 
-        /* Prevent subsequent modifications */
-        initialised = 1;
-    }
+		/* Fetch copy of "trust" setting, if it exists.  This
+		 * memory will never be freed.
+		 */
+		if ( ( len = fetch_raw_setting_copy ( NULL, &trust_setting,
+						      &external ) ) >= 0 ) {
+			root_certificates.fingerprints = external;
+			root_certificates.count = ( len / FINGERPRINT_LEN );
+		}
 
-    DBGC(&root_certificates, "ROOTCERT using %d %s certificate(s):\n",
-         root_certificates.count, (external ? "external" : "built-in"));
-    DBGC_HDA(&root_certificates, 0, root_certificates.fingerprints,
-             (root_certificates.count * FINGERPRINT_LEN));
+		/* Prevent subsequent modifications */
+		initialised = 1;
+	}
+
+	DBGC ( &root_certificates, "ROOTCERT using %d %s certificate(s):\n",
+	       root_certificates.count, ( external ? "external" : "built-in" ));
+	DBGC_HDA ( &root_certificates, 0, root_certificates.fingerprints,
+		   ( root_certificates.count * FINGERPRINT_LEN ) );
 }
 
 /** Root certificate initialiser */
-struct startup_fn rootcert_startup_fn __startup_fn(STARTUP_LATE) = {
-    .name = "rootcert",
-    .startup = rootcert_init,
+struct startup_fn rootcert_startup_fn __startup_fn ( STARTUP_LATE ) = {
+	.name = "rootcert",
+	.startup = rootcert_init,
 };

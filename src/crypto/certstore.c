@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <stdlib.h>
@@ -42,36 +42,37 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** Raw certificate data for all permanent stored certificates */
 #undef CERT
-#define CERT(_index, _path)                                 \
-    extern char stored_cert_##_index##_data[];              \
-    extern char stored_cert_##_index##_len[];               \
-    __asm__(".section \".rodata\", \"a\", " PROGBITS "\n\t" \
-            "\nstored_cert_" #_index "_data:\n\t"           \
-            ".incbin \"" _path "\"\n\t"                     \
-            "\nstored_cert_" #_index "_end:\n\t"            \
-            ".equ stored_cert_" #_index "_len, "            \
-            "( stored_cert_" #_index "_end - "              \
-            "  stored_cert_" #_index "_data )\n\t"          \
-            ".previous\n\t");
+#define CERT( _index, _path )						\
+	extern char stored_cert_ ## _index ## _data[];			\
+	extern char stored_cert_ ## _index ## _len[];			\
+	__asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"	\
+		  "\nstored_cert_" #_index "_data:\n\t"			\
+		  ".incbin \"" _path "\"\n\t"				\
+		  "\nstored_cert_" #_index "_end:\n\t"			\
+		  ".equ stored_cert_" #_index "_len, "			\
+			"( stored_cert_" #_index "_end - "		\
+			"  stored_cert_" #_index "_data )\n\t"		\
+		  ".previous\n\t" );
 CERT_ALL
 
 /** Raw certificate cursors for all permanent stored certificates */
 #undef CERT
-#define CERT(_index, _path) {                                              \
-                                .data = stored_cert_##_index##_data,       \
-                                .len = (size_t)stored_cert_##_index##_len, \
-                            },
+#define CERT( _index, _path ) {						\
+	.data = stored_cert_ ## _index ## _data,			\
+	.len = ( size_t ) stored_cert_ ## _index ## _len, 		\
+},
 static struct asn1_cursor certstore_raw[] = {
-    CERT_ALL};
+	CERT_ALL
+};
 
 /** X.509 certificate structures for all permanent stored certificates */
-static struct x509_certificate certstore_certs[sizeof(certstore_raw) /
-                                               sizeof(certstore_raw[0])];
+static struct x509_certificate certstore_certs[ sizeof ( certstore_raw ) /
+						sizeof ( certstore_raw[0] ) ];
 
 /** Certificate store */
 struct x509_chain certstore = {
-    .refcnt = REF_INIT(ref_no_free),
-    .links = LIST_HEAD_INIT(certstore.links),
+	.refcnt = REF_INIT ( ref_no_free ),
+	.links = LIST_HEAD_INIT ( certstore.links ),
 };
 
 /**
@@ -80,15 +81,16 @@ struct x509_chain certstore = {
  * @v cert		X.509 certificate
  * @ret cert		X.509 certificate
  */
-static struct x509_certificate*
-certstore_found(struct x509_certificate* cert) {
-    /* Mark as most recently used */
-    list_del(&cert->store.list);
-    list_add(&cert->store.list, &certstore.links);
-    DBGC2(&certstore, "CERTSTORE found certificate %s\n",
-          x509_name(cert));
+static struct x509_certificate *
+certstore_found ( struct x509_certificate *cert ) {
 
-    return cert;
+	/* Mark as most recently used */
+	list_del ( &cert->store.list );
+	list_add ( &cert->store.list, &certstore.links );
+	DBGC2 ( &certstore, "CERTSTORE found certificate %s\n",
+		x509_name ( cert ) );
+
+	return cert;
 }
 
 /**
@@ -97,15 +99,15 @@ certstore_found(struct x509_certificate* cert) {
  * @v raw		Raw certificate data
  * @ret cert		X.509 certificate, or NULL if not found
  */
-struct x509_certificate* certstore_find(struct asn1_cursor* raw) {
-    struct x509_certificate* cert;
+struct x509_certificate * certstore_find ( struct asn1_cursor *raw ) {
+	struct x509_certificate *cert;
 
-    /* Search for certificate within store */
-    list_for_each_entry(cert, &certstore.links, store.list) {
-        if (asn1_compare(raw, &cert->raw) == 0)
-            return certstore_found(cert);
-    }
-    return NULL;
+	/* Search for certificate within store */
+	list_for_each_entry ( cert, &certstore.links, store.list ) {
+		if ( asn1_compare ( raw, &cert->raw ) == 0 )
+			return certstore_found ( cert );
+	}
+	return NULL;
 }
 
 /**
@@ -114,18 +116,18 @@ struct x509_certificate* certstore_find(struct asn1_cursor* raw) {
  * @v key		Private key
  * @ret cert		X.509 certificate, or NULL if not found
  */
-struct x509_certificate* certstore_find_key(struct private_key* key) {
-    struct x509_certificate* cert;
+struct x509_certificate * certstore_find_key ( struct private_key *key ) {
+	struct x509_certificate *cert;
 
-    /* Search for certificate within store */
-    list_for_each_entry(cert, &certstore.links, store.list) {
-        if (pubkey_match(cert->signature_algorithm->pubkey,
-                         key->builder.data, key->builder.len,
-                         cert->subject.public_key.raw.data,
-                         cert->subject.public_key.raw.len) == 0)
-            return certstore_found(cert);
-    }
-    return NULL;
+	/* Search for certificate within store */
+	list_for_each_entry ( cert, &certstore.links, store.list ) {
+		if ( pubkey_match ( cert->signature_algorithm->pubkey,
+				    key->builder.data, key->builder.len,
+				    cert->subject.public_key.raw.data,
+				    cert->subject.public_key.raw.len ) == 0 )
+			return certstore_found ( cert );
+	}
+	return NULL;
 }
 
 /**
@@ -133,13 +135,14 @@ struct x509_certificate* certstore_find_key(struct private_key* key) {
  *
  * @v cert		X.509 certificate
  */
-void certstore_add(struct x509_certificate* cert) {
-    /* Add certificate to store */
-    cert->store.cert = cert;
-    x509_get(cert);
-    list_add(&cert->store.list, &certstore.links);
-    DBGC(&certstore, "CERTSTORE added certificate %s\n",
-         x509_name(cert));
+void certstore_add ( struct x509_certificate *cert ) {
+
+	/* Add certificate to store */
+	cert->store.cert = cert;
+	x509_get ( cert );
+	list_add ( &cert->store.list, &certstore.links );
+	DBGC ( &certstore, "CERTSTORE added certificate %s\n",
+	       x509_name ( cert ) );
 }
 
 /**
@@ -147,16 +150,17 @@ void certstore_add(struct x509_certificate* cert) {
  *
  * @v cert		X.509 certificate
  */
-void certstore_del(struct x509_certificate* cert) {
-    /* Ignore attempts to remove permanent certificates */
-    if (cert->flags & X509_FL_PERMANENT)
-        return;
+void certstore_del ( struct x509_certificate *cert ) {
 
-    /* Remove certificate from store */
-    DBGC(&certstore, "CERTSTORE removed certificate %s\n",
-         x509_name(cert));
-    list_del(&cert->store.list);
-    x509_put(cert);
+	/* Ignore attempts to remove permanent certificates */
+	if ( cert->flags & X509_FL_PERMANENT )
+		return;
+
+	/* Remove certificate from store */
+	DBGC ( &certstore, "CERTSTORE removed certificate %s\n",
+	       x509_name ( cert ) );
+	list_del ( &cert->store.list );
+	x509_put ( cert );
 }
 
 /**
@@ -164,94 +168,95 @@ void certstore_del(struct x509_certificate* cert) {
  *
  * @ret discarded	Number of cached items discarded
  */
-static unsigned int certstore_discard(void) {
-    struct x509_certificate* cert;
+static unsigned int certstore_discard ( void ) {
+	struct x509_certificate *cert;
 
-    /* Discard the least recently used certificate for which the
-     * only reference is held by the store itself.
-     */
-    list_for_each_entry_reverse(cert, &certstore.links, store.list) {
-        /* Skip certificates for which another reference is held */
-        if (cert->refcnt.count > 0)
-            continue;
+	/* Discard the least recently used certificate for which the
+	 * only reference is held by the store itself.
+	 */
+	list_for_each_entry_reverse ( cert, &certstore.links, store.list ) {
 
-        /* Skip certificates that were added at build time or
-         * added explicitly at run time.
-         */
-        if (cert->flags & (X509_FL_PERMANENT | X509_FL_EXPLICIT))
-            continue;
+		/* Skip certificates for which another reference is held */
+		if ( cert->refcnt.count > 0 )
+			continue;
 
-        /* Discard certificate */
-        certstore_del(cert);
-        return 1;
-    }
+		/* Skip certificates that were added at build time or
+		 * added explicitly at run time.
+		 */
+		if ( cert->flags & ( X509_FL_PERMANENT | X509_FL_EXPLICIT ) )
+			continue;
 
-    return 0;
+		/* Discard certificate */
+		certstore_del ( cert );
+		return 1;
+	}
+
+	return 0;
 }
 
 /** Certificate store cache discarder */
-struct cache_discarder certstore_discarder __cache_discarder(CACHE_NORMAL) = {
-    .discard = certstore_discard,
+struct cache_discarder certstore_discarder __cache_discarder ( CACHE_NORMAL ) ={
+	.discard = certstore_discard,
 };
 
 /**
  * Construct permanent certificate store
  *
  */
-static void certstore_init(void) {
-    struct asn1_cursor* raw;
-    struct x509_certificate* cert;
-    int i;
-    int rc;
+static void certstore_init ( void ) {
+	struct asn1_cursor *raw;
+	struct x509_certificate *cert;
+	int i;
+	int rc;
 
-    /* Skip if we have no permanent stored certificates */
-    if (!sizeof(certstore_raw))
-        return;
+	/* Skip if we have no permanent stored certificates */
+	if ( ! sizeof ( certstore_raw ) )
+		return;
 
-    /* Add certificates */
-    for (i = 0; i < (int)(sizeof(certstore_raw) /
-                          sizeof(certstore_raw[0]));
-         i++) {
-        /* Skip if certificate already present in store */
-        raw = &certstore_raw[i];
-        if ((cert = certstore_find(raw)) != NULL) {
-            DBGC(&certstore, "CERTSTORE permanent certificate %d "
-                             "is a duplicate of %s\n", i, x509_name(cert));
-            continue;
-        }
+	/* Add certificates */
+	for ( i = 0 ; i < ( int ) ( sizeof ( certstore_raw ) /
+				    sizeof ( certstore_raw[0] ) ) ; i++ ) {
 
-        /* Parse certificate */
-        cert = &certstore_certs[i];
-        ref_init(&cert->refcnt, ref_no_free);
-        if ((rc = x509_parse(cert, raw)) != 0) {
-            DBGC(&certstore, "CERTSTORE could not parse "
-                             "permanent certificate %d: %s\n",
-                 i, strerror(rc));
-            continue;
-        }
+		/* Skip if certificate already present in store */
+		raw = &certstore_raw[i];
+		if ( ( cert = certstore_find ( raw ) ) != NULL ) {
+			DBGC ( &certstore, "CERTSTORE permanent certificate %d "
+			       "is a duplicate of %s\n", i, x509_name ( cert ));
+			continue;
+		}
 
-        /* Add certificate to store.  Certificate will never
-         * be discarded from the store, since we retain a
-         * permanent reference to it.
-         */
-        certstore_add(cert);
-        cert->flags |= X509_FL_PERMANENT;
-        DBGC(&certstore, "CERTSTORE permanent certificate %d is %s\n",
-             i, x509_name(cert));
-    }
+		/* Parse certificate */
+		cert = &certstore_certs[i];
+		ref_init ( &cert->refcnt, ref_no_free );
+		if ( ( rc = x509_parse ( cert, raw ) ) != 0 ) {
+			DBGC ( &certstore, "CERTSTORE could not parse "
+			       "permanent certificate %d: %s\n",
+			       i, strerror ( rc ) );
+			continue;
+		}
+
+		/* Add certificate to store.  Certificate will never
+		 * be discarded from the store, since we retain a
+		 * permanent reference to it.
+		 */
+		certstore_add ( cert );
+		cert->flags |= X509_FL_PERMANENT;
+		DBGC ( &certstore, "CERTSTORE permanent certificate %d is %s\n",
+		       i, x509_name ( cert ) );
+	}
 }
 
 /** Certificate store initialisation function */
-struct init_fn certstore_init_fn __init_fn(INIT_LATE) = {
-    .initialise = certstore_init,
+struct init_fn certstore_init_fn __init_fn ( INIT_LATE ) = {
+	.initialise = certstore_init,
 };
 
 /** Additional certificate setting */
-static struct setting cert_setting __setting(SETTING_CRYPTO, cert) = {
-    .name = "cert",
-    .description = "Certificate",
-    .tag = DHCP_EB_CERT,
-    .type = &setting_type_hex,
+static struct setting cert_setting __setting ( SETTING_CRYPTO, cert ) = {
+	.name = "cert",
+	.description = "Certificate",
+	.tag = DHCP_EB_CERT,
+	.type = &setting_type_hex,
 };
 
 /**
@@ -259,43 +264,43 @@ static struct setting cert_setting __setting(SETTING_CRYPTO, cert) = {
  *
  * @ret rc		Return status code
  */
-static int certstore_apply_settings(void) {
-    static struct x509_certificate* cert = NULL;
-    struct x509_certificate* old_cert;
-    void* cert_data;
-    int len;
-    int rc;
+static int certstore_apply_settings ( void ) {
+	static struct x509_certificate *cert = NULL;
+	struct x509_certificate *old_cert;
+	void *cert_data;
+	int len;
+	int rc;
 
-    /* Record any existing additional certificate */
-    old_cert = cert;
-    cert = NULL;
+	/* Record any existing additional certificate */
+	old_cert = cert;
+	cert = NULL;
 
-    /* Add additional certificate, if any */
-    if ((len = fetch_raw_setting_copy(NULL, &cert_setting,
-                                      &cert_data)) >= 0) {
-        if ((rc = x509_certificate(cert_data, len, &cert)) == 0) {
-            DBGC(&certstore, "CERTSTORE added additional "
-                             "certificate %s\n", x509_name(cert));
-        } else {
-            DBGC(&certstore, "CERTSTORE could not parse "
-                             "additional certificate: %s\n",
-                 strerror(rc));
-            /* Do not fail; leave as an unusable certificate */
-        }
-        free(cert_data);
-    }
+	/* Add additional certificate, if any */
+	if ( ( len = fetch_raw_setting_copy ( NULL, &cert_setting,
+					      &cert_data ) ) >= 0 ) {
+		if ( ( rc = x509_certificate ( cert_data, len, &cert ) ) == 0 ){
+			DBGC ( &certstore, "CERTSTORE added additional "
+			       "certificate %s\n", x509_name ( cert ) );
+		} else {
+			DBGC ( &certstore, "CERTSTORE could not parse "
+			       "additional certificate: %s\n",
+			       strerror ( rc ) );
+			/* Do not fail; leave as an unusable certificate */
+		}
+		free ( cert_data );
+	}
 
-    /* Free old additional certificiate.  Do this after reparsing
-     * the additional certificate; in the common case that the
-     * certificate has not changed, this will allow the stored
-     * certificate to be reused.
-     */
-    x509_put(old_cert);
+	/* Free old additional certificiate.  Do this after reparsing
+	 * the additional certificate; in the common case that the
+	 * certificate has not changed, this will allow the stored
+	 * certificate to be reused.
+	 */
+	x509_put ( old_cert );
 
-    return 0;
+	return 0;
 }
 
 /** Certificate store settings applicator */
 struct settings_applicator certstore_applicator __settings_applicator = {
-    .apply = certstore_apply_settings,
+	.apply = certstore_apply_settings,
 };

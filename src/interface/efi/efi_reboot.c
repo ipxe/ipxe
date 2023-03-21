@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -39,11 +39,11 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v warm		Perform a warm reboot
  */
-static void efi_reboot(int warm) {
-    EFI_RUNTIME_SERVICES* rs = efi_systab->RuntimeServices;
+static void efi_reboot ( int warm ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
 
-    /* Use runtime services to reset system */
-    rs->ResetSystem((warm ? EfiResetWarm : EfiResetCold), 0, 0, NULL);
+	/* Use runtime services to reset system */
+	rs->ResetSystem ( ( warm ? EfiResetWarm : EfiResetCold ), 0, 0, NULL );
 }
 
 /**
@@ -51,15 +51,15 @@ static void efi_reboot(int warm) {
  *
  * @ret rc		Return status code
  */
-static int efi_poweroff(void) {
-    EFI_RUNTIME_SERVICES* rs = efi_systab->RuntimeServices;
+static int efi_poweroff ( void ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
 
-    /* Use runtime services to power off system */
-    rs->ResetSystem(EfiResetShutdown, 0, 0, NULL);
+	/* Use runtime services to power off system */
+	rs->ResetSystem ( EfiResetShutdown, 0, 0, NULL );
 
-    /* Should never happen */
-    return -ECANCELED;
+	/* Should never happen */
+	return -ECANCELED;
 }
 
-PROVIDE_REBOOT(efi, reboot, efi_reboot);
-PROVIDE_REBOOT(efi, poweroff, efi_poweroff);
+PROVIDE_REBOOT ( efi, reboot, efi_reboot );
+PROVIDE_REBOOT ( efi, poweroff, efi_poweroff );

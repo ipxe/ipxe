@@ -1,5 +1,3 @@
-#pragma once
-
 /* Disabled from config/defaults/pcbios.h */
 
 #undef SANBOOT_PROTO_ISCSI

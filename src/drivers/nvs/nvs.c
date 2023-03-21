@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <string.h>
@@ -43,24 +43,24 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v max_len		Maximum length
  * @ret len		Length to use, stopping at block boundaries
  */
-static size_t nvs_frag_len(struct nvs_device* nvs, unsigned int address,
-                           size_t max_len) {
-    size_t frag_len;
+static size_t nvs_frag_len ( struct nvs_device *nvs, unsigned int address,
+			     size_t max_len ) {
+	size_t frag_len;
 
-    /* If there are no block boundaries, return the maximum length */
-    if (!nvs->block_size)
-        return max_len;
+	/* If there are no block boundaries, return the maximum length */
+	if ( ! nvs->block_size )
+		return max_len;
 
-    /* Calculate space remaining up to next block boundary */
-    frag_len = ((nvs->block_size -
-                 (address & (nvs->block_size - 1)))
-                << nvs->word_len_log2);
+	/* Calculate space remaining up to next block boundary */
+	frag_len = ( ( nvs->block_size -
+		       ( address & ( nvs->block_size - 1 ) ) )
+		     << nvs->word_len_log2 );
 
-    /* Limit to maximum length */
-    if (max_len < frag_len)
-        return max_len;
+	/* Limit to maximum length */
+	if ( max_len < frag_len )
+		return max_len;
 
-    return frag_len;
+	return frag_len;
 }
 
 /**
@@ -72,31 +72,32 @@ static size_t nvs_frag_len(struct nvs_device* nvs, unsigned int address,
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-int nvs_read(struct nvs_device* nvs, unsigned int address,
-             void* data, size_t len) {
-    size_t frag_len;
-    int rc;
+int nvs_read ( struct nvs_device *nvs, unsigned int address,
+	       void *data, size_t len ) {
+	size_t frag_len;
+	int rc;
 
-    /* We don't even attempt to handle buffer lengths that aren't
-     * an integral number of words.
-     */
-    assert((len & ((1 << nvs->word_len_log2) - 1)) == 0);
+	/* We don't even attempt to handle buffer lengths that aren't
+	 * an integral number of words.
+	 */
+	assert ( ( len & ( ( 1 << nvs->word_len_log2 ) - 1 ) ) == 0 );
 
-    while (len) {
-        /* Calculate length to read, stopping at block boundaries */
-        frag_len = nvs_frag_len(nvs, address, len);
+	while ( len ) {
 
-        /* Read this portion of the buffer from the device */
-        if ((rc = nvs->read(nvs, address, data, frag_len)) != 0)
-            return rc;
+		/* Calculate length to read, stopping at block boundaries */
+		frag_len = nvs_frag_len ( nvs, address, len );
 
-        /* Update parameters */
-        data += frag_len;
-        address += (frag_len >> nvs->word_len_log2);
-        len -= frag_len;
-    }
+		/* Read this portion of the buffer from the device */
+		if ( ( rc = nvs->read ( nvs, address, data, frag_len ) ) != 0 )
+			return rc;
 
-    return 0;
+		/* Update parameters */
+		data += frag_len;
+		address += ( frag_len >> nvs->word_len_log2 );
+		len -= frag_len;
+	}
+
+	return 0;
 }
 
 /**
@@ -108,23 +109,23 @@ int nvs_read(struct nvs_device* nvs, unsigned int address,
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-static int nvs_verify(struct nvs_device* nvs, unsigned int address,
-                      const void* data, size_t len) {
-    uint8_t read_data[len];
-    int rc;
+static int nvs_verify ( struct nvs_device *nvs, unsigned int address,
+			const void *data, size_t len ) {
+	uint8_t read_data[len];
+	int rc;
 
-    /* Read data into temporary buffer */
-    if ((rc = nvs_read(nvs, address, read_data, len)) != 0)
-        return rc;
+	/* Read data into temporary buffer */
+	if ( ( rc = nvs_read ( nvs, address, read_data, len ) ) != 0 )
+		return rc;
 
-    /* Compare data */
-    if (memcmp(data, read_data, len) != 0) {
-        DBG("NVS %p verification failed at %#04x+%zd\n",
-            nvs, address, len);
-        return -EIO;
-    }
+	/* Compare data */
+	if ( memcmp ( data, read_data, len ) != 0 ) {
+		DBG ( "NVS %p verification failed at %#04x+%zd\n",
+		      nvs, address, len );
+		return -EIO;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -136,33 +137,34 @@ static int nvs_verify(struct nvs_device* nvs, unsigned int address,
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-int nvs_write(struct nvs_device* nvs, unsigned int address,
-              const void* data, size_t len) {
-    size_t frag_len;
-    int rc;
+int nvs_write ( struct nvs_device *nvs, unsigned int address,
+		const void *data, size_t len ) {
+	size_t frag_len;
+	int rc;
 
-    /* We don't even attempt to handle buffer lengths that aren't
-     * an integral number of words.
-     */
-    assert((len & ((1 << nvs->word_len_log2) - 1)) == 0);
+	/* We don't even attempt to handle buffer lengths that aren't
+	 * an integral number of words.
+	 */
+	assert ( ( len & ( ( 1 << nvs->word_len_log2 ) - 1 ) ) == 0 );
 
-    while (len) {
-        /* Calculate length to write, stopping at block boundaries */
-        frag_len = nvs_frag_len(nvs, address, len);
+	while ( len ) {
 
-        /* Write this portion of the buffer to the device */
-        if ((rc = nvs->write(nvs, address, data, frag_len)) != 0)
-            return rc;
+		/* Calculate length to write, stopping at block boundaries */
+		frag_len = nvs_frag_len ( nvs, address, len );
 
-        /* Read back and verify data */
-        if ((rc = nvs_verify(nvs, address, data, frag_len)) != 0)
-            return rc;
+		/* Write this portion of the buffer to the device */
+		if ( ( rc = nvs->write ( nvs, address, data, frag_len ) ) != 0)
+			return rc;
 
-        /* Update parameters */
-        data += frag_len;
-        address += (frag_len >> nvs->word_len_log2);
-        len -= frag_len;
-    }
+		/* Read back and verify data */
+		if ( ( rc = nvs_verify ( nvs, address, data, frag_len ) ) != 0)
+			return rc;
 
-    return 0;
+		/* Update parameters */
+		data += frag_len;
+		address += ( frag_len >> nvs->word_len_log2 );
+		len -= frag_len;
+	}
+
+	return 0;
 }

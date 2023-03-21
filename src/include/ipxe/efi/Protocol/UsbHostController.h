@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   EFI_USB_HC_PROTOCOL as defined in EFI 1.10.
 
@@ -13,18 +11,16 @@
 **/
 
 #ifndef _USB_HOSTCONTROLLER_H_
-    #define _USB_HOSTCONTROLLER_H_
+#define _USB_HOSTCONTROLLER_H_
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #include <ipxe/efi/Protocol/Usb2HostController.h>
+#include <ipxe/efi/Protocol/Usb2HostController.h>
 
-    #define EFI_USB_HC_PROTOCOL_GUID                           \
-        {                                                      \
-            0xf5089266, 0x1aa0, 0x4953, {                      \
-                0x97, 0xd8, 0x56, 0x2f, 0x8a, 0x73, 0xb5, 0x19 \
-            }                                                  \
-        }
+#define EFI_USB_HC_PROTOCOL_GUID \
+  { \
+    0xf5089266, 0x1aa0, 0x4953, {0x97, 0xd8, 0x56, 0x2f, 0x8a, 0x73, 0xb5, 0x19 } \
+  }
 
 ///
 /// Forward reference for pure ANSI compatability
@@ -48,9 +44,12 @@ typedef struct _EFI_USB_HC_PROTOCOL EFI_USB_HC_PROTOCOL;
   @retval EFI_DEVICE_ERROR      An error was encountered while attempting to perform the reset operation.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_RESET)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT16 Attributes);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_RESET)(
+  IN EFI_USB_HC_PROTOCOL     *This,
+  IN UINT16                  Attributes
+  );
 
 /**
   Retrieves current state of the USB host controller.
@@ -65,9 +64,12 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_RESET)(
                                 current state.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_GET_STATE)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    OUT EFI_USB_HC_STATE* State);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_GET_STATE)(
+  IN  EFI_USB_HC_PROTOCOL    *This,
+  OUT EFI_USB_HC_STATE       *State
+  );
 
 /**
   Sets the USB host controller to a specific state.
@@ -81,9 +83,12 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_GET_STATE)(
   @retval EFI_DEVICE_ERROR      Failed to set the state specified by State due to device error.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_SET_STATE)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN EFI_USB_HC_STATE State);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_SET_STATE)(
+  IN EFI_USB_HC_PROTOCOL     *This,
+  IN EFI_USB_HC_STATE        State
+  );
 
 /**
   Submits control transfer to a target USB device.
@@ -116,17 +121,20 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_SET_STATE)(
   @retval EFI_DEVICE_ERROR      The control transfer failed due to host controller or device error.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_CONTROL_TRANSFER)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 DeviceAddress,
-    IN BOOLEAN IsSlowDevice,
-    IN UINT8 MaximumPacketLength,
-    IN EFI_USB_DEVICE_REQUEST* Request,
-    IN EFI_USB_DATA_DIRECTION TransferDirection,
-    IN OUT VOID* Data OPTIONAL,
-    IN OUT UINTN* DataLength OPTIONAL,
-    IN UINTN TimeOut,
-    OUT UINT32* TransferResult);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_CONTROL_TRANSFER)(
+  IN     EFI_USB_HC_PROTOCOL       *This,
+  IN     UINT8                     DeviceAddress,
+  IN     BOOLEAN                   IsSlowDevice,
+  IN     UINT8                     MaximumPacketLength,
+  IN     EFI_USB_DEVICE_REQUEST    *Request,
+  IN     EFI_USB_DATA_DIRECTION    TransferDirection,
+  IN OUT VOID                      *Data       OPTIONAL,
+  IN OUT UINTN                     *DataLength OPTIONAL,
+  IN     UINTN                     TimeOut,
+  OUT    UINT32                    *TransferResult
+  );
 
 /**
   Submits bulk transfer to a bulk endpoint of a USB device.
@@ -159,16 +167,19 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_CONTROL_TRANSFER)(
   @retval EFI_DEVICE_ERROR      The bulk transfer failed due to host controller or device error.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_BULK_TRANSFER)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 DeviceAddress,
-    IN UINT8 EndPointAddress,
-    IN UINT8 MaximumPacketLength,
-    IN OUT VOID* Data,
-    IN OUT UINTN* DataLength,
-    IN OUT UINT8* DataToggle,
-    IN UINTN TimeOut,
-    OUT UINT32* TransferResult);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_BULK_TRANSFER)(
+  IN     EFI_USB_HC_PROTOCOL    *This,
+  IN     UINT8                  DeviceAddress,
+  IN     UINT8                  EndPointAddress,
+  IN     UINT8                  MaximumPacketLength,
+  IN OUT VOID                   *Data,
+  IN OUT UINTN                  *DataLength,
+  IN OUT UINT8                  *DataToggle,
+  IN     UINTN                  TimeOut,
+  OUT    UINT32                 *TransferResult
+  );
 
 /**
   Submits an asynchronous interrupt transfer to an interrupt endpoint of a USB device.
@@ -212,18 +223,21 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_BULK_TRANSFER)(
   @retval EFI_DEVICE_ERROR      The bulk transfer failed due to host controller or device error.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_ASYNC_INTERRUPT_TRANSFER)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 DeviceAddress,
-    IN UINT8 EndPointAddress,
-    IN BOOLEAN IsSlowDevice,
-    IN UINT8 MaxiumPacketLength,
-    IN BOOLEAN IsNewTransfer,
-    IN OUT UINT8* DataToggle,
-    IN UINTN PollingInterval OPTIONAL,
-    IN UINTN DataLength OPTIONAL,
-    IN EFI_ASYNC_USB_TRANSFER_CALLBACK CallBackFunction OPTIONAL,
-    IN VOID* Context OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_ASYNC_INTERRUPT_TRANSFER)(
+  IN     EFI_USB_HC_PROTOCOL                                 *This,
+  IN     UINT8                                               DeviceAddress,
+  IN     UINT8                                               EndPointAddress,
+  IN     BOOLEAN                                             IsSlowDevice,
+  IN     UINT8                                               MaxiumPacketLength,
+  IN     BOOLEAN                                             IsNewTransfer,
+  IN OUT UINT8                                               *DataToggle,
+  IN     UINTN                                               PollingInterval  OPTIONAL,
+  IN     UINTN                                               DataLength       OPTIONAL,
+  IN     EFI_ASYNC_USB_TRANSFER_CALLBACK                     CallBackFunction OPTIONAL,
+  IN     VOID                                                *Context         OPTIONAL
+  );
 
 /**
   Submits synchronous interrupt transfer to an interrupt endpoint of a USB device.
@@ -261,17 +275,20 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_ASYNC_INTERRUPT_TRANSFER)(
   @retval EFI_DEVICE_ERROR      The synchronous interrupt transfer failed due to host controller or device error.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_SYNC_INTERRUPT_TRANSFER)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 DeviceAddress,
-    IN UINT8 EndPointAddress,
-    IN BOOLEAN IsSlowDevice,
-    IN UINT8 MaximumPacketLength,
-    IN OUT VOID* Data,
-    IN OUT UINTN* DataLength,
-    IN OUT UINT8* DataToggle,
-    IN UINTN TimeOut,
-    OUT UINT32* TransferResult);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_SYNC_INTERRUPT_TRANSFER)(
+  IN     EFI_USB_HC_PROTOCOL    *This,
+  IN     UINT8                  DeviceAddress,
+  IN     UINT8                  EndPointAddress,
+  IN     BOOLEAN                IsSlowDevice,
+  IN     UINT8                  MaximumPacketLength,
+  IN OUT VOID                   *Data,
+  IN OUT UINTN                  *DataLength,
+  IN OUT UINT8                  *DataToggle,
+  IN     UINTN                  TimeOut,
+  OUT    UINT32                 *TransferResult
+  );
 
 /**
   Submits isochronous transfer to an isochronous endpoint of a USB device.
@@ -301,14 +318,17 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_SYNC_INTERRUPT_TRANSFER)(
   @retval EFI_DEVICE_ERROR      The isochronous transfer failed due to host controller or device error.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_ISOCHRONOUS_TRANSFER)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 DeviceAddress,
-    IN UINT8 EndPointAddress,
-    IN UINT8 MaximumPacketLength,
-    IN OUT VOID* Data,
-    IN UINTN DataLength,
-    OUT UINT32* TransferResult);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_ISOCHRONOUS_TRANSFER)(
+  IN     EFI_USB_HC_PROTOCOL    *This,
+  IN     UINT8                  DeviceAddress,
+  IN     UINT8                  EndPointAddress,
+  IN     UINT8                  MaximumPacketLength,
+  IN OUT VOID                   *Data,
+  IN     UINTN                  DataLength,
+  OUT    UINT32                 *TransferResult
+  );
 
 /**
   Submits nonblocking isochronous transfer to an isochronous endpoint of a USB device.
@@ -341,15 +361,18 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_ISOCHRONOUS_TRANSFER)(
   @retval EFI_INVALID_PARAMETER Some parameters are invalid.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_ASYNC_ISOCHRONOUS_TRANSFER)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 DeviceAddress,
-    IN UINT8 EndPointAddress,
-    IN UINT8 MaximumPacketLength,
-    IN OUT VOID* Data,
-    IN UINTN DataLength,
-    IN EFI_ASYNC_USB_TRANSFER_CALLBACK IsochronousCallBack,
-    IN VOID* Context OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_ASYNC_ISOCHRONOUS_TRANSFER)(
+  IN     EFI_USB_HC_PROTOCOL                *This,
+  IN     UINT8                              DeviceAddress,
+  IN     UINT8                              EndPointAddress,
+  IN     UINT8                              MaximumPacketLength,
+  IN OUT VOID                               *Data,
+  IN     UINTN                              DataLength,
+  IN     EFI_ASYNC_USB_TRANSFER_CALLBACK    IsochronousCallBack,
+  IN     VOID                               *Context OPTIONAL
+  );
 
 /**
   Retrieves the number of root hub ports.
@@ -362,9 +385,12 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_ASYNC_ISOCHRONOUS_TRANSFER)(
   @retval EFI_INVALID_PARAMETER PortNumber is NULL.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_NUMBER)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    OUT UINT8* PortNumber);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_NUMBER)(
+  IN EFI_USB_HC_PROTOCOL    *This,
+  OUT UINT8                 *PortNumber
+  );
 
 /**
   Retrieves the current status of a USB root hub port.
@@ -381,10 +407,13 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_NUMBER)(
   @retval EFI_INVALID_PARAMETER PortNumber is invalid.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_STATUS)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 PortNumber,
-    OUT EFI_USB_PORT_STATUS* PortStatus);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_STATUS)(
+  IN EFI_USB_HC_PROTOCOL     *This,
+  IN  UINT8                  PortNumber,
+  OUT EFI_USB_PORT_STATUS    *PortStatus
+  );
 
 /**
   Sets a feature for the specified root hub port.
@@ -402,10 +431,13 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_STATUS)(
   @retval EFI_INVALID_PARAMETER PortNumber is invalid or PortFeature is invalid for this function.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_SET_ROOTHUB_PORT_FEATURE)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 PortNumber,
-    IN EFI_USB_PORT_FEATURE PortFeature);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_SET_ROOTHUB_PORT_FEATURE)(
+  IN EFI_USB_HC_PROTOCOL     *This,
+  IN UINT8                   PortNumber,
+  IN EFI_USB_PORT_FEATURE    PortFeature
+  );
 
 /**
   Clears a feature for the specified root hub port.
@@ -423,10 +455,13 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_SET_ROOTHUB_PORT_FEATURE)(
   @retval EFI_INVALID_PARAMETER PortNumber is invalid or PortFeature is invalid for this function.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_CLEAR_ROOTHUB_PORT_FEATURE)(
-    IN EFI_USB_HC_PROTOCOL* This,
-    IN UINT8 PortNumber,
-    IN EFI_USB_PORT_FEATURE PortFeature);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_USB_HC_PROTOCOL_CLEAR_ROOTHUB_PORT_FEATURE)(
+  IN EFI_USB_HC_PROTOCOL     *This,
+  IN UINT8                   PortNumber,
+  IN EFI_USB_PORT_FEATURE    PortFeature
+  );
 
 ///
 /// The EFI_USB_HC_PROTOCOL provides USB host controller management, basic data transactions
@@ -436,33 +471,33 @@ typedef EFI_STATUS(EFIAPI* EFI_USB_HC_PROTOCOL_CLEAR_ROOTHUB_PORT_FEATURE)(
 /// EFI_DEVICE_PATH_PROTOCOL instance, and an EFI_USB_HC_PROTOCOL instance.
 ///
 struct _EFI_USB_HC_PROTOCOL {
-    EFI_USB_HC_PROTOCOL_RESET Reset;
-    EFI_USB_HC_PROTOCOL_GET_STATE GetState;
-    EFI_USB_HC_PROTOCOL_SET_STATE SetState;
-    EFI_USB_HC_PROTOCOL_CONTROL_TRANSFER ControlTransfer;
-    EFI_USB_HC_PROTOCOL_BULK_TRANSFER BulkTransfer;
-    EFI_USB_HC_PROTOCOL_ASYNC_INTERRUPT_TRANSFER AsyncInterruptTransfer;
-    EFI_USB_HC_PROTOCOL_SYNC_INTERRUPT_TRANSFER SyncInterruptTransfer;
-    EFI_USB_HC_PROTOCOL_ISOCHRONOUS_TRANSFER IsochronousTransfer;
-    EFI_USB_HC_PROTOCOL_ASYNC_ISOCHRONOUS_TRANSFER AsyncIsochronousTransfer;
-    EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_NUMBER GetRootHubPortNumber;
-    EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_STATUS GetRootHubPortStatus;
-    EFI_USB_HC_PROTOCOL_SET_ROOTHUB_PORT_FEATURE SetRootHubPortFeature;
-    EFI_USB_HC_PROTOCOL_CLEAR_ROOTHUB_PORT_FEATURE ClearRootHubPortFeature;
-    ///
-    /// The major revision number of the USB host controller. The revision information
-    /// indicates the release of the Universal Serial Bus Specification with which the
-    /// host controller is compliant.
-    ///
-    UINT16 MajorRevision;
-    ///
-    /// The minor revision number of the USB host controller. The revision information
-    /// indicates the release of the Universal Serial Bus Specification with which the
-    /// host controller is compliant.
-    ///
-    UINT16 MinorRevision;
+  EFI_USB_HC_PROTOCOL_RESET                         Reset;
+  EFI_USB_HC_PROTOCOL_GET_STATE                     GetState;
+  EFI_USB_HC_PROTOCOL_SET_STATE                     SetState;
+  EFI_USB_HC_PROTOCOL_CONTROL_TRANSFER              ControlTransfer;
+  EFI_USB_HC_PROTOCOL_BULK_TRANSFER                 BulkTransfer;
+  EFI_USB_HC_PROTOCOL_ASYNC_INTERRUPT_TRANSFER      AsyncInterruptTransfer;
+  EFI_USB_HC_PROTOCOL_SYNC_INTERRUPT_TRANSFER       SyncInterruptTransfer;
+  EFI_USB_HC_PROTOCOL_ISOCHRONOUS_TRANSFER          IsochronousTransfer;
+  EFI_USB_HC_PROTOCOL_ASYNC_ISOCHRONOUS_TRANSFER    AsyncIsochronousTransfer;
+  EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_NUMBER       GetRootHubPortNumber;
+  EFI_USB_HC_PROTOCOL_GET_ROOTHUB_PORT_STATUS       GetRootHubPortStatus;
+  EFI_USB_HC_PROTOCOL_SET_ROOTHUB_PORT_FEATURE      SetRootHubPortFeature;
+  EFI_USB_HC_PROTOCOL_CLEAR_ROOTHUB_PORT_FEATURE    ClearRootHubPortFeature;
+  ///
+  /// The major revision number of the USB host controller. The revision information
+  /// indicates the release of the Universal Serial Bus Specification with which the
+  /// host controller is compliant.
+  ///
+  UINT16                                            MajorRevision;
+  ///
+  /// The minor revision number of the USB host controller. The revision information
+  /// indicates the release of the Universal Serial Bus Specification with which the
+  /// host controller is compliant.
+  ///
+  UINT16                                            MinorRevision;
 };
 
-extern EFI_GUID gEfiUsbHcProtocolGuid;
+extern EFI_GUID  gEfiUsbHcProtocolGuid;
 
 #endif

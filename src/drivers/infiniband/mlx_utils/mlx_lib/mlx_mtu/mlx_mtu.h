@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef MLX_MTU_H_
-    #define MLX_MTU_H_
+#define MLX_MTU_H_
 
 /*
  * Copyright (C) 2015 Mellanox Technologies Ltd.
@@ -22,37 +20,39 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
-    #include "../../include/public/mlx_utils.h"
-    #include "../../mlx_lib/mlx_reg_access/mlx_reg_access.h"
+#include "../../include/public/mlx_utils.h"
+#include "../../mlx_lib/mlx_reg_access/mlx_reg_access.h"
 
-    #define BYTE_TO_BIT 0x8
+#define BYTE_TO_BIT	0x8
 
 struct mlx_mtu {
-    mlx_uint32 reserved1 : 16;
-    mlx_uint32 local_port : 8;
-    mlx_uint32 reserved2 : 8;
-    /* -------------- */
-    mlx_uint32 reserved3 : 16;
-    mlx_uint32 max_mtu : 16;
-    /* -------------- */
-    mlx_uint32 reserved4 : 16;
-    mlx_uint32 admin_mtu : 16;
-    /* -------------- */
-    mlx_uint32 reserved5 : 16;
-    mlx_uint32 oper_mtu : 16;
+	mlx_uint32 reserved1	:16;
+	mlx_uint32 local_port	:8;
+	mlx_uint32 reserved2	:8;
+	/* -------------- */
+	mlx_uint32 reserved3	:16;
+	mlx_uint32 max_mtu		:16;
+	/* -------------- */
+	mlx_uint32 reserved4	:16;
+	mlx_uint32 admin_mtu	:16;
+	/* -------------- */
+	mlx_uint32 reserved5	:16;
+	mlx_uint32 oper_mtu		:16;
 };
 
 mlx_status
 mlx_get_max_mtu(
-    IN mlx_utils* utils,
-    IN mlx_uint8 port_num,
-    OUT mlx_uint32* max_mtu);
+		IN mlx_utils 	*utils,
+		IN mlx_uint8 	port_num,
+		OUT mlx_uint32 	*max_mtu
+		);
 
 mlx_status
 mlx_set_admin_mtu(
-    IN mlx_utils* utils,
-    IN mlx_uint8 port_num,
-    IN mlx_uint32 admin_mtu);
+		IN mlx_utils 	*utils,
+		IN mlx_uint8 	port_num,
+		IN mlx_uint32 	admin_mtu
+		);
 #endif /* MLX_MTU_H_ */

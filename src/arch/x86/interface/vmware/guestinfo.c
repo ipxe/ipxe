@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 /** @file
  *
@@ -49,84 +49,84 @@ static int guestinfo_channel;
  * @ret found		Setting found in GuestInfo
  * @ret len		Length of setting data, or negative error
  */
-static int guestinfo_fetch_type(struct settings* settings,
-                                struct setting* setting,
-                                const struct setting_type* type,
-                                void* data, size_t len, int* found) {
-    const char* parent_name = settings->parent->name;
-    char command[24 /* "info-get guestinfo.ipxe." */ +
-                 strlen(parent_name) + 1 /* "." */ +
-                 strlen(setting->name) + 1 /* "." */ +
-                 (type ? strlen(type->name) : 0) + 1 /* NUL */];
-    struct setting* predefined;
-    char* info;
-    int info_len;
-    int check_len;
-    int ret;
+static int guestinfo_fetch_type ( struct settings *settings,
+				  struct setting *setting,
+				  const struct setting_type *type,
+				  void *data, size_t len, int *found ) {
+	const char *parent_name = settings->parent->name;
+	char command[ 24 /* "info-get guestinfo.ipxe." */ +
+		      strlen ( parent_name ) + 1 /* "." */ +
+		      strlen ( setting->name ) + 1 /* "." */ +
+		      ( type ? strlen ( type->name ) : 0 ) + 1 /* NUL */ ];
+	struct setting *predefined;
+	char *info;
+	int info_len;
+	int check_len;
+	int ret;
 
-    /* Construct info-get command */
-    snprintf(command, sizeof(command),
-             "info-get guestinfo.ipxe.%s%s%s%s%s",
-             parent_name, (parent_name[0] ? "." : ""), setting->name,
-             (type ? "." : ""), (type ? type->name : ""));
+	/* Construct info-get command */
+	snprintf ( command, sizeof ( command ),
+		   "info-get guestinfo.ipxe.%s%s%s%s%s",
+		   parent_name, ( parent_name[0] ? "." : "" ), setting->name,
+		   ( type ? "." : "" ), ( type ? type->name : "" ) );
 
-    /* Check for existence and obtain length of GuestInfo value */
-    info_len = guestrpc_command(guestinfo_channel, command, NULL, 0);
-    if (info_len < 0) {
-        ret = info_len;
-        goto err_get_info_len;
-    }
+	/* Check for existence and obtain length of GuestInfo value */
+	info_len = guestrpc_command ( guestinfo_channel, command, NULL, 0 );
+	if ( info_len < 0 ) {
+		ret = info_len;
+		goto err_get_info_len;
+	}
 
-    /* Mark as found */
-    *found = 1;
+	/* Mark as found */
+	*found = 1;
 
-    /* Determine default type if necessary */
-    if (!type) {
-        predefined = find_setting(setting->name);
-        type = (predefined ? predefined->type : &setting_type_string);
-    }
-    assert(type != NULL);
+	/* Determine default type if necessary */
+	if ( ! type ) {
+		predefined = find_setting ( setting->name );
+		type = ( predefined ? predefined->type : &setting_type_string );
+	}
+	assert ( type != NULL );
 
-    /* Allocate temporary block to hold GuestInfo value */
-    info = zalloc(info_len + 1 /* NUL */);
-    if (!info) {
-        DBGC(settings, "GuestInfo %p could not allocate %d bytes\n",
-             settings, info_len);
-        ret = -ENOMEM;
-        goto err_alloc;
-    }
-    info[info_len] = '\0';
+	/* Allocate temporary block to hold GuestInfo value */
+	info = zalloc ( info_len + 1 /* NUL */ );
+	if ( ! info ) {
+		DBGC ( settings, "GuestInfo %p could not allocate %d bytes\n",
+		       settings, info_len );
+		ret = -ENOMEM;
+		goto err_alloc;
+	}
+	info[info_len] = '\0';
 
-    /* Fetch GuestInfo value */
-    check_len = guestrpc_command(guestinfo_channel, command,
-                                 info, info_len);
-    if (check_len < 0) {
-        ret = check_len;
-        goto err_get_info;
-    }
-    if (check_len != info_len) {
-        DBGC(settings, "GuestInfo %p length mismatch (expected %d, "
-                       "got %d)\n", settings, info_len, check_len);
-        ret = -EIO;
-        goto err_get_info;
-    }
-    DBGC2(settings, "GuestInfo %p found %s = \"%s\"\n",
-          settings, &command[9] /* Skip "info-get " */, info);
+	/* Fetch GuestInfo value */
+	check_len = guestrpc_command ( guestinfo_channel, command,
+				       info, info_len );
+	if ( check_len < 0 ) {
+		ret = check_len;
+		goto err_get_info;
+	}
+	if ( check_len != info_len ) {
+		DBGC ( settings, "GuestInfo %p length mismatch (expected %d, "
+		       "got %d)\n", settings, info_len, check_len );
+		ret = -EIO;
+		goto err_get_info;
+	}
+	DBGC2 ( settings, "GuestInfo %p found %s = \"%s\"\n",
+		settings, &command[9] /* Skip "info-get " */, info );
 
-    /* Parse GuestInfo value according to type */
-    ret = setting_parse(type, info, data, len);
-    if (ret < 0) {
-        DBGC(settings, "GuestInfo %p could not parse \"%s\" as %s: "
-                       "%s\n", settings, info, type->name, strerror(ret));
-        goto err_parse;
-    }
+	/* Parse GuestInfo value according to type */
+	ret = setting_parse ( type, info, data, len );
+	if ( ret < 0 ) {
+		DBGC ( settings, "GuestInfo %p could not parse \"%s\" as %s: "
+		       "%s\n", settings, info, type->name, strerror ( ret ) );
+		goto err_parse;
+	}
 
-err_parse:
-err_get_info:
-    free(info);
-err_alloc:
-err_get_info_len:
-    return ret;
+ err_parse:
+ err_get_info:
+	free ( info );
+ err_alloc:
+ err_get_info_len:
+	return ret;
 }
 
 /**
@@ -138,69 +138,69 @@ err_get_info_len:
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int guestinfo_fetch(struct settings* settings,
-                           struct setting* setting,
-                           void* data, size_t len) {
-    struct setting_type* type;
-    int found = 0;
-    int ret;
+static int guestinfo_fetch ( struct settings *settings,
+			     struct setting *setting,
+			     void *data, size_t len ) {
+	struct setting_type *type;
+	int found = 0;
+	int ret;
 
-    /* Try default type first */
-    ret = guestinfo_fetch_type(settings, setting, NULL,
-                               data, len, &found);
-    if (found)
-        return ret;
+	/* Try default type first */
+	ret = guestinfo_fetch_type ( settings, setting, NULL,
+				     data, len, &found );
+	if ( found )
+		return ret;
 
-    /* Otherwise, try all possible types */
-    for_each_table_entry(type, SETTING_TYPES) {
-        ret = guestinfo_fetch_type(settings, setting, type,
-                                   data, len, &found);
-        if (found)
-            return ret;
-    }
+	/* Otherwise, try all possible types */
+	for_each_table_entry ( type, SETTING_TYPES ) {
+		ret = guestinfo_fetch_type ( settings, setting, type,
+					     data, len, &found );
+		if ( found )
+			return ret;
+	}
 
-    /* Not found */
-    return -ENOENT;
+	/* Not found */
+	return -ENOENT;
 }
 
 /** GuestInfo settings operations */
 static struct settings_operations guestinfo_settings_operations = {
-    .fetch = guestinfo_fetch,
+	.fetch = guestinfo_fetch,
 };
 
 /** GuestInfo settings */
 static struct settings guestinfo_settings = {
-    .refcnt = NULL,
-    .siblings = LIST_HEAD_INIT(guestinfo_settings.siblings),
-    .children = LIST_HEAD_INIT(guestinfo_settings.children),
-    .op = &guestinfo_settings_operations,
+	.refcnt = NULL,
+	.siblings = LIST_HEAD_INIT ( guestinfo_settings.siblings ),
+	.children = LIST_HEAD_INIT ( guestinfo_settings.children ),
+	.op = &guestinfo_settings_operations,
 };
 
 /** Initialise GuestInfo settings */
-static void guestinfo_init(void) {
-    int rc;
+static void guestinfo_init ( void ) {
+	int rc;
 
-    /* Open GuestRPC channel */
-    guestinfo_channel = guestrpc_open();
-    if (guestinfo_channel < 0) {
-        rc = guestinfo_channel;
-        DBG("GuestInfo could not open channel: %s\n",
-            strerror(rc));
-        return;
-    }
+	/* Open GuestRPC channel */
+	guestinfo_channel = guestrpc_open();
+	if ( guestinfo_channel < 0 ) {
+		rc = guestinfo_channel;
+		DBG ( "GuestInfo could not open channel: %s\n",
+		      strerror ( rc ) );
+		return;
+	}
 
-    /* Register root GuestInfo settings */
-    if ((rc = register_settings(&guestinfo_settings, NULL,
-                                "vmware")) != 0) {
-        DBG("GuestInfo could not register settings: %s\n",
-            strerror(rc));
-        return;
-    }
+	/* Register root GuestInfo settings */
+	if ( ( rc = register_settings ( &guestinfo_settings, NULL,
+					"vmware" ) ) != 0 ) {
+		DBG ( "GuestInfo could not register settings: %s\n",
+		      strerror ( rc ) );
+		return;
+	}
 }
 
 /** GuestInfo settings initialiser */
-struct init_fn guestinfo_init_fn __init_fn(INIT_NORMAL) = {
-    .initialise = guestinfo_init,
+struct init_fn guestinfo_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = guestinfo_init,
 };
 
 /**
@@ -209,38 +209,38 @@ struct init_fn guestinfo_init_fn __init_fn(INIT_NORMAL) = {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-static int guestinfo_net_probe(struct net_device* netdev) {
-    struct settings* settings;
-    int rc;
+static int guestinfo_net_probe ( struct net_device *netdev ) {
+	struct settings *settings;
+	int rc;
 
-    /* Do nothing unless we have a GuestInfo channel available */
-    if (guestinfo_channel < 0)
-        return 0;
+	/* Do nothing unless we have a GuestInfo channel available */
+	if ( guestinfo_channel < 0 )
+		return 0;
 
-    /* Allocate and initialise settings block */
-    settings = zalloc(sizeof(*settings));
-    if (!settings) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
-    settings_init(settings, &guestinfo_settings_operations, NULL, NULL);
+	/* Allocate and initialise settings block */
+	settings = zalloc ( sizeof ( *settings ) );
+	if ( ! settings ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	settings_init ( settings, &guestinfo_settings_operations, NULL, NULL );
 
-    /* Register settings */
-    if ((rc = register_settings(settings, netdev_settings(netdev),
-                                "vmware")) != 0) {
-        DBGC(settings, "GuestInfo %p could not register for %s: %s\n",
-             settings, netdev->name, strerror(rc));
-        goto err_register;
-    }
-    DBGC(settings, "GuestInfo %p registered for %s\n",
-         settings, netdev->name);
+	/* Register settings */
+	if ( ( rc = register_settings ( settings, netdev_settings ( netdev ),
+					"vmware" ) ) != 0 ) {
+		DBGC ( settings, "GuestInfo %p could not register for %s: %s\n",
+		       settings, netdev->name, strerror ( rc ) );
+		goto err_register;
+	}
+	DBGC ( settings, "GuestInfo %p registered for %s\n",
+	       settings, netdev->name );
 
-    return 0;
+	return 0;
 
-err_register:
-    free(settings);
-err_alloc:
-    return rc;
+ err_register:
+	free ( settings );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -248,24 +248,24 @@ err_alloc:
  *
  * @v netdev		Network device
  */
-static void guestinfo_net_remove(struct net_device* netdev) {
-    struct settings* parent = netdev_settings(netdev);
-    struct settings* settings;
+static void guestinfo_net_remove ( struct net_device *netdev ) {
+	struct settings *parent = netdev_settings ( netdev );
+	struct settings *settings;
 
-    list_for_each_entry(settings, &parent->children, siblings) {
-        if (settings->op == &guestinfo_settings_operations) {
-            DBGC(settings, "GuestInfo %p unregistered for %s\n",
-                 settings, netdev->name);
-            unregister_settings(settings);
-            free(settings);
-            return;
-        }
-    }
+	list_for_each_entry ( settings, &parent->children, siblings ) {
+		if ( settings->op == &guestinfo_settings_operations ) {
+			DBGC ( settings, "GuestInfo %p unregistered for %s\n",
+			       settings, netdev->name );
+			unregister_settings ( settings );
+			free ( settings );
+			return;
+		}
+	}
 }
 
 /** GuestInfo per-netdevice driver */
 struct net_driver guestinfo_net_driver __net_driver = {
-    .name = "GuestInfo",
-    .probe = guestinfo_net_probe,
-    .remove = guestinfo_net_remove,
+	.name = "GuestInfo",
+	.probe = guestinfo_net_probe,
+	.remove = guestinfo_net_remove,
 };

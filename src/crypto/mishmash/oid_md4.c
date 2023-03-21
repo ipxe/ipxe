@@ -21,17 +21,17 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/md4.h>
 #include <ipxe/asn1.h>
 
 /** "md4" object identifier */
-static uint8_t oid_md4[] = {ASN1_OID_MD4};
+static uint8_t oid_md4[] = { ASN1_OID_MD4 };
 
 /** "md4" OID-identified algorithm */
 struct asn1_algorithm oid_md4_algorithm __asn1_algorithm = {
-    .name = "md4",
-    .digest = &md4_algorithm,
-    .oid = ASN1_CURSOR(oid_md4),
+	.name = "md4",
+	.digest = &md4_algorithm,
+	.oid = ASN1_CURSOR ( oid_md4 ),
 };

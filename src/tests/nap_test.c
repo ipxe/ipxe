@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -39,14 +39,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * Perform CPU sleeping self-test
  *
  */
-static void nap_test_exec(void) {
-    /* Check that we can sleep without crashing or halting forever */
-    cpu_nap();
-    ok(1);
+static void nap_test_exec ( void ) {
+
+	/* Check that we can sleep without crashing or halting forever */
+	cpu_nap();
+	ok ( 1 );
 }
 
 /** CPU sleeping self-test */
 struct self_test nap_test __self_test = {
-    .name = "nap",
-    .exec = nap_test_exec,
+	.name = "nap",
+	.exec = nap_test_exec,
 };

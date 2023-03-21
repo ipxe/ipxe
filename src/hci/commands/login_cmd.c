@@ -27,7 +27,7 @@
 #include <ipxe/parseopt.h>
 #include <ipxe/login_ui.h>
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -43,7 +43,7 @@ static struct option_descriptor login_opts[] = {};
 
 /** "login" command descriptor */
 static struct command_descriptor login_cmd =
-    COMMAND_DESC(struct login_options, login_opts, 0, 0, NULL);
+	COMMAND_DESC ( struct login_options, login_opts, 0, 0, NULL );
 
 /**
  * "login" command
@@ -52,26 +52,26 @@ static struct command_descriptor login_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int login_exec(int argc, char** argv) {
-    struct login_options opts;
-    int rc;
+static int login_exec ( int argc, char **argv ) {
+	struct login_options opts;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &login_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &login_cmd, &opts ) ) != 0 )
+		return rc;
 
-    /* Show login UI */
-    if ((rc = login_ui()) != 0) {
-        printf("Could not set credentials: %s\n",
-               strerror(rc));
-        return rc;
-    }
+	/* Show login UI */
+	if ( ( rc = login_ui() ) != 0 ) {
+		printf ( "Could not set credentials: %s\n",
+			 strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /** Login commands */
 struct command login_command __command = {
-    .name = "login",
-    .exec = login_exec,
+	.name = "login",
+	.exec = login_exec,
 };

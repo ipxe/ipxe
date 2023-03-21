@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stddef.h>
 
@@ -26,86 +26,97 @@ FILE_LICENCE(GPL2_OR_LATER);
 #include "../../include/public/mlx_utils.h"
 mlx_status
 mlx_utils_init(
-    IN mlx_utils* utils,
-    IN mlx_pci* pci)
+				IN mlx_utils *utils,
+				IN mlx_pci *pci
+				)
 {
-    mlx_status status = MLX_SUCCESS;
-    if (pci == NULL || utils == NULL) {
-        status = MLX_INVALID_PARAMETER;
-        goto bail;
-    }
-    utils->pci = pci;
-    status = mlx_pci_init(utils);
-    status = mlx_utils_init_lock(utils);
+	mlx_status status = MLX_SUCCESS;
+	if( pci == NULL || utils == NULL ){
+		status = MLX_INVALID_PARAMETER;
+		goto bail;
+	}
+	utils->pci = pci;
+	status = mlx_pci_init(utils);
+	status = mlx_utils_init_lock(utils);
 bail:
-    return status;
+	return status;
 }
 
 mlx_status
 mlx_utils_teardown(
-    IN mlx_utils* utils)
+				IN mlx_utils *utils
+				)
 {
-    mlx_status status = MLX_SUCCESS;
-    mlx_utils_free_lock(utils);
-    mlx_pci_teardown(utils);
-    return status;
+	mlx_status status = MLX_SUCCESS;
+	mlx_utils_free_lock(utils);
+	mlx_pci_teardown(utils);
+	return status;
 }
 
 mlx_status
 mlx_utils_delay_in_ms(
-    IN mlx_uint32 msecs)
+			IN mlx_uint32 msecs
+		)
 {
-    mlx_utils_delay_in_ms_priv(msecs);
-    return MLX_SUCCESS;
+	mlx_utils_delay_in_ms_priv(msecs);
+	return MLX_SUCCESS;
 }
 mlx_status
 mlx_utils_delay_in_us(
-    IN mlx_uint32 usecs)
+			IN mlx_uint32 usecs
+		)
 {
-    mlx_utils_delay_in_us_priv(usecs);
-    return MLX_SUCCESS;
+	mlx_utils_delay_in_us_priv(usecs);
+	return MLX_SUCCESS;
 }
 mlx_status
 mlx_utils_ilog2(
-    IN mlx_uint32 i,
-    OUT mlx_uint32* log)
+			IN mlx_uint32 i,
+			OUT mlx_uint32 *log
+		)
 {
-    mlx_utils_ilog2_priv(i, log);
-    return MLX_SUCCESS;
+	mlx_utils_ilog2_priv(i, log);
+	return MLX_SUCCESS;
 }
 
 mlx_status
 mlx_utils_init_lock(
-    IN OUT mlx_utils* utils)
+			IN OUT mlx_utils *utils
+		)
 {
-    return mlx_utils_init_lock_priv(&(utils->lock));
+	return mlx_utils_init_lock_priv(&(utils->lock));
+
 }
 
 mlx_status
 mlx_utils_free_lock(
-    IN OUT mlx_utils* utils)
+			IN OUT mlx_utils *utils
+		)
 {
-    return mlx_utils_free_lock_priv(utils->lock);
+	return mlx_utils_free_lock_priv(utils->lock);
 }
 
 mlx_status
-mlx_utils_acquire_lock(
-    IN OUT mlx_utils* utils)
+mlx_utils_acquire_lock (
+			IN OUT mlx_utils *utils
+		)
 {
-    return mlx_utils_acquire_lock_priv(utils->lock);
+	return mlx_utils_acquire_lock_priv(utils->lock);
 }
 
 mlx_status
-mlx_utils_release_lock(
-    IN OUT mlx_utils* utils)
+mlx_utils_release_lock (
+		IN OUT mlx_utils *utils
+		)
 {
-    return mlx_utils_release_lock_priv(utils->lock);
+	return mlx_utils_release_lock_priv(utils->lock);
 }
 
 mlx_status
-mlx_utils_rand(
-    IN mlx_utils* utils,
-    OUT mlx_uint32* rand_num)
+mlx_utils_rand (
+		IN mlx_utils *utils,
+		OUT mlx_uint32 *rand_num
+		)
 {
-    return mlx_utils_rand_priv(utils, rand_num);
+	return mlx_utils_rand_priv(utils, rand_num);
 }

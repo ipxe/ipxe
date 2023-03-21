@@ -1,5 +1,3 @@
-#pragma once
-
 /* Enable IPv6 and HTTPS */
 #define NET_PROTO_IPV6
 #define DOWNLOAD_PROTO_HTTPS

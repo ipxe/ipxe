@@ -27,46 +27,47 @@ FILE_LICENCE(GPL2_OR_LATER);
 #include <ipxe/init.h>
 
 int linux_argc;
-char** linux_argv;
+char **linux_argv;
 
 /** Supported command-line options */
 static struct option options[] = {
-    {"net", 1, NULL, 'n'},
-    {"settings", 1, NULL, 's'},
-    {NULL, 0, NULL, 0}};
+	{"net", 1, NULL, 'n'},
+	{"settings", 1, NULL, 's'},
+	{NULL, 0, NULL, 0}
+};
 
 /**
  * Parse k1=v1[,k2=v2]* into linux_settings
  */
-static int parse_kv(char* kv, struct list_head* list)
+static int parse_kv(char *kv, struct list_head *list)
 {
-    char* token;
-    char* name;
-    char* value;
-    struct linux_setting* setting;
+	char *token;
+	char *name;
+	char *value;
+	struct linux_setting *setting;
 
-    while ((token = strsep(&kv, ",")) != NULL) {
-        name = strsep(&token, "=");
-        if (name == NULL)
-            continue;
-        value = token;
-        if (value == NULL) {
-            DBG("Bad parameter: '%s'\n", name);
-            continue;
-        }
+	while ((token = strsep(&kv, ",")) != NULL) {
+		name = strsep(&token, "=");
+		if (name == NULL)
+			continue;
+		value = token;
+		if (value == NULL) {
+			DBG("Bad parameter: '%s'\n", name);
+			continue;
+		}
 
-        setting = malloc(sizeof(*setting));
+		setting = malloc(sizeof(*setting));
 
-        if (!setting)
-            return -1;
+		if (! setting)
+			return -1;
 
-        setting->name = name;
-        setting->value = value;
-        setting->applied = 0;
-        list_add(&setting->list, list);
-    }
+		setting->name = name;
+		setting->value = value;
+		setting->applied = 0;
+		list_add(&setting->list, list);
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -74,32 +75,32 @@ static int parse_kv(char* kv, struct list_head* list)
  *
  * Format is --net driver_name[,name=value]*
  */
-static int parse_net_args(char* args)
+static int parse_net_args(char *args)
 {
-    char* driver;
-    struct linux_device_request* dev_request;
-    int rc;
+	char *driver;
+	struct linux_device_request *dev_request;
+	int rc;
 
-    driver = strsep(&args, ",");
+	driver = strsep(&args, ",");
 
-    if (strlen(driver) == 0) {
-        printf("Missing driver name");
-        return -1;
-    }
+	if (strlen(driver) == 0) {
+		printf("Missing driver name");
+		return -1;
+	}
 
-    dev_request = malloc(sizeof(*dev_request));
+	dev_request = malloc(sizeof(*dev_request));
 
-    dev_request->driver = driver;
-    INIT_LIST_HEAD(&dev_request->settings);
-    list_add_tail(&dev_request->list, &linux_device_requests);
+	dev_request->driver = driver;
+	INIT_LIST_HEAD(&dev_request->settings);
+	list_add_tail(&dev_request->list, &linux_device_requests);
 
-    /* Parse rest of the settings */
-    rc = parse_kv(args, &dev_request->settings);
+	/* Parse rest of the settings */
+	rc = parse_kv(args, &dev_request->settings);
 
-    if (rc)
-        printf("Parsing net settings failed");
+	if (rc)
+		printf("Parsing net settings failed");
 
-    return rc;
+	return rc;
 }
 
 /**
@@ -107,69 +108,70 @@ static int parse_net_args(char* args)
  *
  * Format is --settings name=value[,name=value]*
  */
-static int parse_settings_args(char* args)
+static int parse_settings_args(char *args)
 {
-    return parse_kv(args, &linux_global_settings);
+	return parse_kv(args, &linux_global_settings);
 }
+
 
 /** Parse passed command-line arguments */
 void linux_args_parse()
 {
-    int c;
-    int rc;
+	int c;
+	int rc;
 
-    reset_getopt();
-    while (1) {
-        int option_index = 0;
+	reset_getopt();
+	while (1) {
+		int option_index = 0;
 
-        c = getopt_long(linux_argc, linux_argv, "", options, &option_index);
-        if (c == -1)
-            break;
+		c = getopt_long(linux_argc, linux_argv, "", options, &option_index);
+		if (c == -1)
+			break;
 
-        switch (c) {
-            case 'n':
-                if ((rc = parse_net_args(optarg)) != 0)
-                    return;
-                break;
-            case 's':
-                if ((rc = parse_settings_args(optarg)) != 0)
-                    return;
-                break;
-            default:
-                return;
-        }
-    }
+		switch (c) {
+		case 'n':
+			if ((rc = parse_net_args(optarg)) != 0)
+				return;
+			break;
+		case 's':
+			if ((rc = parse_settings_args(optarg)) != 0)
+				return;
+			break;
+		default:
+			return;
+		}
+	}
 
-    return;
+	return;
 }
 
 /** Clean up requests and settings */
 void linux_args_cleanup(int flags __unused)
 {
-    struct linux_device_request* request;
-    struct linux_device_request* rtmp;
-    struct linux_setting* setting;
-    struct linux_setting* stmp;
+	struct linux_device_request *request;
+	struct linux_device_request *rtmp;
+	struct linux_setting *setting;
+	struct linux_setting *stmp;
 
-    /* Clean up requests and their settings */
-    list_for_each_entry_safe(request, rtmp, &linux_device_requests, list) {
-        list_for_each_entry_safe(setting, stmp, &request->settings, list) {
-            list_del(&setting->list);
-            free(setting);
-        }
-        list_del(&request->list);
-        free(request);
-    }
+	/* Clean up requests and their settings */
+	list_for_each_entry_safe(request, rtmp, &linux_device_requests, list) {
+		list_for_each_entry_safe(setting, stmp, &request->settings, list) {
+			list_del(&setting->list);
+			free(setting);
+		}
+		list_del(&request->list);
+		free(request);
+	}
 
-    /* Clean up global settings */
-    list_for_each_entry_safe(setting, stmp, &linux_global_settings, list) {
-        list_del(&setting->list);
-        free(setting);
-    }
+	/* Clean up global settings */
+	list_for_each_entry_safe(setting, stmp, &linux_global_settings, list) {
+		list_del(&setting->list);
+		free(setting);
+	}
 }
 
 struct startup_fn startup_linux_args __startup_fn(STARTUP_EARLY) = {
-    .name = "linux_args",
-    .startup = linux_args_parse,
-    .shutdown = linux_args_cleanup,
+	.name = "linux_args",
+	.startup = linux_args_parse,
+	.shutdown = linux_args_cleanup,
 };

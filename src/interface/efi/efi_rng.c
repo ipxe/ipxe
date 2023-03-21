@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <ipxe/entropy.h>
@@ -35,11 +35,11 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  */
 
-struct entropy_source efirng_entropy __entropy_source(ENTROPY_NORMAL);
+struct entropy_source efirng_entropy __entropy_source ( ENTROPY_NORMAL );
 
 /** Random number generator protocol */
-static EFI_RNG_PROTOCOL* efirng;
-EFI_REQUEST_PROTOCOL(EFI_RNG_PROTOCOL, &efirng);
+static EFI_RNG_PROTOCOL *efirng;
+EFI_REQUEST_PROTOCOL ( EFI_RNG_PROTOCOL, &efirng );
 
 /** Minimum number of bytes to request from RNG
  *
@@ -59,21 +59,22 @@ EFI_REQUEST_PROTOCOL(EFI_RNG_PROTOCOL, &efirng);
  *
  * @ret rc		Return status code
  */
-static int efirng_enable(void) {
-    /* Check for RNG protocol support */
-    if (!efirng) {
-        DBGC(&efirng, "EFIRNG has no RNG protocol\n");
-        return -ENOTSUP;
-    }
+static int efirng_enable ( void ) {
 
-    /* Nothing in the EFI specification provides any clue as to
-     * how much entropy will be returned by GetRNG().  Make a
-     * totally uninformed (and conservative guess) that each
-     * sample will contain at least one bit of entropy.
-     */
-    entropy_init(&efirng_entropy, MIN_ENTROPY(1.0));
+	/* Check for RNG protocol support */
+	if ( ! efirng ) {
+		DBGC ( &efirng, "EFIRNG has no RNG protocol\n" );
+		return -ENOTSUP;
+	}
 
-    return 0;
+	/* Nothing in the EFI specification provides any clue as to
+	 * how much entropy will be returned by GetRNG().  Make a
+	 * totally uninformed (and conservative guess) that each
+	 * sample will contain at least one bit of entropy.
+	 */
+	entropy_init ( &efirng_entropy, MIN_ENTROPY ( 1.0 ) );
+
+	return 0;
 }
 
 /**
@@ -82,36 +83,36 @@ static int efirng_enable(void) {
  * @ret noise		Noise sample
  * @ret rc		Return status code
  */
-static int efirng_get_noise(noise_sample_t* noise) {
-    uint8_t buf[EFIRNG_LEN];
-    EFI_STATUS efirc;
-    int rc;
+static int efirng_get_noise ( noise_sample_t *noise ) {
+	uint8_t buf[EFIRNG_LEN];
+	EFI_STATUS efirc;
+	int rc;
 
-    /* Sanity check */
-    assert(efirng != NULL);
+	/* Sanity check */
+	assert ( efirng != NULL );
 
-    /* Get the minimum allowed number of random bytes */
-    if ((efirc = efirng->GetRNG(efirng, NULL, sizeof(buf),
-                                buf)) != 0) {
-        rc = -EEFI(efirc);
-        DBGC(&efirng, "ENTROPY could not read from RNG: %s\n",
-             strerror(rc));
-        return rc;
-    }
+	/* Get the minimum allowed number of random bytes */
+	if ( ( efirc = efirng->GetRNG ( efirng, NULL, sizeof ( buf ),
+					buf ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( &efirng, "ENTROPY could not read from RNG: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
 
-    /* Reduce random bytes to a single noise sample.  This seems
-     * like overkill, but we have no way of knowing how much
-     * entropy is actually present in the bytes returned by the
-     * RNG protocol.
-     */
-    *noise = crc32_le(0, buf, sizeof(buf));
+	/* Reduce random bytes to a single noise sample.  This seems
+	 * like overkill, but we have no way of knowing how much
+	 * entropy is actually present in the bytes returned by the
+	 * RNG protocol.
+	 */
+	*noise = crc32_le ( 0, buf, sizeof ( buf ) );
 
-    return 0;
+	return 0;
 }
 
 /** EFI random number generator protocol entropy source */
-struct entropy_source efirng_entropy __entropy_source(ENTROPY_NORMAL) = {
-    .name = "efirng",
-    .enable = efirng_enable,
-    .get_noise = efirng_get_noise,
+struct entropy_source efirng_entropy __entropy_source ( ENTROPY_NORMAL ) = {
+	.name = "efirng",
+	.enable = efirng_enable,
+	.get_noise = efirng_get_noise,
 };

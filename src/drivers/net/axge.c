@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <string.h>
@@ -45,15 +45,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** Interrupt completion profiler */
 static struct profiler axge_intr_profiler __profiler =
-    {.name = "axge.intr"};
+	{ .name = "axge.intr" };
 
 /** Bulk IN completion profiler */
 static struct profiler axge_in_profiler __profiler =
-    {.name = "axge.in"};
+	{ .name = "axge.in" };
 
 /** Bulk OUT profiler */
 static struct profiler axge_out_profiler __profiler =
-    {.name = "axge.out"};
+	{ .name = "axge.out" };
 
 /** Default bulk IN configuration
  *
@@ -66,10 +66,10 @@ static struct profiler axge_out_profiler __profiler =
  * 2kB receive I/O buffer and a zerocopy receive path.
  */
 static struct axge_bulk_in_control axge_bicr = {
-    .ctrl = 7,
-    .timer = cpu_to_le16(0),
-    .size = 0,
-    .ifg = 0,
+	.ctrl = 7,
+	.timer = cpu_to_le16 ( 0 ),
+	.size = 0,
+	.ifg = 0,
 };
 
 /******************************************************************************
@@ -88,11 +88,12 @@ static struct axge_bulk_in_control axge_bicr = {
  * @v len		Length of data
  * @ret rc		Return status code
  */
-static inline int axge_read_register(struct axge_device* axge,
-                                     unsigned int offset, void* data,
-                                     size_t len) {
-    return usb_control(axge->usb, AXGE_READ_MAC_REGISTER,
-                       offset, len, data, len);
+static inline int axge_read_register ( struct axge_device *axge,
+				       unsigned int offset, void *data,
+				       size_t len ) {
+
+	return usb_control ( axge->usb, AXGE_READ_MAC_REGISTER,
+			     offset, len, data, len );
 }
 
 /**
@@ -103,9 +104,10 @@ static inline int axge_read_register(struct axge_device* axge,
  * @v value		Value to fill in
  * @ret rc		Return status code
  */
-static inline int axge_read_byte(struct axge_device* axge,
-                                 unsigned int offset, uint8_t* value) {
-    return axge_read_register(axge, offset, value, sizeof(*value));
+static inline int axge_read_byte ( struct axge_device *axge,
+				   unsigned int offset, uint8_t *value ) {
+
+	return axge_read_register ( axge, offset, value, sizeof ( *value ) );
 }
 
 /**
@@ -116,9 +118,10 @@ static inline int axge_read_byte(struct axge_device* axge,
  * @v value		Value to fill in
  * @ret rc		Return status code
  */
-static inline int axge_read_word(struct axge_device* axge,
-                                 unsigned int offset, uint16_t* value) {
-    return axge_read_register(axge, offset, value, sizeof(*value));
+static inline int axge_read_word ( struct axge_device *axge,
+				   unsigned int offset, uint16_t *value ) {
+
+	return axge_read_register ( axge, offset, value, sizeof ( *value ) );
 }
 
 /**
@@ -129,9 +132,10 @@ static inline int axge_read_word(struct axge_device* axge,
  * @v value		Value to fill in
  * @ret rc		Return status code
  */
-static inline int axge_read_dword(struct axge_device* axge,
-                                  unsigned int offset, uint32_t* value) {
-    return axge_read_register(axge, offset, value, sizeof(*value));
+static inline int axge_read_dword ( struct axge_device *axge,
+				    unsigned int offset, uint32_t *value ) {
+
+	return axge_read_register ( axge, offset, value, sizeof ( *value ) );
 }
 
 /**
@@ -143,11 +147,12 @@ static inline int axge_read_dword(struct axge_device* axge,
  * @v len		Length of data
  * @ret rc		Return status code
  */
-static inline int axge_write_register(struct axge_device* axge,
-                                      unsigned int offset, void* data,
-                                      size_t len) {
-    return usb_control(axge->usb, AXGE_WRITE_MAC_REGISTER,
-                       offset, len, data, len);
+static inline int axge_write_register ( struct axge_device *axge,
+					unsigned int offset, void *data,
+					size_t len ) {
+
+	return usb_control ( axge->usb, AXGE_WRITE_MAC_REGISTER,
+			     offset, len, data, len );
 }
 
 /**
@@ -158,9 +163,10 @@ static inline int axge_write_register(struct axge_device* axge,
  * @v value		Value
  * @ret rc		Return status code
  */
-static inline int axge_write_byte(struct axge_device* axge,
-                                  unsigned int offset, uint8_t value) {
-    return axge_write_register(axge, offset, &value, sizeof(value));
+static inline int axge_write_byte ( struct axge_device *axge,
+				    unsigned int offset, uint8_t value ) {
+
+	return axge_write_register ( axge, offset, &value, sizeof ( value ));
 }
 
 /**
@@ -171,9 +177,10 @@ static inline int axge_write_byte(struct axge_device* axge,
  * @v value		Value
  * @ret rc		Return status code
  */
-static inline int axge_write_word(struct axge_device* axge,
-                                  unsigned int offset, uint16_t value) {
-    return axge_write_register(axge, offset, &value, sizeof(value));
+static inline int axge_write_word ( struct axge_device *axge,
+				    unsigned int offset, uint16_t value ) {
+
+	return axge_write_register ( axge, offset, &value, sizeof ( value ));
 }
 
 /**
@@ -184,9 +191,10 @@ static inline int axge_write_word(struct axge_device* axge,
  * @v value		Value
  * @ret rc		Return status code
  */
-static inline int axge_write_dword(struct axge_device* axge,
-                                   unsigned int offset, uint32_t value) {
-    return axge_write_register(axge, offset, &value, sizeof(value));
+static inline int axge_write_dword ( struct axge_device *axge,
+				     unsigned int offset, uint32_t value ) {
+
+	return axge_write_register ( axge, offset, &value, sizeof ( value ));
 }
 
 /******************************************************************************
@@ -202,45 +210,45 @@ static inline int axge_write_dword(struct axge_device* axge,
  * @v asix		AXGE device
  * @ret rc		Return status code
  */
-static int axge_check_link(struct axge_device* axge) {
-    struct net_device* netdev = axge->netdev;
-    uint8_t plsr;
-    uint16_t msr;
-    int rc;
+static int axge_check_link ( struct axge_device *axge ) {
+	struct net_device *netdev = axge->netdev;
+	uint8_t plsr;
+	uint16_t msr;
+	int rc;
 
-    /* Read physical link status register */
-    if ((rc = axge_read_byte(axge, AXGE_PLSR, &plsr)) != 0) {
-        DBGC(axge, "AXGE %p could not read PLSR: %s\n",
-             axge, strerror(rc));
-        return rc;
-    }
+	/* Read physical link status register */
+	if ( ( rc = axge_read_byte ( axge, AXGE_PLSR, &plsr ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not read PLSR: %s\n",
+		       axge, strerror ( rc ) );
+		return rc;
+	}
 
-    /* Write medium status register */
-    msr = cpu_to_le16(AXGE_MSR_FD | AXGE_MSR_RFC | AXGE_MSR_TFC |
-                      AXGE_MSR_RE);
-    if (plsr & AXGE_PLSR_EPHY_1000) {
-        msr |= cpu_to_le16(AXGE_MSR_GM);
-    } else if (plsr & AXGE_PLSR_EPHY_100) {
-        msr |= cpu_to_le16(AXGE_MSR_PS);
-    }
-    if ((rc = axge_write_word(axge, AXGE_MSR, msr)) != 0) {
-        DBGC(axge, "AXGE %p could not write MSR: %s\n",
-             axge, strerror(rc));
-        return rc;
-    }
+	/* Write medium status register */
+	msr = cpu_to_le16 ( AXGE_MSR_FD | AXGE_MSR_RFC | AXGE_MSR_TFC |
+			    AXGE_MSR_RE );
+	if ( plsr & AXGE_PLSR_EPHY_1000 ) {
+		msr |= cpu_to_le16 ( AXGE_MSR_GM );
+	} else if ( plsr & AXGE_PLSR_EPHY_100 ) {
+		msr |= cpu_to_le16 ( AXGE_MSR_PS );
+	}
+	if ( ( rc = axge_write_word ( axge, AXGE_MSR, msr ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not write MSR: %s\n",
+		       axge, strerror ( rc ) );
+		return rc;
+	}
 
-    /* Update link status */
-    if (plsr & AXGE_PLSR_EPHY_ANY) {
-        DBGC(axge, "AXGE %p link up (PLSR %02x MSR %04x)\n",
-             axge, plsr, msr);
-        netdev_link_up(netdev);
-    } else {
-        DBGC(axge, "AXGE %p link down (PLSR %02x MSR %04x)\n",
-             axge, plsr, msr);
-        netdev_link_down(netdev);
-    }
+	/* Update link status */
+	if ( plsr & AXGE_PLSR_EPHY_ANY ) {
+		DBGC ( axge, "AXGE %p link up (PLSR %02x MSR %04x)\n",
+		       axge, plsr, msr );
+		netdev_link_up ( netdev );
+	} else {
+		DBGC ( axge, "AXGE %p link down (PLSR %02x MSR %04x)\n",
+		       axge, plsr, msr );
+		netdev_link_down ( netdev );
+	}
 
-    return 0;
+	return 0;
 }
 
 /******************************************************************************
@@ -257,68 +265,68 @@ static int axge_check_link(struct axge_device* axge) {
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
-static void axge_intr_complete(struct usb_endpoint* ep,
-                               struct io_buffer* iobuf, int rc) {
-    struct axge_device* axge = container_of(ep, struct axge_device,
-                                            usbnet.intr);
-    struct net_device* netdev = axge->netdev;
-    struct axge_interrupt* intr;
-    size_t len = iob_len(iobuf);
-    unsigned int link_ok;
+static void axge_intr_complete ( struct usb_endpoint *ep,
+				 struct io_buffer *iobuf, int rc ) {
+	struct axge_device *axge = container_of ( ep, struct axge_device,
+						  usbnet.intr );
+	struct net_device *netdev = axge->netdev;
+	struct axge_interrupt *intr;
+	size_t len = iob_len ( iobuf );
+	unsigned int link_ok;
 
-    /* Profile completions */
-    profile_start(&axge_intr_profiler);
+	/* Profile completions */
+	profile_start ( &axge_intr_profiler );
 
-    /* Ignore packets cancelled when the endpoint closes */
-    if (!ep->open)
-        goto ignore;
+	/* Ignore packets cancelled when the endpoint closes */
+	if ( ! ep->open )
+		goto ignore;
 
-    /* Drop packets with errors */
-    if (rc != 0) {
-        DBGC(axge, "AXGE %p interrupt failed: %s\n",
-             axge, strerror(rc));
-        DBGC_HDA(axge, 0, iobuf->data, iob_len(iobuf));
-        goto error;
-    }
+	/* Drop packets with errors */
+	if ( rc != 0 ) {
+		DBGC ( axge, "AXGE %p interrupt failed: %s\n",
+		       axge, strerror ( rc ) );
+		DBGC_HDA ( axge, 0, iobuf->data, iob_len ( iobuf ) );
+		goto error;
+	}
 
-    /* Extract message header */
-    if (len < sizeof(*intr)) {
-        DBGC(axge, "AXGE %p underlength interrupt:\n", axge);
-        DBGC_HDA(axge, 0, iobuf->data, iob_len(iobuf));
-        rc = -EINVAL;
-        goto error;
-    }
-    intr = iobuf->data;
+	/* Extract message header */
+	if ( len < sizeof ( *intr ) ) {
+		DBGC ( axge, "AXGE %p underlength interrupt:\n", axge );
+		DBGC_HDA ( axge, 0, iobuf->data, iob_len ( iobuf ) );
+		rc = -EINVAL;
+		goto error;
+	}
+	intr = iobuf->data;
 
-    /* Check magic signature */
-    if (intr->magic != cpu_to_le16(AXGE_INTR_MAGIC)) {
-        DBGC(axge, "AXGE %p malformed interrupt:\n", axge);
-        DBGC_HDA(axge, 0, iobuf->data, iob_len(iobuf));
-        rc = -EINVAL;
-        goto error;
-    }
+	/* Check magic signature */
+	if ( intr->magic != cpu_to_le16 ( AXGE_INTR_MAGIC ) ) {
+		DBGC ( axge, "AXGE %p malformed interrupt:\n", axge );
+		DBGC_HDA ( axge, 0, iobuf->data, iob_len ( iobuf ) );
+		rc = -EINVAL;
+		goto error;
+	}
 
-    /* Extract link status */
-    link_ok = (intr->link & cpu_to_le16(AXGE_INTR_LINK_PPLS));
-    if ((!!link_ok) ^ (!!netdev_link_ok(netdev)))
-        axge->check_link = 1;
+	/* Extract link status */
+	link_ok = ( intr->link & cpu_to_le16 ( AXGE_INTR_LINK_PPLS ) );
+	if ( ( !! link_ok ) ^ ( !! netdev_link_ok ( netdev ) ) )
+		axge->check_link = 1;
 
-    /* Free I/O buffer */
-    free_iob(iobuf);
-    profile_stop(&axge_intr_profiler);
+	/* Free I/O buffer */
+	free_iob ( iobuf );
+	profile_stop ( &axge_intr_profiler );
 
-    return;
+	return;
 
-error:
-    netdev_rx_err(netdev, iob_disown(iobuf), rc);
-ignore:
-    free_iob(iobuf);
-    return;
+ error:
+	netdev_rx_err ( netdev, iob_disown ( iobuf ), rc );
+ ignore:
+	free_iob ( iobuf );
+	return;
 }
 
 /** Interrupt endpoint operations */
 static struct usb_endpoint_driver_operations axge_intr_operations = {
-    .complete = axge_intr_complete,
+	.complete = axge_intr_complete,
 };
 
 /******************************************************************************
@@ -335,118 +343,121 @@ static struct usb_endpoint_driver_operations axge_intr_operations = {
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
-static void axge_in_complete(struct usb_endpoint* ep,
-                             struct io_buffer* iobuf, int rc) {
-    struct axge_device* axge = container_of(ep, struct axge_device,
-                                            usbnet.in);
-    struct net_device* netdev = axge->netdev;
-    struct axge_rx_footer* ftr;
-    struct axge_rx_descriptor* desc;
-    struct io_buffer* pkt;
-    unsigned int count;
-    unsigned int offset;
-    size_t len;
-    size_t padded_len;
+static void axge_in_complete ( struct usb_endpoint *ep,
+			       struct io_buffer *iobuf, int rc ) {
+	struct axge_device *axge = container_of ( ep, struct axge_device,
+						  usbnet.in );
+	struct net_device *netdev = axge->netdev;
+	struct axge_rx_footer *ftr;
+	struct axge_rx_descriptor *desc;
+	struct io_buffer *pkt;
+	unsigned int count;
+	unsigned int offset;
+	size_t len;
+	size_t padded_len;
 
-    /* Profile receive completions */
-    profile_start(&axge_in_profiler);
+	/* Profile receive completions */
+	profile_start ( &axge_in_profiler );
 
-    /* Ignore packets cancelled when the endpoint closes */
-    if (!ep->open)
-        goto ignore;
+	/* Ignore packets cancelled when the endpoint closes */
+	if ( ! ep->open )
+		goto ignore;
 
-    /* Record USB errors against the network device */
-    if (rc != 0) {
-        DBGC(axge, "AXGE %p bulk IN failed: %s\n",
-             axge, strerror(rc));
-        goto error;
-    }
+	/* Record USB errors against the network device */
+	if ( rc != 0 ) {
+		DBGC ( axge, "AXGE %p bulk IN failed: %s\n",
+		       axge, strerror ( rc ) );
+		goto error;
+	}
 
-    /* Sanity check */
-    if (iob_len(iobuf) < sizeof(*ftr)) {
-        DBGC(axge, "AXGE %p underlength bulk IN:\n", axge);
-        DBGC_HDA(axge, 0, iobuf->data, iob_len(iobuf));
-        rc = -EINVAL;
-        goto error;
-    }
+	/* Sanity check */
+	if ( iob_len ( iobuf ) < sizeof ( *ftr ) ) {
+		DBGC ( axge, "AXGE %p underlength bulk IN:\n", axge );
+		DBGC_HDA ( axge, 0, iobuf->data, iob_len ( iobuf ) );
+		rc = -EINVAL;
+		goto error;
+	}
 
-    /* Parse ftr, strip ftr and descriptors */
-    iob_unput(iobuf, sizeof(*ftr));
-    ftr = (iobuf->data + iob_len(iobuf));
-    count = le16_to_cpu(ftr->count);
-    if (count == 0) {
-        DBGC(axge, "AXGE %p zero-packet bulk IN:\n", axge);
-        DBGC_HDA(axge, 0, iobuf->data, iob_len(iobuf));
-        goto ignore;
-    }
-    offset = le16_to_cpu(ftr->offset);
-    if ((iob_len(iobuf) < offset) ||
-        ((iob_len(iobuf) - offset) < (count * sizeof(*desc)))) {
-        DBGC(axge, "AXGE %p malformed bulk IN footer:\n", axge);
-        DBGC_HDA(axge, 0, iobuf->data, iob_len(iobuf));
-        rc = -EINVAL;
-        goto error;
-    }
-    desc = (iobuf->data + offset);
-    iob_unput(iobuf, (iob_len(iobuf) - offset));
+	/* Parse ftr, strip ftr and descriptors */
+	iob_unput ( iobuf, sizeof ( *ftr ) );
+	ftr = ( iobuf->data + iob_len ( iobuf ) );
+	count = le16_to_cpu ( ftr->count );
+	if ( count == 0 ) {
+		DBGC ( axge, "AXGE %p zero-packet bulk IN:\n", axge );
+		DBGC_HDA ( axge, 0, iobuf->data, iob_len ( iobuf ) );
+		goto ignore;
+	}
+	offset = le16_to_cpu ( ftr->offset );
+	if ( ( iob_len ( iobuf ) < offset ) ||
+	     ( ( iob_len ( iobuf ) - offset ) < ( count * sizeof ( *desc ) ) )){
+		DBGC ( axge, "AXGE %p malformed bulk IN footer:\n", axge );
+		DBGC_HDA ( axge, 0, iobuf->data, iob_len ( iobuf ) );
+		rc = -EINVAL;
+		goto error;
+	}
+	desc = ( iobuf->data + offset );
+	iob_unput ( iobuf, ( iob_len ( iobuf ) - offset ) );
 
-    /* Process packets */
-    for (; count--; desc++) {
-        /* Parse descriptor */
-        len = (le16_to_cpu(desc->len_flags) & AXGE_RX_LEN_MASK);
-        padded_len = ((len + AXGE_RX_LEN_PAD_ALIGN - 1) &
-                      ~(AXGE_RX_LEN_PAD_ALIGN - 1));
-        if (iob_len(iobuf) < padded_len) {
-            DBGC(axge, "AXGE %p malformed bulk IN descriptor:\n",
-                 axge);
-            DBGC_HDA(axge, 0, iobuf->data, iob_len(iobuf));
-            rc = -EINVAL;
-            goto error;
-        }
+	/* Process packets */
+	for ( ; count-- ; desc++ ) {
 
-        /* Check for previous dropped packets */
-        if (desc->len_flags & cpu_to_le16(AXGE_RX_CRC_ERROR))
-            netdev_rx_err(netdev, NULL, -EIO);
-        if (desc->len_flags & cpu_to_le16(AXGE_RX_DROP_ERROR))
-            netdev_rx_err(netdev, NULL, -ENOBUFS);
+		/* Parse descriptor */
+		len = ( le16_to_cpu ( desc->len_flags ) & AXGE_RX_LEN_MASK );
+		padded_len = ( ( len + AXGE_RX_LEN_PAD_ALIGN - 1 ) &
+			       ~( AXGE_RX_LEN_PAD_ALIGN - 1 ) );
+		if ( iob_len ( iobuf ) < padded_len ) {
+			DBGC ( axge, "AXGE %p malformed bulk IN descriptor:\n",
+			       axge );
+			DBGC_HDA ( axge, 0, iobuf->data, iob_len ( iobuf ) );
+			rc = -EINVAL;
+			goto error;
+		}
 
-        /* Allocate new I/O buffer, if applicable */
-        if (count) {
-            /* More packets remain: allocate a new buffer */
-            pkt = alloc_iob(AXGE_IN_RESERVE + len);
-            if (!pkt) {
-                /* Record error and continue */
-                netdev_rx_err(netdev, NULL, -ENOMEM);
-                iob_pull(iobuf, padded_len);
-                continue;
-            }
-            iob_reserve(pkt, AXGE_IN_RESERVE);
-            memcpy(iob_put(pkt, len), iobuf->data, len);
-            iob_pull(iobuf, padded_len);
+		/* Check for previous dropped packets */
+		if ( desc->len_flags & cpu_to_le16 ( AXGE_RX_CRC_ERROR ) )
+			netdev_rx_err ( netdev, NULL, -EIO );
+		if ( desc->len_flags & cpu_to_le16 ( AXGE_RX_DROP_ERROR ) )
+			netdev_rx_err ( netdev, NULL, -ENOBUFS );
 
-        } else {
-            /* This is the last (or only) packet: use this buffer */
-            iob_unput(iobuf, (padded_len - len));
-            pkt = iob_disown(iobuf);
-        }
+		/* Allocate new I/O buffer, if applicable */
+		if ( count ) {
 
-        /* Hand off to network stack */
-        netdev_rx(netdev, iob_disown(pkt));
-    }
+			/* More packets remain: allocate a new buffer */
+			pkt = alloc_iob ( AXGE_IN_RESERVE + len );
+			if ( ! pkt ) {
+				/* Record error and continue */
+				netdev_rx_err ( netdev, NULL, -ENOMEM );
+				iob_pull ( iobuf, padded_len );
+				continue;
+			}
+			iob_reserve ( pkt, AXGE_IN_RESERVE );
+			memcpy ( iob_put ( pkt, len ), iobuf->data, len );
+			iob_pull ( iobuf, padded_len );
 
-    assert(iobuf == NULL);
-    profile_stop(&axge_in_profiler);
-    return;
+		} else {
 
-error:
-    netdev_rx_err(netdev, iob_disown(iobuf), rc);
-ignore:
-    free_iob(iobuf);
+			/* This is the last (or only) packet: use this buffer */
+			iob_unput ( iobuf, ( padded_len - len ) );
+			pkt = iob_disown ( iobuf );
+		}
+
+		/* Hand off to network stack */
+		netdev_rx ( netdev, iob_disown ( pkt ) );
+	}
+
+	assert ( iobuf == NULL );
+	profile_stop ( &axge_in_profiler );
+	return;
+
+ error:
+	netdev_rx_err ( netdev, iob_disown ( iobuf ), rc );
+ ignore:
+	free_iob ( iobuf );
 }
 
 /** Bulk IN endpoint operations */
 static struct usb_endpoint_driver_operations axge_in_operations = {
-    .complete = axge_in_complete,
+	.complete = axge_in_complete,
 };
 
 /**
@@ -456,28 +467,28 @@ static struct usb_endpoint_driver_operations axge_in_operations = {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int axge_out_transmit(struct axge_device* axge,
-                             struct io_buffer* iobuf) {
-    struct axge_tx_header* hdr;
-    size_t len = iob_len(iobuf);
-    int rc;
+static int axge_out_transmit ( struct axge_device *axge,
+			       struct io_buffer *iobuf ) {
+	struct axge_tx_header *hdr;
+	size_t len = iob_len ( iobuf );
+	int rc;
 
-    /* Profile transmissions */
-    profile_start(&axge_out_profiler);
+	/* Profile transmissions */
+	profile_start ( &axge_out_profiler );
 
-    /* Prepend header */
-    if ((rc = iob_ensure_headroom(iobuf, sizeof(*hdr))) != 0)
-        return rc;
-    hdr = iob_push(iobuf, sizeof(*hdr));
-    hdr->len = cpu_to_le32(len);
-    hdr->wtf = 0;
+	/* Prepend header */
+	if ( ( rc = iob_ensure_headroom ( iobuf, sizeof ( *hdr ) ) ) != 0 )
+		return rc;
+	hdr = iob_push ( iobuf, sizeof ( *hdr ) );
+	hdr->len = cpu_to_le32 ( len );
+	hdr->wtf = 0;
 
-    /* Enqueue I/O buffer */
-    if ((rc = usb_stream(&axge->usbnet.out, iobuf, 0)) != 0)
-        return rc;
+	/* Enqueue I/O buffer */
+	if ( ( rc = usb_stream ( &axge->usbnet.out, iobuf, 0 ) ) != 0 )
+		return rc;
 
-    profile_stop(&axge_out_profiler);
-    return 0;
+	profile_stop ( &axge_out_profiler );
+	return 0;
 }
 
 /**
@@ -487,19 +498,19 @@ static int axge_out_transmit(struct axge_device* axge,
  * @v iobuf		I/O buffer
  * @v rc		Completion status code
  */
-static void axge_out_complete(struct usb_endpoint* ep,
-                              struct io_buffer* iobuf, int rc) {
-    struct axge_device* axge = container_of(ep, struct axge_device,
-                                            usbnet.out);
-    struct net_device* netdev = axge->netdev;
+static void axge_out_complete ( struct usb_endpoint *ep,
+				struct io_buffer *iobuf, int rc ) {
+	struct axge_device *axge = container_of ( ep, struct axge_device,
+						  usbnet.out );
+	struct net_device *netdev = axge->netdev;
 
-    /* Report TX completion */
-    netdev_tx_complete_err(netdev, iobuf, rc);
+	/* Report TX completion */
+	netdev_tx_complete_err ( netdev, iobuf, rc );
 }
 
 /** Bulk OUT endpoint operations */
 static struct usb_endpoint_driver_operations axge_out_operations = {
-    .complete = axge_out_complete,
+	.complete = axge_out_complete,
 };
 
 /******************************************************************************
@@ -515,56 +526,56 @@ static struct usb_endpoint_driver_operations axge_out_operations = {
  * @v netdev		Network device
  * @ret rc		Return status code
  */
-static int axge_open(struct net_device* netdev) {
-    struct axge_device* axge = netdev->priv;
-    uint16_t rcr;
-    int rc;
+static int axge_open ( struct net_device *netdev ) {
+	struct axge_device *axge = netdev->priv;
+	uint16_t rcr;
+	int rc;
 
-    /* Reapply device configuration to avoid transaction errors */
-    if ((rc = usb_set_configuration(axge->usb, axge->config)) != 0) {
-        DBGC(axge, "AXGE %p could not set configuration: %s\n",
-             axge, strerror(rc));
-        goto err_set_configuration;
-    }
+	/* Reapply device configuration to avoid transaction errors */
+	if ( ( rc = usb_set_configuration ( axge->usb, axge->config ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not set configuration: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_set_configuration;
+	}
 
-    /* Open USB network device */
-    if ((rc = usbnet_open(&axge->usbnet)) != 0) {
-        DBGC(axge, "AXGE %p could not open: %s\n",
-             axge, strerror(rc));
-        goto err_open;
-    }
+	/* Open USB network device */
+	if ( ( rc = usbnet_open ( &axge->usbnet ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not open: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_open;
+	}
 
-    /* Set MAC address */
-    if ((rc = axge_write_register(axge, AXGE_NIDR,
-                                  netdev->ll_addr, ETH_ALEN)) != 0) {
-        DBGC(axge, "AXGE %p could not set MAC address: %s\n",
-             axge, strerror(rc));
-        goto err_write_mac;
-    }
+	/* Set MAC address */
+	if ( ( rc = axge_write_register ( axge, AXGE_NIDR,
+					  netdev->ll_addr, ETH_ALEN ) ) !=0){
+		DBGC ( axge, "AXGE %p could not set MAC address: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_write_mac;
+	}
 
-    /* Enable receiver */
-    rcr = cpu_to_le16(AXGE_RCR_PRO | AXGE_RCR_AMALL |
-                      AXGE_RCR_AB | AXGE_RCR_SO);
-    if ((rc = axge_write_word(axge, AXGE_RCR, rcr)) != 0) {
-        DBGC(axge, "AXGE %p could not write RCR: %s\n",
-             axge, strerror(rc));
-        goto err_write_rcr;
-    }
+	/* Enable receiver */
+	rcr = cpu_to_le16 ( AXGE_RCR_PRO | AXGE_RCR_AMALL |
+			    AXGE_RCR_AB | AXGE_RCR_SO );
+	if ( ( rc = axge_write_word ( axge, AXGE_RCR, rcr ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not write RCR: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_write_rcr;
+	}
 
-    /* Update link status */
-    if ((rc = axge_check_link(axge)) != 0)
-        goto err_check_link;
+	/* Update link status */
+	if ( ( rc = axge_check_link ( axge ) ) != 0 )
+		goto err_check_link;
 
-    return 0;
+	return 0;
 
-err_check_link:
-    axge_write_word(axge, AXGE_RCR, 0);
-err_write_rcr:
-err_write_mac:
-    usbnet_close(&axge->usbnet);
-err_open:
-err_set_configuration:
-    return rc;
+ err_check_link:
+	axge_write_word ( axge, AXGE_RCR, 0 );
+ err_write_rcr:
+ err_write_mac:
+	usbnet_close ( &axge->usbnet );
+ err_open:
+ err_set_configuration:
+	return rc;
 }
 
 /**
@@ -572,14 +583,14 @@ err_set_configuration:
  *
  * @v netdev		Network device
  */
-static void axge_close(struct net_device* netdev) {
-    struct axge_device* axge = netdev->priv;
+static void axge_close ( struct net_device *netdev ) {
+	struct axge_device *axge = netdev->priv;
 
-    /* Disable receiver */
-    axge_write_word(axge, AXGE_RCR, 0);
+	/* Disable receiver */
+	axge_write_word ( axge, AXGE_RCR, 0 );
 
-    /* Close USB network device */
-    usbnet_close(&axge->usbnet);
+	/* Close USB network device */
+	usbnet_close ( &axge->usbnet );
 }
 
 /**
@@ -589,16 +600,16 @@ static void axge_close(struct net_device* netdev) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int axge_transmit(struct net_device* netdev,
-                         struct io_buffer* iobuf) {
-    struct axge_device* axge = netdev->priv;
-    int rc;
+static int axge_transmit ( struct net_device *netdev,
+			   struct io_buffer *iobuf ) {
+	struct axge_device *axge = netdev->priv;
+	int rc;
 
-    /* Transmit packet */
-    if ((rc = axge_out_transmit(axge, iobuf)) != 0)
-        return rc;
+	/* Transmit packet */
+	if ( ( rc = axge_out_transmit ( axge, iobuf ) ) != 0 )
+		return rc;
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -606,33 +617,33 @@ static int axge_transmit(struct net_device* netdev,
  *
  * @v netdev		Network device
  */
-static void axge_poll(struct net_device* netdev) {
-    struct axge_device* axge = netdev->priv;
-    int rc;
+static void axge_poll ( struct net_device *netdev ) {
+	struct axge_device *axge = netdev->priv;
+	int rc;
 
-    /* Poll USB bus */
-    usb_poll(axge->bus);
+	/* Poll USB bus */
+	usb_poll ( axge->bus );
 
-    /* Refill endpoints */
-    if ((rc = usbnet_refill(&axge->usbnet)) != 0)
-        netdev_rx_err(netdev, NULL, rc);
+	/* Refill endpoints */
+	if ( ( rc = usbnet_refill ( &axge->usbnet ) ) != 0 )
+		netdev_rx_err ( netdev, NULL, rc );
 
-    /* Update link state, if applicable */
-    if (axge->check_link) {
-        if ((rc = axge_check_link(axge)) == 0) {
-            axge->check_link = 0;
-        } else {
-            netdev_rx_err(netdev, NULL, rc);
-        }
-    }
+	/* Update link state, if applicable */
+	if ( axge->check_link ) {
+		if ( ( rc = axge_check_link ( axge ) ) == 0 ) {
+			axge->check_link = 0;
+		} else {
+			netdev_rx_err ( netdev, NULL, rc );
+		}
+	}
 }
 
 /** AXGE network device operations */
 static struct net_device_operations axge_operations = {
-    .open = axge_open,
-    .close = axge_close,
-    .transmit = axge_transmit,
-    .poll = axge_poll,
+	.open		= axge_open,
+	.close		= axge_close,
+	.transmit	= axge_transmit,
+	.poll		= axge_poll,
 };
 
 /******************************************************************************
@@ -649,106 +660,106 @@ static struct net_device_operations axge_operations = {
  * @v config		Configuration descriptor
  * @ret rc		Return status code
  */
-static int axge_probe(struct usb_function* func,
-                      struct usb_configuration_descriptor* config) {
-    struct usb_device* usb = func->usb;
-    struct net_device* netdev;
-    struct axge_device* axge;
-    uint16_t epprcr;
-    uint8_t csr;
-    int rc;
+static int axge_probe ( struct usb_function *func,
+			struct usb_configuration_descriptor *config ) {
+	struct usb_device *usb = func->usb;
+	struct net_device *netdev;
+	struct axge_device *axge;
+	uint16_t epprcr;
+	uint8_t csr;
+	int rc;
 
-    /* Allocate and initialise structure */
-    netdev = alloc_etherdev(sizeof(*axge));
-    if (!netdev) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
-    netdev_init(netdev, &axge_operations);
-    netdev->dev = &func->dev;
-    axge = netdev->priv;
-    memset(axge, 0, sizeof(*axge));
-    axge->usb = usb;
-    axge->bus = usb->port->hub->bus;
-    axge->netdev = netdev;
-    axge->config = config->config;
-    usbnet_init(&axge->usbnet, func, &axge_intr_operations,
-                &axge_in_operations, &axge_out_operations);
-    usb_refill_init(&axge->usbnet.intr, 0, 0, AXGE_INTR_MAX_FILL);
-    usb_refill_init(&axge->usbnet.in, AXGE_IN_RESERVE,
-                    AXGE_IN_MTU, AXGE_IN_MAX_FILL);
-    DBGC(axge, "AXGE %p on %s\n", axge, func->name);
+	/* Allocate and initialise structure */
+	netdev = alloc_etherdev ( sizeof ( *axge ) );
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	netdev_init ( netdev, &axge_operations );
+	netdev->dev = &func->dev;
+	axge = netdev->priv;
+	memset ( axge, 0, sizeof ( *axge ) );
+	axge->usb = usb;
+	axge->bus = usb->port->hub->bus;
+	axge->netdev = netdev;
+	axge->config = config->config;
+	usbnet_init ( &axge->usbnet, func, &axge_intr_operations,
+		      &axge_in_operations, &axge_out_operations );
+	usb_refill_init ( &axge->usbnet.intr, 0, 0, AXGE_INTR_MAX_FILL );
+	usb_refill_init ( &axge->usbnet.in, AXGE_IN_RESERVE,
+			  AXGE_IN_MTU, AXGE_IN_MAX_FILL );
+	DBGC ( axge, "AXGE %p on %s\n", axge, func->name );
 
-    /* Describe USB network device */
-    if ((rc = usbnet_describe(&axge->usbnet, config)) != 0) {
-        DBGC(axge, "AXGE %p could not describe: %s\n",
-             axge, strerror(rc));
-        goto err_describe;
-    }
+	/* Describe USB network device */
+	if ( ( rc = usbnet_describe ( &axge->usbnet, config ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not describe: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_describe;
+	}
 
-    /* Fetch MAC address */
-    if ((rc = axge_read_register(axge, AXGE_NIDR, netdev->hw_addr,
-                                 ETH_ALEN)) != 0) {
-        DBGC(axge, "AXGE %p could not fetch MAC address: %s\n",
-             axge, strerror(rc));
-        goto err_read_mac;
-    }
+	/* Fetch MAC address */
+	if ( ( rc = axge_read_register ( axge, AXGE_NIDR, netdev->hw_addr,
+					 ETH_ALEN ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not fetch MAC address: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_read_mac;
+	}
 
-    /* Power up PHY */
-    if ((rc = axge_write_word(axge, AXGE_EPPRCR, 0)) != 0) {
-        DBGC(axge, "AXGE %p could not write EPPRCR: %s\n",
-             axge, strerror(rc));
-        goto err_write_epprcr_off;
-    }
-    epprcr = cpu_to_le16(AXGE_EPPRCR_IPRL);
-    if ((rc = axge_write_word(axge, AXGE_EPPRCR, epprcr)) != 0) {
-        DBGC(axge, "AXGE %p could not write EPPRCR: %s\n",
-             axge, strerror(rc));
-        goto err_write_epprcr_on;
-    }
-    mdelay(AXGE_EPPRCR_DELAY_MS);
+	/* Power up PHY */
+	if ( ( rc = axge_write_word ( axge, AXGE_EPPRCR, 0 ) ) != 0 ) {
+		DBGC ( axge, "AXGE %p could not write EPPRCR: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_write_epprcr_off;
+	}
+	epprcr = cpu_to_le16 ( AXGE_EPPRCR_IPRL );
+	if ( ( rc = axge_write_word ( axge, AXGE_EPPRCR, epprcr ) ) != 0){
+		DBGC ( axge, "AXGE %p could not write EPPRCR: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_write_epprcr_on;
+	}
+	mdelay ( AXGE_EPPRCR_DELAY_MS );
 
-    /* Select clocks */
-    csr = (AXGE_CSR_BCS | AXGE_CSR_ACS);
-    if ((rc = axge_write_byte(axge, AXGE_CSR, csr)) != 0) {
-        DBGC(axge, "AXGE %p could not write CSR: %s\n",
-             axge, strerror(rc));
-        goto err_write_csr;
-    }
-    mdelay(AXGE_CSR_DELAY_MS);
+	/* Select clocks */
+	csr = ( AXGE_CSR_BCS | AXGE_CSR_ACS );
+	if ( ( rc = axge_write_byte ( axge, AXGE_CSR, csr ) ) != 0){
+		DBGC ( axge, "AXGE %p could not write CSR: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_write_csr;
+	}
+	mdelay ( AXGE_CSR_DELAY_MS );
 
-    /* Configure bulk IN pipeline */
-    if ((rc = axge_write_register(axge, AXGE_BICR, &axge_bicr,
-                                  sizeof(axge_bicr))) != 0) {
-        DBGC(axge, "AXGE %p could not write BICR: %s\n",
-             axge, strerror(rc));
-        goto err_write_bicr;
-    }
+	/* Configure bulk IN pipeline */
+	if ( ( rc = axge_write_register ( axge, AXGE_BICR, &axge_bicr,
+					  sizeof ( axge_bicr ) ) ) != 0 ){
+		DBGC ( axge, "AXGE %p could not write BICR: %s\n",
+		       axge, strerror ( rc ) );
+		goto err_write_bicr;
+	}
 
-    /* Register network device */
-    if ((rc = register_netdev(netdev)) != 0)
-        goto err_register;
+	/* Register network device */
+	if ( ( rc = register_netdev ( netdev ) ) != 0 )
+		goto err_register;
 
-    /* Update link status */
-    if ((rc = axge_check_link(axge)) != 0)
-        goto err_check_link;
+	/* Update link status */
+	if ( ( rc = axge_check_link ( axge ) ) != 0 )
+		goto err_check_link;
 
-    usb_func_set_drvdata(func, axge);
-    return 0;
+	usb_func_set_drvdata ( func, axge );
+	return 0;
 
-err_check_link:
-    unregister_netdev(netdev);
-err_register:
-err_write_bicr:
-err_write_csr:
-err_write_epprcr_on:
-err_write_epprcr_off:
-err_read_mac:
-err_describe:
-    netdev_nullify(netdev);
-    netdev_put(netdev);
-err_alloc:
-    return rc;
+ err_check_link:
+	unregister_netdev ( netdev );
+ err_register:
+ err_write_bicr:
+ err_write_csr:
+ err_write_epprcr_on:
+ err_write_epprcr_off:
+ err_read_mac:
+ err_describe:
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -756,55 +767,55 @@ err_alloc:
  *
  * @v func		USB function
  */
-static void axge_remove(struct usb_function* func) {
-    struct axge_device* axge = usb_func_get_drvdata(func);
-    struct net_device* netdev = axge->netdev;
+static void axge_remove ( struct usb_function *func ) {
+	struct axge_device *axge = usb_func_get_drvdata ( func );
+	struct net_device *netdev = axge->netdev;
 
-    unregister_netdev(netdev);
-    netdev_nullify(netdev);
-    netdev_put(netdev);
+	unregister_netdev ( netdev );
+	netdev_nullify ( netdev );
+	netdev_put ( netdev );
 }
 
 /** AXGE device IDs */
 static struct usb_device_id axge_ids[] = {
-    {
-        .name = "ax88179",
-        .vendor = 0x0b95,
-        .product = 0x1790,
-    },
-    {
-        .name = "ax88178a",
-        .vendor = 0x0b95,
-        .product = 0x178a,
-    },
-    {
-        .name = "dub1312",
-        .vendor = 0x2001,
-        .product = 0x4a00,
-    },
-    {
-        .name = "axge-sitecom",
-        .vendor = 0x0df6,
-        .product = 0x0072,
-    },
-    {
-        .name = "axge-samsung",
-        .vendor = 0x04e8,
-        .product = 0xa100,
-    },
-    {
-        .name = "onelinkdock",
-        .vendor = 0x17ef,
-        .product = 0x304b,
-    },
+	{
+		.name = "ax88179",
+		.vendor = 0x0b95,
+		.product = 0x1790,
+	},
+	{
+		.name = "ax88178a",
+		.vendor = 0x0b95,
+		.product = 0x178a,
+	},
+	{
+		.name = "dub1312",
+		.vendor = 0x2001,
+		.product = 0x4a00,
+	},
+	{
+		.name = "axge-sitecom",
+		.vendor = 0x0df6,
+		.product = 0x0072,
+	},
+	{
+		.name = "axge-samsung",
+		.vendor = 0x04e8,
+		.product = 0xa100,
+	},
+	{
+		.name = "onelinkdock",
+		.vendor = 0x17ef,
+		.product = 0x304b,
+	},
 };
 
 /** AXGE driver */
 struct usb_driver axge_driver __usb_driver = {
-    .ids = axge_ids,
-    .id_count = (sizeof(axge_ids) / sizeof(axge_ids[0])),
-    .class = USB_CLASS_ID(USB_ANY_ID, USB_ANY_ID, USB_ANY_ID),
-    .score = USB_SCORE_NORMAL,
-    .probe = axge_probe,
-    .remove = axge_remove,
+	.ids = axge_ids,
+	.id_count = ( sizeof ( axge_ids ) / sizeof ( axge_ids[0] ) ),
+	.class = USB_CLASS_ID ( USB_ANY_ID, USB_ANY_ID, USB_ANY_ID ),
+	.score = USB_SCORE_NORMAL,
+	.probe = axge_probe,
+	.remove = axge_remove,
 };

@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   Disk IO protocol as defined in the UEFI 2.0 specification.
 
@@ -13,21 +11,19 @@
 **/
 
 #ifndef __DISK_IO_H__
-    #define __DISK_IO_H__
+#define __DISK_IO_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #define EFI_DISK_IO_PROTOCOL_GUID                         \
-        {                                                     \
-            0xce345171, 0xba0b, 0x11d2, {                     \
-                0x8e, 0x4f, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b \
-            }                                                 \
-        }
+#define EFI_DISK_IO_PROTOCOL_GUID \
+  { \
+    0xce345171, 0xba0b, 0x11d2, {0x8e, 0x4f, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b } \
+  }
 
-    ///
-    /// Protocol GUID name defined in EFI1.1.
-    ///
-    #define DISK_IO_PROTOCOL EFI_DISK_IO_PROTOCOL_GUID
+///
+/// Protocol GUID name defined in EFI1.1.
+///
+#define DISK_IO_PROTOCOL  EFI_DISK_IO_PROTOCOL_GUID
 
 typedef struct _EFI_DISK_IO_PROTOCOL EFI_DISK_IO_PROTOCOL;
 
@@ -53,12 +49,15 @@ typedef EFI_DISK_IO_PROTOCOL EFI_DISK_IO;
                                 valid for the device.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_DISK_READ)(
-    IN EFI_DISK_IO_PROTOCOL* This,
-    IN UINT32 MediaId,
-    IN UINT64 Offset,
-    IN UINTN BufferSize,
-    OUT VOID* Buffer);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DISK_READ)(
+  IN EFI_DISK_IO_PROTOCOL         *This,
+  IN UINT32                       MediaId,
+  IN UINT64                       Offset,
+  IN UINTN                        BufferSize,
+  OUT VOID                        *Buffer
+  );
 
 /**
   Writes a specified number of bytes to a device.
@@ -78,34 +77,37 @@ typedef EFI_STATUS(EFIAPI* EFI_DISK_READ)(
                                  valid for the device.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_DISK_WRITE)(
-    IN EFI_DISK_IO_PROTOCOL* This,
-    IN UINT32 MediaId,
-    IN UINT64 Offset,
-    IN UINTN BufferSize,
-    IN VOID* Buffer);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DISK_WRITE)(
+  IN EFI_DISK_IO_PROTOCOL         *This,
+  IN UINT32                       MediaId,
+  IN UINT64                       Offset,
+  IN UINTN                        BufferSize,
+  IN VOID                         *Buffer
+  );
 
-    #define EFI_DISK_IO_PROTOCOL_REVISION 0x00010000
+#define EFI_DISK_IO_PROTOCOL_REVISION  0x00010000
 
-    ///
-    /// Revision defined in EFI1.1
-    ///
-    #define EFI_DISK_IO_INTERFACE_REVISION EFI_DISK_IO_PROTOCOL_REVISION
+///
+/// Revision defined in EFI1.1
+///
+#define EFI_DISK_IO_INTERFACE_REVISION  EFI_DISK_IO_PROTOCOL_REVISION
 
 ///
 /// This protocol is used to abstract Block I/O interfaces.
 ///
 struct _EFI_DISK_IO_PROTOCOL {
-    ///
-    /// The revision to which the disk I/O interface adheres. All future
-    /// revisions must be backwards compatible. If a future version is not
-    /// backwards compatible, it is not the same GUID.
-    ///
-    UINT64 Revision;
-    EFI_DISK_READ ReadDisk;
-    EFI_DISK_WRITE WriteDisk;
+  ///
+  /// The revision to which the disk I/O interface adheres. All future
+  /// revisions must be backwards compatible. If a future version is not
+  /// backwards compatible, it is not the same GUID.
+  ///
+  UINT64            Revision;
+  EFI_DISK_READ     ReadDisk;
+  EFI_DISK_WRITE    WriteDisk;
 };
 
-extern EFI_GUID gEfiDiskIoProtocolGuid;
+extern EFI_GUID  gEfiDiskIoProtocolGuid;
 
 #endif

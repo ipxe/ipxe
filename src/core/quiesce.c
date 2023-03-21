@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -33,21 +33,21 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/quiesce.h>
 
 /** Quiesce system */
-void quiesce(void) {
-    struct quiescer* quiescer;
+void quiesce ( void ) {
+	struct quiescer *quiescer;
 
-    /* Call all quiescers */
-    for_each_table_entry(quiescer, QUIESCERS) {
-        quiescer->quiesce();
-    }
+	/* Call all quiescers */
+	for_each_table_entry ( quiescer, QUIESCERS ) {
+		quiescer->quiesce();
+	}
 }
 
 /** Unquiesce system */
-void unquiesce(void) {
-    struct quiescer* quiescer;
+void unquiesce ( void ) {
+	struct quiescer *quiescer;
 
-    /* Call all quiescers */
-    for_each_table_entry(quiescer, QUIESCERS) {
-        quiescer->unquiesce();
-    }
+	/* Call all quiescers */
+	for_each_table_entry ( quiescer, QUIESCERS ) {
+		quiescer->unquiesce();
+	}
 }

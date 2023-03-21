@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <errno.h>
@@ -46,14 +46,14 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v offset		Starting offset
  * @ret next		Offset to next line
  */
-static size_t pem_next(userptr_t data, size_t len, size_t offset) {
-    off_t eol;
+static size_t pem_next ( userptr_t data, size_t len, size_t offset ) {
+	off_t eol;
 
-    /* Find and skip next newline character, if any */
-    eol = memchr_user(data, offset, '\n', (len - offset));
-    if (eol < 0)
-        return len;
-    return (eol + 1);
+	/* Find and skip next newline character, if any */
+	eol = memchr_user ( data, offset, '\n', ( len - offset ) );
+	if ( eol < 0 )
+		return len;
+	return ( eol + 1 );
 }
 
 /**
@@ -65,28 +65,29 @@ static size_t pem_next(userptr_t data, size_t len, size_t offset) {
  * @v marker		Boundary marker
  * @ret offset		Offset to boundary marker line, or negative error
  */
-static int pem_marker(userptr_t data, size_t len, size_t offset,
-                      const char* marker) {
-    char buf[strlen(marker)];
+static int pem_marker ( userptr_t data, size_t len, size_t offset,
+			const char *marker ) {
+	char buf[ strlen ( marker ) ];
 
-    /* Sanity check */
-    assert(offset <= len);
+	/* Sanity check */
+	assert ( offset <= len );
 
-    /* Scan for marker at start of line */
-    while (offset < len) {
-        /* Check for marker */
-        if ((len - offset) < sizeof(buf))
-            break;
-        copy_from_user(buf, data, offset, sizeof(buf));
-        if (memcmp(buf, marker, sizeof(buf)) == 0)
-            return offset;
+	/* Scan for marker at start of line */
+	while ( offset < len ) {
 
-        /* Move to next line */
-        offset = pem_next(data, len, offset);
-        assert(offset <= len);
-    }
+		/* Check for marker */
+		if ( ( len - offset ) < sizeof ( buf ) )
+			break;
+		copy_from_user ( buf, data, offset, sizeof ( buf ) );
+		if ( memcmp ( buf, marker, sizeof ( buf ) ) == 0 )
+			return offset;
 
-    return -ENOENT;
+		/* Move to next line */
+		offset = pem_next ( data, len, offset );
+		assert ( offset <= len );
+	}
+
+	return -ENOENT;
 }
 
 /**
@@ -101,86 +102,86 @@ static int pem_marker(userptr_t data, size_t len, size_t offset,
  * The caller is responsible for eventually calling free() on the
  * allocated ASN.1 cursor.
  */
-int pem_asn1(userptr_t data, size_t len, size_t offset,
-             struct asn1_cursor** cursor) {
-    size_t encoded_len;
-    size_t decoded_max_len;
-    char* encoded;
-    void* decoded;
-    int decoded_len;
-    int begin;
-    int end;
-    int rc;
+int pem_asn1 ( userptr_t data, size_t len, size_t offset,
+	       struct asn1_cursor **cursor ) {
+	size_t encoded_len;
+	size_t decoded_max_len;
+	char *encoded;
+	void *decoded;
+	int decoded_len;
+	int begin;
+	int end;
+	int rc;
 
-    /* Locate and skip BEGIN marker */
-    begin = pem_marker(data, len, offset, PEM_BEGIN);
-    if (begin < 0) {
-        rc = begin;
-        DBGC(data, "PEM [%#zx,%#zx) missing BEGIN marker: %s\n",
-             offset, len, strerror(rc));
-        goto err_begin;
-    }
-    begin = pem_next(data, len, begin);
+	/* Locate and skip BEGIN marker */
+	begin = pem_marker ( data, len, offset, PEM_BEGIN );
+	if ( begin < 0 ) {
+		rc = begin;
+		DBGC ( data, "PEM [%#zx,%#zx) missing BEGIN marker: %s\n",
+		       offset, len, strerror ( rc ) );
+		goto err_begin;
+	}
+	begin = pem_next ( data, len, begin );
 
-    /* Locate and skip END marker */
-    end = pem_marker(data, len, begin, PEM_END);
-    if (end < 0) {
-        rc = end;
-        DBGC(data, "PEM [%#zx,%#zx) missing END marker: %s\n",
-             offset, len, strerror(rc));
-        goto err_end;
-    }
-    encoded_len = (end - begin);
-    end = pem_next(data, len, end);
+	/* Locate and skip END marker */
+	end = pem_marker ( data, len, begin, PEM_END );
+	if ( end < 0 ) {
+		rc = end;
+		DBGC ( data, "PEM [%#zx,%#zx) missing END marker: %s\n",
+		       offset, len, strerror ( rc ) );
+		goto err_end;
+	}
+	encoded_len = ( end - begin );
+	end = pem_next ( data, len, end );
 
-    /* Extract Base64-encoded data */
-    encoded = malloc(encoded_len + 1 /* NUL */);
-    if (!encoded) {
-        rc = -ENOMEM;
-        goto err_alloc_encoded;
-    }
-    copy_from_user(encoded, data, begin, encoded_len);
-    encoded[encoded_len] = '\0';
+	/* Extract Base64-encoded data */
+	encoded = malloc ( encoded_len + 1 /* NUL */ );
+	if ( ! encoded ) {
+		rc = -ENOMEM;
+		goto err_alloc_encoded;
+	}
+	copy_from_user ( encoded, data, begin, encoded_len );
+	encoded[encoded_len] = '\0';
 
-    /* Allocate cursor and data buffer */
-    decoded_max_len = base64_decoded_max_len(encoded);
-    *cursor = malloc(sizeof(**cursor) + decoded_max_len);
-    if (!*cursor) {
-        rc = -ENOMEM;
-        goto err_alloc_cursor;
-    }
-    decoded = (((void*)*cursor) + sizeof(**cursor));
+	/* Allocate cursor and data buffer */
+	decoded_max_len = base64_decoded_max_len ( encoded );
+	*cursor = malloc ( sizeof ( **cursor ) + decoded_max_len );
+	if ( ! *cursor ) {
+		rc = -ENOMEM;
+		goto err_alloc_cursor;
+	}
+	decoded = ( ( ( void * ) *cursor ) + sizeof ( **cursor ) );
 
-    /* Decode Base64-encoded data */
-    decoded_len = base64_decode(encoded, decoded, decoded_max_len);
-    if (decoded_len < 0) {
-        rc = decoded_len;
-        DBGC(data, "PEM could not decode: %s\n", strerror(rc));
-        goto err_decode;
-    }
-    (*cursor)->data = decoded;
-    (*cursor)->len = decoded_len;
-    assert((*cursor)->len <= decoded_max_len);
+	/* Decode Base64-encoded data */
+	decoded_len = base64_decode ( encoded, decoded, decoded_max_len );
+	if ( decoded_len < 0 ) {
+		rc = decoded_len;
+		DBGC ( data, "PEM could not decode: %s\n", strerror ( rc ) );
+		goto err_decode;
+	}
+	(*cursor)->data = decoded;
+	(*cursor)->len = decoded_len;
+	assert ( (*cursor)->len <= decoded_max_len );
 
-    /* Free Base64-encoded data */
-    free(encoded);
+	/* Free Base64-encoded data */
+	free ( encoded );
 
-    /* Update offset and skip any unencapsulated trailer */
-    offset = end;
-    if (pem_marker(data, len, offset, PEM_BEGIN) < 0)
-        offset = len;
+	/* Update offset and skip any unencapsulated trailer */
+	offset = end;
+	if ( pem_marker ( data, len, offset, PEM_BEGIN ) < 0 )
+		offset = len;
 
-    return offset;
+	return offset;
 
-err_decode:
-    free(*cursor);
-    *cursor = NULL;
-err_alloc_cursor:
-    free(encoded);
-err_alloc_encoded:
-err_end:
-err_begin:
-    return rc;
+ err_decode:
+	free ( *cursor );
+	*cursor = NULL;
+ err_alloc_cursor:
+	free ( encoded );
+ err_alloc_encoded:
+ err_end:
+ err_begin:
+	return rc;
 }
 
 /**
@@ -189,20 +190,20 @@ err_begin:
  * @v image		PEM image
  * @ret rc		Return status code
  */
-static int pem_image_probe(struct image* image) {
-    int offset;
-    int rc;
+static int pem_image_probe ( struct image *image ) {
+	int offset;
+	int rc;
 
-    /* Check that image contains a BEGIN marker */
-    if ((offset = pem_marker(image->data, image->len, 0,
-                             PEM_BEGIN)) < 0) {
-        rc = offset;
-        DBGC(image, "PEM %s has no BEGIN marker: %s\n",
-             image->name, strerror(rc));
-        return rc;
-    }
+	/* Check that image contains a BEGIN marker */
+	if ( ( offset = pem_marker ( image->data, image->len, 0,
+				     PEM_BEGIN ) ) < 0 ) {
+		rc = offset;
+		DBGC ( image, "PEM %s has no BEGIN marker: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -216,26 +217,26 @@ static int pem_image_probe(struct image* image) {
  * The caller is responsible for eventually calling free() on the
  * allocated ASN.1 cursor.
  */
-static int pem_image_asn1(struct image* image, size_t offset,
-                          struct asn1_cursor** cursor) {
-    int next;
-    int rc;
+static int pem_image_asn1 ( struct image *image, size_t offset,
+			    struct asn1_cursor **cursor ) {
+	int next;
+	int rc;
 
-    /* Extract ASN.1 object */
-    if ((next = pem_asn1(image->data, image->len, offset,
-                         cursor)) < 0) {
-        rc = next;
-        DBGC(image, "PEM %s could not extract ASN.1: %s\n",
-             image->name, strerror(rc));
-        return rc;
-    }
+	/* Extract ASN.1 object */
+	if ( ( next = pem_asn1 ( image->data, image->len, offset,
+				 cursor ) ) < 0 ) {
+		rc = next;
+		DBGC ( image, "PEM %s could not extract ASN.1: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return next;
+	return next;
 }
 
 /** PEM image type */
-struct image_type pem_image_type __image_type(PROBE_NORMAL) = {
-    .name = "PEM",
-    .probe = pem_image_probe,
-    .asn1 = pem_image_asn1,
+struct image_type pem_image_type __image_type ( PROBE_NORMAL ) = {
+	.name = "PEM",
+	.probe = pem_image_probe,
+	.asn1 = pem_image_asn1,
 };

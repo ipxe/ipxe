@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "mlx_mtu.h"
 #include "../../include/public/mlx_memory.h"
@@ -25,68 +25,70 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 mlx_status
 mlx_get_max_mtu(
-    IN mlx_utils* utils,
-    IN mlx_uint8 port_num,
-    OUT mlx_uint32* max_mtu)
+		IN mlx_utils 	*utils,
+		IN mlx_uint8 	port_num,
+		OUT mlx_uint32 	*max_mtu
+		)
 {
-    mlx_status status = MLX_SUCCESS;
-    struct mlx_mtu mtu;
-    mlx_uint32 reg_status;
-    *max_mtu = 0;
+	mlx_status status = MLX_SUCCESS;
+	struct mlx_mtu mtu;
+	mlx_uint32 reg_status;
+	*max_mtu = 0;
 
-    if (utils == NULL) {
-        status = MLX_INVALID_PARAMETER;
-        goto bad_param;
-    }
+	if (utils == NULL) {
+		status = MLX_INVALID_PARAMETER;
+		goto bad_param;
+	}
 
-    mlx_memory_set(utils, &mtu, 0, sizeof(mtu));
+	mlx_memory_set(utils, &mtu, 0, sizeof(mtu));
 
-    mtu.local_port = port_num;
+	mtu.local_port = port_num;
 
-    status = mlx_reg_access(utils, REG_ID_PMTU, REG_ACCESS_READ, &mtu,
-                            sizeof(mtu), &reg_status);
-    MLX_CHECK_STATUS(utils, status, reg_err, "mlx_reg_access failed ");
-    if (reg_status != 0) {
-        MLX_DEBUG_ERROR(utils, "mlx_reg_access failed with status = %d\n", reg_status);
-        status = MLX_FAILED;
-        goto reg_err;
-    }
-    // Return data in bits
-    *max_mtu = mtu.max_mtu * BYTE_TO_BIT;
+	status = mlx_reg_access(utils, REG_ID_PMTU, REG_ACCESS_READ, &mtu,
+			sizeof(mtu), &reg_status);
+	MLX_CHECK_STATUS(utils, status, reg_err, "mlx_reg_access failed ");
+	if (reg_status != 0) {
+		MLX_DEBUG_ERROR(utils,"mlx_reg_access failed with status = %d\n", reg_status);
+		status = MLX_FAILED;
+		goto reg_err;
+	}
+	// Return data in bits
+	*max_mtu = mtu.max_mtu * BYTE_TO_BIT;
 reg_err:
 bad_param:
-    return status;
+	return status;
 }
 
 mlx_status
 mlx_set_admin_mtu(
-    IN mlx_utils* utils,
-    IN mlx_uint8 port_num,
-    IN mlx_uint32 admin_mtu)
+		IN mlx_utils 	*utils,
+		IN mlx_uint8 	port_num,
+		IN mlx_uint32 	admin_mtu
+		)
 {
-    mlx_status status = MLX_SUCCESS;
-    struct mlx_mtu mtu;
-    mlx_uint32 reg_status;
+	mlx_status status = MLX_SUCCESS;
+	struct mlx_mtu mtu;
+	mlx_uint32 reg_status;
 
-    if (utils == NULL) {
-        status = MLX_INVALID_PARAMETER;
-        goto bad_param;
-    }
+	if (utils == NULL) {
+		status = MLX_INVALID_PARAMETER;
+		goto bad_param;
+	}
 
-    mlx_memory_set(utils, &mtu, 0, sizeof(mtu));
+	mlx_memory_set(utils, &mtu, 0, sizeof(mtu));
 
-    mtu.local_port = port_num;
-    mtu.admin_mtu = admin_mtu;
+	mtu.local_port = port_num;
+	mtu.admin_mtu = admin_mtu;
 
-    status = mlx_reg_access(utils, REG_ID_PMTU, REG_ACCESS_WRITE, &mtu,
-                            sizeof(mtu), &reg_status);
-    MLX_CHECK_STATUS(utils, status, reg_err, "mlx_reg_access failed ");
-    if (reg_status != 0) {
-        MLX_DEBUG_ERROR(utils, "mlx_reg_access failed with status = %d\n", reg_status);
-        status = MLX_FAILED;
-        goto reg_err;
-    }
+	status = mlx_reg_access(utils, REG_ID_PMTU, REG_ACCESS_WRITE, &mtu,
+			sizeof(mtu), &reg_status);
+	MLX_CHECK_STATUS(utils, status, reg_err, "mlx_reg_access failed ");
+	if (reg_status != 0) {
+		MLX_DEBUG_ERROR(utils,"mlx_reg_access failed with status = %d\n", reg_status);
+		status = MLX_FAILED;
+		goto reg_err;
+	}
 reg_err:
 bad_param:
-    return status;
+	return status;
 }

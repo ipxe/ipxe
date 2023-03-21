@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/general.h>
 
@@ -35,17 +35,17 @@ PROVIDE_REQUIRING_SYMBOL();
  * Drag in HTTP extensions
  */
 #ifdef HTTP_AUTH_BASIC
-REQUIRE_OBJECT(httpbasic);
+REQUIRE_OBJECT ( httpbasic );
 #endif
 #ifdef HTTP_AUTH_DIGEST
-REQUIRE_OBJECT(httpdigest);
+REQUIRE_OBJECT ( httpdigest );
 #endif
 #ifdef HTTP_AUTH_NTLM
-REQUIRE_OBJECT(httpntlm);
+REQUIRE_OBJECT ( httpntlm );
 #endif
 #ifdef HTTP_ENC_PEERDIST
-REQUIRE_OBJECT(peerdist);
+REQUIRE_OBJECT ( peerdist );
 #endif
 #ifdef HTTP_HACK_GCE
-REQUIRE_OBJECT(httpgce);
+REQUIRE_OBJECT ( httpgce );
 #endif

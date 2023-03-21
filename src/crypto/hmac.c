@@ -33,7 +33,7 @@
  *     with the distribution.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -54,27 +54,27 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v key		Key
  * @v key_len		Length of key
  */
-void hmac_init(struct digest_algorithm* digest, void* ctx, const void* key,
-               size_t key_len) {
-    hmac_context_t(digest)* hctx = ctx;
-    unsigned int i;
+void hmac_init ( struct digest_algorithm *digest, void *ctx, const void *key,
+		 size_t key_len ) {
+	hmac_context_t ( digest ) *hctx = ctx;
+	unsigned int i;
 
-    /* Construct input pad */
-    memset(hctx->pad, 0, sizeof(hctx->pad));
-    if (key_len <= sizeof(hctx->pad)) {
-        memcpy(hctx->pad, key, key_len);
-    } else {
-        digest_init(digest, hctx->ctx);
-        digest_update(digest, hctx->ctx, key, key_len);
-        digest_final(digest, hctx->ctx, hctx->pad);
-    }
-    for (i = 0; i < sizeof(hctx->pad); i++) {
-        hctx->pad[i] ^= 0x36;
-    }
+	/* Construct input pad */
+	memset ( hctx->pad, 0, sizeof ( hctx->pad ) );
+	if ( key_len <= sizeof ( hctx->pad ) ) {
+		memcpy ( hctx->pad, key, key_len );
+	} else {
+		digest_init ( digest, hctx->ctx );
+		digest_update ( digest, hctx->ctx, key, key_len );
+		digest_final ( digest, hctx->ctx, hctx->pad );
+	}
+	for ( i = 0 ; i < sizeof ( hctx->pad ) ; i++ ) {
+		hctx->pad[i] ^= 0x36;
+	}
 
-    /* Start inner hash */
-    digest_init(digest, hctx->ctx);
-    digest_update(digest, hctx->ctx, hctx->pad, sizeof(hctx->pad));
+	/* Start inner hash */
+	digest_init ( digest, hctx->ctx );
+	digest_update ( digest, hctx->ctx, hctx->pad, sizeof ( hctx->pad ) );
 }
 
 /**
@@ -84,24 +84,24 @@ void hmac_init(struct digest_algorithm* digest, void* ctx, const void* key,
  * @v ctx		HMAC context
  * @v hmac		HMAC digest to fill in
  */
-void hmac_final(struct digest_algorithm* digest, void* ctx, void* hmac) {
-    hmac_context_t(digest)* hctx = ctx;
-    unsigned int i;
+void hmac_final ( struct digest_algorithm *digest, void *ctx, void *hmac ) {
+	hmac_context_t ( digest ) *hctx = ctx;
+	unsigned int i;
 
-    /* Construct output pad from input pad */
-    for (i = 0; i < sizeof(hctx->pad); i++) {
-        hctx->pad[i] ^= 0x6a;
-    }
+	/* Construct output pad from input pad */
+	for ( i = 0 ; i < sizeof ( hctx->pad ) ; i++ ) {
+		hctx->pad[i] ^= 0x6a;
+	}
 
-    /* Finish inner hash */
-    digest_final(digest, hctx->ctx, hmac);
+	/* Finish inner hash */
+	digest_final ( digest, hctx->ctx, hmac );
 
-    /* Perform outer hash */
-    digest_init(digest, hctx->ctx);
-    digest_update(digest, hctx->ctx, hctx->pad, sizeof(hctx->pad));
-    digest_update(digest, hctx->ctx, hmac, digest->digestsize);
-    digest_final(digest, hctx->ctx, hmac);
+	/* Perform outer hash */
+	digest_init ( digest, hctx->ctx );
+	digest_update ( digest, hctx->ctx, hctx->pad, sizeof ( hctx->pad ) );
+	digest_update ( digest, hctx->ctx, hmac, digest->digestsize );
+	digest_final ( digest, hctx->ctx, hmac );
 
-    /* Erase output pad (from which the key may be derivable) */
-    memset(hctx->pad, 0, sizeof(hctx->pad));
+	/* Erase output pad (from which the key may be derivable) */
+	memset ( hctx->pad, 0, sizeof ( hctx->pad ) );
 }

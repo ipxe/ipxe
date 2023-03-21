@@ -1,7 +1,5 @@
-#pragma once
-
 #ifndef REGISTERS_H
-    #define REGISTERS_H
+#define REGISTERS_H
 
 /** @file
  *
@@ -12,9 +10,9 @@
  *
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-    #include <stdint.h>
+#include <stdint.h>
 
 /**
  * A 16-bit general register.
@@ -24,15 +22,15 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  */
 typedef union {
-    struct {
-        union {
-            uint8_t l;
-            uint8_t byte;
-        };
-        uint8_t h;
-    } __attribute__((packed));
-    uint16_t word;
-} __attribute__((packed)) reg16_t;
+	struct {
+		union {
+			uint8_t l;
+			uint8_t byte;
+		};
+		uint8_t h;
+	} __attribute__ (( packed ));
+	uint16_t word;
+} __attribute__ (( packed )) reg16_t;
 
 /**
  * A 32-bit general register.
@@ -42,16 +40,16 @@ typedef union {
  *
  */
 typedef union {
-    struct {
-        union {
-            uint8_t l;
-            uint8_t byte;
-        };
-        uint8_t h;
-    } __attribute__((packed));
-    uint16_t word;
-    uint32_t dword;
-} __attribute__((packed)) reg32_t;
+	struct {
+		union {
+			uint8_t l;
+			uint8_t byte;
+		};
+		uint8_t h;
+	} __attribute__ (( packed ));
+	uint16_t word;
+	uint32_t dword;
+} __attribute__ (( packed )) reg32_t;
 
 /**
  * A 32-bit general register dump.
@@ -62,55 +60,55 @@ typedef union {
  *
  */
 struct i386_regs {
-    union {
-        uint16_t di;
-        uint32_t edi;
-    };
-    union {
-        uint16_t si;
-        uint32_t esi;
-    };
-    union {
-        uint16_t bp;
-        uint32_t ebp;
-    };
-    union {
-        uint16_t sp;
-        uint32_t esp;
-    };
-    union {
-        struct {
-            uint8_t bl;
-            uint8_t bh;
-        } __attribute__((packed));
-        uint16_t bx;
-        uint32_t ebx;
-    };
-    union {
-        struct {
-            uint8_t dl;
-            uint8_t dh;
-        } __attribute__((packed));
-        uint16_t dx;
-        uint32_t edx;
-    };
-    union {
-        struct {
-            uint8_t cl;
-            uint8_t ch;
-        } __attribute__((packed));
-        uint16_t cx;
-        uint32_t ecx;
-    };
-    union {
-        struct {
-            uint8_t al;
-            uint8_t ah;
-        } __attribute__((packed));
-        uint16_t ax;
-        uint32_t eax;
-    };
-} __attribute__((packed));
+	union {
+		uint16_t di;
+		uint32_t edi;
+	};
+	union {
+		uint16_t si;
+		uint32_t esi;
+	};
+	union {
+		uint16_t bp;
+		uint32_t ebp;
+	};
+	union {
+		uint16_t sp;
+		uint32_t esp;
+	};
+	union {
+		struct {
+			uint8_t bl;
+			uint8_t bh;
+		} __attribute__ (( packed ));
+		uint16_t bx;
+		uint32_t ebx;
+	};
+	union {
+		struct {
+			uint8_t dl;
+			uint8_t dh;
+		} __attribute__ (( packed ));
+		uint16_t dx;
+		uint32_t edx;
+	};
+	union {
+		struct {
+			uint8_t cl;
+			uint8_t ch;
+		} __attribute__ (( packed ));
+		uint16_t cx;
+		uint32_t ecx;
+	};
+	union {
+		struct {
+			uint8_t al;
+			uint8_t ah;
+		} __attribute__ (( packed ));
+		uint16_t ax;
+		uint32_t eax;
+	};
+} __attribute__ (( packed ));
 
 /**
  * A segment register dump.
@@ -138,13 +136,13 @@ struct i386_regs {
  *
  */
 struct i386_seg_regs {
-    uint16_t cs;
-    uint16_t ss;
-    uint16_t ds;
-    uint16_t es;
-    uint16_t fs;
-    uint16_t gs;
-} __attribute__((packed));
+	uint16_t cs;
+	uint16_t ss;
+	uint16_t ds;
+	uint16_t es;
+	uint16_t fs;
+	uint16_t gs;
+} __attribute__ (( packed ));
 
 /**
  * A full register dump.
@@ -174,26 +172,26 @@ struct i386_seg_regs {
  *
  */
 struct i386_all_regs {
-    struct i386_seg_regs segs;
-    struct i386_regs regs;
-    uint32_t flags;
-} __attribute__((packed));
+	struct i386_seg_regs segs;
+	struct i386_regs regs;
+	uint32_t flags;
+} __attribute__ (( packed ));
 
-    /* Flags */
-    #define CF (1 << 0)
-    #define PF (1 << 2)
-    #define AF (1 << 4)
-    #define ZF (1 << 6)
-    #define SF (1 << 7)
-    #define OF (1 << 11)
+/* Flags */
+#define CF ( 1 <<  0 )
+#define PF ( 1 <<  2 )
+#define AF ( 1 <<  4 )
+#define ZF ( 1 <<  6 )
+#define SF ( 1 <<  7 )
+#define OF ( 1 << 11 )
 
 /* Segment:offset structure.  Note that the order within the structure
  * is offset:segment.
  */
 struct segoff {
-    uint16_t offset;
-    uint16_t segment;
-} __attribute__((packed));
+	uint16_t offset;
+	uint16_t segment;
+} __attribute__ (( packed ));
 
 typedef struct segoff segoff_t;
 

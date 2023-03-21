@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -48,64 +48,64 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload(struct uri* uri, unsigned long timeout,
-                struct image** image) {
-    struct uri uri_redacted;
-    char* uri_string_redacted;
-    int rc;
+int imgdownload ( struct uri *uri, unsigned long timeout,
+		  struct image **image ) {
+	struct uri uri_redacted;
+	char *uri_string_redacted;
+	int rc;
 
-    /* Construct redacted URI */
-    memcpy(&uri_redacted, uri, sizeof(uri_redacted));
-    uri_redacted.user = NULL;
-    uri_redacted.password = NULL;
-    uri_redacted.equery = NULL;
-    uri_redacted.efragment = NULL;
-    uri_string_redacted = format_uri_alloc(&uri_redacted);
-    if (!uri_string_redacted) {
-        rc = -ENOMEM;
-        goto err_uri_string;
-    }
+	/* Construct redacted URI */
+	memcpy ( &uri_redacted, uri, sizeof ( uri_redacted ) );
+	uri_redacted.user = NULL;
+	uri_redacted.password = NULL;
+	uri_redacted.equery = NULL;
+	uri_redacted.efragment = NULL;
+	uri_string_redacted = format_uri_alloc ( &uri_redacted );
+	if ( ! uri_string_redacted ) {
+		rc = -ENOMEM;
+		goto err_uri_string;
+	}
 
-    /* Resolve URI */
-    uri = resolve_uri(cwuri, uri);
-    if (!uri) {
-        rc = -ENOMEM;
-        goto err_resolve_uri;
-    }
+	/* Resolve URI */
+	uri = resolve_uri ( cwuri, uri );
+	if ( ! uri ) {
+		rc = -ENOMEM;
+		goto err_resolve_uri;
+	}
 
-    /* Allocate image */
-    *image = alloc_image(uri);
-    if (!*image) {
-        rc = -ENOMEM;
-        goto err_alloc_image;
-    }
+	/* Allocate image */
+	*image = alloc_image ( uri );
+	if ( ! *image ) {
+		rc = -ENOMEM;
+		goto err_alloc_image;
+	}
 
-    /* Create downloader */
-    if ((rc = create_downloader(&monojob, *image)) != 0) {
-        printf("Could not start download: %s\n", strerror(rc));
-        goto err_create_downloader;
-    }
+	/* Create downloader */
+	if ( ( rc = create_downloader ( &monojob, *image ) ) != 0 ) {
+		printf ( "Could not start download: %s\n", strerror ( rc ) );
+		goto err_create_downloader;
+	}
 
-    /* Wait for download to complete */
-    if ((rc = monojob_wait(uri_string_redacted, timeout)) != 0)
-        goto err_monojob_wait;
+	/* Wait for download to complete */
+	if ( ( rc = monojob_wait ( uri_string_redacted, timeout ) ) != 0 )
+		goto err_monojob_wait;
 
-    /* Register image */
-    if ((rc = register_image(*image)) != 0) {
-        printf("Could not register image: %s\n", strerror(rc));
-        goto err_register_image;
-    }
+	/* Register image */
+	if ( ( rc = register_image ( *image ) ) != 0 ) {
+		printf ( "Could not register image: %s\n", strerror ( rc ) );
+		goto err_register_image;
+	}
 
-err_register_image:
-err_monojob_wait:
-err_create_downloader:
-    image_put(*image);
-err_alloc_image:
-    uri_put(uri);
-err_resolve_uri:
-    free(uri_string_redacted);
-err_uri_string:
-    return rc;
+ err_register_image:
+ err_monojob_wait:
+ err_create_downloader:
+	image_put ( *image );
+ err_alloc_image:
+	uri_put ( uri );
+ err_resolve_uri:
+	free ( uri_string_redacted );
+ err_uri_string:
+	return rc;
 }
 
 /**
@@ -116,18 +116,18 @@ err_uri_string:
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload_string(const char* uri_string, unsigned long timeout,
-                       struct image** image) {
-    struct uri* uri;
-    int rc;
+int imgdownload_string ( const char *uri_string, unsigned long timeout,
+			 struct image **image ) {
+	struct uri *uri;
+	int rc;
 
-    if (!(uri = parse_uri(uri_string)))
-        return -ENOMEM;
+	if ( ! ( uri = parse_uri ( uri_string ) ) )
+		return -ENOMEM;
 
-    rc = imgdownload(uri, timeout, image);
+	rc = imgdownload ( uri, timeout, image );
 
-    uri_put(uri);
-    return rc;
+	uri_put ( uri );
+	return rc;
 }
 
 /**
@@ -138,15 +138,16 @@ int imgdownload_string(const char* uri_string, unsigned long timeout,
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgacquire(const char* name_uri, unsigned long timeout,
-               struct image** image) {
-    /* If we already have an image with the specified name, use it */
-    *image = find_image(name_uri);
-    if (*image)
-        return 0;
+int imgacquire ( const char *name_uri, unsigned long timeout,
+		 struct image **image ) {
 
-    /* Otherwise, download a new image */
-    return imgdownload_string(name_uri, timeout, image);
+	/* If we already have an image with the specified name, use it */
+	*image = find_image ( name_uri );
+	if ( *image )
+		return 0;
+
+	/* Otherwise, download a new image */
+	return imgdownload_string ( name_uri, timeout, image );
 }
 
 /**
@@ -154,19 +155,19 @@ int imgacquire(const char* name_uri, unsigned long timeout,
  *
  * @v image		Executable/loadable image
  */
-void imgstat(struct image* image) {
-    printf("%s : %zd bytes", image->name, image->len);
-    if (image->type)
-        printf(" [%s]", image->type->name);
-    if (image->flags & IMAGE_TRUSTED)
-        printf(" [TRUSTED]");
-    if (image->flags & IMAGE_SELECTED)
-        printf(" [SELECTED]");
-    if (image->flags & IMAGE_AUTO_UNREGISTER)
-        printf(" [AUTOFREE]");
-    if (image->cmdline)
-        printf(" \"%s\"", image->cmdline);
-    printf("\n");
+void imgstat ( struct image *image ) {
+	printf ( "%s : %zd bytes", image->name, image->len );
+	if ( image->type )
+		printf ( " [%s]", image->type->name );
+	if ( image->flags & IMAGE_TRUSTED )
+		printf ( " [TRUSTED]" );
+	if ( image->flags & IMAGE_SELECTED )
+		printf ( " [SELECTED]" );
+	if ( image->flags & IMAGE_AUTO_UNREGISTER )
+		printf ( " [AUTOFREE]" );
+	if ( image->cmdline )
+		printf ( " \"%s\"", image->cmdline );
+	printf ( "\n" );
 }
 
 /**
@@ -177,15 +178,15 @@ void imgstat(struct image* image) {
  * @v len		Length
  * @ret rc		Return status code
  */
-int imgmem(const char* name, userptr_t data, size_t len) {
-    struct image* image;
+int imgmem ( const char *name, userptr_t data, size_t len ) {
+	struct image *image;
 
-    /* Create image */
-    image = image_memory(name, data, len);
-    if (!image) {
-        printf("Could not create image\n");
-        return -ENOMEM;
-    }
+	/* Create image */
+	image = image_memory ( name, data, len );
+	if ( ! image ) {
+		printf ( "Could not create image\n" );
+		return -ENOMEM;
+	}
 
-    return 0;
+	return 0;
 }

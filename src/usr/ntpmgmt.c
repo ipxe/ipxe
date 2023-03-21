@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdio.h>
@@ -42,16 +42,16 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v hostname		Hostname
  * @ret rc		Return status code
  */
-int ntp(const char* hostname) {
-    int rc;
+int ntp ( const char *hostname ) {
+	int rc;
 
-    /* Start NTP client */
-    if ((rc = start_ntp(&monojob, hostname)) != 0)
-        return rc;
+	/* Start NTP client */
+	if ( ( rc = start_ntp ( &monojob, hostname ) ) != 0 )
+		return rc;
 
-    /* Wait for NTP to complete */
-    if ((rc = monojob_wait(NULL, 0)) != 0)
-        return rc;
+	/* Wait for NTP to complete */
+	if ( ( rc = monojob_wait ( NULL, 0 ) ) != 0 )
+		return rc;
 
-    return 0;
+	return 0;
 }

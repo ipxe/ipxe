@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -39,17 +39,17 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v fmt		Format string
  * @v args		Arguments
  */
-void log_vprintf(const char* fmt, va_list args) {
-    int saved_usage;
+void log_vprintf ( const char *fmt, va_list args ) {
+	int saved_usage;
 
-    /* Mark console as in use for log messages */
-    saved_usage = console_set_usage(CONSOLE_USAGE_LOG);
+	/* Mark console as in use for log messages */
+	saved_usage = console_set_usage ( CONSOLE_USAGE_LOG );
 
-    /* Print message */
-    vprintf(fmt, args);
+	/* Print message */
+	vprintf ( fmt, args );
 
-    /* Restore console usage */
-    console_set_usage(saved_usage);
+	/* Restore console usage */
+	console_set_usage ( saved_usage );
 }
 
 /**
@@ -58,10 +58,10 @@ void log_vprintf(const char* fmt, va_list args) {
  * @v fmt		Format string
  * @v ...		Arguments
  */
-void log_printf(const char* fmt, ...) {
-    va_list args;
+void log_printf ( const char *fmt, ... ) {
+	va_list args;
 
-    va_start(args, fmt);
-    log_vprintf(fmt, args);
-    va_end(args);
+	va_start ( args, fmt );
+	log_vprintf ( fmt, args );
+	va_end ( args );
 }

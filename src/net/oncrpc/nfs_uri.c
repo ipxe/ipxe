@@ -29,119 +29,120 @@
  *
  */
 
-int nfs_uri_init(struct nfs_uri* nfs_uri, const struct uri* uri) {
-    if (!(nfs_uri->mountpoint = strdup(uri->path)))
-        return -ENOMEM;
+int nfs_uri_init ( struct nfs_uri *nfs_uri, const struct uri *uri ) {
+	if ( ! ( nfs_uri->mountpoint = strdup ( uri->path ) ) )
+		return -ENOMEM;
 
-    nfs_uri->filename = basename(nfs_uri->mountpoint);
-    if (strchr(uri->path, '/') != NULL)
-        nfs_uri->mountpoint = dirname(nfs_uri->mountpoint);
+	nfs_uri->filename = basename ( nfs_uri->mountpoint );
+	if ( strchr ( uri->path, '/' ) != NULL )
+		nfs_uri->mountpoint = dirname ( nfs_uri->mountpoint );
 
-    if (nfs_uri->filename[0] == '\0') {
-        free(nfs_uri->mountpoint);
-        return -EINVAL;
-    }
+	if ( nfs_uri->filename[0] == '\0' ) {
+		free ( nfs_uri->mountpoint );
+		return -EINVAL;
+	}
 
-    if (!(nfs_uri->path = strdup(nfs_uri->filename))) {
-        free(nfs_uri->mountpoint);
-        return -ENOMEM;
-    }
-    nfs_uri->lookup_pos = nfs_uri->path;
+	if ( ! ( nfs_uri->path = strdup ( nfs_uri->filename ) ) ) {
+		free ( nfs_uri->mountpoint );
+		return -ENOMEM;
+	}
+	nfs_uri->lookup_pos = nfs_uri->path;
 
-    return 0;
+	return 0;
 }
 
-char* nfs_uri_mountpoint(const struct nfs_uri* uri) {
-    if (uri->mountpoint + 1 == uri->filename ||
-        uri->mountpoint == uri->filename)
-        return "/";
+char *nfs_uri_mountpoint ( const struct nfs_uri *uri ) {
+	if ( uri->mountpoint + 1 == uri->filename ||
+	     uri->mountpoint     == uri->filename )
+		return "/";
 
-    return uri->mountpoint;
+	return uri->mountpoint;
 }
 
-int nfs_uri_next_mountpoint(struct nfs_uri* uri) {
-    char* sep;
+int nfs_uri_next_mountpoint ( struct nfs_uri *uri ) {
+	char *sep;
 
-    if (uri->mountpoint + 1 == uri->filename ||
-        uri->mountpoint == uri->filename)
-        return -ENOENT;
+	if ( uri->mountpoint + 1 == uri->filename ||
+	     uri->mountpoint     == uri->filename )
+		return -ENOENT;
 
-    sep = strrchr(uri->mountpoint, '/');
-    uri->filename[-1] = '/';
-    uri->filename = sep + 1;
-    *sep = '\0';
+	sep = strrchr ( uri->mountpoint, '/' );
+	uri->filename[-1] = '/';
+	uri->filename     = sep + 1;
+	*sep = '\0';
 
-    free(uri->path);
-    if (!(uri->path = strdup(uri->filename))) {
-        uri->path = NULL;
-        return -ENOMEM;
-    }
-    uri->lookup_pos = uri->path;
+	free ( uri->path );
+	if ( ! ( uri->path = strdup ( uri->filename ) ) ) {
+		uri->path = NULL;
+		return -ENOMEM;
+	}
+	uri->lookup_pos = uri->path;
 
-    return 0;
+	return 0;
 }
 
-int nfs_uri_symlink(struct nfs_uri* uri, const char* symlink) {
-    size_t len;
-    char* new_path;
+int nfs_uri_symlink ( struct nfs_uri *uri, const char *symlink ) {
+	size_t len;
+	char *new_path;
 
-    if (!uri->path)
-        return -EINVAL;
+	if ( ! uri->path )
+		return -EINVAL;
 
-    if (*symlink == '/')
-    {
-        if (strncmp(symlink, uri->mountpoint,
-                    strlen(uri->mountpoint)) != 0)
-            return -EINVAL;
+	if ( *symlink == '/' )
+	{
+		if ( strncmp ( symlink, uri->mountpoint,
+			       strlen ( uri->mountpoint ) ) != 0 )
+			return -EINVAL;
 
-        len = strlen(uri->lookup_pos) + strlen(symlink) -
-              strlen(uri->mountpoint);
-        if (!(new_path = malloc(len * sizeof(char))))
-            return -ENOMEM;
+		len = strlen ( uri->lookup_pos ) + strlen ( symlink ) - \
+		      strlen ( uri->mountpoint );
+		if ( ! ( new_path = malloc ( len * sizeof ( char ) ) ) )
+			return -ENOMEM;
 
-        strcpy(new_path, symlink + strlen(uri->mountpoint));
-        strcpy(new_path + strlen(new_path), uri->lookup_pos);
+		strcpy ( new_path, symlink + strlen ( uri->mountpoint ) );
+		strcpy ( new_path + strlen ( new_path ), uri->lookup_pos );
 
-    } else {
-        len = strlen(uri->lookup_pos) + strlen(symlink);
-        if (!(new_path = malloc(len * sizeof(char))))
-            return -ENOMEM;
+	} else {
+		len = strlen ( uri->lookup_pos ) + strlen ( symlink );
+		if ( ! ( new_path = malloc ( len * sizeof ( char ) ) ) )
+			return -ENOMEM;
 
-        strcpy(new_path, symlink);
-        strcpy(new_path + strlen(new_path), uri->lookup_pos);
-    }
 
-    free(uri->path);
-    uri->lookup_pos = uri->path = new_path;
+		strcpy ( new_path, symlink );
+		strcpy ( new_path + strlen ( new_path ), uri->lookup_pos );
+	}
 
-    return 0;
+	free ( uri->path );
+	uri->lookup_pos = uri->path = new_path;
+
+	return 0;
 }
 
-char* nfs_uri_next_path_component(struct nfs_uri* uri) {
-    char* sep;
-    char* start;
+char *nfs_uri_next_path_component ( struct nfs_uri *uri ) {
+	char *sep;
+	char *start;
 
-    if (!uri->path)
-        return NULL;
+	if ( ! uri->path )
+		return NULL;
 
-    for (sep = uri->lookup_pos; *sep != '\0' && *sep != '/'; sep++)
-        ;
+	for ( sep = uri->lookup_pos ; *sep != '\0' && *sep != '/'; sep++ )
+		;
 
-    start = uri->lookup_pos;
-    uri->lookup_pos = sep;
-    if (*sep != '\0') {
-        uri->lookup_pos++;
-        *sep = '\0';
-        if (*start == '\0')
-            return nfs_uri_next_path_component(uri);
-    }
+	start = uri->lookup_pos;
+	uri->lookup_pos = sep;
+	if ( *sep != '\0' ) {
+		uri->lookup_pos++;
+		*sep = '\0';
+		if ( *start == '\0' )
+			return nfs_uri_next_path_component ( uri );
+	}
 
-    return start;
+	return start;
 }
 
-void nfs_uri_free(struct nfs_uri* uri) {
-    free(uri->mountpoint);
-    free(uri->path);
-    uri->mountpoint = NULL;
-    uri->path = NULL;
+void nfs_uri_free ( struct nfs_uri *uri ) {
+	free ( uri->mountpoint );
+	free ( uri->path );
+	uri->mountpoint = NULL;
+	uri->path       = NULL;
 }

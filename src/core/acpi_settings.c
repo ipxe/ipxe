@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * @file
@@ -46,9 +46,10 @@ static const struct settings_scope acpi_settings_scope;
  * @v setting		Setting
  * @ret applies		Setting applies within this settings block
  */
-static int acpi_settings_applies(struct settings* settings __unused,
-                                 const struct setting* setting) {
-    return (setting->scope == &acpi_settings_scope);
+static int acpi_settings_applies ( struct settings *settings __unused,
+				   const struct setting *setting ) {
+
+	return ( setting->scope == &acpi_settings_scope );
 }
 
 /**
@@ -60,101 +61,101 @@ static int acpi_settings_applies(struct settings* settings __unused,
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int acpi_settings_fetch(struct settings* settings,
-                               struct setting* setting,
-                               void* data, size_t len) {
-    struct acpi_header acpi;
-    uint32_t tag_high;
-    uint32_t tag_low;
-    uint32_t tag_signature;
-    unsigned int tag_index;
-    size_t tag_offset;
-    size_t tag_len;
-    userptr_t table;
-    size_t offset;
-    size_t max_len;
-    int delta;
-    unsigned int i;
+static int acpi_settings_fetch ( struct settings *settings,
+				 struct setting *setting,
+				 void *data, size_t len ) {
+	struct acpi_header acpi;
+	uint32_t tag_high;
+	uint32_t tag_low;
+	uint32_t tag_signature;
+	unsigned int tag_index;
+	size_t tag_offset;
+	size_t tag_len;
+	userptr_t table;
+	size_t offset;
+	size_t max_len;
+	int delta;
+	unsigned int i;
 
-    /* Parse settings tag */
-    tag_high = (setting->tag >> 32);
-    tag_low = setting->tag;
-    tag_signature = bswap_32(tag_high);
-    tag_index = ((tag_low >> 24) & 0xff);
-    tag_offset = ((tag_low >> 8) & 0xffff);
-    tag_len = ((tag_low >> 0) & 0xff);
-    DBGC(settings, "ACPI %s.%d offset %#zx length %#zx\n",
-         acpi_name(tag_signature), tag_index, tag_offset, tag_len);
+	/* Parse settings tag */
+	tag_high = ( setting->tag >> 32 );
+	tag_low = setting->tag;
+	tag_signature = bswap_32 ( tag_high );
+	tag_index = ( ( tag_low >> 24 ) & 0xff );
+	tag_offset = ( ( tag_low >> 8 ) & 0xffff );
+	tag_len = ( ( tag_low >> 0 ) & 0xff );
+	DBGC ( settings, "ACPI %s.%d offset %#zx length %#zx\n",
+	       acpi_name ( tag_signature ), tag_index, tag_offset, tag_len );
 
-    /* Locate ACPI table */
-    table = acpi_table(tag_signature, tag_index);
-    if (!table)
-        return -ENOENT;
+	/* Locate ACPI table */
+	table = acpi_table ( tag_signature, tag_index );
+	if ( ! table )
+		return -ENOENT;
 
-    /* Read table header */
-    copy_from_user(&acpi, table, 0, sizeof(acpi));
+	/* Read table header */
+	copy_from_user ( &acpi, table, 0, sizeof ( acpi ) );
 
-    /* Calculate starting offset and maximum available length */
-    max_len = le32_to_cpu(acpi.length);
-    if (tag_offset > max_len)
-        return -ENOENT;
-    offset = tag_offset;
-    max_len -= offset;
+	/* Calculate starting offset and maximum available length */
+	max_len = le32_to_cpu ( acpi.length );
+	if ( tag_offset > max_len )
+		return -ENOENT;
+	offset = tag_offset;
+	max_len -= offset;
 
-    /* Restrict to requested length, if specified */
-    if (tag_len && (tag_len < max_len))
-        max_len = tag_len;
+	/* Restrict to requested length, if specified */
+	if ( tag_len && ( tag_len < max_len ) )
+		max_len = tag_len;
 
-    /* Invert endianness for numeric settings */
-    if (setting->type && setting->type->numerate) {
-        offset += (max_len - 1);
-        delta = -1;
-    } else {
-        delta = +1;
-    }
+	/* Invert endianness for numeric settings */
+	if ( setting->type && setting->type->numerate ) {
+		offset += ( max_len - 1 );
+		delta = -1;
+	} else {
+		delta = +1;
+	}
 
-    /* Read data */
-    for (i = 0; ((i < max_len) && (i < len)); i++) {
-        copy_from_user(data, table, offset, 1);
-        data++;
-        offset += delta;
-    }
+	/* Read data */
+	for ( i = 0 ; ( ( i < max_len ) && ( i < len ) ) ; i++ ) {
+		copy_from_user ( data, table, offset, 1 );
+		data++;
+		offset += delta;
+	}
 
-    /* Set type if not already specified */
-    if (!setting->type)
-        setting->type = &setting_type_hexraw;
+	/* Set type if not already specified */
+	if ( ! setting->type )
+		setting->type = &setting_type_hexraw;
 
-    return max_len;
+	return max_len;
 }
 
 /** ACPI settings operations */
 static struct settings_operations acpi_settings_operations = {
-    .applies = acpi_settings_applies,
-    .fetch = acpi_settings_fetch,
+	.applies = acpi_settings_applies,
+	.fetch = acpi_settings_fetch,
 };
 
 /** ACPI settings */
 static struct settings acpi_settings = {
-    .refcnt = NULL,
-    .siblings = LIST_HEAD_INIT(acpi_settings.siblings),
-    .children = LIST_HEAD_INIT(acpi_settings.children),
-    .op = &acpi_settings_operations,
-    .default_scope = &acpi_settings_scope,
+	.refcnt = NULL,
+	.siblings = LIST_HEAD_INIT ( acpi_settings.siblings ),
+	.children = LIST_HEAD_INIT ( acpi_settings.children ),
+	.op = &acpi_settings_operations,
+	.default_scope = &acpi_settings_scope,
 };
 
 /** Initialise ACPI settings */
-static void acpi_settings_init(void) {
-    int rc;
+static void acpi_settings_init ( void ) {
+	int rc;
 
-    if ((rc = register_settings(&acpi_settings, NULL,
-                                "acpi")) != 0) {
-        DBG("ACPI could not register settings: %s\n",
-            strerror(rc));
-        return;
-    }
+	if ( ( rc = register_settings ( &acpi_settings, NULL,
+					"acpi" ) ) != 0 ) {
+		DBG ( "ACPI could not register settings: %s\n",
+		      strerror ( rc ) );
+		return;
+	}
 }
 
 /** ACPI settings initialiser */
-struct init_fn acpi_settings_init_fn __init_fn(INIT_NORMAL) = {
-    .initialise = acpi_settings_init,
+struct init_fn acpi_settings_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = acpi_settings_init,
 };

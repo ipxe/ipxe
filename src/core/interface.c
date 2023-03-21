@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <ipxe/interface.h>
@@ -44,24 +44,25 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v intf		Null interface
  * @v rc		Reason for close
  */
-static void null_intf_close(struct interface* intf __unused,
-                            int rc __unused) {
-    /* Do nothing.  In particular, do not call intf_restart(),
-     * since that would result in an infinite loop.
-     */
+static void null_intf_close ( struct interface *intf __unused,
+			      int rc __unused ) {
+
+	/* Do nothing.  In particular, do not call intf_restart(),
+	 * since that would result in an infinite loop.
+	 */
 }
 
 /** Null interface operations */
 static struct interface_operation null_intf_op[] = {
-    INTF_OP(intf_close, struct interface*, null_intf_close),
+	INTF_OP ( intf_close, struct interface *, null_intf_close ),
 };
 
 /** Null interface descriptor */
 struct interface_descriptor null_intf_desc =
-    INTF_DESC_PURE(null_intf_op);
+	INTF_DESC_PURE ( null_intf_op );
 
 /** The null interface */
-struct interface null_intf = INTF_INIT(null_intf_desc);
+struct interface null_intf = INTF_INIT ( null_intf_desc );
 
 /*****************************************************************************
  *
@@ -79,17 +80,18 @@ struct interface null_intf = INTF_INIT(null_intf_desc);
  * reference to the new destination interface is obtained, and the
  * interface is updated to point to the new destination interface.
  */
-void intf_plug(struct interface* intf, struct interface* dest) {
-    if (intf == &null_intf)
-        return;
+void intf_plug ( struct interface *intf, struct interface *dest ) {
 
-    DBGC(INTF_COL(intf),
-         "INTF " INTF_INTF_FMT " replug to " INTF_FMT "\n",
-         INTF_INTF_DBG(intf, intf->dest), INTF_DBG(dest));
+	if ( intf == &null_intf )
+		return;
 
-    intf_get(dest);
-    intf_put(intf->dest);
-    intf->dest = dest;
+	DBGC ( INTF_COL ( intf ),
+	       "INTF " INTF_INTF_FMT " replug to " INTF_FMT "\n",
+	       INTF_INTF_DBG ( intf, intf->dest ), INTF_DBG ( dest ) );
+
+	intf_get ( dest );
+	intf_put ( intf->dest );
+	intf->dest = dest;
 }
 
 /**
@@ -102,9 +104,9 @@ void intf_plug(struct interface* intf, struct interface* dest) {
  * A.  (The basic plug() function is unidirectional; this function is
  * merely a shorthand for two calls to plug(), hence the name.)
  */
-void intf_plug_plug(struct interface* a, struct interface* b) {
-    intf_plug(a, b);
-    intf_plug(b, a);
+void intf_plug_plug ( struct interface *a, struct interface *b ) {
+	intf_plug ( a, b );
+	intf_plug ( b, a );
 }
 
 /**
@@ -112,11 +114,11 @@ void intf_plug_plug(struct interface* a, struct interface* b) {
  *
  * @v intf		Object interface
  */
-void intf_unplug(struct interface* intf) {
-    DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " unplug\n",
-         INTF_INTF_DBG(intf, intf->dest));
-    intf_put(intf->dest);
-    intf->dest = &null_intf;
+void intf_unplug ( struct interface *intf ) {
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " unplug\n",
+	       INTF_INTF_DBG ( intf, intf->dest ) );
+	intf_put ( intf->dest );
+	intf->dest = &null_intf;
 }
 
 /**
@@ -124,8 +126,8 @@ void intf_unplug(struct interface* intf) {
  *
  * @v intf		Object interface
  */
-void intf_nullify(struct interface* intf) {
-    intf->desc = &null_intf_desc;
+void intf_nullify ( struct interface *intf ) {
+	intf->desc = &null_intf_desc;
 }
 
 /**
@@ -134,9 +136,9 @@ void intf_nullify(struct interface* intf) {
  * @v intf		Object interface
  * @ret intf		Object interface
  */
-struct interface* intf_get(struct interface* intf) {
-    ref_get(intf->refcnt);
-    return intf;
+struct interface * intf_get ( struct interface *intf ) {
+	ref_get ( intf->refcnt );
+	return intf;
 }
 
 /**
@@ -144,8 +146,8 @@ struct interface* intf_get(struct interface* intf) {
  *
  * @v intf		Object interface
  */
-void intf_put(struct interface* intf) {
-    ref_put(intf->refcnt);
+void intf_put ( struct interface *intf ) {
+	ref_put ( intf->refcnt );
 }
 
 /**
@@ -154,8 +156,8 @@ void intf_put(struct interface* intf) {
  * @v intf		Object interface
  * @ret object		Containing object
  */
-void* intf_object(struct interface* intf) {
-    return (((void*)intf) - intf->desc->offset);
+void * intf_object ( struct interface *intf ) {
+	return ( ( ( void * ) intf ) - intf->desc->offset );
 }
 
 /**
@@ -164,14 +166,14 @@ void* intf_object(struct interface* intf) {
  * @v intf		Object interface
  * @ret passthru	Pass-through interface, or NULL
  */
-static struct interface* intf_get_passthru(struct interface* intf) {
-    struct interface_descriptor* desc = intf->desc;
+static struct interface * intf_get_passthru ( struct interface *intf ) {
+	struct interface_descriptor *desc = intf->desc;
 
-    if (desc->passthru_offset) {
-        return (((void*)intf) + desc->passthru_offset);
-    } else {
-        return NULL;
-    }
+	if ( desc->passthru_offset ) {
+		return ( ( ( void * ) intf ) + desc->passthru_offset );
+	} else {
+		return NULL;
+	}
 }
 
 /**
@@ -182,21 +184,21 @@ static struct interface* intf_get_passthru(struct interface* intf) {
  * @ret dest		Destination interface
  * @ret func		Implementing method, or NULL
  */
-void* intf_get_dest_op_no_passthru_untyped(struct interface* intf,
-                                           void* type,
-                                           struct interface** dest) {
-    struct interface_descriptor* desc;
-    struct interface_operation* op;
-    unsigned int i;
+void * intf_get_dest_op_no_passthru_untyped ( struct interface *intf,
+					      void *type,
+					      struct interface **dest ) {
+	struct interface_descriptor *desc;
+	struct interface_operation *op;
+	unsigned int i;
 
-    *dest = intf_get(intf->dest);
-    desc = (*dest)->desc;
-    for (i = desc->num_op, op = desc->op; i; i--, op++) {
-        if (op->type == type)
-            return op->func;
-    }
+	*dest = intf_get ( intf->dest );
+	desc = (*dest)->desc;
+	for ( i = desc->num_op, op = desc->op ; i ; i--, op++ ) {
+		if ( op->type == type )
+			return op->func;
+	}
 
-    return NULL;
+	return NULL;
 }
 
 /**
@@ -207,23 +209,24 @@ void* intf_get_dest_op_no_passthru_untyped(struct interface* intf,
  * @ret dest		Destination interface
  * @ret func		Implementing method, or NULL
  */
-void* intf_get_dest_op_untyped(struct interface* intf, void* type,
-                               struct interface** dest) {
-    void* func;
+void * intf_get_dest_op_untyped ( struct interface *intf, void *type,
+				  struct interface **dest ) {
+	void *func;
 
-    while (1) {
-        /* Search for an implementing method provided by the
-         * current destination interface.
-         */
-        func = intf_get_dest_op_no_passthru_untyped(intf, type, dest);
-        if (func)
-            return func;
+	while ( 1 ) {
 
-        /* Pass through to the underlying interface, if applicable */
-        if (!(intf = intf_get_passthru(*dest)))
-            return NULL;
-        intf_put(*dest);
-    }
+		/* Search for an implementing method provided by the
+		 * current destination interface.
+		 */
+		func = intf_get_dest_op_no_passthru_untyped( intf, type, dest );
+		if ( func )
+			return func;
+
+		/* Pass through to the underlying interface, if applicable */
+		if ( ! ( intf = intf_get_passthru ( *dest ) ) )
+			return NULL;
+		intf_put ( *dest );
+	}
 }
 
 /*****************************************************************************
@@ -243,23 +246,23 @@ void* intf_get_dest_op_untyped(struct interface* intf, void* type,
  * the interface.  In most cases, you probably want to use
  * intf_shutdown() or intf_restart() instead.
  */
-void intf_close(struct interface* intf, int rc) {
-    struct interface* dest;
-    intf_close_TYPE(void*)* op =
-        intf_get_dest_op(intf, intf_close, &dest);
-    void* object = intf_object(dest);
+void intf_close ( struct interface *intf, int rc ) {
+	struct interface *dest;
+	intf_close_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, intf_close, &dest );
+	void *object = intf_object ( dest );
 
-    DBGC(INTF_COL(intf), "INTF " INTF_INTF_FMT " close (%s)\n",
-         INTF_INTF_DBG(intf, dest), strerror(rc));
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_INTF_FMT " close (%s)\n",
+	       INTF_INTF_DBG ( intf, dest ), strerror ( rc ) );
 
-    if (op) {
-        op(object, rc);
-    } else {
-        /* Default is to restart the interface */
-        intf_restart(dest, rc);
-    }
+	if ( op ) {
+		op ( object, rc );
+	} else {
+		/* Default is to restart the interface */
+		intf_restart ( dest, rc );
+	}
 
-    intf_put(dest);
+	intf_put ( dest );
 }
 
 /**
@@ -272,24 +275,24 @@ void intf_close(struct interface* intf, int rc) {
  * executes a close operation on the destination interface, and
  * unplugs the interface.
  */
-void intf_shutdown(struct interface* intf, int rc) {
-    struct interface tmp;
+void intf_shutdown ( struct interface *intf, int rc ) {
+	struct interface tmp;
 
-    DBGC(INTF_COL(intf), "INTF " INTF_FMT " shutting down (%s)\n",
-         INTF_DBG(intf), strerror(rc));
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " shutting down (%s)\n",
+	       INTF_DBG ( intf ), strerror ( rc ) );
 
-    /* Block further operations */
-    intf_nullify(intf);
+	/* Block further operations */
+	intf_nullify ( intf );
 
-    /* Transfer destination to temporary interface */
-    tmp.dest = intf->dest;
-    intf->dest = &null_intf;
+	/* Transfer destination to temporary interface */
+	tmp.dest = intf->dest;
+	intf->dest = &null_intf;
 
-    /* Notify destination of close via temporary interface */
-    intf_close(&tmp, rc);
+	/* Notify destination of close via temporary interface */
+	intf_close ( &tmp, rc );
 
-    /* Unplug temporary interface */
-    intf_unplug(&tmp);
+	/* Unplug temporary interface */
+	intf_unplug ( &tmp );
 }
 
 /**
@@ -298,19 +301,19 @@ void intf_shutdown(struct interface* intf, int rc) {
  * @v intfs		Object interfaces
  * @v rc		Reason for close
  */
-void intfs_vshutdown(va_list intfs, int rc) {
-    struct interface* intf;
-    va_list tmp;
+void intfs_vshutdown ( va_list intfs, int rc ) {
+	struct interface *intf;
+	va_list tmp;
 
-    /* Nullify all interfaces to avoid potential loops */
-    va_copy(tmp, intfs);
-    while ((intf = va_arg(tmp, struct interface*)))
-        intf_nullify(intf);
-    va_end(tmp);
+	/* Nullify all interfaces to avoid potential loops */
+	va_copy ( tmp, intfs );
+	while ( ( intf = va_arg ( tmp, struct interface * ) ) )
+		intf_nullify ( intf );
+	va_end ( tmp );
 
-    /* Shut down all interfaces */
-    while ((intf = va_arg(intfs, struct interface*)))
-        intf_shutdown(intf, rc);
+	/* Shut down all interfaces */
+	while ( ( intf = va_arg ( intfs, struct interface * ) ) )
+		intf_shutdown ( intf, rc );
 }
 
 /**
@@ -319,12 +322,12 @@ void intfs_vshutdown(va_list intfs, int rc) {
  * @v rc		Reason for close
  * @v ...		Object interfaces
  */
-void intfs_shutdown(int rc, ...) {
-    va_list intfs;
+void intfs_shutdown ( int rc, ... ) {
+	va_list intfs;
 
-    va_start(intfs, rc);
-    intfs_vshutdown(intfs, rc);
-    va_end(intfs);
+	va_start ( intfs, rc );
+	intfs_vshutdown ( intfs, rc );
+	va_end ( intfs );
 }
 
 /**
@@ -336,20 +339,21 @@ void intfs_shutdown(int rc, ...) {
  * Shuts down the interface, then unblocks operations that were
  * blocked during shutdown.
  */
-void intf_restart(struct interface* intf, int rc) {
-    /* Shut down the interface */
-    intf_shutdown(intf, rc);
+void intf_restart ( struct interface *intf, int rc ) {
 
-    DBGC(INTF_COL(intf), "INTF " INTF_FMT " restarting\n",
-         INTF_DBG(intf));
+	/* Shut down the interface */
+	intf_shutdown ( intf, rc );
 
-    /* Restore the interface descriptor.  Must be done after
-     * shutdown (rather than inhibiting intf_shutdown() from
-     * nullifying the descriptor) in order to avoid a potential
-     * infinite loop as the intf_close() operations on each side
-     * of the link call each other recursively.
-     */
-    intf_reinit(intf);
+	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " restarting\n",
+	       INTF_DBG ( intf ) );
+
+	/* Restore the interface descriptor.  Must be done after
+	 * shutdown (rather than inhibiting intf_shutdown() from
+	 * nullifying the descriptor) in order to avoid a potential
+	 * infinite loop as the intf_close() operations on each side
+	 * of the link call each other recursively.
+	 */
+	intf_reinit ( intf );
 }
 
 /**
@@ -358,18 +362,18 @@ void intf_restart(struct interface* intf, int rc) {
  * @v intfs		Object interfaces
  * @v rc		Reason for close
  */
-void intfs_vrestart(va_list intfs, int rc) {
-    struct interface* intf;
-    va_list tmp;
+void intfs_vrestart ( va_list intfs, int rc ) {
+	struct interface *intf;
+	va_list tmp;
 
-    /* Shut down all interfaces */
-    va_copy(tmp, intfs);
-    intfs_vshutdown(tmp, rc);
-    va_end(tmp);
+	/* Shut down all interfaces */
+	va_copy ( tmp, intfs );
+	intfs_vshutdown ( tmp, rc );
+	va_end ( tmp );
 
-    /* Reinitialise all interfaces */
-    while ((intf = va_arg(intfs, struct interface*)))
-        intf_reinit(intf);
+	/* Reinitialise all interfaces */
+	while ( ( intf = va_arg ( intfs, struct interface * ) ) )
+		intf_reinit ( intf );
 }
 
 /**
@@ -378,12 +382,12 @@ void intfs_vrestart(va_list intfs, int rc) {
  * @v rc		Reason for close
  * @v ...		Object interfaces
  */
-void intfs_restart(int rc, ...) {
-    va_list intfs;
+void intfs_restart ( int rc, ... ) {
+	va_list intfs;
 
-    va_start(intfs, rc);
-    intfs_vrestart(intfs, rc);
-    va_end(intfs);
+	va_start ( intfs, rc );
+	intfs_vrestart ( intfs, rc );
+	va_end ( intfs );
 }
 
 /**
@@ -393,14 +397,14 @@ void intfs_restart(int rc, ...) {
  * @v upper		Upper end of filter
  * @v lower		Lower end of filter
  */
-void intf_insert(struct interface* intf, struct interface* upper,
-                 struct interface* lower) {
-    struct interface* dest = intf->dest;
+void intf_insert ( struct interface *intf, struct interface *upper,
+		   struct interface *lower ) {
+	struct interface *dest = intf->dest;
 
-    intf_get(dest);
-    intf_plug_plug(intf, upper);
-    intf_plug_plug(lower, dest);
-    intf_put(dest);
+	intf_get ( dest );
+	intf_plug_plug ( intf, upper );
+	intf_plug_plug ( lower, dest );
+	intf_put ( dest );
 }
 
 /**
@@ -412,18 +416,18 @@ void intf_insert(struct interface* intf, struct interface* upper,
  * This is a helper function to implement methods which take no
  * parameters and return nothing.
  */
-void intf_poke(struct interface* intf,
-               void(type)(struct interface* intf)) {
-    struct interface* dest;
-    intf_poke_TYPE(void*)* op =
-        intf_get_dest_op_untyped(intf, type, &dest);
-    void* object = intf_object(dest);
+void intf_poke ( struct interface *intf,
+		 void ( type ) ( struct interface *intf ) ) {
+	struct interface *dest;
+	intf_poke_TYPE ( void * ) *op =
+		intf_get_dest_op_untyped ( intf, type, &dest );
+	void *object = intf_object ( dest );
 
-    if (op) {
-        op(object);
-    } else {
-        /* Default is to do nothing */
-    }
+	if ( op ) {
+		op ( object );
+	} else {
+		/* Default is to do nothing */
+	}
 
-    intf_put(dest);
+	intf_put ( dest );
 }

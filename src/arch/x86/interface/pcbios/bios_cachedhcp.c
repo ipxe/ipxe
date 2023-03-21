@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/init.h>
@@ -39,8 +39,8 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * This can be set by the prefix.
  */
-uint32_t __bss16(cached_dhcpack_phys);
-#define cached_dhcpack_phys __use_data16(cached_dhcpack_phys)
+uint32_t __bss16 ( cached_dhcpack_phys );
+#define cached_dhcpack_phys __use_data16 ( cached_dhcpack_phys )
 
 /** Colour for debug messages */
 #define colour &cached_dhcpack_phys
@@ -49,29 +49,29 @@ uint32_t __bss16(cached_dhcpack_phys);
  * Cached DHCPACK initialisation function
  *
  */
-static void cachedhcp_init(void) {
-    int rc;
+static void cachedhcp_init ( void ) {
+	int rc;
 
-    /* Do nothing if no cached DHCPACK is present */
-    if (!cached_dhcpack_phys) {
-        DBGC(colour, "CACHEDHCP found no cached DHCPACK\n");
-        return;
-    }
+	/* Do nothing if no cached DHCPACK is present */
+	if ( ! cached_dhcpack_phys ) {
+		DBGC ( colour, "CACHEDHCP found no cached DHCPACK\n" );
+		return;
+	}
 
-    /* Record cached DHCPACK */
-    if ((rc = cachedhcp_record(&cached_dhcpack, 0,
-                               phys_to_user(cached_dhcpack_phys),
-                               sizeof(BOOTPLAYER_t))) != 0) {
-        DBGC(colour, "CACHEDHCP could not record DHCPACK: %s\n",
-             strerror(rc));
-        return;
-    }
+	/* Record cached DHCPACK */
+	if ( ( rc = cachedhcp_record ( &cached_dhcpack, 0,
+				       phys_to_user ( cached_dhcpack_phys ),
+				       sizeof ( BOOTPLAYER_t ) ) ) != 0 ) {
+		DBGC ( colour, "CACHEDHCP could not record DHCPACK: %s\n",
+		       strerror ( rc ) );
+		return;
+	}
 
-    /* Mark as consumed */
-    cached_dhcpack_phys = 0;
+	/* Mark as consumed */
+	cached_dhcpack_phys = 0;
 }
 
 /** Cached DHCPACK initialisation function */
-struct init_fn cachedhcp_init_fn __init_fn(INIT_NORMAL) = {
-    .initialise = cachedhcp_init,
+struct init_fn cachedhcp_init_fn __init_fn ( INIT_NORMAL ) = {
+	.initialise = cachedhcp_init,
 };

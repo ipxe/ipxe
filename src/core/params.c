@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -34,29 +34,29 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/params.h>
 
 /** List of all parameter lists */
-static LIST_HEAD(parameters);
+static LIST_HEAD ( parameters );
 
 /**
  * Free request parameter list
  *
  * @v refcnt		Reference count
  */
-static void free_parameters(struct refcnt* refcnt) {
-    struct parameters* params =
-        container_of(refcnt, struct parameters, refcnt);
-    struct parameter* param;
-    struct parameter* tmp;
+static void free_parameters ( struct refcnt *refcnt ) {
+	struct parameters *params =
+		container_of ( refcnt, struct parameters, refcnt );
+	struct parameter *param;
+	struct parameter *tmp;
 
-    DBGC(params, "PARAMS \"%s\" destroyed\n", params->name);
+	DBGC ( params, "PARAMS \"%s\" destroyed\n", params->name );
 
-    /* Free all parameters */
-    list_for_each_entry_safe(param, tmp, &params->entries, list) {
-        list_del(&param->list);
-        free(param);
-    }
+	/* Free all parameters */
+	list_for_each_entry_safe ( param, tmp, &params->entries, list ) {
+		list_del ( &param->list );
+		free ( param );
+	}
 
-    /* Free parameter list */
-    free(params);
+	/* Free parameter list */
+	free ( params );
 }
 
 /**
@@ -65,16 +65,16 @@ static void free_parameters(struct refcnt* refcnt) {
  * @v name		Parameter list name (may be NULL)
  * @ret params		Parameter list, or NULL if not found
  */
-struct parameters* find_parameters(const char* name) {
-    struct parameters* params;
+struct parameters * find_parameters ( const char *name ) {
+	struct parameters *params;
 
-    list_for_each_entry(params, &parameters, list) {
-        if ((params->name == name) ||
-            (strcmp(params->name, name) == 0)) {
-            return params;
-        }
-    }
-    return NULL;
+	list_for_each_entry ( params, &parameters, list ) {
+		if ( ( params->name == name ) ||
+		     ( strcmp ( params->name, name ) == 0 ) ) {
+			return params;
+		}
+	}
+	return NULL;
 }
 
 /**
@@ -83,38 +83,38 @@ struct parameters* find_parameters(const char* name) {
  * @v name		Parameter list name (may be NULL)
  * @ret params		Parameter list, or NULL on failure
  */
-struct parameters* create_parameters(const char* name) {
-    struct parameters* params;
-    size_t name_len;
-    char* name_copy;
+struct parameters * create_parameters ( const char *name ) {
+	struct parameters *params;
+	size_t name_len;
+	char *name_copy;
 
-    /* Destroy any existing parameter list of this name */
-    params = find_parameters(name);
-    if (params) {
-        claim_parameters(params);
-        params_put(params);
-    }
+	/* Destroy any existing parameter list of this name */
+	params = find_parameters ( name );
+	if ( params ) {
+		claim_parameters ( params );
+		params_put ( params );
+	}
 
-    /* Allocate parameter list */
-    name_len = (name ? (strlen(name) + 1 /* NUL */) : 0);
-    params = zalloc(sizeof(*params) + name_len);
-    if (!params)
-        return NULL;
-    ref_init(&params->refcnt, free_parameters);
-    name_copy = ((void*)(params + 1));
+	/* Allocate parameter list */
+	name_len = ( name ? ( strlen ( name ) + 1 /* NUL */ ) : 0 );
+	params = zalloc ( sizeof ( *params ) + name_len );
+	if ( ! params )
+		return NULL;
+	ref_init ( &params->refcnt, free_parameters );
+	name_copy = ( ( void * ) ( params + 1 ) );
 
-    /* Populate parameter list */
-    if (name) {
-        strcpy(name_copy, name);
-        params->name = name_copy;
-    }
-    INIT_LIST_HEAD(&params->entries);
+	/* Populate parameter list */
+	if ( name ) {
+		strcpy ( name_copy, name );
+		params->name = name_copy;
+	}
+	INIT_LIST_HEAD ( &params->entries );
 
-    /* Add to list of parameter lists */
-    list_add_tail(&params->list, &parameters);
+	/* Add to list of parameter lists */
+	list_add_tail ( &params->list, &parameters );
 
-    DBGC(params, "PARAMS \"%s\" created\n", params->name);
-    return params;
+	DBGC ( params, "PARAMS \"%s\" created\n", params->name );
+	return params;
 }
 
 /**
@@ -126,37 +126,37 @@ struct parameters* create_parameters(const char* name) {
  * @v flags		Parameter flags
  * @ret param		Parameter, or NULL on failure
  */
-struct parameter* add_parameter(struct parameters* params,
-                                const char* key, const char* value,
-                                unsigned int flags) {
-    struct parameter* param;
-    size_t key_len;
-    size_t value_len;
-    char* key_copy;
-    char* value_copy;
+struct parameter * add_parameter ( struct parameters *params,
+				   const char *key, const char *value,
+				   unsigned int flags ) {
+	struct parameter *param;
+	size_t key_len;
+	size_t value_len;
+	char *key_copy;
+	char *value_copy;
 
-    /* Allocate parameter */
-    key_len = (strlen(key) + 1 /* NUL */);
-    value_len = (strlen(value) + 1 /* NUL */);
-    param = zalloc(sizeof(*param) + key_len + value_len);
-    if (!param)
-        return NULL;
-    key_copy = ((void*)(param + 1));
-    value_copy = (key_copy + key_len);
+	/* Allocate parameter */
+	key_len = ( strlen ( key ) + 1 /* NUL */ );
+	value_len = ( strlen ( value ) + 1 /* NUL */ );
+	param = zalloc ( sizeof ( *param ) + key_len + value_len );
+	if ( ! param )
+		return NULL;
+	key_copy = ( ( void * ) ( param + 1 ) );
+	value_copy = ( key_copy + key_len );
 
-    /* Populate parameter */
-    strcpy(key_copy, key);
-    param->key = key_copy;
-    strcpy(value_copy, value);
-    param->value = value_copy;
-    param->flags = flags;
+	/* Populate parameter */
+	strcpy ( key_copy, key );
+	param->key = key_copy;
+	strcpy ( value_copy, value );
+	param->value = value_copy;
+	param->flags = flags;
 
-    /* Add to list of parameters */
-    list_add_tail(&param->list, &params->entries);
+	/* Add to list of parameters */
+	list_add_tail ( &param->list, &params->entries );
 
-    DBGC(params, "PARAMS \"%s\" added \"%s\"=\"%s\"%s%s\n",
-         params->name, param->key, param->value,
-         ((param->flags & PARAMETER_FORM) ? " (form)" : ""),
-         ((param->flags & PARAMETER_HEADER) ? " (header)" : ""));
-    return param;
+	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"%s%s\n",
+	       params->name, param->key, param->value,
+	       ( ( param->flags & PARAMETER_FORM ) ? " (form)" : "" ),
+	       ( ( param->flags & PARAMETER_HEADER ) ? " (header)" : "" ) );
+	return param;
 }

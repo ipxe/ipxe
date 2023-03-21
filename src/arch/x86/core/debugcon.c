@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -45,9 +45,9 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define DEBUG_PORT_CHECK 0xe9
 
 /* Set default console usage if applicable */
-#if !(defined(CONSOLE_DEBUGCON) && CONSOLE_EXPLICIT(CONSOLE_DEBUGCON))
-    #undef CONSOLE_DEBUGCON
-    #define CONSOLE_DEBUGCON (CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_TUI)
+#if ! ( defined ( CONSOLE_DEBUGCON ) && CONSOLE_EXPLICIT ( CONSOLE_DEBUGCON ) )
+#undef CONSOLE_DEBUGCON
+#define CONSOLE_DEBUGCON ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_TUI )
 #endif
 
 /**
@@ -55,35 +55,36 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v character		Character to be printed
  */
-static void debugcon_putchar(int character) {
-    /* Write character to debug port */
-    outb(character, DEBUG_PORT);
+static void debugcon_putchar ( int character ) {
+
+	/* Write character to debug port */
+	outb ( character, DEBUG_PORT );
 }
 
 /** Debug port console driver */
 struct console_driver debugcon_console __console_driver = {
-    .putchar = debugcon_putchar,
-    .usage = CONSOLE_DEBUGCON,
+	.putchar = debugcon_putchar,
+	.usage = CONSOLE_DEBUGCON,
 };
 
 /**
  * Initialise debug port console
  *
  */
-static void debugcon_init(void) {
-    uint8_t check;
+static void debugcon_init ( void ) {
+	uint8_t check;
 
-    /* Check if console is present */
-    check = inb(DEBUG_PORT);
-    if (check != DEBUG_PORT_CHECK) {
-        DBG("Debug port not present; disabling console\n");
-        debugcon_console.disabled = CONSOLE_DISABLED;
-    }
+	/* Check if console is present */
+	check = inb ( DEBUG_PORT );
+	if ( check != DEBUG_PORT_CHECK ) {
+		DBG ( "Debug port not present; disabling console\n" );
+		debugcon_console.disabled = CONSOLE_DISABLED;
+	}
 }
 
 /**
  * Debug port console initialisation function
  */
-struct init_fn debugcon_init_fn __init_fn(INIT_EARLY) = {
-    .initialise = debugcon_init,
+struct init_fn debugcon_init_fn __init_fn ( INIT_EARLY ) = {
+	.initialise = debugcon_init,
 };

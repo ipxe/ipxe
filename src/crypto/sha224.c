@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -36,16 +36,16 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 /** SHA-224 initial digest values */
 static const struct sha256_digest sha224_init_digest = {
-    .h = {
-        cpu_to_be32(0xc1059ed8),
-        cpu_to_be32(0x367cd507),
-        cpu_to_be32(0x3070dd17),
-        cpu_to_be32(0xf70e5939),
-        cpu_to_be32(0xffc00b31),
-        cpu_to_be32(0x68581511),
-        cpu_to_be32(0x64f98fa7),
-        cpu_to_be32(0xbefa4fa4),
-    },
+	.h = {
+		cpu_to_be32 ( 0xc1059ed8 ),
+		cpu_to_be32 ( 0x367cd507 ),
+		cpu_to_be32 ( 0x3070dd17 ),
+		cpu_to_be32 ( 0xf70e5939 ),
+		cpu_to_be32 ( 0xffc00b31 ),
+		cpu_to_be32 ( 0x68581511 ),
+		cpu_to_be32 ( 0x64f98fa7 ),
+		cpu_to_be32 ( 0xbefa4fa4 ),
+	},
 };
 
 /**
@@ -53,19 +53,19 @@ static const struct sha256_digest sha224_init_digest = {
  *
  * @v ctx		SHA-224 context
  */
-static void sha224_init(void* ctx) {
-    struct sha256_context* context = ctx;
+static void sha224_init ( void *ctx ) {
+	struct sha256_context *context = ctx;
 
-    sha256_family_init(context, &sha224_init_digest, SHA224_DIGEST_SIZE);
+	sha256_family_init ( context, &sha224_init_digest, SHA224_DIGEST_SIZE );
 }
 
 /** SHA-224 algorithm */
 struct digest_algorithm sha224_algorithm = {
-    .name = "sha224",
-    .ctxsize = sizeof(struct sha256_context),
-    .blocksize = sizeof(union sha256_block),
-    .digestsize = SHA224_DIGEST_SIZE,
-    .init = sha224_init,
-    .update = sha256_update,
-    .final = sha256_final,
+	.name		= "sha224",
+	.ctxsize	= sizeof ( struct sha256_context ),
+	.blocksize	= sizeof ( union sha256_block ),
+	.digestsize	= SHA224_DIGEST_SIZE,
+	.init		= sha224_init,
+	.update		= sha256_update,
+	.final		= sha256_final,
 };

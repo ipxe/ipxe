@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <assert.h>
 #include <ipxe/crypto.h>
@@ -42,18 +42,18 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v len		Length of data
  * @v raw_cipher	Underlying cipher algorithm
  */
-void ecb_encrypt(void* ctx, const void* src, void* dst, size_t len,
-                 struct cipher_algorithm* raw_cipher) {
-    size_t blocksize = raw_cipher->blocksize;
+void ecb_encrypt ( void *ctx, const void *src, void *dst, size_t len,
+		   struct cipher_algorithm *raw_cipher ) {
+	size_t blocksize = raw_cipher->blocksize;
 
-    assert((len % blocksize) == 0);
+	assert ( ( len % blocksize ) == 0 );
 
-    while (len) {
-        cipher_encrypt(raw_cipher, ctx, src, dst, blocksize);
-        dst += blocksize;
-        src += blocksize;
-        len -= blocksize;
-    }
+	while ( len ) {
+		cipher_encrypt ( raw_cipher, ctx, src, dst, blocksize );
+		dst += blocksize;
+		src += blocksize;
+		len -= blocksize;
+	}
 }
 
 /**
@@ -65,16 +65,16 @@ void ecb_encrypt(void* ctx, const void* src, void* dst, size_t len,
  * @v len		Length of data
  * @v raw_cipher	Underlying cipher algorithm
  */
-void ecb_decrypt(void* ctx, const void* src, void* dst, size_t len,
-                 struct cipher_algorithm* raw_cipher) {
-    size_t blocksize = raw_cipher->blocksize;
+void ecb_decrypt ( void *ctx, const void *src, void *dst, size_t len,
+		   struct cipher_algorithm *raw_cipher ) {
+	size_t blocksize = raw_cipher->blocksize;
 
-    assert((len % blocksize) == 0);
+	assert ( ( len % blocksize ) == 0 );
 
-    while (len) {
-        cipher_decrypt(raw_cipher, ctx, src, dst, blocksize);
-        dst += blocksize;
-        src += blocksize;
-        len -= blocksize;
-    }
+	while ( len ) {
+		cipher_decrypt ( raw_cipher, ctx, src, dst, blocksize );
+		dst += blocksize;
+		src += blocksize;
+		len -= blocksize;
+	}
 }

@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/general.h>
 
@@ -36,12 +36,12 @@ PROVIDE_REQUIRING_SYMBOL();
  *
  */
 #ifdef FCMGMT_CMD
-REQUIRE_OBJECT(fcmgmt_cmd);
+REQUIRE_OBJECT ( fcmgmt_cmd );
 #endif
 
 /*
  * Drag in Fibre Channel-specific protocols
  */
 #ifdef SANBOOT_PROTO_FCP
-REQUIRE_OBJECT(fcp);
+REQUIRE_OBJECT ( fcp );
 #endif

@@ -19,7 +19,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/general.h>
 
@@ -35,22 +35,22 @@ PROVIDE_REQUIRING_SYMBOL();
  * Drag in Infiniband-specific protocols
  */
 #ifdef SANBOOT_PROTO_IB_SRP
-REQUIRE_OBJECT(ib_srp);
+REQUIRE_OBJECT ( ib_srp );
 #endif
 
 /*
  * Drag in Infiniband-specific virtual network devices
  */
 #ifdef VNIC_IPOIB
-REQUIRE_OBJECT(ipoib);
+REQUIRE_OBJECT ( ipoib );
 #endif
 #ifdef VNIC_XSIGO
-REQUIRE_OBJECT(xsigo);
+REQUIRE_OBJECT ( xsigo );
 #endif
 
 /*
  * Drag in Infiniband-specific commands
  */
 #ifdef IBMGMT_CMD
-REQUIRE_OBJECT(ibmgmt_cmd);
+REQUIRE_OBJECT ( ibmgmt_cmd );
 #endif

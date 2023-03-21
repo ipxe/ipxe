@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <ipxe/profile.h>
@@ -37,12 +37,12 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * Print profiling statistics
  *
  */
-void profstat(void) {
-    struct profiler* profiler;
+void profstat ( void ) {
+	struct profiler *profiler;
 
-    for_each_table_entry(profiler, PROFILERS) {
-        printf("%s: %ld +/- %ld ticks (%d samples)\n",
-               profiler->name, profile_mean(profiler),
-               profile_stddev(profiler), profiler->count);
-    }
+	for_each_table_entry ( profiler, PROFILERS ) {
+		printf ( "%s: %ld +/- %ld ticks (%d samples)\n",
+			 profiler->name, profile_mean ( profiler ),
+			 profile_stddev ( profiler ), profiler->count );
+	}
 }

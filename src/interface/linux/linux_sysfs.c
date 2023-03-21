@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <string.h>
 #include <errno.h>
@@ -42,54 +42,55 @@ FILE_LICENCE(GPL2_OR_LATER);
  * @v data		Data to fill in
  * @ret len		Length read, or negative error
  */
-int linux_sysfs_read(const char* filename, userptr_t* data) {
-    userptr_t tmp;
-    ssize_t read;
-    size_t len;
-    int fd;
-    int rc;
+int linux_sysfs_read ( const char *filename, userptr_t *data ) {
+	userptr_t tmp;
+	ssize_t read;
+	size_t len;
+	int fd;
+	int rc;
 
-    /* Open file */
-    fd = linux_open(filename, O_RDONLY);
-    if (fd < 0) {
-        rc = -ELINUX(linux_errno);
-        DBGC(filename, "LINUX could not open %s: %s\n",
-             filename, linux_strerror(linux_errno));
-        goto err_open;
-    }
+	/* Open file */
+	fd = linux_open ( filename, O_RDONLY );
+	if ( fd < 0 ) {
+		rc = -ELINUX ( linux_errno );
+		DBGC ( filename, "LINUX could not open %s: %s\n",
+		       filename, linux_strerror ( linux_errno ) );
+		goto err_open;
+	}
 
-    /* Read file */
-    for (*data = UNULL, len = 0;; len += read) {
-        /* (Re)allocate space */
-        tmp = urealloc(*data, (len + LINUX_SYSFS_BLKSIZE));
-        if (!tmp) {
-            rc = -ENOMEM;
-            goto err_alloc;
-        }
-        *data = tmp;
+	/* Read file */
+	for ( *data = UNULL, len = 0 ; ; len += read ) {
 
-        /* Read from file */
-        read = linux_read(fd, user_to_virt(*data, len),
-                          LINUX_SYSFS_BLKSIZE);
-        if (read == 0)
-            break;
-        if (read < 0) {
-            DBGC(filename, "LINUX could not read %s: %s\n",
-                 filename, linux_strerror(linux_errno));
-            goto err_read;
-        }
-    }
+		/* (Re)allocate space */
+		tmp = urealloc ( *data, ( len + LINUX_SYSFS_BLKSIZE ) );
+		if ( ! tmp ) {
+			rc = -ENOMEM;
+			goto err_alloc;
+		}
+		*data = tmp;
 
-    /* Close file */
-    linux_close(fd);
+		/* Read from file */
+		read = linux_read ( fd, user_to_virt ( *data, len ),
+				    LINUX_SYSFS_BLKSIZE );
+		if ( read == 0 )
+			break;
+		if ( read < 0 ) {
+			DBGC ( filename, "LINUX could not read %s: %s\n",
+			       filename, linux_strerror ( linux_errno ) );
+			goto err_read;
+		}
+	}
 
-    DBGC(filename, "LINUX read %s\n", filename);
-    return len;
+	/* Close file */
+	linux_close ( fd );
 
-err_read:
-err_alloc:
-    ufree(*data);
-    linux_close(fd);
-err_open:
-    return rc;
+	DBGC ( filename, "LINUX read %s\n", filename );
+	return len;
+
+ err_read:
+ err_alloc:
+	ufree ( *data );
+	linux_close ( fd );
+ err_open:
+	return rc;
 }

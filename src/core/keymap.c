@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <ctype.h>
@@ -44,13 +44,13 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #define UPPER_MASK 0x5f
 
 /** Case toggle bit */
-#define CASE_TOGGLE (ASCII_MASK & ~UPPER_MASK)
+#define CASE_TOGGLE ( ASCII_MASK & ~UPPER_MASK )
 
 /** Default keyboard mapping */
-static TABLE_START(keymap_start, KEYMAP);
+static TABLE_START ( keymap_start, KEYMAP );
 
 /** Current keyboard mapping */
-static struct keymap* keymap_current = keymap_start;
+static struct keymap *keymap_current = keymap_start;
 
 /**
  * Remap a key
@@ -58,41 +58,41 @@ static struct keymap* keymap_current = keymap_start;
  * @v character		Character read from console
  * @ret mapped		Mapped character
  */
-unsigned int key_remap(unsigned int character) {
-    struct keymap* keymap = keymap_current;
-    unsigned int mapped = (character & KEYMAP_MASK);
-    struct keymap_key* key;
+unsigned int key_remap ( unsigned int character ) {
+	struct keymap *keymap = keymap_current;
+	unsigned int mapped = ( character & KEYMAP_MASK );
+	struct keymap_key *key;
 
-    /* Invert case before remapping if applicable */
-    if ((character & KEYMAP_CAPSLOCK_UNDO) && isalpha(mapped))
-        mapped ^= CASE_TOGGLE;
+	/* Invert case before remapping if applicable */
+	if ( ( character & KEYMAP_CAPSLOCK_UNDO ) && isalpha ( mapped ) )
+		mapped ^= CASE_TOGGLE;
 
-    /* Select remapping table */
-    key = ((character & KEYMAP_ALTGR) ? keymap->altgr : keymap->basic);
+	/* Select remapping table */
+	key = ( ( character & KEYMAP_ALTGR ) ? keymap->altgr : keymap->basic );
 
-    /* Remap via table */
-    for (; key->from; key++) {
-        if (mapped == key->from) {
-            mapped = key->to;
-            break;
-        }
-    }
+	/* Remap via table */
+	for ( ; key->from ; key++ ) {
+		if ( mapped == key->from ) {
+			mapped = key->to;
+			break;
+		}
+	}
 
-    /* Handle Ctrl-<key> and CapsLock */
-    if (isalpha(mapped)) {
-        if (character & KEYMAP_CTRL) {
-            mapped &= CTRL_MASK;
-        } else if (character & KEYMAP_CAPSLOCK) {
-            mapped ^= CASE_TOGGLE;
-        }
-    }
+	/* Handle Ctrl-<key> and CapsLock */
+	if ( isalpha ( mapped ) ) {
+		if ( character & KEYMAP_CTRL ) {
+			mapped &= CTRL_MASK;
+		} else if ( character & KEYMAP_CAPSLOCK ) {
+			mapped ^= CASE_TOGGLE;
+		}
+	}
 
-    /* Clear flags */
-    mapped &= ASCII_MASK;
+	/* Clear flags */
+	mapped &= ASCII_MASK;
 
-    DBGC2(&keymap_current, "KEYMAP mapped %04x => %02x\n",
-          character, mapped);
-    return mapped;
+	DBGC2 ( &keymap_current, "KEYMAP mapped %04x => %02x\n",
+		character, mapped );
+	return mapped;
 }
 
 /**
@@ -101,16 +101,16 @@ unsigned int key_remap(unsigned int character) {
  * @v name		Keyboard map name
  * @ret keymap		Keyboard map, or NULL if not found
  */
-struct keymap* keymap_find(const char* name) {
-    struct keymap* keymap;
+struct keymap * keymap_find ( const char *name ) {
+	struct keymap *keymap;
 
-    /* Find matching keyboard map */
-    for_each_table_entry(keymap, KEYMAP) {
-        if (strcmp(keymap->name, name) == 0)
-            return keymap;
-    }
+	/* Find matching keyboard map */
+	for_each_table_entry ( keymap, KEYMAP ) {
+		if ( strcmp ( keymap->name, name ) == 0 )
+			return keymap;
+	}
 
-    return NULL;
+	return NULL;
 }
 
 /**
@@ -118,13 +118,14 @@ struct keymap* keymap_find(const char* name) {
  *
  * @v keymap		Keyboard map, or NULL to use default
  */
-void keymap_set(struct keymap* keymap) {
-    /* Use default keymap if none specified */
-    if (!keymap)
-        keymap = keymap_start;
+void keymap_set ( struct keymap *keymap ) {
 
-    /* Set new keyboard map */
-    if (keymap != keymap_current)
-        DBGC(&keymap_current, "KEYMAP using \"%s\"\n", keymap->name);
-    keymap_current = keymap;
+	/* Use default keymap if none specified */
+	if ( ! keymap )
+		keymap = keymap_start;
+
+	/* Set new keyboard map */
+	if ( keymap != keymap_current )
+		DBGC ( &keymap_current, "KEYMAP using \"%s\"\n", keymap->name );
+	keymap_current = keymap;
 }

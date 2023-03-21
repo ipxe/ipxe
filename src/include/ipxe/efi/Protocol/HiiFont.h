@@ -1,5 +1,3 @@
-#pragma once
-
 /** @file
   The file provides services to retrieve font information.
 
@@ -12,58 +10,54 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef __HII_FONT_H__
-    #define __HII_FONT_H__
+#define __HII_FONT_H__
 
-FILE_LICENCE(BSD2_PATENT);
+FILE_LICENCE ( BSD2_PATENT );
 
-    #include <ipxe/efi/Protocol/GraphicsOutput.h>
-    #include <ipxe/efi/Protocol/HiiImage.h>
+#include <ipxe/efi/Protocol/GraphicsOutput.h>
+#include <ipxe/efi/Protocol/HiiImage.h>
 
-    #define EFI_HII_FONT_PROTOCOL_GUID                        \
-        {                                                     \
-            0xe9ca4775, 0x8657, 0x47fc, {                     \
-                0x97, 0xe7, 0x7e, 0xd6, 0x5a, 0x8, 0x43, 0x24 \
-            }                                                 \
-        }
+#define EFI_HII_FONT_PROTOCOL_GUID \
+{ 0xe9ca4775, 0x8657, 0x47fc, { 0x97, 0xe7, 0x7e, 0xd6, 0x5a, 0x8, 0x43, 0x24 } }
 
 typedef struct _EFI_HII_FONT_PROTOCOL EFI_HII_FONT_PROTOCOL;
 
-typedef VOID* EFI_FONT_HANDLE;
+typedef VOID *EFI_FONT_HANDLE;
 
 ///
 /// EFI_HII_OUT_FLAGS.
 ///
 typedef UINT32 EFI_HII_OUT_FLAGS;
 
-    #define EFI_HII_OUT_FLAG_CLIP 0x00000001
-    #define EFI_HII_OUT_FLAG_WRAP 0x00000002
-    #define EFI_HII_OUT_FLAG_CLIP_CLEAN_Y 0x00000004
-    #define EFI_HII_OUT_FLAG_CLIP_CLEAN_X 0x00000008
-    #define EFI_HII_OUT_FLAG_TRANSPARENT 0x00000010
-    #define EFI_HII_IGNORE_IF_NO_GLYPH 0x00000020
-    #define EFI_HII_IGNORE_LINE_BREAK 0x00000040
-    #define EFI_HII_DIRECT_TO_SCREEN 0x00000080
+#define EFI_HII_OUT_FLAG_CLIP          0x00000001
+#define EFI_HII_OUT_FLAG_WRAP          0x00000002
+#define EFI_HII_OUT_FLAG_CLIP_CLEAN_Y  0x00000004
+#define EFI_HII_OUT_FLAG_CLIP_CLEAN_X  0x00000008
+#define EFI_HII_OUT_FLAG_TRANSPARENT   0x00000010
+#define EFI_HII_IGNORE_IF_NO_GLYPH     0x00000020
+#define EFI_HII_IGNORE_LINE_BREAK      0x00000040
+#define EFI_HII_DIRECT_TO_SCREEN       0x00000080
 
 /**
   Definition of EFI_HII_ROW_INFO.
 **/
 typedef struct _EFI_HII_ROW_INFO {
-    ///
-    /// The index of the first character in the string which is displayed on the line.
-    ///
-    UINTN StartIndex;
-    ///
-    /// The index of the last character in the string which is displayed on the line.
-    /// If this is the same as StartIndex, then no characters are displayed.
-    ///
-    UINTN EndIndex;
-    UINTN LineHeight; ///< The height of the line, in pixels.
-    UINTN LineWidth;  ///< The width of the text on the line, in pixels.
+  ///
+  /// The index of the first character in the string which is displayed on the line.
+  ///
+  UINTN    StartIndex;
+  ///
+  /// The index of the last character in the string which is displayed on the line.
+  /// If this is the same as StartIndex, then no characters are displayed.
+  ///
+  UINTN    EndIndex;
+  UINTN    LineHeight; ///< The height of the line, in pixels.
+  UINTN    LineWidth;  ///< The width of the text on the line, in pixels.
 
-    ///
-    /// The font baseline offset in pixels from the bottom of the row, or 0 if none.
-    ///
-    UINTN BaselineOffset;
+  ///
+  /// The font baseline offset in pixels from the bottom of the row, or 0 if none.
+  ///
+  UINTN    BaselineOffset;
 } EFI_HII_ROW_INFO;
 
 ///
@@ -72,24 +66,24 @@ typedef struct _EFI_HII_ROW_INFO {
 ///
 typedef UINT32 EFI_FONT_INFO_MASK;
 
-    #define EFI_FONT_INFO_SYS_FONT 0x00000001
-    #define EFI_FONT_INFO_SYS_SIZE 0x00000002
-    #define EFI_FONT_INFO_SYS_STYLE 0x00000004
-    #define EFI_FONT_INFO_SYS_FORE_COLOR 0x00000010
-    #define EFI_FONT_INFO_SYS_BACK_COLOR 0x00000020
-    #define EFI_FONT_INFO_RESIZE 0x00001000
-    #define EFI_FONT_INFO_RESTYLE 0x00002000
-    #define EFI_FONT_INFO_ANY_FONT 0x00010000
-    #define EFI_FONT_INFO_ANY_SIZE 0x00020000
-    #define EFI_FONT_INFO_ANY_STYLE 0x00040000
+#define EFI_FONT_INFO_SYS_FONT        0x00000001
+#define EFI_FONT_INFO_SYS_SIZE        0x00000002
+#define EFI_FONT_INFO_SYS_STYLE       0x00000004
+#define EFI_FONT_INFO_SYS_FORE_COLOR  0x00000010
+#define EFI_FONT_INFO_SYS_BACK_COLOR  0x00000020
+#define EFI_FONT_INFO_RESIZE          0x00001000
+#define EFI_FONT_INFO_RESTYLE         0x00002000
+#define EFI_FONT_INFO_ANY_FONT        0x00010000
+#define EFI_FONT_INFO_ANY_SIZE        0x00020000
+#define EFI_FONT_INFO_ANY_STYLE       0x00040000
 
 //
 // EFI_FONT_INFO
 //
 typedef struct {
-    EFI_HII_FONT_STYLE FontStyle;
-    UINT16 FontSize; ///< character cell height in pixels
-    CHAR16 FontName[1];
+  EFI_HII_FONT_STYLE    FontStyle;
+  UINT16                FontSize;   ///< character cell height in pixels
+  CHAR16                FontName[1];
 } EFI_FONT_INFO;
 
 /**
@@ -105,10 +99,10 @@ typedef struct {
   font requested and the font available.
 **/
 typedef struct _EFI_FONT_DISPLAY_INFO {
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL ForegroundColor;
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL BackgroundColor;
-    EFI_FONT_INFO_MASK FontInfoMask;
-    EFI_FONT_INFO FontInfo;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL    ForegroundColor;
+  EFI_GRAPHICS_OUTPUT_BLT_PIXEL    BackgroundColor;
+  EFI_FONT_INFO_MASK               FontInfoMask;
+  EFI_FONT_INFO                    FontInfo;
 } EFI_FONT_DISPLAY_INFO;
 
 /**
@@ -215,17 +209,20 @@ typedef struct _EFI_FONT_DISPLAY_INFO {
 
   @retval EFI_INVALID_PARAMETER Flags were invalid combination.
 **/
-typedef EFI_STATUS(EFIAPI* EFI_HII_STRING_TO_IMAGE)(
-    IN CONST EFI_HII_FONT_PROTOCOL* This,
-    IN EFI_HII_OUT_FLAGS Flags,
-    IN CONST EFI_STRING String,
-    IN CONST EFI_FONT_DISPLAY_INFO* StringInfo,
-    IN OUT EFI_IMAGE_OUTPUT** Blt,
-    IN UINTN BltX,
-    IN UINTN BltY,
-    OUT EFI_HII_ROW_INFO** RowInfoArray OPTIONAL,
-    OUT UINTN* RowInfoArraySize OPTIONAL,
-    OUT UINTN* ColumnInfoArray OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_HII_STRING_TO_IMAGE)(
+  IN CONST  EFI_HII_FONT_PROTOCOL *This,
+  IN        EFI_HII_OUT_FLAGS     Flags,
+  IN CONST  EFI_STRING            String,
+  IN CONST  EFI_FONT_DISPLAY_INFO *StringInfo,
+  IN OUT    EFI_IMAGE_OUTPUT      **Blt,
+  IN        UINTN                 BltX,
+  IN        UINTN                 BltY,
+  OUT       EFI_HII_ROW_INFO      **RowInfoArray OPTIONAL,
+  OUT       UINTN                 *RowInfoArraySize OPTIONAL,
+  OUT       UINTN                 *ColumnInfoArray OPTIONAL
+  );
 
 /**
 
@@ -346,19 +343,22 @@ typedef EFI_STATUS(EFIAPI* EFI_HII_STRING_TO_IMAGE)(
                                 or the stringid is not in the specified PackageList.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_HII_STRING_ID_TO_IMAGE)(
-    IN CONST EFI_HII_FONT_PROTOCOL* This,
-    IN EFI_HII_OUT_FLAGS Flags,
-    IN EFI_HII_HANDLE PackageList,
-    IN EFI_STRING_ID StringId,
-    IN CONST CHAR8* Language,
-    IN CONST EFI_FONT_DISPLAY_INFO* StringInfo OPTIONAL,
-    IN OUT EFI_IMAGE_OUTPUT** Blt,
-    IN UINTN BltX,
-    IN UINTN BltY,
-    OUT EFI_HII_ROW_INFO** RowInfoArray OPTIONAL,
-    OUT UINTN* RowInfoArraySize OPTIONAL,
-    OUT UINTN* ColumnInfoArray OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_HII_STRING_ID_TO_IMAGE)(
+  IN CONST  EFI_HII_FONT_PROTOCOL *This,
+  IN        EFI_HII_OUT_FLAGS     Flags,
+  IN        EFI_HII_HANDLE        PackageList,
+  IN        EFI_STRING_ID         StringId,
+  IN CONST  CHAR8                 *Language,
+  IN CONST  EFI_FONT_DISPLAY_INFO *StringInfo       OPTIONAL,
+  IN OUT    EFI_IMAGE_OUTPUT      **Blt,
+  IN        UINTN                 BltX,
+  IN        UINTN                 BltY,
+  OUT       EFI_HII_ROW_INFO      **RowInfoArray    OPTIONAL,
+  OUT       UINTN                 *RowInfoArraySize OPTIONAL,
+  OUT       UINTN                 *ColumnInfoArray  OPTIONAL
+  );
 
 /**
 
@@ -394,12 +394,15 @@ typedef EFI_STATUS(EFIAPI* EFI_HII_STRING_ID_TO_IMAGE)(
 
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_HII_GET_GLYPH)(
-    IN CONST EFI_HII_FONT_PROTOCOL* This,
-    IN CONST CHAR16 Char,
-    IN CONST EFI_FONT_DISPLAY_INFO* StringInfo,
-    OUT EFI_IMAGE_OUTPUT** Blt,
-    OUT UINTN* Baseline OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_HII_GET_GLYPH)(
+  IN CONST  EFI_HII_FONT_PROTOCOL *This,
+  IN CONST  CHAR16                Char,
+  IN CONST  EFI_FONT_DISPLAY_INFO *StringInfo,
+  OUT       EFI_IMAGE_OUTPUT      **Blt,
+  OUT       UINTN                 *Baseline OPTIONAL
+  );
 
 /**
 
@@ -438,23 +441,26 @@ typedef EFI_STATUS(EFIAPI* EFI_HII_GET_GLYPH)(
   @retval EFI_OUT_OF_RESOURCES   There were insufficient resources to complete the request.
 
 **/
-typedef EFI_STATUS(EFIAPI* EFI_HII_GET_FONT_INFO)(
-    IN CONST EFI_HII_FONT_PROTOCOL* This,
-    IN OUT EFI_FONT_HANDLE* FontHandle,
-    IN CONST EFI_FONT_DISPLAY_INFO* StringInfoIn OPTIONAL,
-    OUT EFI_FONT_DISPLAY_INFO** StringInfoOut,
-    IN CONST EFI_STRING String OPTIONAL);
+typedef
+EFI_STATUS
+(EFIAPI *EFI_HII_GET_FONT_INFO)(
+  IN CONST  EFI_HII_FONT_PROTOCOL *This,
+  IN OUT    EFI_FONT_HANDLE       *FontHandle,
+  IN CONST  EFI_FONT_DISPLAY_INFO *StringInfoIn  OPTIONAL,
+  OUT       EFI_FONT_DISPLAY_INFO **StringInfoOut,
+  IN CONST  EFI_STRING            String OPTIONAL
+  );
 
 ///
 /// The protocol provides the service to retrieve the font informations.
 ///
 struct _EFI_HII_FONT_PROTOCOL {
-    EFI_HII_STRING_TO_IMAGE StringToImage;
-    EFI_HII_STRING_ID_TO_IMAGE StringIdToImage;
-    EFI_HII_GET_GLYPH GetGlyph;
-    EFI_HII_GET_FONT_INFO GetFontInfo;
+  EFI_HII_STRING_TO_IMAGE       StringToImage;
+  EFI_HII_STRING_ID_TO_IMAGE    StringIdToImage;
+  EFI_HII_GET_GLYPH             GetGlyph;
+  EFI_HII_GET_FONT_INFO         GetFontInfo;
 };
 
-extern EFI_GUID gEfiHiiFontProtocolGuid;
+extern EFI_GUID  gEfiHiiFontProtocolGuid;
 
 #endif

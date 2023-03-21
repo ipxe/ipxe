@@ -1,5 +1,6 @@
 #!ipxe
 
+echo [Autoboot iPXE] Trying to boot using automatic settings...
 
 set dhcp6.user-class einebox
 autoboot ||

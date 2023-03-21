@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/init.h>
 #include "pxe.h"
@@ -36,19 +36,20 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 /* PXENV_UNDI_LOADER
  *
  */
-PXENV_EXIT_t undi_loader(struct s_UNDI_LOADER* undi_loader) {
-    /* Perform one-time initialisation (e.g. heap) */
-    initialise();
+PXENV_EXIT_t undi_loader ( struct s_UNDI_LOADER *undi_loader ) {
 
-    DBG("[PXENV_UNDI_LOADER to CS %04x DS %04x]",
-        undi_loader->UNDI_CS, undi_loader->UNDI_DS);
+	/* Perform one-time initialisation (e.g. heap) */
+	initialise();
 
-    /* Fill in UNDI loader structure */
-    undi_loader->PXEptr.segment = rm_cs;
-    undi_loader->PXEptr.offset = __from_text16(&ppxe);
-    undi_loader->PXENVptr.segment = rm_cs;
-    undi_loader->PXENVptr.offset = __from_text16(&pxenv);
+	DBG ( "[PXENV_UNDI_LOADER to CS %04x DS %04x]",
+	      undi_loader->UNDI_CS, undi_loader->UNDI_DS );
 
-    undi_loader->Status = PXENV_STATUS_SUCCESS;
-    return PXENV_EXIT_SUCCESS;
+	/* Fill in UNDI loader structure */
+	undi_loader->PXEptr.segment = rm_cs;
+	undi_loader->PXEptr.offset = __from_text16 ( &ppxe );
+	undi_loader->PXENVptr.segment = rm_cs;
+	undi_loader->PXENVptr.offset = __from_text16 ( &pxenv );
+
+	undi_loader->Status = PXENV_STATUS_SUCCESS;
+	return PXENV_EXIT_SUCCESS;
 }

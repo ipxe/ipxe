@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -34,7 +34,7 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 #include <ipxe/entropy.h>
 #include <ipxe/drbg.h>
 
-struct entropy_source rdrand_entropy __entropy_source(ENTROPY_PREFERRED);
+struct entropy_source rdrand_entropy __entropy_source ( ENTROPY_PREFERRED );
 
 /** Number of times to retry RDRAND instruction */
 #define RDRAND_RETRY_COUNT 16
@@ -47,25 +47,25 @@ struct entropy_source rdrand_entropy __entropy_source(ENTROPY_PREFERRED);
  *
  * @ret rc		Return status code
  */
-static int rdrand_entropy_enable(void) {
-    struct x86_features features;
+static int rdrand_entropy_enable ( void ) {
+	struct x86_features features;
 
-    /* Check that RDRAND is supported */
-    x86_features(&features);
-    if (!(features.intel.ecx & CPUID_FEATURES_INTEL_ECX_RDRAND)) {
-        DBGC(colour, "RDRAND not supported\n");
-        return -ENOTSUP;
-    }
+	/* Check that RDRAND is supported */
+	x86_features ( &features );
+	if ( ! ( features.intel.ecx & CPUID_FEATURES_INTEL_ECX_RDRAND ) ) {
+		DBGC ( colour, "RDRAND not supported\n" );
+		return -ENOTSUP;
+	}
 
-    /* Data returned by RDRAND is theoretically full entropy, up
-     * to a security strength of 128 bits, so assume that each
-     * sample contains exactly 8 bits of entropy.
-     */
-    if (DRBG_SECURITY_STRENGTH > 128)
-        return -ENOTSUP;
-    entropy_init(&rdrand_entropy, MIN_ENTROPY(8.0));
+	/* Data returned by RDRAND is theoretically full entropy, up
+	 * to a security strength of 128 bits, so assume that each
+	 * sample contains exactly 8 bits of entropy.
+	 */
+	if ( DRBG_SECURITY_STRENGTH > 128 )
+		return -ENOTSUP;
+	entropy_init ( &rdrand_entropy, MIN_ENTROPY ( 8.0 ) );
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -74,30 +74,30 @@ static int rdrand_entropy_enable(void) {
  * @ret noise		Noise sample
  * @ret rc		Return status code
  */
-static int rdrand_get_noise(noise_sample_t* noise) {
-    unsigned int result;
-    unsigned int discard_c;
-    unsigned int ok;
+static int rdrand_get_noise ( noise_sample_t *noise ) {
+	unsigned int result;
+	unsigned int discard_c;
+	unsigned int ok;
 
-    /* Issue RDRAND, retrying until CF is set */
-    __asm__("\n1:\n\t"
-            "rdrand %0\n\t"
-            "sbb %1, %1\n\t"
-            "loopz 1b\n\t"
-            : "=r"(result), "=r"(ok), "=c"(discard_c)
-            : "2"(RDRAND_RETRY_COUNT));
-    if (!ok) {
-        DBGC(colour, "RDRAND failed to become ready\n");
-        return -EBUSY;
-    }
+	/* Issue RDRAND, retrying until CF is set */
+	__asm__ ( "\n1:\n\t"
+		  "rdrand %0\n\t"
+		  "sbb %1, %1\n\t"
+		  "loopz 1b\n\t"
+		  : "=r" ( result ), "=r" ( ok ), "=c" ( discard_c )
+		  : "2" ( RDRAND_RETRY_COUNT ) );
+	if ( ! ok ) {
+		DBGC ( colour, "RDRAND failed to become ready\n" );
+		return -EBUSY;
+	}
 
-    *noise = result;
-    return 0;
+	*noise = result;
+	return 0;
 }
 
 /** Hardware random number generator entropy source */
-struct entropy_source rdrand_entropy __entropy_source(ENTROPY_PREFERRED) = {
-    .name = "rdrand",
-    .enable = rdrand_entropy_enable,
-    .get_noise = rdrand_get_noise,
+struct entropy_source rdrand_entropy __entropy_source ( ENTROPY_PREFERRED ) = {
+	.name = "rdrand",
+	.enable = rdrand_entropy_enable,
+	.get_noise = rdrand_get_noise,
 };

@@ -22,7 +22,7 @@
  *
  */
 
-FILE_LICENCE(MIT);
+FILE_LICENCE ( MIT );
 
 /*********************************\
 * Protocol Control Unit Functions *
@@ -45,33 +45,39 @@ FILE_LICENCE(MIT);
  *
  * For iPXE we always assume STA mode.
  */
-int ath5k_hw_set_opmode(struct ath5k_hw* ah)
+int ath5k_hw_set_opmode(struct ath5k_hw *ah)
 {
-    u32 pcu_reg, beacon_reg, low_id, high_id;
+	u32 pcu_reg, beacon_reg, low_id, high_id;
 
-    /* Preserve rest settings */
-    pcu_reg = ath5k_hw_reg_read(ah, AR5K_STA_ID1) & 0xffff0000;
-    pcu_reg &= ~(AR5K_STA_ID1_ADHOC | AR5K_STA_ID1_AP | AR5K_STA_ID1_KEYSRCH_MODE | (ah->ah_version == AR5K_AR5210 ? (AR5K_STA_ID1_PWR_SV | AR5K_STA_ID1_NO_PSPOLL) : 0));
 
-    beacon_reg = 0;
+	/* Preserve rest settings */
+	pcu_reg = ath5k_hw_reg_read(ah, AR5K_STA_ID1) & 0xffff0000;
+	pcu_reg &= ~(AR5K_STA_ID1_ADHOC | AR5K_STA_ID1_AP
+			| AR5K_STA_ID1_KEYSRCH_MODE
+			| (ah->ah_version == AR5K_AR5210 ?
+			(AR5K_STA_ID1_PWR_SV | AR5K_STA_ID1_NO_PSPOLL) : 0));
 
-    pcu_reg |= AR5K_STA_ID1_KEYSRCH_MODE | (ah->ah_version == AR5K_AR5210 ? AR5K_STA_ID1_PWR_SV : 0);
+	beacon_reg = 0;
 
-    /*
-     * Set PCU registers
-     */
-    low_id = AR5K_LOW_ID(ah->ah_sta_id);
-    high_id = AR5K_HIGH_ID(ah->ah_sta_id);
-    ath5k_hw_reg_write(ah, low_id, AR5K_STA_ID0);
-    ath5k_hw_reg_write(ah, pcu_reg | high_id, AR5K_STA_ID1);
+	pcu_reg |= AR5K_STA_ID1_KEYSRCH_MODE
+		| (ah->ah_version == AR5K_AR5210 ?
+		   AR5K_STA_ID1_PWR_SV : 0);
 
-    /*
-     * Set Beacon Control Register on 5210
-     */
-    if (ah->ah_version == AR5K_AR5210)
-        ath5k_hw_reg_write(ah, beacon_reg, AR5K_BCR);
+	/*
+	 * Set PCU registers
+	 */
+	low_id = AR5K_LOW_ID(ah->ah_sta_id);
+	high_id = AR5K_HIGH_ID(ah->ah_sta_id);
+	ath5k_hw_reg_write(ah, low_id, AR5K_STA_ID0);
+	ath5k_hw_reg_write(ah, pcu_reg | high_id, AR5K_STA_ID1);
 
-    return 0;
+	/*
+	 * Set Beacon Control Register on 5210
+	 */
+	if (ah->ah_version == AR5K_AR5210)
+		ath5k_hw_reg_write(ah, beacon_reg, AR5K_BCR);
+
+	return 0;
 }
 
 /**
@@ -86,18 +92,19 @@ int ath5k_hw_set_opmode(struct ath5k_hw* ah)
  * If not hw just uses the lowest rate available for the current modulation
  * scheme being used (1Mbit for CCK and 6Mbits for OFDM).
  */
-void ath5k_hw_set_ack_bitrate_high(struct ath5k_hw* ah, int high)
+void ath5k_hw_set_ack_bitrate_high(struct ath5k_hw *ah, int high)
 {
-    if (ah->ah_version != AR5K_AR5212)
-        return;
-    else {
-        u32 val = AR5K_STA_ID1_BASE_RATE_11B | AR5K_STA_ID1_ACKCTS_6MB;
-        if (high)
-            AR5K_REG_ENABLE_BITS(ah, AR5K_STA_ID1, val);
-        else
-            AR5K_REG_DISABLE_BITS(ah, AR5K_STA_ID1, val);
-    }
+	if (ah->ah_version != AR5K_AR5212)
+		return;
+	else {
+		u32 val = AR5K_STA_ID1_BASE_RATE_11B | AR5K_STA_ID1_ACKCTS_6MB;
+		if (high)
+			AR5K_REG_ENABLE_BITS(ah, AR5K_STA_ID1, val);
+		else
+			AR5K_REG_DISABLE_BITS(ah, AR5K_STA_ID1, val);
+	}
 }
+
 
 /******************\
 * ACK/CTS Timeouts *
@@ -108,10 +115,10 @@ void ath5k_hw_set_ack_bitrate_high(struct ath5k_hw* ah, int high)
  *
  * @ah: The &struct ath5k_hw
  */
-unsigned int ath5k_hw_get_ack_timeout(struct ath5k_hw* ah)
+unsigned int ath5k_hw_get_ack_timeout(struct ath5k_hw *ah)
 {
-    return ath5k_hw_clocktoh(AR5K_REG_MS(ath5k_hw_reg_read(ah,
-                                                           AR5K_TIME_OUT), AR5K_TIME_OUT_ACK), ah->ah_turbo);
+	return ath5k_hw_clocktoh(AR5K_REG_MS(ath5k_hw_reg_read(ah,
+			AR5K_TIME_OUT), AR5K_TIME_OUT_ACK), ah->ah_turbo);
 }
 
 /**
@@ -120,16 +127,16 @@ unsigned int ath5k_hw_get_ack_timeout(struct ath5k_hw* ah)
  * @ah: The &struct ath5k_hw
  * @timeout: Timeout in usec
  */
-int ath5k_hw_set_ack_timeout(struct ath5k_hw* ah, unsigned int timeout)
+int ath5k_hw_set_ack_timeout(struct ath5k_hw *ah, unsigned int timeout)
 {
-    if (ath5k_hw_clocktoh(AR5K_REG_MS(0xffffffff, AR5K_TIME_OUT_ACK),
-                          ah->ah_turbo) <= timeout)
-        return -EINVAL;
+	if (ath5k_hw_clocktoh(AR5K_REG_MS(0xffffffff, AR5K_TIME_OUT_ACK),
+			ah->ah_turbo) <= timeout)
+		return -EINVAL;
 
-    AR5K_REG_WRITE_BITS(ah, AR5K_TIME_OUT, AR5K_TIME_OUT_ACK,
-                        ath5k_hw_htoclock(timeout, ah->ah_turbo));
+	AR5K_REG_WRITE_BITS(ah, AR5K_TIME_OUT, AR5K_TIME_OUT_ACK,
+		ath5k_hw_htoclock(timeout, ah->ah_turbo));
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -137,10 +144,10 @@ int ath5k_hw_set_ack_timeout(struct ath5k_hw* ah, unsigned int timeout)
  *
  * @ah: The &struct ath5k_hw
  */
-unsigned int ath5k_hw_get_cts_timeout(struct ath5k_hw* ah)
+unsigned int ath5k_hw_get_cts_timeout(struct ath5k_hw *ah)
 {
-    return ath5k_hw_clocktoh(AR5K_REG_MS(ath5k_hw_reg_read(ah,
-                                                           AR5K_TIME_OUT), AR5K_TIME_OUT_CTS), ah->ah_turbo);
+	return ath5k_hw_clocktoh(AR5K_REG_MS(ath5k_hw_reg_read(ah,
+			AR5K_TIME_OUT), AR5K_TIME_OUT_CTS), ah->ah_turbo);
 }
 
 /**
@@ -149,17 +156,18 @@ unsigned int ath5k_hw_get_cts_timeout(struct ath5k_hw* ah)
  * @ah: The &struct ath5k_hw
  * @timeout: Timeout in usec
  */
-int ath5k_hw_set_cts_timeout(struct ath5k_hw* ah, unsigned int timeout)
+int ath5k_hw_set_cts_timeout(struct ath5k_hw *ah, unsigned int timeout)
 {
-    if (ath5k_hw_clocktoh(AR5K_REG_MS(0xffffffff, AR5K_TIME_OUT_CTS),
-                          ah->ah_turbo) <= timeout)
-        return -EINVAL;
+	if (ath5k_hw_clocktoh(AR5K_REG_MS(0xffffffff, AR5K_TIME_OUT_CTS),
+			ah->ah_turbo) <= timeout)
+		return -EINVAL;
 
-    AR5K_REG_WRITE_BITS(ah, AR5K_TIME_OUT, AR5K_TIME_OUT_CTS,
-                        ath5k_hw_htoclock(timeout, ah->ah_turbo));
+	AR5K_REG_WRITE_BITS(ah, AR5K_TIME_OUT, AR5K_TIME_OUT_CTS,
+			ath5k_hw_htoclock(timeout, ah->ah_turbo));
 
-    return 0;
+	return 0;
 }
+
 
 /****************\
 * BSSID handling *
@@ -176,9 +184,9 @@ int ath5k_hw_set_cts_timeout(struct ath5k_hw* ah, unsigned int timeout)
  *
  * TODO: Remove it once we merge ath5k_softc and ath5k_hw
  */
-void ath5k_hw_get_lladdr(struct ath5k_hw* ah, u8* mac)
+void ath5k_hw_get_lladdr(struct ath5k_hw *ah, u8 *mac)
 {
-    memcpy(mac, ah->ah_sta_id, ETH_ALEN);
+	memcpy(mac, ah->ah_sta_id, ETH_ALEN);
 }
 
 /**
@@ -189,23 +197,23 @@ void ath5k_hw_get_lladdr(struct ath5k_hw* ah, u8* mac)
  *
  * Set station id on hw using the provided mac address
  */
-int ath5k_hw_set_lladdr(struct ath5k_hw* ah, const u8* mac)
+int ath5k_hw_set_lladdr(struct ath5k_hw *ah, const u8 *mac)
 {
-    u32 low_id, high_id;
-    u32 pcu_reg;
+	u32 low_id, high_id;
+	u32 pcu_reg;
 
-    /* Set new station ID */
-    memcpy(ah->ah_sta_id, mac, ETH_ALEN);
+	/* Set new station ID */
+	memcpy(ah->ah_sta_id, mac, ETH_ALEN);
 
-    pcu_reg = ath5k_hw_reg_read(ah, AR5K_STA_ID1) & 0xffff0000;
+	pcu_reg = ath5k_hw_reg_read(ah, AR5K_STA_ID1) & 0xffff0000;
 
-    low_id = AR5K_LOW_ID(mac);
-    high_id = AR5K_HIGH_ID(mac);
+	low_id = AR5K_LOW_ID(mac);
+	high_id = AR5K_HIGH_ID(mac);
 
-    ath5k_hw_reg_write(ah, low_id, AR5K_STA_ID0);
-    ath5k_hw_reg_write(ah, pcu_reg | high_id, AR5K_STA_ID1);
+	ath5k_hw_reg_write(ah, low_id, AR5K_STA_ID0);
+	ath5k_hw_reg_write(ah, pcu_reg | high_id, AR5K_STA_ID1);
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -217,27 +225,28 @@ int ath5k_hw_set_lladdr(struct ath5k_hw* ah, const u8* mac)
  *
  * Sets the BSSID which trigers the "SME Join" operation
  */
-void ath5k_hw_set_associd(struct ath5k_hw* ah, const u8* bssid, u16 assoc_id)
+void ath5k_hw_set_associd(struct ath5k_hw *ah, const u8 *bssid, u16 assoc_id)
 {
-    u32 low_id, high_id;
+	u32 low_id, high_id;
 
-    /*
-     * Set simple BSSID mask on 5212
-     */
-    if (ah->ah_version == AR5K_AR5212) {
-        ath5k_hw_reg_write(ah, AR5K_LOW_ID(ah->ah_bssid_mask),
-                           AR5K_BSS_IDM0);
-        ath5k_hw_reg_write(ah, AR5K_HIGH_ID(ah->ah_bssid_mask),
-                           AR5K_BSS_IDM1);
-    }
+	/*
+	 * Set simple BSSID mask on 5212
+	 */
+	if (ah->ah_version == AR5K_AR5212) {
+		ath5k_hw_reg_write(ah, AR5K_LOW_ID(ah->ah_bssid_mask),
+							AR5K_BSS_IDM0);
+		ath5k_hw_reg_write(ah, AR5K_HIGH_ID(ah->ah_bssid_mask),
+							AR5K_BSS_IDM1);
+	}
 
-    /*
-     * Set BSSID which triggers the "SME Join" operation
-     */
-    low_id = AR5K_LOW_ID(bssid);
-    high_id = AR5K_HIGH_ID(bssid);
-    ath5k_hw_reg_write(ah, low_id, AR5K_BSS_ID0);
-    ath5k_hw_reg_write(ah, high_id | ((assoc_id & 0x3fff) << AR5K_BSS_ID1_AID_S), AR5K_BSS_ID1);
+	/*
+	 * Set BSSID which triggers the "SME Join" operation
+	 */
+	low_id = AR5K_LOW_ID(bssid);
+	high_id = AR5K_HIGH_ID(bssid);
+	ath5k_hw_reg_write(ah, low_id, AR5K_BSS_ID0);
+	ath5k_hw_reg_write(ah, high_id | ((assoc_id & 0x3fff) <<
+				AR5K_BSS_ID1_AID_S), AR5K_BSS_ID1);
 }
 
 /**
@@ -336,25 +345,26 @@ void ath5k_hw_set_associd(struct ath5k_hw* ah, const u8* bssid, u16 assoc_id)
  * IFRAME-05:  1101 --> allowed but its not for us!!!
  *
  */
-int ath5k_hw_set_bssid_mask(struct ath5k_hw* ah, const u8* mask)
+int ath5k_hw_set_bssid_mask(struct ath5k_hw *ah, const u8 *mask)
 {
-    u32 low_id, high_id;
+	u32 low_id, high_id;
 
-    /* Cache bssid mask so that we can restore it
-     * on reset */
-    memcpy(ah->ah_bssid_mask, mask, ETH_ALEN);
-    if (ah->ah_version == AR5K_AR5212) {
-        low_id = AR5K_LOW_ID(mask);
-        high_id = AR5K_HIGH_ID(mask);
+	/* Cache bssid mask so that we can restore it
+	 * on reset */
+	memcpy(ah->ah_bssid_mask, mask, ETH_ALEN);
+	if (ah->ah_version == AR5K_AR5212) {
+		low_id = AR5K_LOW_ID(mask);
+		high_id = AR5K_HIGH_ID(mask);
 
-        ath5k_hw_reg_write(ah, low_id, AR5K_BSS_IDM0);
-        ath5k_hw_reg_write(ah, high_id, AR5K_BSS_IDM1);
+		ath5k_hw_reg_write(ah, low_id, AR5K_BSS_IDM0);
+		ath5k_hw_reg_write(ah, high_id, AR5K_BSS_IDM1);
 
-        return 0;
-    }
+		return 0;
+	}
 
-    return -EIO;
+	return -EIO;
 }
+
 
 /************\
 * RX Control *
@@ -371,9 +381,9 @@ int ath5k_hw_set_bssid_mask(struct ath5k_hw* ah, const u8* mask)
  * NOTE: RX DMA should be already enabled using ath5k_hw_start_rx_dma
  * TODO: Init ANI here
  */
-void ath5k_hw_start_rx_pcu(struct ath5k_hw* ah)
+void ath5k_hw_start_rx_pcu(struct ath5k_hw *ah)
 {
-    AR5K_REG_DISABLE_BITS(ah, AR5K_DIAG_SW, AR5K_DIAG_SW_DIS_RX);
+	AR5K_REG_DISABLE_BITS(ah, AR5K_DIAG_SW, AR5K_DIAG_SW_DIS_RX);
 }
 
 /**
@@ -385,19 +395,19 @@ void ath5k_hw_start_rx_pcu(struct ath5k_hw* ah)
  *
  * TODO: Detach ANI here
  */
-void ath5k_hw_stop_rx_pcu(struct ath5k_hw* ah)
+void ath5k_hw_stop_rx_pcu(struct ath5k_hw *ah)
 {
-    AR5K_REG_ENABLE_BITS(ah, AR5K_DIAG_SW, AR5K_DIAG_SW_DIS_RX);
+	AR5K_REG_ENABLE_BITS(ah, AR5K_DIAG_SW, AR5K_DIAG_SW_DIS_RX);
 }
 
 /*
  * Set multicast filter
  */
-void ath5k_hw_set_mcast_filter(struct ath5k_hw* ah, u32 filter0, u32 filter1)
+void ath5k_hw_set_mcast_filter(struct ath5k_hw *ah, u32 filter0, u32 filter1)
 {
-    /* Set the multicat filter */
-    ath5k_hw_reg_write(ah, filter0, AR5K_MCAST_FILTER0);
-    ath5k_hw_reg_write(ah, filter1, AR5K_MCAST_FILTER1);
+	/* Set the multicat filter */
+	ath5k_hw_reg_write(ah, filter0, AR5K_MCAST_FILTER0);
+	ath5k_hw_reg_write(ah, filter1, AR5K_MCAST_FILTER1);
 }
 
 /**
@@ -411,23 +421,23 @@ void ath5k_hw_set_mcast_filter(struct ath5k_hw* ah, u32 filter0, u32 filter1)
  * and pass to the driver. For a list of frame types
  * check out reg.h.
  */
-u32 ath5k_hw_get_rx_filter(struct ath5k_hw* ah)
+u32 ath5k_hw_get_rx_filter(struct ath5k_hw *ah)
 {
-    u32 data, filter = 0;
+	u32 data, filter = 0;
 
-    filter = ath5k_hw_reg_read(ah, AR5K_RX_FILTER);
+	filter = ath5k_hw_reg_read(ah, AR5K_RX_FILTER);
 
-    /*Radar detection for 5212*/
-    if (ah->ah_version == AR5K_AR5212) {
-        data = ath5k_hw_reg_read(ah, AR5K_PHY_ERR_FIL);
+	/*Radar detection for 5212*/
+	if (ah->ah_version == AR5K_AR5212) {
+		data = ath5k_hw_reg_read(ah, AR5K_PHY_ERR_FIL);
 
-        if (data & AR5K_PHY_ERR_FIL_RADAR)
-            filter |= AR5K_RX_FILTER_RADARERR;
-        if (data & (AR5K_PHY_ERR_FIL_OFDM | AR5K_PHY_ERR_FIL_CCK))
-            filter |= AR5K_RX_FILTER_PHYERR;
-    }
+		if (data & AR5K_PHY_ERR_FIL_RADAR)
+			filter |= AR5K_RX_FILTER_RADARERR;
+		if (data & (AR5K_PHY_ERR_FIL_OFDM | AR5K_PHY_ERR_FIL_CCK))
+			filter |= AR5K_RX_FILTER_PHYERR;
+	}
 
-    return filter;
+	return filter;
 }
 
 /**
@@ -440,39 +450,40 @@ u32 ath5k_hw_get_rx_filter(struct ath5k_hw* ah)
  * register on 5212 and newer chips so that we have proper PHY
  * error reporting.
  */
-void ath5k_hw_set_rx_filter(struct ath5k_hw* ah, u32 filter)
+void ath5k_hw_set_rx_filter(struct ath5k_hw *ah, u32 filter)
 {
-    u32 data = 0;
+	u32 data = 0;
 
-    /* Set PHY error filter register on 5212*/
-    if (ah->ah_version == AR5K_AR5212) {
-        if (filter & AR5K_RX_FILTER_RADARERR)
-            data |= AR5K_PHY_ERR_FIL_RADAR;
-        if (filter & AR5K_RX_FILTER_PHYERR)
-            data |= AR5K_PHY_ERR_FIL_OFDM | AR5K_PHY_ERR_FIL_CCK;
-    }
+	/* Set PHY error filter register on 5212*/
+	if (ah->ah_version == AR5K_AR5212) {
+		if (filter & AR5K_RX_FILTER_RADARERR)
+			data |= AR5K_PHY_ERR_FIL_RADAR;
+		if (filter & AR5K_RX_FILTER_PHYERR)
+			data |= AR5K_PHY_ERR_FIL_OFDM | AR5K_PHY_ERR_FIL_CCK;
+	}
 
-    /*
-     * The AR5210 uses promiscous mode to detect radar activity
-     */
-    if (ah->ah_version == AR5K_AR5210 &&
-        (filter & AR5K_RX_FILTER_RADARERR)) {
-        filter &= ~AR5K_RX_FILTER_RADARERR;
-        filter |= AR5K_RX_FILTER_PROM;
-    }
+	/*
+	 * The AR5210 uses promiscous mode to detect radar activity
+	 */
+	if (ah->ah_version == AR5K_AR5210 &&
+			(filter & AR5K_RX_FILTER_RADARERR)) {
+		filter &= ~AR5K_RX_FILTER_RADARERR;
+		filter |= AR5K_RX_FILTER_PROM;
+	}
 
-    /*Zero length DMA (phy error reporting) */
-    if (data)
-        AR5K_REG_ENABLE_BITS(ah, AR5K_RXCFG, AR5K_RXCFG_ZLFDMA);
-    else
-        AR5K_REG_DISABLE_BITS(ah, AR5K_RXCFG, AR5K_RXCFG_ZLFDMA);
+	/*Zero length DMA (phy error reporting) */
+	if (data)
+		AR5K_REG_ENABLE_BITS(ah, AR5K_RXCFG, AR5K_RXCFG_ZLFDMA);
+	else
+		AR5K_REG_DISABLE_BITS(ah, AR5K_RXCFG, AR5K_RXCFG_ZLFDMA);
 
-    /*Write RX Filter register*/
-    ath5k_hw_reg_write(ah, filter & 0xff, AR5K_RX_FILTER);
+	/*Write RX Filter register*/
+	ath5k_hw_reg_write(ah, filter & 0xff, AR5K_RX_FILTER);
 
-    /*Write PHY error filter register on 5212*/
-    if (ah->ah_version == AR5K_AR5212)
-        ath5k_hw_reg_write(ah, data, AR5K_PHY_ERR_FIL);
+	/*Write PHY error filter register on 5212*/
+	if (ah->ah_version == AR5K_AR5212)
+		ath5k_hw_reg_write(ah, data, AR5K_PHY_ERR_FIL);
+
 }
 
 /*********************\
@@ -482,42 +493,42 @@ void ath5k_hw_set_rx_filter(struct ath5k_hw* ah, u32 filter)
 /*
  * Reset a key entry on the table
  */
-int ath5k_hw_reset_key(struct ath5k_hw* ah, u16 entry)
+int ath5k_hw_reset_key(struct ath5k_hw *ah, u16 entry)
 {
-    unsigned int i, type;
-    u16 micentry = entry + AR5K_KEYTABLE_MIC_OFFSET;
+	unsigned int i, type;
+	u16 micentry = entry + AR5K_KEYTABLE_MIC_OFFSET;
 
-    type = ath5k_hw_reg_read(ah, AR5K_KEYTABLE_TYPE(entry));
+	type = ath5k_hw_reg_read(ah, AR5K_KEYTABLE_TYPE(entry));
 
-    for (i = 0; i < AR5K_KEYCACHE_SIZE; i++)
-        ath5k_hw_reg_write(ah, 0, AR5K_KEYTABLE_OFF(entry, i));
+	for (i = 0; i < AR5K_KEYCACHE_SIZE; i++)
+		ath5k_hw_reg_write(ah, 0, AR5K_KEYTABLE_OFF(entry, i));
 
-    /* Reset associated MIC entry if TKIP
-     * is enabled located at offset (entry + 64) */
-    if (type == AR5K_KEYTABLE_TYPE_TKIP) {
-        for (i = 0; i < AR5K_KEYCACHE_SIZE / 2; i++)
-            ath5k_hw_reg_write(ah, 0,
-                               AR5K_KEYTABLE_OFF(micentry, i));
-    }
+	/* Reset associated MIC entry if TKIP
+	 * is enabled located at offset (entry + 64) */
+	if (type == AR5K_KEYTABLE_TYPE_TKIP) {
+		for (i = 0; i < AR5K_KEYCACHE_SIZE / 2 ; i++)
+			ath5k_hw_reg_write(ah, 0,
+				AR5K_KEYTABLE_OFF(micentry, i));
+	}
 
-    /*
-     * Set NULL encryption on AR5212+
-     *
-     * Note: AR5K_KEYTABLE_TYPE -> AR5K_KEYTABLE_OFF(entry, 5)
-     *       AR5K_KEYTABLE_TYPE_NULL -> 0x00000007
-     *
-     * Note2: Windows driver (ndiswrapper) sets this to
-     *        0x00000714 instead of 0x00000007
-     */
-    if (ah->ah_version >= AR5K_AR5211) {
-        ath5k_hw_reg_write(ah, AR5K_KEYTABLE_TYPE_NULL,
-                           AR5K_KEYTABLE_TYPE(entry));
+	/*
+	 * Set NULL encryption on AR5212+
+	 *
+	 * Note: AR5K_KEYTABLE_TYPE -> AR5K_KEYTABLE_OFF(entry, 5)
+	 *       AR5K_KEYTABLE_TYPE_NULL -> 0x00000007
+	 *
+	 * Note2: Windows driver (ndiswrapper) sets this to
+	 *        0x00000714 instead of 0x00000007
+	 */
+	if (ah->ah_version >= AR5K_AR5211) {
+		ath5k_hw_reg_write(ah, AR5K_KEYTABLE_TYPE_NULL,
+				AR5K_KEYTABLE_TYPE(entry));
 
-        if (type == AR5K_KEYTABLE_TYPE_TKIP) {
-            ath5k_hw_reg_write(ah, AR5K_KEYTABLE_TYPE_NULL,
-                               AR5K_KEYTABLE_TYPE(micentry));
-        }
-    }
+		if (type == AR5K_KEYTABLE_TYPE_TKIP) {
+			ath5k_hw_reg_write(ah, AR5K_KEYTABLE_TYPE_NULL,
+				AR5K_KEYTABLE_TYPE(micentry));
+		}
+	}
 
-    return 0;
+	return 0;
 }

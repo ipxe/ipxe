@@ -20,7 +20,7 @@
  * Shao Miller <shao.miller@yrdsb.edu.on.ca>.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,8 +44,8 @@ static struct option_descriptor time_opts[] = {};
 
 /** "time" command descriptor */
 static struct command_descriptor time_cmd =
-    COMMAND_DESC(struct time_options, time_opts, 1, MAX_ARGUMENTS,
-                 "<command>");
+	COMMAND_DESC ( struct time_options, time_opts, 1, MAX_ARGUMENTS,
+		       "<command>" );
 
 /**
  * "time" command
@@ -54,30 +54,30 @@ static struct command_descriptor time_cmd =
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int time_exec(int argc, char** argv) {
-    struct time_options opts;
-    unsigned long start;
-    unsigned long elapsed;
-    int decisecs;
-    int rc;
+static int time_exec ( int argc, char **argv ) {
+	struct time_options opts;
+	unsigned long start;
+	unsigned long elapsed;
+	int decisecs;
+	int rc;
 
-    /* Parse options */
-    if ((rc = parse_options(argc, argv, &time_cmd, &opts)) != 0)
-        return rc;
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &time_cmd, &opts ) ) != 0 )
+		return rc;
 
-    start = currticks();
-    rc = execv(argv[1], argv + 1);
-    elapsed = (currticks() - start);
-    decisecs = (10 * elapsed / TICKS_PER_SEC);
+	start = currticks();
+	rc = execv ( argv[1], argv + 1 );
+	elapsed = ( currticks() - start );
+	decisecs = ( 10 * elapsed / TICKS_PER_SEC );
 
-    printf("%s: %d.%ds\n", argv[0],
-           (decisecs / 10), (decisecs % 10));
+	printf ( "%s: %d.%ds\n", argv[0],
+		 ( decisecs / 10 ), ( decisecs % 10 ) );
 
-    return rc;
+	return rc;
 }
 
 /** "time" command */
 struct command time_command __command = {
-    .name = "time",
-    .exec = time_exec,
+	.name = "time",
+	.exec = time_exec,
 };

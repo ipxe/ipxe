@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <string.h>
@@ -49,22 +49,22 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  */
 struct ping_connection {
-    /** Reference counter */
-    struct refcnt refcnt;
-    /** List of ping connections */
-    struct list_head list;
+	/** Reference counter */
+	struct refcnt refcnt;
+	/** List of ping connections */
+	struct list_head list;
 
-    /** Remote socket address */
-    struct sockaddr_tcpip peer;
-    /** Local port number */
-    uint16_t port;
+	/** Remote socket address */
+	struct sockaddr_tcpip peer;
+	/** Local port number */
+	uint16_t port;
 
-    /** Data transfer interface */
-    struct interface xfer;
+	/** Data transfer interface */
+	struct interface xfer;
 };
 
 /** List of registered ping connections */
-static LIST_HEAD(ping_conns);
+static LIST_HEAD ( ping_conns );
 
 /**
  * Identify ping connection by local port number
@@ -72,14 +72,14 @@ static LIST_HEAD(ping_conns);
  * @v port		Local port number
  * @ret ping		Ping connection, or NULL
  */
-static struct ping_connection* ping_demux(unsigned int port) {
-    struct ping_connection* ping;
+static struct ping_connection * ping_demux ( unsigned int port ) {
+	struct ping_connection *ping;
 
-    list_for_each_entry(ping, &ping_conns, list) {
-        if (ping->port == port)
-            return ping;
-    }
-    return NULL;
+	list_for_each_entry ( ping, &ping_conns, list ) {
+		if ( ping->port == port )
+			return ping;
+	}
+	return NULL;
 }
 
 /**
@@ -88,8 +88,9 @@ static struct ping_connection* ping_demux(unsigned int port) {
  * @v port		Local port number
  * @ret port		Local port number, or negative error
  */
-static int ping_port_available(int port) {
-    return (ping_demux(port) ? -EADDRINUSE : port);
+static int ping_port_available ( int port ) {
+
+	return ( ping_demux ( port ) ? -EADDRINUSE : port );
 }
 
 /**
@@ -99,35 +100,35 @@ static int ping_port_available(int port) {
  * @v st_src		Source address
  * @ret rc		Return status code
  */
-int ping_rx(struct io_buffer* iobuf, struct sockaddr_tcpip* st_src) {
-    struct icmp_echo* echo = iobuf->data;
-    struct ping_connection* ping;
-    struct xfer_metadata meta;
-    int rc;
+int ping_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src ) {
+	struct icmp_echo *echo = iobuf->data;
+	struct ping_connection *ping;
+	struct xfer_metadata meta;
+	int rc;
 
-    /* Sanity check: should already have been checked by ICMP layer */
-    assert(iob_len(iobuf) >= sizeof(*echo));
+	/* Sanity check: should already have been checked by ICMP layer */
+	assert ( iob_len ( iobuf ) >= sizeof ( *echo ) );
 
-    /* Identify connection */
-    ping = ping_demux(ntohs(echo->ident));
-    DBGC(ping, "PING %p reply id %#04x seq %#04x\n",
-         ping, ntohs(echo->ident), ntohs(echo->sequence));
-    if (!ping) {
-        rc = -ENOTCONN;
-        goto discard;
-    }
+	/* Identify connection */
+	ping = ping_demux ( ntohs ( echo->ident ) );
+	DBGC ( ping, "PING %p reply id %#04x seq %#04x\n",
+	       ping, ntohs ( echo->ident ), ntohs ( echo->sequence ) );
+	if ( ! ping ) {
+		rc = -ENOTCONN;
+		goto discard;
+	}
 
-    /* Strip header, construct metadata, and pass data to upper layer */
-    iob_pull(iobuf, sizeof(*echo));
-    memset(&meta, 0, sizeof(meta));
-    meta.src = ((struct sockaddr*)st_src);
-    meta.flags = XFER_FL_ABS_OFFSET;
-    meta.offset = ntohs(echo->sequence);
-    return xfer_deliver(&ping->xfer, iob_disown(iobuf), &meta);
+	/* Strip header, construct metadata, and pass data to upper layer */
+	iob_pull ( iobuf, sizeof ( *echo ) );
+	memset ( &meta, 0, sizeof ( meta ) );
+	meta.src = ( ( struct sockaddr * ) st_src );
+	meta.flags = XFER_FL_ABS_OFFSET;
+	meta.offset = ntohs ( echo->sequence );
+	return xfer_deliver ( &ping->xfer, iob_disown ( iobuf ), &meta );
 
-discard:
-    free_iob(iobuf);
-    return rc;
+ discard:
+	free_iob ( iobuf );
+	return rc;
 }
 
 /**
@@ -137,16 +138,16 @@ discard:
  * @v len		Payload size
  * @ret iobuf		I/O buffer, or NULL
  */
-static struct io_buffer*
-ping_alloc_iob(struct ping_connection* ping __unused, size_t len) {
-    size_t header_len;
-    struct io_buffer* iobuf;
+static struct io_buffer *
+ping_alloc_iob ( struct ping_connection *ping __unused, size_t len ) {
+	size_t header_len;
+	struct io_buffer *iobuf;
 
-    header_len = (MAX_LL_NET_HEADER_LEN + sizeof(struct icmp_echo));
-    iobuf = alloc_iob(header_len + len);
-    if (iobuf)
-        iob_reserve(iobuf, header_len);
-    return iobuf;
+	header_len = ( MAX_LL_NET_HEADER_LEN + sizeof ( struct icmp_echo ) );
+	iobuf = alloc_iob ( header_len + len );
+	if ( iobuf )
+		iob_reserve ( iobuf, header_len );
+	return iobuf;
 }
 
 /**
@@ -157,25 +158,25 @@ ping_alloc_iob(struct ping_connection* ping __unused, size_t len) {
  * @v meta		Data transfer metadata
  * @ret rc		Return status code
  */
-static int ping_deliver(struct ping_connection* ping, struct io_buffer* iobuf,
-                        struct xfer_metadata* meta) {
-    struct icmp_echo* echo = iob_push(iobuf, sizeof(*echo));
-    int rc;
+static int ping_deliver ( struct ping_connection *ping, struct io_buffer *iobuf,
+			  struct xfer_metadata *meta ) {
+	struct icmp_echo *echo = iob_push ( iobuf, sizeof ( *echo ) );
+	int rc;
 
-    /* Construct header */
-    memset(echo, 0, sizeof(*echo));
-    echo->ident = htons(ping->port);
-    echo->sequence = htons(meta->offset);
+	/* Construct header */
+	memset ( echo, 0, sizeof ( *echo ) );
+	echo->ident = htons ( ping->port );
+	echo->sequence = htons ( meta->offset );
 
-    /* Transmit echo request */
-    if ((rc = icmp_tx_echo_request(iob_disown(iobuf),
-                                   &ping->peer)) != 0) {
-        DBGC(ping, "PING %p could not transmit: %s\n",
-             ping, strerror(rc));
-        return rc;
-    }
+	/* Transmit echo request */
+	if ( ( rc = icmp_tx_echo_request ( iob_disown ( iobuf ),
+					   &ping->peer ) ) != 0 ) {
+		DBGC ( ping, "PING %p could not transmit: %s\n",
+		       ping, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -184,27 +185,28 @@ static int ping_deliver(struct ping_connection* ping, struct io_buffer* iobuf,
  * @v ping		Ping connection
  * @v rc		Reason for close
  */
-static void ping_close(struct ping_connection* ping, int rc) {
-    /* Close data transfer interface */
-    intf_shutdown(&ping->xfer, rc);
+static void ping_close ( struct ping_connection *ping, int rc ) {
 
-    /* Remove from list of connections and drop list's reference */
-    list_del(&ping->list);
-    ref_put(&ping->refcnt);
+	/* Close data transfer interface */
+	intf_shutdown ( &ping->xfer, rc );
 
-    DBGC(ping, "PING %p closed\n", ping);
+	/* Remove from list of connections and drop list's reference */
+	list_del ( &ping->list );
+	ref_put ( &ping->refcnt );
+
+	DBGC ( ping, "PING %p closed\n", ping );
 }
 
 /** Ping data transfer interface operations */
 static struct interface_operation ping_xfer_operations[] = {
-    INTF_OP(xfer_deliver, struct ping_connection*, ping_deliver),
-    INTF_OP(xfer_alloc_iob, struct ping_connection*, ping_alloc_iob),
-    INTF_OP(intf_close, struct ping_connection*, ping_close),
+	INTF_OP ( xfer_deliver, struct ping_connection *, ping_deliver ),
+	INTF_OP ( xfer_alloc_iob, struct ping_connection *, ping_alloc_iob ),
+	INTF_OP ( intf_close, struct ping_connection *, ping_close ),
 };
 
 /** Ping data transfer interface descriptor */
 static struct interface_descriptor ping_xfer_desc =
-    INTF_DESC(struct ping_connection, xfer, ping_xfer_operations);
+	INTF_DESC ( struct ping_connection, xfer, ping_xfer_operations );
 
 /**
  * Open a ping connection
@@ -214,53 +216,53 @@ static struct interface_descriptor ping_xfer_desc =
  * @v local		Local socket address, or NULL
  * @ret rc		Return status code
  */
-static int ping_open(struct interface* xfer, struct sockaddr* peer,
-                     struct sockaddr* local) {
-    struct sockaddr_tcpip* st_peer = (struct sockaddr_tcpip*)peer;
-    struct sockaddr_tcpip* st_local = (struct sockaddr_tcpip*)local;
-    struct ping_connection* ping;
-    int port;
-    int rc;
+static int ping_open ( struct interface *xfer, struct sockaddr *peer,
+		       struct sockaddr *local ) {
+	struct sockaddr_tcpip *st_peer = ( struct sockaddr_tcpip * ) peer;
+	struct sockaddr_tcpip *st_local = ( struct sockaddr_tcpip * ) local;
+	struct ping_connection *ping;
+	int port;
+	int rc;
 
-    /* Allocate and initialise structure */
-    ping = zalloc(sizeof(*ping));
-    if (!ping) {
-        rc = -ENOMEM;
-        goto err_alloc;
-    }
-    DBGC(ping, "PING %p allocated\n", ping);
-    ref_init(&ping->refcnt, NULL);
-    intf_init(&ping->xfer, &ping_xfer_desc, &ping->refcnt);
-    memcpy(&ping->peer, st_peer, sizeof(ping->peer));
+	/* Allocate and initialise structure */
+	ping = zalloc ( sizeof ( *ping ) );
+	if ( ! ping ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	DBGC ( ping, "PING %p allocated\n", ping );
+	ref_init ( &ping->refcnt, NULL );
+	intf_init ( &ping->xfer, &ping_xfer_desc, &ping->refcnt );
+	memcpy ( &ping->peer, st_peer, sizeof ( ping->peer ) );
 
-    /* Bind to local port */
-    port = tcpip_bind(st_local, ping_port_available);
-    if (port < 0) {
-        rc = port;
-        DBGC(ping, "PING %p could not bind: %s\n",
-             ping, strerror(rc));
-        goto err_bind;
-    }
-    ping->port = port;
-    DBGC(ping, "PING %p bound to id %#04x\n", ping, port);
+	/* Bind to local port */
+	port = tcpip_bind ( st_local, ping_port_available );
+	if ( port < 0 ) {
+		rc = port;
+		DBGC ( ping, "PING %p could not bind: %s\n",
+		       ping, strerror ( rc ) );
+		goto err_bind;
+	}
+	ping->port = port;
+	DBGC ( ping, "PING %p bound to id %#04x\n", ping, port );
 
-    /* Attach parent interface, transfer reference to connection
-     * list, and return
-     */
-    intf_plug_plug(&ping->xfer, xfer);
-    list_add(&ping->list, &ping_conns);
-    return 0;
+	/* Attach parent interface, transfer reference to connection
+	 * list, and return
+	 */
+	intf_plug_plug ( &ping->xfer, xfer );
+	list_add ( &ping->list, &ping_conns );
+	return 0;
 
-err_bind:
-    ref_put(&ping->refcnt);
-err_alloc:
-    return rc;
+ err_bind:
+	ref_put ( &ping->refcnt );
+ err_alloc:
+	return rc;
 }
 
 /** Ping socket opener */
 struct socket_opener ping_socket_opener __socket_opener = {
-    .semantics = PING_SOCK_ECHO,
-    .open = ping_open,
+	.semantics	= PING_SOCK_ECHO,
+	.open		= ping_open,
 };
 
 /** Linkage hack */

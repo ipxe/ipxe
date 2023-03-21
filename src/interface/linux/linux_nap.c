@@ -35,7 +35,7 @@ FILE_LICENCE(GPL2_OR_LATER);
  */
 static void linux_cpu_nap(void)
 {
-    linux_usleep(0);
+	linux_usleep(0);
 }
 
 PROVIDE_NAP(linux, cpu_nap, linux_cpu_nap);

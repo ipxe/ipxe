@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -31,58 +31,58 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
 
 #include <ipxe/list.h>
 
-void extern_list_add(struct list_head* new, struct list_head* head) {
-    inline_list_add(new, head);
+void extern_list_add ( struct list_head *new, struct list_head *head ) {
+	inline_list_add ( new, head );
 }
 
-void extern_list_add_tail(struct list_head* new, struct list_head* head) {
-    inline_list_add_tail(new, head);
+void extern_list_add_tail ( struct list_head *new, struct list_head *head ) {
+	inline_list_add_tail ( new, head );
 }
 
-void extern_list_del(struct list_head* list) {
-    inline_list_del(list);
+void extern_list_del ( struct list_head *list ) {
+	inline_list_del ( list );
 }
 
-int extern_list_empty(const struct list_head* list) {
-    return inline_list_empty(list);
+int extern_list_empty ( const struct list_head *list ) {
+	return inline_list_empty ( list );
 }
 
-int extern_list_is_singular(const struct list_head* list) {
-    return inline_list_is_singular(list);
+int extern_list_is_singular ( const struct list_head *list ) {
+	return inline_list_is_singular ( list );
 }
 
-int extern_list_is_last(const struct list_head* list,
-                        const struct list_head* head) {
-    return inline_list_is_last(list, head);
+int extern_list_is_last ( const struct list_head *list,
+			  const struct list_head *head ) {
+	return inline_list_is_last ( list, head );
 }
 
-void extern_list_cut_position(struct list_head* new,
-                              struct list_head* list,
-                              struct list_head* entry) {
-    inline_list_cut_position(new, list, entry);
+void extern_list_cut_position ( struct list_head *new,
+				struct list_head *list,
+				struct list_head *entry ) {
+	inline_list_cut_position ( new, list, entry );
 }
 
-void extern_list_splice(const struct list_head* list,
-                        struct list_head* entry) {
-    inline_list_splice(list, entry);
+void extern_list_splice ( const struct list_head *list,
+			  struct list_head *entry ) {
+	inline_list_splice ( list, entry );
 }
 
-void extern_list_splice_tail(const struct list_head* list,
-                             struct list_head* entry) {
-    inline_list_splice_tail(list, entry);
+void extern_list_splice_tail ( const struct list_head *list,
+			       struct list_head *entry ) {
+	inline_list_splice_tail ( list, entry );
 }
 
-void extern_list_splice_init(struct list_head* list,
-                             struct list_head* entry) {
-    inline_list_splice_init(list, entry);
+void extern_list_splice_init ( struct list_head *list,
+			       struct list_head *entry ) {
+	inline_list_splice_init ( list, entry );
 }
 
-void extern_list_splice_tail_init(struct list_head* list,
-                                  struct list_head* entry) {
-    inline_list_splice_tail_init(list, entry);
+void extern_list_splice_tail_init ( struct list_head *list,
+				    struct list_head *entry ) {
+	inline_list_splice_tail_init ( list, entry );
 }
 
-int extern_list_contains(struct list_head* entry,
-                         struct list_head* head) {
-    return inline_list_contains(entry, head);
+int extern_list_contains ( struct list_head *entry,
+			   struct list_head *head ) {
+	return inline_list_contains ( entry, head );
 }

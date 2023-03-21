@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <ipxe/interface.h>
@@ -44,24 +44,24 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-int block_read(struct interface* control, struct interface* data,
-               uint64_t lba, unsigned int count,
-               userptr_t buffer, size_t len) {
-    struct interface* dest;
-    block_read_TYPE(void*)* op =
-        intf_get_dest_op(control, block_read, &dest);
-    void* object = intf_object(dest);
-    int rc;
+int block_read ( struct interface *control, struct interface *data,
+		 uint64_t lba, unsigned int count,
+		 userptr_t buffer, size_t len ) {
+	struct interface *dest;
+	block_read_TYPE ( void * ) *op =
+		intf_get_dest_op ( control, block_read, &dest );
+	void *object = intf_object ( dest );
+	int rc;
 
-    if (op) {
-        rc = op(object, data, lba, count, buffer, len);
-    } else {
-        /* Default is to fail to issue the command */
-        rc = -EOPNOTSUPP;
-    }
+	if ( op ) {
+		rc = op ( object, data, lba, count, buffer, len );
+	} else {
+		/* Default is to fail to issue the command */
+		rc = -EOPNOTSUPP;
+	}
 
-    intf_put(dest);
-    return rc;
+	intf_put ( dest );
+	return rc;
 }
 
 /**
@@ -75,24 +75,24 @@ int block_read(struct interface* control, struct interface* data,
  * @v len		Length of data buffer
  * @ret rc		Return status code
  */
-int block_write(struct interface* control, struct interface* data,
-                uint64_t lba, unsigned int count,
-                userptr_t buffer, size_t len) {
-    struct interface* dest;
-    block_write_TYPE(void*)* op =
-        intf_get_dest_op(control, block_write, &dest);
-    void* object = intf_object(dest);
-    int rc;
+int block_write ( struct interface *control, struct interface *data,
+		  uint64_t lba, unsigned int count,
+		  userptr_t buffer, size_t len ) {
+	struct interface *dest;
+	block_write_TYPE ( void * ) *op =
+		intf_get_dest_op ( control, block_write, &dest );
+	void *object = intf_object ( dest );
+	int rc;
 
-    if (op) {
-        rc = op(object, data, lba, count, buffer, len);
-    } else {
-        /* Default is to fail to issue the command */
-        rc = -EOPNOTSUPP;
-    }
+	if ( op ) {
+		rc = op ( object, data, lba, count, buffer, len );
+	} else {
+		/* Default is to fail to issue the command */
+		rc = -EOPNOTSUPP;
+	}
 
-    intf_put(dest);
-    return rc;
+	intf_put ( dest );
+	return rc;
 }
 
 /**
@@ -102,22 +102,22 @@ int block_write(struct interface* control, struct interface* data,
  * @v data		Data interface
  * @ret rc		Return status code
  */
-int block_read_capacity(struct interface* control, struct interface* data) {
-    struct interface* dest;
-    block_read_capacity_TYPE(void*)* op =
-        intf_get_dest_op(control, block_read_capacity, &dest);
-    void* object = intf_object(dest);
-    int rc;
+int block_read_capacity ( struct interface *control, struct interface *data ) {
+	struct interface *dest;
+	block_read_capacity_TYPE ( void * ) *op =
+		intf_get_dest_op ( control, block_read_capacity, &dest );
+	void *object = intf_object ( dest );
+	int rc;
 
-    if (op) {
-        rc = op(object, data);
-    } else {
-        /* Default is to fail to issue the command */
-        rc = -EOPNOTSUPP;
-    }
+	if ( op ) {
+		rc = op ( object, data );
+	} else {
+		/* Default is to fail to issue the command */
+		rc = -EOPNOTSUPP;
+	}
 
-    intf_put(dest);
-    return rc;
+	intf_put ( dest );
+	return rc;
 }
 
 /**
@@ -126,18 +126,18 @@ int block_read_capacity(struct interface* control, struct interface* data) {
  * @v intf		Interface
  * @v capacity		Block device capacity
  */
-void block_capacity(struct interface* intf,
-                    struct block_device_capacity* capacity) {
-    struct interface* dest;
-    block_capacity_TYPE(void*)* op =
-        intf_get_dest_op(intf, block_capacity, &dest);
-    void* object = intf_object(dest);
+void block_capacity ( struct interface *intf,
+		      struct block_device_capacity *capacity ) {
+	struct interface *dest;
+	block_capacity_TYPE ( void * ) *op =
+		intf_get_dest_op ( intf, block_capacity, &dest );
+	void *object = intf_object ( dest );
 
-    if (op) {
-        op(object, capacity);
-    } else {
-        /* Default is to do nothing */
-    }
+	if ( op ) {
+		op ( object, capacity );
+	} else {
+		/* Default is to do nothing */
+	}
 
-    intf_put(dest);
+	intf_put ( dest );
 }

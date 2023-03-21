@@ -21,7 +21,7 @@
  * COPYING.UBDL), provided that you have satisfied its requirements.
  */
 
-FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
@@ -40,12 +40,12 @@ FILE_LICENCE(GPL2_OR_LATER_OR_UBDL);
  *
  * @v refcnt		Reference count
  */
-static void free_pixbuf(struct refcnt* refcnt) {
-    struct pixel_buffer* pixbuf =
-        container_of(refcnt, struct pixel_buffer, refcnt);
+static void free_pixbuf ( struct refcnt *refcnt ) {
+	struct pixel_buffer *pixbuf =
+		container_of ( refcnt, struct pixel_buffer, refcnt );
 
-    ufree(pixbuf->data);
-    free(pixbuf);
+	ufree ( pixbuf->data );
+	free ( pixbuf );
 }
 
 /**
@@ -55,36 +55,36 @@ static void free_pixbuf(struct refcnt* refcnt) {
  * @h height		Height
  * @ret pixbuf		Pixel buffer, or NULL on failure
  */
-struct pixel_buffer* alloc_pixbuf(unsigned int width, unsigned int height) {
-    struct pixel_buffer* pixbuf;
+struct pixel_buffer * alloc_pixbuf ( unsigned int width, unsigned int height ) {
+	struct pixel_buffer *pixbuf;
 
-    /* Allocate and initialise structure */
-    pixbuf = zalloc(sizeof(*pixbuf));
-    if (!pixbuf)
-        goto err_alloc_pixbuf;
-    ref_init(&pixbuf->refcnt, free_pixbuf);
-    pixbuf->width = width;
-    pixbuf->height = height;
-    pixbuf->len = (width * height * sizeof(uint32_t));
+	/* Allocate and initialise structure */
+	pixbuf = zalloc ( sizeof ( *pixbuf ) );
+	if ( ! pixbuf )
+		goto err_alloc_pixbuf;
+	ref_init ( &pixbuf->refcnt, free_pixbuf );
+	pixbuf->width = width;
+	pixbuf->height = height;
+	pixbuf->len = ( width * height * sizeof ( uint32_t ) );
 
-    /* Check for multiplication overflow */
-    if ((width != 0) &&
-        ((pixbuf->len / sizeof(uint32_t)) / width) != height) {
-        goto err_overflow;
-    }
+	/* Check for multiplication overflow */
+	if ( ( width != 0 ) &&
+	     ( ( pixbuf->len / sizeof ( uint32_t ) ) / width ) != height ) {
+		goto err_overflow;
+	}
 
-    /* Allocate pixel data buffer */
-    pixbuf->data = umalloc(pixbuf->len);
-    if (!pixbuf->data)
-        goto err_alloc_data;
+	/* Allocate pixel data buffer */
+	pixbuf->data = umalloc ( pixbuf->len );
+	if ( ! pixbuf->data )
+		goto err_alloc_data;
 
-    return pixbuf;
+	return pixbuf;
 
-err_alloc_data:
-err_overflow:
-    pixbuf_put(pixbuf);
-err_alloc_pixbuf:
-    return NULL;
+ err_alloc_data:
+ err_overflow:
+	pixbuf_put ( pixbuf );
+ err_alloc_pixbuf:
+	return NULL;
 }
 
 /**
@@ -94,25 +94,25 @@ err_alloc_pixbuf:
  * @v pixbuf		Pixel buffer to fill in
  * @ret rc		Return status code
  */
-int image_pixbuf(struct image* image, struct pixel_buffer** pixbuf) {
-    int rc;
+int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
+	int rc;
 
-    /* Check that this image can be used to create a pixel buffer */
-    if (!(image->type && image->type->pixbuf))
-        return -ENOTSUP;
+	/* Check that this image can be used to create a pixel buffer */
+	if ( ! ( image->type && image->type->pixbuf ) )
+		return -ENOTSUP;
 
-    /* Try creating pixel buffer */
-    if ((rc = image->type->pixbuf(image, pixbuf)) != 0) {
-        DBGC(image, "IMAGE %s could not create pixel buffer: %s\n",
-             image->name, strerror(rc));
-        return rc;
-    }
+	/* Try creating pixel buffer */
+	if ( ( rc = image->type->pixbuf ( image, pixbuf ) ) != 0 ) {
+		DBGC ( image, "IMAGE %s could not create pixel buffer: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
 
-    return 0;
+	return 0;
 }
 
 /* Drag in objects via image_pixbuf() */
-REQUIRING_SYMBOL(image_pixbuf);
+REQUIRING_SYMBOL ( image_pixbuf );
 
 /* Drag in pixel buffer image formats */
-REQUIRE_OBJECT(config_pixbuf);
+REQUIRE_OBJECT ( config_pixbuf );

@@ -17,7 +17,7 @@
  * 02110-1301, USA.
  */
 
-FILE_LICENCE(GPL2_OR_LATER);
+FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -35,18 +35,18 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 /** A cached ACPI table */
 struct linux_acpi_table {
-    /** List of cached tables */
-    struct list_head list;
-    /** Signature */
-    uint32_t signature;
-    /** Index */
-    unsigned int index;
-    /** Cached data */
-    userptr_t data;
+	/** List of cached tables */
+	struct list_head list;
+	/** Signature */
+	uint32_t signature;
+	/** Index */
+	unsigned int index;
+	/** Cached data */
+	userptr_t data;
 };
 
 /** List of cached ACPI tables */
-static LIST_HEAD(linux_acpi_tables);
+static LIST_HEAD ( linux_acpi_tables );
 
 /**
  * Locate ACPI table
@@ -55,94 +55,94 @@ static LIST_HEAD(linux_acpi_tables);
  * @v index		Requested index of table with this signature
  * @ret table		Table, or UNULL if not found
  */
-static userptr_t linux_acpi_find(uint32_t signature, unsigned int index) {
-    struct linux_acpi_table* table;
-    struct acpi_header* header;
-    union {
-        uint32_t signature;
-        char filename[5];
-    } u;
-    static const char prefix[] = ACPI_SYSFS_PREFIX;
-    char filename[sizeof(prefix) - 1 /* NUL */ + 4 /* signature */
-                  + 3 /* "999" */ + 1 /* NUL */];
-    int len;
-    int rc;
+static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
+	struct linux_acpi_table *table;
+	struct acpi_header *header;
+	union {
+		uint32_t signature;
+		char filename[5];
+	} u;
+	static const char prefix[] = ACPI_SYSFS_PREFIX;
+	char filename[ sizeof ( prefix ) - 1 /* NUL */ + 4 /* signature */
+		       + 3 /* "999" */ + 1 /* NUL */ ];
+	int len;
+	int rc;
 
-    /* Check for existing table */
-    list_for_each_entry(table, &linux_acpi_tables, list) {
-        if ((table->signature == signature) &&
-            (table->index == index))
-            return table->data;
-    }
+	/* Check for existing table */
+	list_for_each_entry ( table, &linux_acpi_tables, list ) {
+		if ( ( table->signature == signature ) &&
+		     ( table->index == index ) )
+			return table->data;
+	}
 
-    /* Allocate a new table */
-    table = malloc(sizeof(*table));
-    if (!table)
-        goto err_alloc;
-    table->signature = signature;
-    table->index = index;
+	/* Allocate a new table */
+	table = malloc ( sizeof ( *table ) );
+	if ( ! table )
+		goto err_alloc;
+	table->signature = signature;
+	table->index = index;
 
-    /* Construct filename (including numeric suffix) */
-    memset(&u, 0, sizeof(u));
-    u.signature = le32_to_cpu(signature);
-    snprintf(filename, sizeof(filename), "%s%s%d", prefix,
-             u.filename, (index + 1));
+	/* Construct filename (including numeric suffix) */
+	memset ( &u, 0, sizeof ( u ) );
+	u.signature = le32_to_cpu ( signature );
+	snprintf ( filename, sizeof ( filename ), "%s%s%d", prefix,
+		   u.filename, ( index + 1 ) );
 
-    /* Read file (with or without numeric suffix for index 0) */
-    len = linux_sysfs_read(filename, &table->data);
-    if ((len < 0) && (index == 0)) {
-        filename[sizeof(prefix) - 1 /* NUL */ +
-                 4 /* signature */] = '\0';
-        len = linux_sysfs_read(filename, &table->data);
-    }
-    if (len < 0) {
-        rc = len;
-        DBGC(&linux_acpi_tables, "ACPI could not read %s: %s\n",
-             filename, strerror(rc));
-        goto err_read;
-    }
-    header = user_to_virt(table->data, 0);
-    if ((((size_t)len) < sizeof(*header)) ||
-        (((size_t)len) < le32_to_cpu(header->length))) {
-        rc = -ENOENT;
-        DBGC(&linux_acpi_tables, "ACPI underlength %s (%d bytes)\n",
-             filename, len);
-        goto err_len;
-    }
+	/* Read file (with or without numeric suffix for index 0) */
+	len = linux_sysfs_read ( filename, &table->data );
+	if ( ( len < 0 ) && ( index == 0 ) ) {
+		filename[ sizeof ( prefix ) - 1 /* NUL */ +
+			  4 /* signature */ ] = '\0';
+		len = linux_sysfs_read ( filename, &table->data );
+	}
+	if ( len < 0 ) {
+		rc = len;
+		DBGC ( &linux_acpi_tables, "ACPI could not read %s: %s\n",
+		       filename, strerror ( rc ) );
+		goto err_read;
+	}
+	header = user_to_virt ( table->data, 0 );
+	if ( ( ( ( size_t ) len ) < sizeof ( *header ) ) ||
+	     ( ( ( size_t ) len ) < le32_to_cpu ( header->length ) ) ) {
+		rc = -ENOENT;
+		DBGC ( &linux_acpi_tables, "ACPI underlength %s (%d bytes)\n",
+		       filename, len );
+		goto err_len;
+	}
 
-    /* Add to list of tables */
-    list_add(&table->list, &linux_acpi_tables);
-    DBGC(&linux_acpi_tables, "ACPI cached %s\n", filename);
+	/* Add to list of tables */
+	list_add ( &table->list, &linux_acpi_tables );
+	DBGC ( &linux_acpi_tables, "ACPI cached %s\n", filename );
 
-    return table->data;
+	return table->data;
 
-err_len:
-    ufree(table->data);
-err_read:
-    free(table);
-err_alloc:
-    return UNULL;
+ err_len:
+	ufree ( table->data );
+ err_read:
+	free ( table );
+ err_alloc:
+	return UNULL;
 }
 
 /**
  * Free cached ACPI data
  *
  */
-static void linux_acpi_shutdown(int booting __unused) {
-    struct linux_acpi_table* table;
-    struct linux_acpi_table* tmp;
+static void linux_acpi_shutdown ( int booting __unused ) {
+	struct linux_acpi_table *table;
+	struct linux_acpi_table *tmp;
 
-    list_for_each_entry_safe(table, tmp, &linux_acpi_tables, list) {
-        list_del(&table->list);
-        ufree(table->data);
-        free(table);
-    }
+	list_for_each_entry_safe ( table, tmp, &linux_acpi_tables, list ) {
+		list_del ( &table->list );
+		ufree ( table->data );
+		free ( table );
+	}
 }
 
 /** ACPI shutdown function */
-struct startup_fn linux_acpi_startup_fn __startup_fn(STARTUP_NORMAL) = {
-    .name = "linux_acpi",
-    .shutdown = linux_acpi_shutdown,
+struct startup_fn linux_acpi_startup_fn __startup_fn ( STARTUP_NORMAL ) = {
+	.name = "linux_acpi",
+	.shutdown = linux_acpi_shutdown,
 };
 
-PROVIDE_ACPI(linux, acpi_find, linux_acpi_find);
+PROVIDE_ACPI ( linux, acpi_find, linux_acpi_find );
