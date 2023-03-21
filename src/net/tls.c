@@ -1196,7 +1196,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	hello.extensions.server_name.list[0].len
 		= htons ( sizeof ( hello.extensions.server_name.list[0].name ));
 	memcpy ( hello.extensions.server_name.list[0].name, session->name,
-		 sizeof ( hello.extensions.server_name.list[0].name ) );
+		 name_len );
 	hello.extensions.max_fragment_length_type
 		= htons ( TLS_MAX_FRAGMENT_LENGTH );
 	hello.extensions.max_fragment_length_len
