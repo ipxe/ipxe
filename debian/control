@@ -1,0 +1,27 @@
+Source: yandex-ipxe-images
+Section: unknown
+Priority: optional
+Maintainer: Pavel Krotkiy <potsh@yandex-team.ru>
+Build-Depends: debhelper (>= 8.0.0)
+Rules-Requires-Root: binary-targets
+Standards-Version: 3.9.4
+Homepage: http://netboot.yandex.net
+Vcs-Git: https://a.yandex-team.ru/arcadia/haas/netboot/ipxe
+
+Package: yandex-ipxe-images
+Architecture: any
+#Pre-Depends:
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Yandex ipxe images collection
+ Provide x64/arm64 vCDROM ISO/IMG to boot server from network using iPXE
+ even if server has no IPv6 or iPXE boot is not supported.
+ Contains selected images:
+ ipxe
+   ├── arm64
+   │   ├── ipxe-autoboot.iso
+   │   └── ipxe-shell.iso
+   └── x86_64
+       ├── ipxe-autoboot.img
+       ├── ipxe-autoboot.iso
+       ├── ipxe-shell.img
+       └── ipxe-shell.iso
