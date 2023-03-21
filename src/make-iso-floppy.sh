@@ -27,7 +27,6 @@ echo "Generating ISO\\IMG images...."
 set -x
 ./util/genfsimg -o ../binares/${ARCH}/ipxe-${target}.iso bin-${ARCH}-efi/ipxe--ecm--ncm.efi $([ ${ARCH} = "arm64" ] || echo "bin-${ARCH}-pcbios/ipxe--ecm--ncm.lkrn")
 [ ${ARCH} = "arm64" ] || ./util/genfsimg -o ../binares/${ARCH}/ipxe-${target}.img bin-${ARCH}-pcbios/ipxe--ecm--ncm.lkrn
-:q
 set +x
 
 cp bin-${ARCH}-efi/ipxe--ecm--ncm.efi ../binares/${ARCH}/ipxe-${target}.efi
