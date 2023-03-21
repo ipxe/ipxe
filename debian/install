@@ -1,0 +1,13 @@
+# x64 ISO/IMG
+binaries/x86_64/ipxe-autoboot.iso /srv/www/install/ipxe/x86_64/
+binaries/x86_64/ipxe-autoboot.img /srv/www/install/ipxe/x86_64/
+binaries/x86_64/ipxe-shell.iso /srv/www/install/ipxe/x86_64/
+binaries/x86_64/ipxe-shell.img /srv/www/install/ipxe/x86_64/
+
+# arm64 ISO
+binaries/arm64/ipxe-autoboot.iso /srv/www/install/ipxe/arm64/
+binaries/arm64/ipxe-shell.iso /srv/www/install/ipxe/arm64/
+
+# UEFI kernels
+binaries/x86_64/ipxe-autoboot.efi /srv/tftpboot/
+binaries/arm64/ipxe-autoboot-arm64.efi  /srv/tftpboot/
