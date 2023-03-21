@@ -211,7 +211,6 @@ install :
 #
 ifneq ($(wildcard ../.git),)
 VERSIONS := $(shell git describe --tags --always --long --abbrev=1 --match "v*")
-#$(info Building version: $(VERSIONS))
 VERSION_TUPLE	:= $(subst ., ,$(subst -, ,$(patsubst v%,%,$(VERSIONS))))
 VERSION_MAJOR	:= $(word 1,$(VERSION_TUPLE))
 VERSION_MINOR	:= $(word 2,$(VERSION_TUPLE))
@@ -235,7 +234,6 @@ else
 EXTRAVERSION    := +
 endif
 else
-$(info fail)
 VERSION_MAJOR	= 1
 VERSION_MINOR	= 0
 VERSION_PATCH	= 0
