@@ -1,3 +1,9 @@
+yandex-ipxe-images (1.2) unstable; urgency=medium
+
+  * RNDSVC-2455: Change ISO path
+
+ -- Pavel Krotkiy <porsh@yandex-team.ru>  Tue, 21 Mar 2023 22:55:56 +0300
+
 yandex-ipxe-images (1.1) unstable; urgency=medium
 
   * RNDSVC-2438: Add EFI bootloaders for x86_64 and aarch64
