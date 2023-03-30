@@ -398,6 +398,8 @@ struct tls_connection {
 	struct io_buffer rx_header_iobuf;
 	/** List of received data buffers */
 	struct list_head rx_data;
+	/** Received handshake fragment */
+	struct io_buffer *rx_handshake;
 };
 
 /** RX I/O buffer size
