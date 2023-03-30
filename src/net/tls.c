@@ -1682,9 +1682,14 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_change_cipher ( struct tls_connection *tls ) {
-	static const uint8_t change_cipher[1] = { 1 };
+	static const struct {
+		uint8_t spec;
+	} __attribute__ (( packed )) change_cipher = {
+		.spec = TLS_CHANGE_CIPHER_SPEC,
+	};
+
 	return tls_send_plaintext ( tls, TLS_TYPE_CHANGE_CIPHER,
-				    change_cipher, sizeof ( change_cipher ) );
+				    &change_cipher, sizeof ( change_cipher ) );
 }
 
 /**
@@ -1737,14 +1742,20 @@ static int tls_send_finished ( struct tls_connection *tls ) {
  */
 static int tls_new_change_cipher ( struct tls_connection *tls,
 				   const void *data, size_t len ) {
+	const struct {
+		uint8_t spec;
+	} __attribute__ (( packed )) *change_cipher = data;
 	int rc;
 
-	if ( ( len != 1 ) || ( *( ( uint8_t * ) data ) != 1 ) ) {
+	/* Sanity check */
+	if ( ( sizeof ( *change_cipher ) != len ) ||
+	     ( change_cipher->spec != TLS_CHANGE_CIPHER_SPEC ) ) {
 		DBGC ( tls, "TLS %p received invalid Change Cipher\n", tls );
-		DBGC_HD ( tls, data, len );
+		DBGC_HD ( tls, change_cipher, len );
 		return -EINVAL_CHANGE_CIPHER;
 	}
 
+	/* Change receive cipher spec */
 	if ( ( rc = tls_change_cipher ( tls, &tls->rx_cipherspec_pending,
 					&tls->rx_cipherspec ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not activate RX cipher: %s\n",

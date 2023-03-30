@@ -52,6 +52,9 @@ struct tls_header {
 /** Change cipher content type */
 #define TLS_TYPE_CHANGE_CIPHER 20
 
+/** Change cipher spec magic byte */
+#define TLS_CHANGE_CIPHER_SPEC 1
+
 /** Alert content type */
 #define TLS_TYPE_ALERT 21
 
