@@ -191,7 +191,6 @@ struct pe_relocs {
 
 struct pe_header {
 	EFI_IMAGE_DOS_HEADER dos;
-	uint8_t padding[128];
 	EFI_IMAGE_NT_HEADERS nt;
 };
 
