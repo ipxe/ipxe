@@ -321,6 +321,33 @@ static void efi_file_image ( struct efi_file *file, struct image *image ) {
 }
 
 /**
+ * Open image-backed file
+ *
+ * @v image		Image
+ * @v new		New EFI file
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS efi_file_open_image ( struct image *image,
+					EFI_FILE_PROTOCOL **new ) {
+	struct efi_file *file;
+
+	/* Allocate and initialise file */
+	file = zalloc ( sizeof ( *file ) );
+	if ( ! file )
+		return EFI_OUT_OF_RESOURCES;
+	ref_init ( &file->refcnt, efi_file_free );
+	memcpy ( &file->file, &efi_file_root.file, sizeof ( file->file ) );
+	memcpy ( &file->load, &efi_file_root.load, sizeof ( file->load ) );
+	efi_file_image ( file, image_get ( image ) );
+
+	/* Return opened file */
+	*new = &file->file;
+
+	DBGC ( file, "EFIFILE %s opened\n", efi_file_name ( file ) );
+	return 0;
+}
+
+/**
  * Open file
  *
  * @v this		EFI file
@@ -335,7 +362,6 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 		CHAR16 *wname, UINT64 mode, UINT64 attributes __unused ) {
 	struct efi_file *file = container_of ( this, struct efi_file, file );
 	char buf[ wcslen ( wname ) + 1 /* NUL */ ];
-	struct efi_file *new_file;
 	struct image *image;
 	char *name;
 
@@ -367,31 +393,16 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 		return EFI_WRITE_PROTECTED;
 	}
 
+	/* Allow registered images to be opened */
+	if ( ( image = efi_file_find ( name ) ) != NULL )
+		return efi_file_open_image ( image, new );
+
 	/* Allow magic initrd to be opened */
 	if ( strcasecmp ( name, efi_file_initrd.file.name ) == 0 )
 		return efi_file_open_fixed ( &efi_file_initrd.file, new );
 
-	/* Identify image */
-	image = efi_file_find ( name );
-	if ( ! image ) {
-		DBGC ( file, "EFIFILE %s does not exist\n", name );
-		return EFI_NOT_FOUND;
-	}
-
-	/* Allocate and initialise file */
-	new_file = zalloc ( sizeof ( *new_file ) );
-	if ( ! new_file )
-		return EFI_OUT_OF_RESOURCES;
-	ref_init ( &file->refcnt, efi_file_free );
-	memcpy ( &new_file->file, &efi_file_root.file,
-		 sizeof ( new_file->file ) );
-	memcpy ( &new_file->load, &efi_file_root.load,
-		 sizeof ( new_file->load ) );
-	efi_file_image ( new_file, image_get ( image ) );
-	*new = &new_file->file;
-	DBGC ( new_file, "EFIFILE %s opened\n", efi_file_name ( new_file ) );
-
-	return 0;
+	DBGC ( file, "EFIFILE %s does not exist\n", name );
+	return EFI_NOT_FOUND;
 }
 
 /**
