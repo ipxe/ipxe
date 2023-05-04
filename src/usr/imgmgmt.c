@@ -165,6 +165,8 @@ void imgstat ( struct image *image ) {
 		printf ( " [SELECTED]" );
 	if ( image->flags & IMAGE_AUTO_UNREGISTER )
 		printf ( " [AUTOFREE]" );
+	if ( image->flags & IMAGE_HIDDEN )
+		printf ( " [HIDDEN]" );
 	if ( image->cmdline )
 		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );

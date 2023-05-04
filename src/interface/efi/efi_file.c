@@ -250,6 +250,10 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 	len = 0;
 	for_each_image ( image ) {
 
+		/* Skip hidden images */
+		if ( image->flags & IMAGE_HIDDEN )
+			continue;
+
 		/* Pad to alignment boundary */
 		pad_len = ( ( -reader->pos ) & ( INITRD_ALIGN - 1 ) );
 		if ( pad_len ) {
@@ -524,13 +528,21 @@ static EFI_STATUS efi_file_read_dir ( struct efi_file *file, UINTN *len,
 	/* Construct directory entries for image-backed files */
 	index = file->pos;
 	for_each_image ( image ) {
-		if ( index-- == 0 ) {
-			efi_file_image ( &entry, image );
-			efirc = efi_file_info ( &entry, len, data );
-			if ( efirc == 0 )
-				file->pos++;
-			return efirc;
-		}
+
+		/* Skip hidden images */
+		if ( image->flags & IMAGE_HIDDEN )
+			continue;
+
+		/* Skip preceding images */
+		if ( index-- )
+			continue;
+
+		/* Construct directory entry */
+		efi_file_image ( &entry, image );
+		efirc = efi_file_info ( &entry, len, data );
+		if ( efirc == 0 )
+			file->pos++;
+		return efirc;
 	}
 
 	/* No more entries */
@@ -1093,6 +1105,7 @@ int efi_file_install ( EFI_HANDLE handle ) {
 		EFI_DISK_IO_PROTOCOL *diskio;
 		void *interface;
 	} diskio;
+	struct image *image;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -1156,9 +1169,12 @@ int efi_file_install ( EFI_HANDLE handle ) {
 		goto err_initrd_claim;
 
 	/* Install Linux initrd fixed device path file if non-empty */
-	if ( have_images() &&
-	     ( ( rc = efi_file_path_install ( &efi_file_initrd ) ) != 0 ) ) {
-		goto err_initrd_install;
+	for_each_image ( image ) {
+		if ( image->flags & IMAGE_HIDDEN )
+			continue;
+		if ( ( rc = efi_file_path_install ( &efi_file_initrd ) ) != 0 )
+			goto err_initrd_install;
+		break;
 	}
 
 	return 0;

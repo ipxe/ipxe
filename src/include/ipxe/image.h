@@ -72,6 +72,9 @@ struct image {
 /** Image will be automatically unregistered after execution */
 #define IMAGE_AUTO_UNREGISTER 0x0008
 
+/** Image will be hidden from enumeration */
+#define IMAGE_HIDDEN 0x0010
+
 /** An executable image type */
 struct image_type {
 	/** Name of this image type */
@@ -160,15 +163,6 @@ extern struct image *current_image;
 /** Iterate over all registered images, safe against deletion */
 #define for_each_image_safe( image, tmp ) \
 	list_for_each_entry_safe ( (image), (tmp), &images, list )
-
-/**
- * Test for existence of images
- *
- * @ret existence	Some images exist
- */
-static inline int have_images ( void ) {
-	return ( ! list_empty ( &images ) );
-}
 
 /**
  * Retrieve first image
