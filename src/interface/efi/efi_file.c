@@ -374,6 +374,7 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 	char buf[ wcslen ( wname ) + 1 /* NUL */ ];
 	struct image *image;
 	char *name;
+	char *sep;
 
 	/* Convert name to ASCII */
 	snprintf ( buf, sizeof ( buf ), "%ls", wname );
@@ -411,6 +412,16 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 	if ( strcasecmp ( name, efi_file_initrd.file.name ) == 0 ) {
 		return efi_file_open_fixed ( &efi_file_initrd.file, wname,
 					     new );
+	}
+
+	/* Allow currently selected image to be opened as "grub*.efi",
+	 * to work around buggy versions of the UEFI shim.
+	 */
+	if ( ( strncasecmp ( name, "grub", 4 ) == 0 ) &&
+	     ( ( sep = strrchr ( name, '.' ) ) != NULL ) &&
+	     ( strcasecmp ( sep, ".efi" ) == 0 ) &&
+	     ( ( image = image_find_selected() ) != NULL ) ) {
+		return efi_file_open_image ( image, wname, new );
 	}
 
 	DBGC ( file, "EFIFILE %ls does not exist\n", wname );
