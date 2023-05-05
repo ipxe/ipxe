@@ -141,6 +141,7 @@ static int efi_image_exec ( struct image *image ) {
 	EFI_HANDLE handle;
 	EFI_MEMORY_TYPE type;
 	wchar_t *cmdline;
+	unsigned int toggle;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -152,6 +153,12 @@ static int efi_image_exec ( struct image *image ) {
 		rc = -ENODEV;
 		goto err_no_snpdev;
 	}
+
+	/* Re-register as a hidden image to allow for access via file I/O */
+	toggle = ( ~image->flags & IMAGE_HIDDEN );
+	image->flags |= IMAGE_HIDDEN;
+	if ( ( rc = register_image ( image ) ) != 0 )
+		goto err_register_image;
 
 	/* Install file I/O protocols */
 	if ( ( rc = efi_file_install ( snpdev->handle ) ) != 0 ) {
@@ -296,6 +303,9 @@ static int efi_image_exec ( struct image *image ) {
  err_pxe_install:
 	efi_file_uninstall ( snpdev->handle );
  err_file_install:
+	unregister_image ( image );
+ err_register_image:
+	image->flags ^= toggle;
  err_no_snpdev:
 	return rc;
 }
