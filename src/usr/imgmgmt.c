@@ -156,13 +156,17 @@ int imgacquire ( const char *name_uri, unsigned long timeout,
  * @v image		Executable/loadable image
  */
 void imgstat ( struct image *image ) {
+	struct image_tag *tag;
+
 	printf ( "%s : %zd bytes", image->name, image->len );
 	if ( image->type )
 		printf ( " [%s]", image->type->name );
+	for_each_table_entry ( tag, IMAGE_TAGS ) {
+		if ( tag->image == image )
+			printf ( " [%s]", tag->name );
+	}
 	if ( image->flags & IMAGE_TRUSTED )
 		printf ( " [TRUSTED]" );
-	if ( image->flags & IMAGE_SELECTED )
-		printf ( " [SELECTED]" );
 	if ( image->flags & IMAGE_AUTO_UNREGISTER )
 		printf ( " [AUTOFREE]" );
 	if ( image->flags & IMAGE_HIDDEN )

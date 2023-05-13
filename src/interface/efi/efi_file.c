@@ -420,7 +420,7 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 	if ( ( strncasecmp ( name, "grub", 4 ) == 0 ) &&
 	     ( ( sep = strrchr ( name, '.' ) ) != NULL ) &&
 	     ( strcasecmp ( sep, ".efi" ) == 0 ) &&
-	     ( ( image = image_find_selected() ) != NULL ) ) {
+	     ( ( image = find_image_tag ( &selected_image ) ) != NULL ) ) {
 		return efi_file_open_image ( image, wname, new );
 	}
 

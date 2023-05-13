@@ -61,19 +61,16 @@ struct image {
 };
 
 /** Image is registered */
-#define IMAGE_REGISTERED 0x00001
-
-/** Image is selected for execution */
-#define IMAGE_SELECTED 0x0002
+#define IMAGE_REGISTERED 0x0001
 
 /** Image is trusted */
-#define IMAGE_TRUSTED 0x0004
+#define IMAGE_TRUSTED 0x0002
 
 /** Image will be automatically unregistered after execution */
-#define IMAGE_AUTO_UNREGISTER 0x0008
+#define IMAGE_AUTO_UNREGISTER 0x0004
 
 /** Image will be hidden from enumeration */
-#define IMAGE_HIDDEN 0x0010
+#define IMAGE_HIDDEN 0x0008
 
 /** An executable image type */
 struct image_type {
@@ -153,8 +150,23 @@ struct image_type {
 /** An executable image type */
 #define __image_type( probe_order ) __table_entry ( IMAGE_TYPES, probe_order )
 
+/** An image tag */
+struct image_tag {
+	/** Name */
+	const char *name;
+	/** Image (weak reference, nullified when image is freed) */
+	struct image *image;
+};
+
+/** Image tag table */
+#define IMAGE_TAGS __table ( struct image_tag, "image_tags" )
+
+/** An image tag */
+#define __image_tag __table_entry ( IMAGE_TAGS, 01 )
+
 extern struct list_head images;
-extern struct image *current_image;
+extern struct image_tag current_image;
+extern struct image_tag selected_image;
 
 /** Iterate over all registered images */
 #define for_each_image( image ) \
@@ -181,11 +193,11 @@ extern int image_set_len ( struct image *image, size_t len );
 extern int image_set_data ( struct image *image, userptr_t data, size_t len );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
-struct image * find_image ( const char *name );
+extern struct image * find_image ( const char *name );
+extern struct image * find_image_tag ( struct image_tag *tag );
 extern int image_exec ( struct image *image );
 extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
-extern struct image * image_find_selected ( void );
 extern int image_set_trust ( int require_trusted, int permanent );
 extern struct image * image_memory ( const char *name, userptr_t data,
 				     size_t len );
@@ -242,6 +254,21 @@ static inline void image_trust ( struct image *image ) {
  */
 static inline void image_untrust ( struct image *image ) {
 	image->flags &= ~IMAGE_TRUSTED;
+}
+
+/**
+ * Tag image
+ *
+ * @v image		Image
+ * @v tag		Image tag
+ * @ret prev		Previous tagged image (if any)
+ */
+static inline struct image * image_tag ( struct image *image,
+					 struct image_tag *tag ) {
+	struct image *prev = tag->image;
+
+	tag->image = image;
+	return prev;
 }
 
 #endif /* _IPXE_IMAGE_H */

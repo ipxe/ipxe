@@ -129,7 +129,7 @@ static int imgsingle_exec ( int argc, char **argv,
 					    &image ) ) != 0 )
 			goto err_acquire;
 	} else {
-		image = image_find_selected();
+		image = find_image_tag ( &selected_image );
 		if ( ! image ) {
 			printf ( "No image selected\n" );
 			goto err_acquire;
