@@ -31,6 +31,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_wrap.h>
 #include <ipxe/efi/efi_pxe.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_image.h>
+#include <ipxe/efi/efi_shim.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -134,6 +136,8 @@ static int efi_image_exec ( struct image *image ) {
 		EFI_LOADED_IMAGE_PROTOCOL *image;
 		void *interface;
 	} loaded;
+	struct image *shim;
+	struct image *exec;
 	EFI_HANDLE handle;
 	EFI_MEMORY_TYPE type;
 	wchar_t *cmdline;
@@ -148,6 +152,15 @@ static int efi_image_exec ( struct image *image ) {
 		       image->name );
 		rc = -ENODEV;
 		goto err_no_snpdev;
+	}
+
+	/* Use shim instead of directly executing image if applicable */
+	shim = ( efi_can_load ( image ) ?
+		 NULL : find_image_tag ( &efi_shim ) );
+	exec = ( shim ? shim : image );
+	if ( shim ) {
+		DBGC ( image, "EFIIMAGE %s executing via %s\n",
+		       image->name, shim->name );
 	}
 
 	/* Re-register as a hidden image to allow for access via file I/O */
@@ -178,7 +191,7 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Create device path for image */
-	path = efi_image_path ( image, snpdev->path );
+	path = efi_image_path ( exec, snpdev->path );
 	if ( ! path ) {
 		DBGC ( image, "EFIIMAGE %s could not create device path\n",
 		       image->name );
@@ -195,11 +208,20 @@ static int efi_image_exec ( struct image *image ) {
 		goto err_cmdline;
 	}
 
+	/* Install shim special handling if applicable */
+	if ( shim &&
+	     ( ( rc = efi_shim_install ( shim, snpdev->handle,
+					 &cmdline ) ) != 0 ) ){
+		DBGC ( image, "EFIIMAGE %s could not install shim handling: "
+		       "%s\n", image->name, strerror ( rc ) );
+		goto err_shim_install;
+	}
+
 	/* Attempt loading image */
 	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path,
-				       user_to_virt ( image->data, 0 ),
-				       image->len, &handle ) ) != 0 ) {
+				       user_to_virt ( exec->data, 0 ),
+				       exec->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %s could not load: %s\n",
@@ -289,6 +311,9 @@ static int efi_image_exec ( struct image *image ) {
 	if ( rc != 0 )
 		bs->UnloadImage ( handle );
  err_load_image:
+	if ( shim )
+		efi_shim_uninstall();
+ err_shim_install:
 	free ( cmdline );
  err_cmdline:
 	free ( path );

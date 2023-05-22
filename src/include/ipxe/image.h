@@ -257,6 +257,15 @@ static inline void image_untrust ( struct image *image ) {
 }
 
 /**
+ * Mark image as hidden
+ *
+ * @v image		Image
+ */
+static inline void image_hide ( struct image *image ) {
+	image->flags |= IMAGE_HIDDEN;
+}
+
+/**
  * Tag image
  *
  * @v image		Image
