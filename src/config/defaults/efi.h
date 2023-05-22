@@ -47,6 +47,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define USB_BLOCK		/* USB block devices */
 
 #define	REBOOT_CMD		/* Reboot command */
+#define SHIM_CMD		/* EFI shim command */
 
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86

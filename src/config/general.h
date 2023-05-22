@@ -160,6 +160,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define CERT_CMD		/* Certificate management commands */
 //#define IMAGE_MEM_CMD		/* Read memory command */
 #define IMAGE_ARCHIVE_CMD	/* Archive image management commands */
+//#define SHIM_CMD		/* EFI shim command */
 
 /*
  * ROM-specific options
