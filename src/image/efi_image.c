@@ -109,18 +109,14 @@ efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
  */
 static wchar_t * efi_image_cmdline ( struct image *image ) {
 	wchar_t *cmdline;
-	size_t len;
 
-	len = ( strlen ( image->name ) +
-		( image->cmdline ?
-		  ( 1 /* " " */ + strlen ( image->cmdline ) ) : 0 ) );
-	cmdline = zalloc ( ( len + 1 /* NUL */ ) * sizeof ( wchar_t ) );
-	if ( ! cmdline )
+	/* Allocate and construct command line */
+	if ( efi_asprintf ( &cmdline, "%s%s%s", image->name,
+			    ( image->cmdline ? " " : "" ),
+			    ( image->cmdline ? image->cmdline : "" ) ) < 0 ) {
 		return NULL;
-	efi_snprintf ( cmdline, ( len + 1 /* NUL */ ), "%s%s%s",
-		       image->name,
-		       ( image->cmdline ? " " : "" ),
-		       ( image->cmdline ? image->cmdline : "" ) );
+	}
+
 	return cmdline;
 }
 
