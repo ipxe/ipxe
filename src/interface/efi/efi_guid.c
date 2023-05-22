@@ -54,6 +54,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/PciRootBridgeIo.h>
 #include <ipxe/efi/Protocol/PxeBaseCode.h>
 #include <ipxe/efi/Protocol/SerialIo.h>
+#include <ipxe/efi/Protocol/ShimLock.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/Protocol/SimplePointer.h>
@@ -226,6 +227,10 @@ EFI_GUID efi_pxe_base_code_protocol_guid
 /** Serial I/O protocol GUID */
 EFI_GUID efi_serial_io_protocol_guid
 	= EFI_SERIAL_IO_PROTOCOL_GUID;
+
+/** Shim lock protocol GUID */
+EFI_GUID efi_shim_lock_protocol_guid
+	= EFI_SHIM_LOCK_PROTOCOL_GUID;
 
 /** Simple file system protocol GUID */
 EFI_GUID efi_simple_file_system_protocol_guid

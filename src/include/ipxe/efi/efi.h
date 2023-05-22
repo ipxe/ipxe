@@ -197,6 +197,7 @@ extern EFI_GUID efi_pci_io_protocol_guid;
 extern EFI_GUID efi_pci_root_bridge_io_protocol_guid;
 extern EFI_GUID efi_pxe_base_code_protocol_guid;
 extern EFI_GUID efi_serial_io_protocol_guid;
+extern EFI_GUID efi_shim_lock_protocol_guid;
 extern EFI_GUID efi_simple_file_system_protocol_guid;
 extern EFI_GUID efi_simple_network_protocol_guid;
 extern EFI_GUID efi_simple_pointer_protocol_guid;

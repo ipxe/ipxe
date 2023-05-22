@@ -143,6 +143,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "PxeBaseCode" },
 	{ &efi_serial_io_protocol_guid,
 	  "SerialIo" },
+	{ &efi_shim_lock_protocol_guid,
+	  "ShimLock" },
 	{ &efi_simple_file_system_protocol_guid,
 	  "SimpleFileSystem" },
 	{ &efi_simple_network_protocol_guid,
