@@ -39,9 +39,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v image		Shim image, or NULL to clear shim
  * @v require_loader	Require use of a third party loader
  * @v allow_pxe		Allow use of PXE base code
+ * @v allow_sbat	Allow SBAT variable access
  * @ret rc		Return status code
  */
-int shim ( struct image *image, int require_loader, int allow_pxe ) {
+int shim ( struct image *image, int require_loader, int allow_pxe,
+	   int allow_sbat ) {
 
 	/* Record (or clear) shim image */
 	image_tag ( image, &efi_shim );
@@ -53,6 +55,7 @@ int shim ( struct image *image, int require_loader, int allow_pxe ) {
 	/* Record configuration */
 	efi_shim_require_loader = require_loader;
 	efi_shim_allow_pxe = allow_pxe;
+	efi_shim_allow_sbat = allow_sbat;
 
 	return 0;
 }

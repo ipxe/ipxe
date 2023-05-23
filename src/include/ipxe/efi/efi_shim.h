@@ -14,6 +14,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 extern int efi_shim_require_loader;
 extern int efi_shim_allow_pxe;
+extern int efi_shim_allow_sbat;
 extern struct image_tag efi_shim __image_tag;
 
 extern int efi_shim_install ( struct image *shim, EFI_HANDLE handle,

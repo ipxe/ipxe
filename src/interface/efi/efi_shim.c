@@ -84,6 +84,26 @@ int efi_shim_require_loader = 0;
  */
 int efi_shim_allow_pxe = 0;
 
+/**
+ * Allow SBAT variable access
+ *
+ * The UEFI shim implements a fairly nicely designed revocation
+ * mechanism designed around the concept of security generations.
+ * Unfortunately nobody in the shim community has thus far added the
+ * relevant metadata to the Linux kernel, with the result that current
+ * versions of shim are incapable of booting current versions of the
+ * Linux kernel.
+ *
+ * Experience shows that there is unfortunately no point in trying to
+ * get a fix for this upstreamed into shim.  We therefore default to
+ * working around this undesirable behaviour by patching data read
+ * from the "SbatLevel" variable used to hold SBAT configuration.
+ *
+ * This option may be used to allow shim unpatched access to the
+ * "SbatLevel" variable, in case this behaviour is ever desirable.
+ */
+int efi_shim_allow_sbat = 0;
+
 /** UEFI shim image */
 struct image_tag efi_shim __image_tag = {
 	.name = "SHIM",
@@ -91,6 +111,33 @@ struct image_tag efi_shim __image_tag = {
 
 /** Original GetMemoryMap() function */
 static EFI_GET_MEMORY_MAP efi_shim_orig_get_memory_map;
+
+/** Original ExitBootServices() function */
+static EFI_EXIT_BOOT_SERVICES efi_shim_orig_exit_boot_services;
+
+/** Original SetVariable() function */
+static EFI_SET_VARIABLE efi_shim_orig_set_variable;
+
+/** Original GetVariable() function */
+static EFI_GET_VARIABLE efi_shim_orig_get_variable;
+
+/** Verify read from SbatLevel variable */
+static int efi_shim_sbatlevel_verify;
+
+/**
+ * Check if variable is SbatLevel
+ *
+ * @v name		Variable name
+ * @v guid		Variable namespace GUID
+ * @ret is_sbatlevel	Variable is SbatLevel
+ */
+static int efi_shim_is_sbatlevel ( const CHAR16 *name, const EFI_GUID *guid ) {
+	static CHAR16 sbatlevel[] = L"SbatLevel";
+	EFI_GUID *shimlock = &efi_shim_lock_protocol_guid;
+
+	return ( ( memcmp ( name, sbatlevel, sizeof ( sbatlevel ) ) == 0 ) &&
+		 ( memcmp ( guid, shimlock, sizeof ( *shimlock ) ) == 0 ) );
+}
 
 /**
  * Unlock UEFI shim
@@ -135,6 +182,92 @@ static EFIAPI EFI_STATUS efi_shim_get_memory_map ( UINTN *len,
 	/* Hand off to original GetMemoryMap() */
 	return efi_shim_orig_get_memory_map ( len, map, key, desclen,
 					      descver );
+}
+
+/**
+ * Wrap ExitBootServices()
+ *
+ * @v handle		Image handle
+ * @v key		Memory map key
+ * @ret efirc		EFI status code
+ */
+static EFIAPI EFI_STATUS efi_shim_exit_boot_services ( EFI_HANDLE handle,
+						       UINTN key ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+
+	/* Restore original runtime services functions */
+	rs->SetVariable = efi_shim_orig_set_variable;
+	rs->GetVariable = efi_shim_orig_get_variable;
+
+	/* Hand off to original ExitBootServices() */
+	return efi_shim_orig_exit_boot_services ( handle, key );
+}
+
+/**
+ * Wrap SetVariable()
+ *
+ * @v name		Variable name
+ * @v guid		Variable namespace GUID
+ * @v attrs		Attributes
+ * @v len		Buffer size
+ * @v data		Data buffer
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_shim_set_variable ( CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
+			UINTN len, VOID *data ) {
+	EFI_STATUS efirc;
+
+	/* Call original SetVariable() */
+	efirc = efi_shim_orig_set_variable ( name, guid, attrs, len, data );
+
+	/* Allow verification of SbatLevel variable content */
+	if ( efi_shim_is_sbatlevel ( name, guid ) && ( efirc == 0 ) ) {
+		DBGC ( &efi_shim, "SHIM detected write to %ls:\n", name );
+		DBGC_HDA ( &efi_shim, 0, data, len );
+		efi_shim_sbatlevel_verify = 1;
+	}
+
+	return efirc;
+}
+
+/**
+ * Wrap GetVariable()
+ *
+ * @v name		Variable name
+ * @v guid		Variable namespace GUID
+ * @v attrs		Attributes to fill in
+ * @v len		Buffer size
+ * @v data		Data buffer
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+efi_shim_get_variable ( CHAR16 *name, EFI_GUID *guid, UINT32 *attrs,
+			UINTN *len, VOID *data ) {
+	char *value = data;
+	EFI_STATUS efirc;
+
+	/* Call original GetVariable() */
+	efirc = efi_shim_orig_get_variable ( name, guid, attrs, len, data );
+
+	/* Patch SbatLevel variable if applicable */
+	if ( efi_shim_is_sbatlevel ( name, guid ) && data && ( efirc == 0 ) ) {
+		if ( efi_shim_allow_sbat ) {
+			DBGC ( &efi_shim, "SHIM allowing read from %ls:\n",
+			       name );
+		} else if ( efi_shim_sbatlevel_verify ) {
+			DBGC ( &efi_shim, "SHIM allowing one read from %ls:\n",
+			       name );
+			efi_shim_sbatlevel_verify = 0;
+		} else {
+			DBGC ( &efi_shim, "SHIM patching read from %ls:\n",
+			       name );
+			value[0] = '\0';
+		}
+		DBGC_HDA ( &efi_shim, 0, data, *len );
+	}
+
+	return efirc;
 }
 
 /**
@@ -225,6 +358,7 @@ static int efi_shim_cmdline ( struct image *shim, wchar_t **cmdline ) {
 int efi_shim_install ( struct image *shim, EFI_HANDLE handle,
 		       wchar_t **cmdline ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
 	int rc;
 
 	/* Stop PXE base code */
@@ -237,11 +371,17 @@ int efi_shim_install ( struct image *shim, EFI_HANDLE handle,
 	if ( ( rc = efi_shim_cmdline ( shim, cmdline ) ) != 0 )
 		return rc;
 
-	/* Record original boot services functions */
+	/* Record original boot and runtime services functions */
 	efi_shim_orig_get_memory_map = bs->GetMemoryMap;
+	efi_shim_orig_exit_boot_services = bs->ExitBootServices;
+	efi_shim_orig_set_variable = rs->SetVariable;
+	efi_shim_orig_get_variable = rs->GetVariable;
 
-	/* Wrap relevant boot services functions */
+	/* Wrap relevant boot and runtime services functions */
 	bs->GetMemoryMap = efi_shim_get_memory_map;
+	bs->ExitBootServices = efi_shim_exit_boot_services;
+	rs->SetVariable = efi_shim_set_variable;
+	rs->GetVariable = efi_shim_get_variable;
 
 	return 0;
 }
@@ -252,7 +392,11 @@ int efi_shim_install ( struct image *shim, EFI_HANDLE handle,
  */
 void efi_shim_uninstall ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
 
-	/* Restore original boot services functions */
+	/* Restore original boot and runtime services functions */
 	bs->GetMemoryMap = efi_shim_orig_get_memory_map;
+	bs->ExitBootServices = efi_shim_orig_exit_boot_services;
+	rs->SetVariable = efi_shim_orig_set_variable;
+	rs->GetVariable = efi_shim_orig_get_variable;
 }

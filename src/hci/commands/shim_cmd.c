@@ -44,6 +44,8 @@ struct shim_options {
 	int require_loader;
 	/** Allow PXE base code protocol */
 	int allow_pxe;
+	/** Allow SBAT variable access */
+	int allow_sbat;
 };
 
 /** "shim" option list */
@@ -54,6 +56,8 @@ static struct option_descriptor shim_opts[] = {
 		      struct shim_options, require_loader, parse_flag ),
 	OPTION_DESC ( "allow-pxe", 'p', no_argument,
 		      struct shim_options, allow_pxe, parse_flag ),
+	OPTION_DESC ( "allow-sbat", 's', no_argument,
+		      struct shim_options, allow_sbat, parse_flag ),
 };
 
 /** "shim" command descriptor */
@@ -94,7 +98,8 @@ static int shim_exec ( int argc, char **argv ) {
 	}
 
 	/* (Un)register as shim */
-	if ( ( rc = shim ( image, opts.require_loader, opts.allow_pxe ) ) != 0 )
+	if ( ( rc = shim ( image, opts.require_loader, opts.allow_pxe,
+			   opts.allow_sbat ) ) != 0 )
 		goto err_shim;
 
  err_shim:
