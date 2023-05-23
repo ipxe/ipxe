@@ -90,23 +90,13 @@ struct image_tag efi_shim __image_tag = {
 };
 
 /** Original GetMemoryMap() function */
-static EFI_GET_MEMORY_MAP efi_shim_orig_map;
+static EFI_GET_MEMORY_MAP efi_shim_orig_get_memory_map;
 
 /**
  * Unlock UEFI shim
  *
- * @v len		Memory map size
- * @v map		Memory map
- * @v key		Memory map key
- * @v desclen		Descriptor size
- * @v descver		Descriptor version
- * @ret efirc		EFI status code
- *
  */
-static EFIAPI EFI_STATUS efi_shim_unlock ( UINTN *len,
-					   EFI_MEMORY_DESCRIPTOR *map,
-					   UINTN *key, UINTN *desclen,
-					   UINT32 *descver ) {
+static void efi_shim_unlock ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	uint8_t empty[0];
 	union {
@@ -121,9 +111,30 @@ static EFIAPI EFI_STATUS efi_shim_unlock ( UINTN *len,
 		u.lock->Verify ( empty, sizeof ( empty ) );
 		DBGC ( &efi_shim, "SHIM unlocked via %p\n", u.lock );
 	}
+}
+
+/**
+ * Wrap GetMemoryMap()
+ *
+ * @v len		Memory map size
+ * @v map		Memory map
+ * @v key		Memory map key
+ * @v desclen		Descriptor size
+ * @v descver		Descriptor version
+ * @ret efirc		EFI status code
+ */
+static EFIAPI EFI_STATUS efi_shim_get_memory_map ( UINTN *len,
+						   EFI_MEMORY_DESCRIPTOR *map,
+						   UINTN *key, UINTN *desclen,
+						   UINT32 *descver ) {
+
+	/* Unlock shim */
+	if ( ! efi_shim_require_loader )
+		efi_shim_unlock();
 
 	/* Hand off to original GetMemoryMap() */
-	return efi_shim_orig_map ( len, map, key, desclen, descver );
+	return efi_shim_orig_get_memory_map ( len, map, key, desclen,
+					      descver );
 }
 
 /**
@@ -216,27 +227,23 @@ int efi_shim_install ( struct image *shim, EFI_HANDLE handle,
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	int rc;
 
-	/* Intercept GetMemoryMap() via boot services table */
-	efi_shim_orig_map = bs->GetMemoryMap;
-	if ( ! efi_shim_require_loader )
-		bs->GetMemoryMap = efi_shim_unlock;
-
 	/* Stop PXE base code */
 	if ( ( ! efi_shim_allow_pxe ) &&
 	     ( ( rc = efi_shim_inhibit_pxe ( handle ) ) != 0 ) ) {
-		goto err_inhibit_pxe;
+		return rc;
 	}
 
 	/* Update command line */
 	if ( ( rc = efi_shim_cmdline ( shim, cmdline ) ) != 0 )
-		goto err_cmdline;
+		return rc;
+
+	/* Record original boot services functions */
+	efi_shim_orig_get_memory_map = bs->GetMemoryMap;
+
+	/* Wrap relevant boot services functions */
+	bs->GetMemoryMap = efi_shim_get_memory_map;
 
 	return 0;
-
- err_cmdline:
- err_inhibit_pxe:
-	bs->GetMemoryMap = efi_shim_orig_map;
-	return rc;
 }
 
 /**
@@ -246,6 +253,6 @@ int efi_shim_install ( struct image *shim, EFI_HANDLE handle,
 void efi_shim_uninstall ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
-	/* Restore original GetMemoryMap() */
-	bs->GetMemoryMap = efi_shim_orig_map;
+	/* Restore original boot services functions */
+	bs->GetMemoryMap = efi_shim_orig_get_memory_map;
 }
