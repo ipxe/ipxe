@@ -36,6 +36,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/* Exist as a dummy command on non-EFI platforms */
+#ifdef PLATFORM_efi
+#define shim_dummy 0
+#else
+#define shim_dummy 1
+#endif
+
 /** "shim" options */
 struct shim_options {
 	/** Download timeout */
@@ -79,6 +86,12 @@ static int shim_exec ( int argc, char **argv ) {
 	int download;
 	int rc;
 
+	/* Do absolutely nothing if this is a non-EFI platform */
+	if ( shim_dummy ) {
+		rc = 0;
+		goto err_dummy;
+	}
+
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &shim_cmd, &opts ) ) != 0 )
 		goto err_parse;
@@ -105,6 +118,7 @@ static int shim_exec ( int argc, char **argv ) {
  err_shim:
  err_image:
  err_parse:
+ err_dummy:
 	return rc;
 }
 
