@@ -590,6 +590,32 @@ int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 }
 
 /**
+ * Check ASN.1 OID-identified algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @v expected		Expected algorithm
+ * @ret rc		Return status code
+ */
+int asn1_check_algorithm ( const struct asn1_cursor *cursor,
+			   struct asn1_algorithm *expected ) {
+	struct asn1_algorithm *actual;
+	int rc;
+
+	/* Parse algorithm */
+	if ( ( rc = asn1_algorithm ( cursor, &actual ) ) != 0 )
+		return rc;
+
+	/* Check algorithm matches */
+	if ( actual != expected ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s does not match %s\n",
+		       cursor, actual->name, expected->name );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
+}
+
+/**
  * Parse ASN.1 GeneralizedTime
  *
  * @v cursor		ASN.1 cursor

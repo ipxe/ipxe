@@ -164,7 +164,7 @@ static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
 	int is_private;
 	int rc;
 
-	/* Enter subjectPublicKeyInfo/RSAPrivateKey */
+	/* Enter subjectPublicKeyInfo/privateKeyInfo/RSAPrivateKey */
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
@@ -176,6 +176,23 @@ static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
 
 		/* Skip version */
 		asn1_skip_any ( &cursor );
+
+		/* Enter privateKey, if present */
+		if ( asn1_check_algorithm ( &cursor,
+					    &rsa_encryption_algorithm ) == 0 ) {
+
+			/* Skip privateKeyAlgorithm */
+			asn1_skip_any ( &cursor );
+
+			/* Enter privateKey */
+			asn1_enter ( &cursor, ASN1_OCTET_STRING );
+
+			/* Enter RSAPrivateKey */
+			asn1_enter ( &cursor, ASN1_SEQUENCE );
+
+			/* Skip version */
+			asn1_skip ( &cursor, ASN1_INTEGER );
+		}
 
 	} else {
 
