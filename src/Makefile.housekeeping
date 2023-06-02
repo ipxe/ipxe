@@ -686,9 +686,14 @@ VERYCLEANUP += $(PRIVKEY_LIST)
 #
 PRIVKEY_INC := $(BIN)/.private_key.der
 
+PRIVKEY_OUT_FLAGS := -outform DER
+
+OPENSSL_MAJOR_VERSION := $(shell $(OPENSSL) version | awk '{split($$2, ver, "."); print ver[1]}')
+PRIVKEY_OUT_FLAGS += $(shell [ $(OPENSSL_MAJOR_VERSION) -ge 3 ] && $(ECHO) '-traditional')
+
 ifdef PRIVKEY
 $(PRIVKEY_INC) : $(PRIVKEY) $(PRIVKEY_LIST)
-	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
+	$(Q)$(OPENSSL) rsa -in $< -out $@ $(PRIVKEY_OUT_FLAGS)
 
 privkey_DEPS += $(PRIVKEY_INC)
 endif
