@@ -39,6 +39,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/Dhcp4.h>
 #include <ipxe/efi/Protocol/Dhcp6.h>
 #include <ipxe/efi/Protocol/DiskIo.h>
+#include <ipxe/efi/Protocol/Dns4.h>
+#include <ipxe/efi/Protocol/Dns6.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/GraphicsOutput.h>
 #include <ipxe/efi/Protocol/HiiConfigAccess.h>
@@ -158,6 +160,22 @@ EFI_GUID efi_dhcp6_service_binding_protocol_guid
 /** Disk I/O protocol GUID */
 EFI_GUID efi_disk_io_protocol_guid
 	= EFI_DISK_IO_PROTOCOL_GUID;
+
+/** DNSv4 protocol GUID */
+EFI_GUID efi_dns4_protocol_guid
+	= EFI_DNS4_PROTOCOL_GUID;
+
+/** DNSv4 service binding protocol GUID */
+EFI_GUID efi_dns4_service_binding_protocol_guid
+	= EFI_DNS4_SERVICE_BINDING_PROTOCOL_GUID;
+
+/** DNSv6 protocol GUID */
+EFI_GUID efi_dns6_protocol_guid
+	= EFI_DNS6_PROTOCOL_GUID;
+
+/** DNSv6 service binding protocol GUID */
+EFI_GUID efi_dns6_service_binding_protocol_guid
+	= EFI_DNS6_SERVICE_BINDING_PROTOCOL_GUID;
 
 /** Driver binding protocol GUID */
 EFI_GUID efi_driver_binding_protocol_guid
