@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/DevicePath.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
 #include <ipxe/efi/Protocol/Dhcp4.h>
+#include <ipxe/efi/Protocol/Dhcp6.h>
 #include <ipxe/efi/Protocol/DiskIo.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/GraphicsOutput.h>
@@ -44,11 +45,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/HiiFont.h>
 #include <ipxe/efi/Protocol/Ip4.h>
 #include <ipxe/efi/Protocol/Ip4Config.h>
+#include <ipxe/efi/Protocol/Ip6.h>
+#include <ipxe/efi/Protocol/Ip6Config.h>
 #include <ipxe/efi/Protocol/LoadFile.h>
 #include <ipxe/efi/Protocol/LoadFile2.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/Protocol/ManagedNetwork.h>
 #include <ipxe/efi/Protocol/Mtftp4.h>
+#include <ipxe/efi/Protocol/Mtftp6.h>
 #include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
 #include <ipxe/efi/Protocol/PciIo.h>
 #include <ipxe/efi/Protocol/PciRootBridgeIo.h>
@@ -63,7 +67,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SimpleTextOut.h>
 #include <ipxe/efi/Protocol/TcgService.h>
 #include <ipxe/efi/Protocol/Tcp4.h>
+#include <ipxe/efi/Protocol/Tcp6.h>
 #include <ipxe/efi/Protocol/Udp4.h>
+#include <ipxe/efi/Protocol/Udp6.h>
 #include <ipxe/efi/Protocol/UgaDraw.h>
 #include <ipxe/efi/Protocol/UnicodeCollation.h>
 #include <ipxe/efi/Protocol/UsbHostController.h>
@@ -140,6 +146,14 @@ EFI_GUID efi_dhcp4_protocol_guid
 EFI_GUID efi_dhcp4_service_binding_protocol_guid
 	= EFI_DHCP4_SERVICE_BINDING_PROTOCOL_GUID;
 
+/** DHCPv6 protocol GUID */
+EFI_GUID efi_dhcp6_protocol_guid
+	= EFI_DHCP6_PROTOCOL_GUID;
+
+/** DHCPv6 service binding protocol GUID */
+EFI_GUID efi_dhcp6_service_binding_protocol_guid
+	= EFI_DHCP6_SERVICE_BINDING_PROTOCOL_GUID;
+
 /** Disk I/O protocol GUID */
 EFI_GUID efi_disk_io_protocol_guid
 	= EFI_DISK_IO_PROTOCOL_GUID;
@@ -172,6 +186,18 @@ EFI_GUID efi_ip4_config_protocol_guid
 EFI_GUID efi_ip4_service_binding_protocol_guid
 	= EFI_IP4_SERVICE_BINDING_PROTOCOL_GUID;
 
+/** IPv6 protocol GUID */
+EFI_GUID efi_ip6_protocol_guid
+	= EFI_IP6_PROTOCOL_GUID;
+
+/** IPv6 configuration protocol GUID */
+EFI_GUID efi_ip6_config_protocol_guid
+	= EFI_IP6_CONFIG_PROTOCOL_GUID;
+
+/** IPv6 service binding protocol GUID */
+EFI_GUID efi_ip6_service_binding_protocol_guid
+	= EFI_IP6_SERVICE_BINDING_PROTOCOL_GUID;
+
 /** Load file protocol GUID */
 EFI_GUID efi_load_file_protocol_guid
 	= EFI_LOAD_FILE_PROTOCOL_GUID;
@@ -203,6 +229,14 @@ EFI_GUID efi_mtftp4_protocol_guid
 /** MTFTPv4 service binding protocol GUID */
 EFI_GUID efi_mtftp4_service_binding_protocol_guid
 	= EFI_MTFTP4_SERVICE_BINDING_PROTOCOL_GUID;
+
+/** MTFTPv6 protocol GUID */
+EFI_GUID efi_mtftp6_protocol_guid
+	= EFI_MTFTP6_PROTOCOL_GUID;
+
+/** MTFTPv6 service binding protocol GUID */
+EFI_GUID efi_mtftp6_service_binding_protocol_guid
+	= EFI_MTFTP6_SERVICE_BINDING_PROTOCOL_GUID;
 
 /** Network interface identifier protocol GUID (old version) */
 EFI_GUID efi_nii_protocol_guid
@@ -268,6 +302,14 @@ EFI_GUID efi_tcp4_protocol_guid
 EFI_GUID efi_tcp4_service_binding_protocol_guid
 	= EFI_TCP4_SERVICE_BINDING_PROTOCOL_GUID;
 
+/** TCPv6 protocol GUID */
+EFI_GUID efi_tcp6_protocol_guid
+	= EFI_TCP6_PROTOCOL_GUID;
+
+/** TCPv6 service binding protocol GUID */
+EFI_GUID efi_tcp6_service_binding_protocol_guid
+	= EFI_TCP6_SERVICE_BINDING_PROTOCOL_GUID;
+
 /** TrEE protocol GUID */
 EFI_GUID efi_tree_protocol_guid
 	= EFI_TREE_PROTOCOL_GUID;
@@ -279,6 +321,14 @@ EFI_GUID efi_udp4_protocol_guid
 /** UDPv4 service binding protocol GUID */
 EFI_GUID efi_udp4_service_binding_protocol_guid
 	= EFI_UDP4_SERVICE_BINDING_PROTOCOL_GUID;
+
+/** UDPv6 protocol GUID */
+EFI_GUID efi_udp6_protocol_guid
+	= EFI_UDP6_PROTOCOL_GUID;
+
+/** UDPv6 service binding protocol GUID */
+EFI_GUID efi_udp6_service_binding_protocol_guid
+	= EFI_UDP6_SERVICE_BINDING_PROTOCOL_GUID;
 
 /** UGA draw protocol GUID */
 EFI_GUID efi_uga_draw_protocol_guid
