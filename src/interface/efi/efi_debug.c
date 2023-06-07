@@ -65,6 +65,12 @@ static EFI_GUID efi_iscsi4_dxe_guid = {
 	{ 0x84, 0x86, 0x08, 0x3c, 0x86, 0xb1, 0x82, 0xa7 }
 };
 
+/** UefiPxeBcDxe module GUID */
+static EFI_GUID efi_uefi_pxe_bc_dxe_guid = {
+	0xb95e9fda, 0x26de, 0x48d2,
+	{ 0x88, 0x07, 0x1f, 0x91, 0x07, 0xac, 0x5e, 0x3a }
+};
+
 /** VlanConfigDxe module GUID */
 static EFI_GUID efi_vlan_config_dxe_guid = {
 	0xe4f61863, 0xfe2c, 0x4b56,
@@ -221,6 +227,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Udp6" },
 	{ &efi_udp6_service_binding_protocol_guid,
 	  "Udp6Sb" },
+	{ &efi_uefi_pxe_bc_dxe_guid,
+	  "UefiPxeBcDxe" },
 	{ &efi_uga_draw_protocol_guid,
 	  "UgaDraw" },
 	{ &efi_unicode_collation_protocol_guid,
