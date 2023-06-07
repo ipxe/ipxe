@@ -43,10 +43,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * checking somewhat useless.  Work around this bizarre sabotage
  * attempt by redefining EFI_HANDLE as a pointer to an anonymous
  * structure.
+ *
+ * EFI headers perform some ABI validation checks via _Static_assert()
+ * that may fail when EFI headers are included on a non-EFI platform.
+ * Temporarily disable static assertions to allow these headers to be
+ * included.
  */
 #define EFI_HANDLE STUPID_EFI_HANDLE
+#ifndef PLATFORM_efi
+#define _Static_assert(expr, msg)
+#endif
 #include <ipxe/efi/Uefi/UefiBaseType.h>
 #undef EFI_HANDLE
+#undef _Static_assert
 typedef struct {} *EFI_HANDLE;
 
 /* Include the top-level EFI header files */
