@@ -47,7 +47,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
 
-/** Iscsi4Dxe module GUID */
+/** IScsiDxe module GUID */
+static EFI_GUID efi_iscsi_dxe_guid = {
+	0x86cddf93, 0x4872, 0x4597,
+	{ 0x8a, 0xf9, 0xa3, 0x5a, 0xe4, 0xd3, 0x72, 0x5f }
+};
+
+/** Old IScsi4Dxe module GUID */
 static EFI_GUID efi_iscsi4_dxe_guid = {
 	0x4579b72d, 0x7ec4, 0x4dd4,
 	{ 0x84, 0x86, 0x08, 0x3c, 0x86, 0xb1, 0x82, 0xa7 }
@@ -137,6 +143,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Ip6Config" },
 	{ &efi_ip6_service_binding_protocol_guid,
 	  "Ip6Sb" },
+	{ &efi_iscsi_dxe_guid,
+	  "IScsiDxe" },
 	{ &efi_iscsi4_dxe_guid,
 	  "IScsi4Dxe" },
 	{ &efi_load_file_protocol_guid,
