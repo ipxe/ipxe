@@ -115,6 +115,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Ip4" },
 	{ &efi_ip4_config_protocol_guid,
 	  "Ip4Config" },
+	{ &efi_ip4_config2_protocol_guid,
+	  "Ip4Config2" },
 	{ &efi_ip4_service_binding_protocol_guid,
 	  "Ip4Sb" },
 	{ &efi_ip6_protocol_guid,

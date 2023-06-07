@@ -193,6 +193,7 @@ extern EFI_GUID efi_hii_config_access_protocol_guid;
 extern EFI_GUID efi_hii_font_protocol_guid;
 extern EFI_GUID efi_ip4_protocol_guid;
 extern EFI_GUID efi_ip4_config_protocol_guid;
+extern EFI_GUID efi_ip4_config2_protocol_guid;
 extern EFI_GUID efi_ip4_service_binding_protocol_guid;
 extern EFI_GUID efi_ip6_protocol_guid;
 extern EFI_GUID efi_ip6_config_protocol_guid;

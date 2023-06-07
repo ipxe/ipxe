@@ -45,6 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/HiiFont.h>
 #include <ipxe/efi/Protocol/Ip4.h>
 #include <ipxe/efi/Protocol/Ip4Config.h>
+#include <ipxe/efi/Protocol/Ip4Config2.h>
 #include <ipxe/efi/Protocol/Ip6.h>
 #include <ipxe/efi/Protocol/Ip6Config.h>
 #include <ipxe/efi/Protocol/LoadFile.h>
@@ -181,6 +182,10 @@ EFI_GUID efi_ip4_protocol_guid
 /** IPv4 configuration protocol GUID */
 EFI_GUID efi_ip4_config_protocol_guid
 	= EFI_IP4_CONFIG_PROTOCOL_GUID;
+
+/** IPv4 configuration 2 protocol GUID */
+EFI_GUID efi_ip4_config2_protocol_guid
+	= EFI_IP4_CONFIG2_PROTOCOL_GUID;
 
 /** IPv4 service binding protocol GUID */
 EFI_GUID efi_ip4_service_binding_protocol_guid
