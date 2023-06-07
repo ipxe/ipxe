@@ -47,6 +47,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
 
+/** HttpBootDxe module GUID */
+static EFI_GUID efi_http_boot_dxe_guid = {
+	0xecebcb00, 0xd9c8, 0x11e4,
+	{ 0xaf, 0x3d, 0x8c, 0xdc, 0xd4, 0x26, 0xc9, 0x73 }
+};
+
 /** IScsiDxe module GUID */
 static EFI_GUID efi_iscsi_dxe_guid = {
 	0x86cddf93, 0x4872, 0x4597,
@@ -125,6 +131,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "HiiConfigAccess" },
 	{ &efi_hii_font_protocol_guid,
 	  "HiiFont" },
+	{ &efi_http_boot_dxe_guid,
+	  "HttpBootDxe" },
 	{ &efi_http_protocol_guid,
 	  "Http" },
 	{ &efi_http_service_binding_protocol_guid,
