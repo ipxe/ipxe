@@ -435,6 +435,37 @@ efi_veto_hp_xhci ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 	return 0;
 }
 
+/**
+ * Veto VMware UefiPxeBcDxe driver
+ *
+ * @v binding		Driver binding protocol
+ * @v loaded		Loaded image protocol
+ * @v wtf		Component name protocol, if present
+ * @v manufacturer	Manufacturer name, if present
+ * @v name		Driver name, if present
+ * @ret vetoed		Driver is to be vetoed
+ */
+static int
+efi_veto_vmware_uefipxebc ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
+			    EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
+			    EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
+			    const char *manufacturer, const CHAR16 *name ) {
+	static const CHAR16 uefipxebc[] = L"UEFI PXE Base Code Driver";
+	static const char *vmware = "VMware, Inc.";
+
+	/* Check manufacturer and driver name */
+	if ( ! manufacturer )
+		return 0;
+	if ( ! name )
+		return 0;
+	if ( strcmp ( manufacturer, vmware ) != 0 )
+		return 0;
+	if ( memcmp ( name, uefipxebc, sizeof ( uefipxebc ) ) != 0 )
+		return 0;
+
+	return 1;
+}
+
 /** Driver vetoes */
 static struct efi_veto efi_vetoes[] = {
 	{
@@ -444,6 +475,10 @@ static struct efi_veto efi_vetoes[] = {
 	{
 		.name = "HP Xhci",
 		.veto = efi_veto_hp_xhci,
+	},
+	{
+		.name = "VMware UefiPxeBc",
+		.veto = efi_veto_vmware_uefipxebc,
 	},
 };
 
