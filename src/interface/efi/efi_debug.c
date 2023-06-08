@@ -387,6 +387,34 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 }
 
 /**
+ * Print protocol information on a given handle
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ */
+void dbg_efi_protocol ( EFI_HANDLE handle, EFI_GUID *protocol ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	VOID *interface;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Get protocol instance */
+	if ( ( efirc = bs->HandleProtocol ( handle, protocol,
+					    &interface ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		printf ( "HANDLE %s could not identify %s: %s\n",
+			 efi_handle_name ( handle ),
+			 efi_guid_ntoa ( protocol ), strerror ( rc ) );
+		return;
+	}
+	printf ( "HANDLE %s %s at %p\n", efi_handle_name ( handle ),
+		 efi_guid_ntoa ( protocol ), interface );
+
+	/* Dump list of openers */
+	dbg_efi_openers ( handle, protocol );
+}
+
+/**
  * Print list of protocol handlers attached to a handle
  *
  * @v handle		EFI handle
@@ -394,7 +422,6 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_GUID **protocols;
-	EFI_GUID *protocol;
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
@@ -417,10 +444,7 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 
 	/* Dump list of protocols */
 	for ( i = 0 ; i < count ; i++ ) {
-		protocol = protocols[i];
-		printf ( "HANDLE %s %s supported\n", efi_handle_name ( handle ),
-			 efi_guid_ntoa ( protocol ) );
-		dbg_efi_openers ( handle, protocol );
+		dbg_efi_protocol ( handle, protocols[i] );
 	}
 
 	/* Free list */
