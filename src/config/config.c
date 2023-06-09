@@ -355,6 +355,9 @@ REQUIRE_OBJECT ( vram_settings );
 #ifdef ACPI_SETTINGS
 REQUIRE_OBJECT ( acpi_settings );
 #endif
+#ifdef EFI_SETTINGS
+REQUIRE_OBJECT ( efi_settings );
+#endif
 
 /*
  * Drag in selected keyboard map

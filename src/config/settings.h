@@ -9,6 +9,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <config/defaults.h>
+
 #define	PCI_SETTINGS	/* PCI device settings */
 //#define	CPUID_SETTINGS	/* CPUID settings */
 //#define	MEMMAP_SETTINGS	/* Memory map settings */

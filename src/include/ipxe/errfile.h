@@ -406,6 +406,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_cmdline	      ( ERRFILE_OTHER | 0x005b0000 )
 #define ERRFILE_efi_rng		      ( ERRFILE_OTHER | 0x005c0000 )
 #define ERRFILE_efi_shim	      ( ERRFILE_OTHER | 0x005d0000 )
+#define ERRFILE_efi_settings	      ( ERRFILE_OTHER | 0x005e0000 )
 
 /** @} */
 
