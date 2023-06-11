@@ -342,6 +342,12 @@ struct dhcp_client_uuid {
 /** DNS domain search list */
 #define DHCP_DOMAIN_SEARCH 119
 
+/** DHCP 121 - Classless Static Route Option  */
+#define DHCP_CLASSLESS_STATIC_ROUTE 121
+
+/** DHCP 121 - Classless Static Route Option for Microsoft DHCP-server  */
+#define DHCP_CLASSLESS_STATIC_ROUTE_MS 249
+
 /** Etherboot-specific encapsulated options
  *
  * This encapsulated options field is used to contain all options
