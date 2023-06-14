@@ -1,6 +1,8 @@
 #!ipxe
 dhcp
-shell
-echo pxelinux.cfg/01-${mac}
-chain pxelinux.cfg/01-${mac}
 #shell
+echo pxelinux.cfg/01-${mac}
+chain tftp://${next-server}/pxelinux.cfg/01-${mac} || goto default_boot
+
+default_boot:
+chain tftp://${next-server}/pxelinux.cfg/default || shell
