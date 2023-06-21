@@ -1032,8 +1032,9 @@ static void nii_poll_tx ( struct net_device *netdev, unsigned int stat ) {
 	if ( stat & PXE_STATFLAGS_GET_STATUS_NO_TXBUFS_WRITTEN )
 		return;
 
-	/* Sanity check */
-	assert ( nii->txbuf != NULL );
+	/* Ignore spurious completions reported by some devices */
+	if ( ! nii->txbuf )
+		return;
 
 	/* Complete transmission */
 	iobuf = nii->txbuf;
@@ -1131,7 +1132,7 @@ static void nii_poll ( struct net_device *netdev ) {
 	/* Get status */
 	op = NII_OP ( PXE_OPCODE_GET_STATUS,
 		      ( PXE_OPFLAGS_GET_INTERRUPT_STATUS |
-			( nii->txbuf ? PXE_OPFLAGS_GET_TRANSMITTED_BUFFERS : 0)|
+			PXE_OPFLAGS_GET_TRANSMITTED_BUFFERS |
 			( nii->media ? PXE_OPFLAGS_GET_MEDIA_STATUS : 0 ) ) );
 	if ( ( stat = nii_issue_db ( nii, op, &db, sizeof ( db ) ) ) < 0 ) {
 		rc = -EIO_STAT ( stat );
@@ -1141,8 +1142,7 @@ static void nii_poll ( struct net_device *netdev ) {
 	}
 
 	/* Process any TX completions */
-	if ( nii->txbuf )
-		nii_poll_tx ( netdev, stat );
+	nii_poll_tx ( netdev, stat );
 
 	/* Process any RX completions */
 	nii_poll_rx ( netdev );
