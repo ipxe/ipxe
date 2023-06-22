@@ -617,6 +617,7 @@ void efi_veto ( void ) {
 	/* Get manufacturer name */
 	fetch_string_setting_copy ( NULL, &manufacturer_setting,
 				    &manufacturer );
+	DBGC ( &efi_vetoes, "EFIVETO manufacturer is \"%s\"\n", manufacturer );
 
 	/* Unload any vetoed drivers */
 	for ( i = 0 ; i < num_drivers ; i++ ) {
