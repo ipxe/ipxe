@@ -37,8 +37,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** A driver veto */
-struct efi_veto {
+/** A driver veto candidate */
+struct efi_veto_candidate {
 	/** Veto name (for debugging) */
 	const char *name;
 	/**
@@ -57,14 +57,27 @@ struct efi_veto {
 			 const char *manufacturer, const CHAR16 *name );
 };
 
+/** A driver veto */
+struct efi_veto {
+	/** Driver binding handle */
+	EFI_HANDLE driver;
+	/** Driving binding protocol */
+	EFI_DRIVER_BINDING_PROTOCOL *binding;
+	/** Image handle */
+	EFI_HANDLE image;
+	/** Loaded image protocol */
+	EFI_LOADED_IMAGE_PROTOCOL *loaded;
+};
+
 /**
  * Unload an EFI driver
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @ret rc		Return status code
  */
-static int efi_veto_unload ( EFI_HANDLE driver ) {
+static int efi_veto_unload ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE driver = veto->driver;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -82,11 +95,12 @@ static int efi_veto_unload ( EFI_HANDLE driver ) {
 /**
  * Disconnect an EFI driver from all handles
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @ret rc		Return status code
  */
-static int efi_veto_disconnect ( EFI_HANDLE driver ) {
+static int efi_veto_disconnect ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE driver = veto->driver;
 	EFI_HANDLE *handles;
 	EFI_HANDLE handle;
 	UINTN count;
@@ -131,11 +145,12 @@ static int efi_veto_disconnect ( EFI_HANDLE driver ) {
 /**
  * Uninstall an EFI driver binding protocol
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @ret rc		Return status code
  */
-static int efi_veto_uninstall ( EFI_HANDLE driver ) {
+static int efi_veto_uninstall ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE driver = veto->driver;
 	union {
 		EFI_DRIVER_BINDING_PROTOCOL *binding;
 		void *interface;
@@ -178,14 +193,15 @@ static int efi_veto_uninstall ( EFI_HANDLE driver ) {
 /**
  * Close protocol on handle potentially opened by an EFI driver
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @v handle		Potentially opened handle
  * @v protocol		Opened protocol
  * @ret rc		Return status code
  */
-static int efi_veto_close_protocol ( EFI_HANDLE driver, EFI_HANDLE handle,
+static int efi_veto_close_protocol ( struct efi_veto *veto, EFI_HANDLE handle,
 				     EFI_GUID *protocol ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE driver = veto->driver;
 	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *openers;
 	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener;
 	EFI_HANDLE controller;
@@ -235,12 +251,13 @@ static int efi_veto_close_protocol ( EFI_HANDLE driver, EFI_HANDLE handle,
 /**
  * Close handle potentially opened by an EFI driver
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @v handle		Potentially opened handle
  * @ret rc		Return status code
  */
-static int efi_veto_close_handle ( EFI_HANDLE driver, EFI_HANDLE handle ) {
+static int efi_veto_close_handle ( struct efi_veto *veto, EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE driver = veto->driver;
 	EFI_GUID **protocols;
 	UINTN count;
 	unsigned int i;
@@ -260,7 +277,7 @@ static int efi_veto_close_handle ( EFI_HANDLE driver, EFI_HANDLE handle ) {
 
 	/* Close each protocol */
 	for ( i = 0 ; i < count ; i++ ) {
-		if ( ( rc = efi_veto_close_protocol ( driver, handle,
+		if ( ( rc = efi_veto_close_protocol ( veto, handle,
 						      protocols[i] ) ) != 0 )
 			goto err_close;
 	}
@@ -277,11 +294,12 @@ static int efi_veto_close_handle ( EFI_HANDLE driver, EFI_HANDLE handle ) {
 /**
  * Close all remaining handles opened by an EFI driver
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @ret rc		Return status code
  */
-static int efi_veto_close ( EFI_HANDLE driver ) {
+static int efi_veto_close ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE driver = veto->driver;
 	EFI_HANDLE *handles;
 	UINTN count;
 	unsigned int i;
@@ -299,8 +317,7 @@ static int efi_veto_close ( EFI_HANDLE driver ) {
 
 	/* Close each handle */
 	for ( i = 0 ; i < count ; i++ ) {
-		if ( ( rc = efi_veto_close_handle ( driver,
-						    handles[i] ) ) != 0 )
+		if ( ( rc = efi_veto_close_handle ( veto, handles[i] ) ) != 0 )
 			goto err_close;
 	}
 
@@ -318,22 +335,23 @@ static int efi_veto_close ( EFI_HANDLE driver ) {
 /**
  * Terminate an EFI driver with extreme prejudice
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @ret rc		Return status code
  */
-static int efi_veto_destroy ( EFI_HANDLE driver ) {
+static int efi_veto_destroy ( struct efi_veto *veto ) {
+	EFI_HANDLE driver = veto->driver;
 	int rc;
 
 	/* Disconnect driver from all handles */
-	if ( ( rc = efi_veto_disconnect ( driver ) ) != 0 )
+	if ( ( rc = efi_veto_disconnect ( veto ) ) != 0 )
 		return rc;
 
 	/* Uninstall driver binding protocol */
-	if ( ( rc = efi_veto_uninstall ( driver ) ) != 0 )
+	if ( ( rc = efi_veto_uninstall ( veto ) ) != 0 )
 		return rc;
 
 	/* Close any remaining opened handles */
-	if ( ( rc = efi_veto_close ( driver ) ) != 0 )
+	if ( ( rc = efi_veto_close ( veto ) ) != 0 )
 		return rc;
 
 	DBGC ( driver, "EFIVETO %s forcibly removed\n",
@@ -344,18 +362,18 @@ static int efi_veto_destroy ( EFI_HANDLE driver ) {
 /**
  * Veto an EFI driver
  *
- * @v driver		Driver binding handle
+ * @v veto		Driver veto
  * @ret rc		Return status code
  */
-static int efi_veto_driver ( EFI_HANDLE driver ) {
+static int efi_veto_driver ( struct efi_veto *veto ) {
 	int rc;
 
 	/* Try gracefully unloading the driver */
-	if ( ( rc = efi_veto_unload ( driver ) ) == 0 )
+	if ( ( rc = efi_veto_unload ( veto ) ) == 0 )
 		return 0;
 
 	/* If that fails, use a hammer */
-	if ( ( rc = efi_veto_destroy ( driver ) ) == 0 )
+	if ( ( rc = efi_veto_destroy ( veto ) ) == 0 )
 		return 0;
 
 	return rc;
@@ -467,7 +485,7 @@ efi_veto_vmware_uefipxebc ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 }
 
 /** Driver vetoes */
-static struct efi_veto efi_vetoes[] = {
+static struct efi_veto_candidate efi_vetoes[] = {
 	{
 		.name = "Ip4Config",
 		.veto = efi_veto_ip4config,
@@ -487,11 +505,11 @@ static struct efi_veto efi_vetoes[] = {
  *
  * @v driver		Driver binding handle
  * @v manufacturer	Manufacturer name, if present
- * @ret veto		Driver veto, or NULL
+ * @ret veto		Driver veto to fill in
  * @ret rc		Return status code
  */
 static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
-			   struct efi_veto **veto ) {
+			   struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_DRIVER_BINDING_PROTOCOL *binding;
@@ -515,7 +533,7 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 		efi_handle_name ( driver ) );
 
 	/* Mark as not vetoed */
-	*veto = NULL;
+	memset ( veto, 0, sizeof ( *veto ) );
 
 	/* Open driver binding protocol */
 	if ( ( efirc = bs->OpenProtocol (
@@ -567,7 +585,13 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 			    sizeof ( efi_vetoes[0] ) ) ; i++ ) {
 		if ( efi_vetoes[i].veto ( binding.binding, loaded.loaded,
 					  wtf.wtf, manufacturer, name ) ) {
-			*veto = &efi_vetoes[i];
+			DBGC ( driver, "EFIVETO %s is vetoed (%s)\n",
+			       efi_handle_name ( driver ),
+			       efi_vetoes[i].name );
+			veto->driver = driver;
+			veto->binding = binding.binding;
+			veto->image = image;
+			veto->loaded = loaded.loaded;
 			break;
 		}
 	}
@@ -595,7 +619,7 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
  */
 void efi_veto ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	struct efi_veto *veto;
+	struct efi_veto veto;
 	EFI_HANDLE *drivers;
 	EFI_HANDLE driver;
 	UINTN num_drivers;
@@ -629,11 +653,9 @@ void efi_veto ( void ) {
 			       efi_handle_name ( driver ), strerror ( rc ) );
 			continue;
 		}
-		if ( ! veto )
+		if ( ! veto.driver )
 			continue;
-		DBGC ( driver, "EFIVETO %s is vetoed (%s)\n",
-		       efi_handle_name ( driver ), veto->name );
-		if ( ( rc = efi_veto_driver ( driver ) ) != 0 ) {
+		if ( ( rc = efi_veto_driver ( &veto ) ) != 0 ) {
 			DBGC ( driver, "EFIVETO %s could not veto: %s\n",
 			       efi_handle_name ( driver ), strerror ( rc ) );
 		}
