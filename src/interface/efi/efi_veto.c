@@ -227,7 +227,7 @@ static int efi_veto_close_protocol ( struct efi_veto *veto, EFI_HANDLE handle,
 
 	/* Close anything opened by this driver */
 	for ( i = 0 ; i < count ; i++ ) {
-		opener = &openers[i];
+		opener = &openers[ count - i - 1 ];
 		if ( ( opener->AgentHandle != driver ) &&
 		     ( opener->AgentHandle != image ) ) {
 			continue;
@@ -265,6 +265,7 @@ static int efi_veto_close_handle ( struct efi_veto *veto, EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE driver = veto->driver;
 	EFI_GUID **protocols;
+	EFI_GUID *protocol;
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
@@ -283,8 +284,9 @@ static int efi_veto_close_handle ( struct efi_veto *veto, EFI_HANDLE handle ) {
 
 	/* Close each protocol */
 	for ( i = 0 ; i < count ; i++ ) {
+		protocol = protocols[ count - i - 1];
 		if ( ( rc = efi_veto_close_protocol ( veto, handle,
-						      protocols[i] ) ) != 0 )
+						      protocol ) ) != 0 )
 			goto err_close;
 	}
 
@@ -307,6 +309,7 @@ static int efi_veto_close ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE driver = veto->driver;
 	EFI_HANDLE *handles;
+	EFI_HANDLE handle;
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
@@ -323,7 +326,8 @@ static int efi_veto_close ( struct efi_veto *veto ) {
 
 	/* Close each handle */
 	for ( i = 0 ; i < count ; i++ ) {
-		if ( ( rc = efi_veto_close_handle ( veto, handles[i] ) ) != 0 )
+		handle = handles[ count - i - 1 ];
+		if ( ( rc = efi_veto_close_handle ( veto, handle ) ) != 0 )
 			goto err_close;
 	}
 
@@ -628,7 +632,7 @@ void efi_veto ( void ) {
 	struct efi_veto veto;
 	EFI_HANDLE *drivers;
 	EFI_HANDLE driver;
-	UINTN num_drivers;
+	UINTN count;
 	unsigned int i;
 	char *manufacturer;
 	EFI_STATUS efirc;
@@ -637,7 +641,7 @@ void efi_veto ( void ) {
 	/* Locate all driver binding protocol handles */
 	if ( ( efirc = bs->LocateHandleBuffer (
 			ByProtocol, &efi_driver_binding_protocol_guid,
-			NULL, &num_drivers, &drivers ) ) != 0 ) {
+			NULL, &count, &drivers ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( &efi_vetoes, "EFIVETO could not list all drivers: "
 		       "%s\n", strerror ( rc ) );
@@ -650,8 +654,8 @@ void efi_veto ( void ) {
 	DBGC ( &efi_vetoes, "EFIVETO manufacturer is \"%s\"\n", manufacturer );
 
 	/* Unload any vetoed drivers */
-	for ( i = 0 ; i < num_drivers ; i++ ) {
-		driver = drivers[i];
+	for ( i = 0 ; i < count ; i++ ) {
+		driver = drivers[ count - i - 1 ];
 		if ( ( rc = efi_veto_find ( driver, manufacturer,
 					    &veto ) ) != 0 ) {
 			DBGC ( driver, "EFIVETO %s could not determine "
