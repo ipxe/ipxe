@@ -205,6 +205,7 @@ static int efi_veto_close_protocol ( struct efi_veto *veto, EFI_HANDLE handle,
 				     EFI_GUID *protocol ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE driver = veto->driver;
+	EFI_HANDLE image = veto->image;
 	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *openers;
 	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener;
 	EFI_HANDLE controller;
@@ -227,8 +228,10 @@ static int efi_veto_close_protocol ( struct efi_veto *veto, EFI_HANDLE handle,
 	/* Close anything opened by this driver */
 	for ( i = 0 ; i < count ; i++ ) {
 		opener = &openers[i];
-		if ( opener->AgentHandle != driver )
+		if ( ( opener->AgentHandle != driver ) &&
+		     ( opener->AgentHandle != image ) ) {
 			continue;
+		}
 		controller = opener->ControllerHandle;
 		DBGC_EFI_OPENER ( driver, handle, protocol, opener );
 		if ( ( efirc = bs->CloseProtocol ( handle, protocol, driver,
