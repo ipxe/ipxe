@@ -78,14 +78,17 @@ struct efi_veto {
 static int efi_veto_unload ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE driver = veto->driver;
+	EFI_HANDLE image = veto->image;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Unload the driver */
-	if ( ( efirc = bs->UnloadImage ( driver ) ) != 0 ) {
+	if ( ( efirc = bs->UnloadImage ( image ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( driver, "EFIVETO %s could not unload: %s\n",
-		       efi_handle_name ( driver ), strerror ( rc ) );
+		DBGC ( driver, "EFIVETO %s could not unload",
+		       efi_handle_name ( driver ) );
+		DBGC ( driver, " %s: %s\n", efi_handle_name ( image ),
+		       strerror ( rc ) );
 		return rc;
 	}
 
