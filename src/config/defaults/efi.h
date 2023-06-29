@@ -67,4 +67,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	IMAGE_GZIP		/* GZIP image support */
 #endif
 
+#if defined ( __loongarch__ )
+#define IOAPI_LOONG64
+#define NAP_EFILOONG64
+#endif
+
 #endif /* CONFIG_DEFAULTS_EFI_H */
