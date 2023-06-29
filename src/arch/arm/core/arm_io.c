@@ -46,7 +46,7 @@ union arm32_io_qword {
  *
  * This is not atomic for ARM32.
  */
-static uint64_t arm32_readq ( volatile uint64_t *io_addr ) {
+static __unused uint64_t arm32_readq ( volatile uint64_t *io_addr ) {
 	volatile union arm32_io_qword *ptr =
 		container_of ( io_addr, union arm32_io_qword, qword );
 	union arm32_io_qword tmp;
@@ -64,7 +64,8 @@ static uint64_t arm32_readq ( volatile uint64_t *io_addr ) {
  *
  * This is not atomic for ARM32.
  */
-static void arm32_writeq ( uint64_t data, volatile uint64_t *io_addr ) {
+static __unused void arm32_writeq ( uint64_t data,
+				    volatile uint64_t *io_addr ) {
 	volatile union arm32_io_qword *ptr =
 		container_of ( io_addr, union arm32_io_qword, qword );
 	union arm32_io_qword tmp;
