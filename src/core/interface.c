@@ -276,7 +276,7 @@ void intf_close ( struct interface *intf, int rc ) {
  * unplugs the interface.
  */
 void intf_shutdown ( struct interface *intf, int rc ) {
-	struct interface tmp;
+	struct interface tmp = INTF_INIT ( null_intf_desc );
 
 	DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " shutting down (%s)\n",
 	       INTF_DBG ( intf ), strerror ( rc ) );
