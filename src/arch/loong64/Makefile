@@ -20,6 +20,7 @@ CFLAGS		+= -fshort-wchar
 
 # LoongArch64-specific directories containing source files
 SRCDIRS		+= arch/loong64/core
+SRCDIRS		+= arch/loong64/interface/efi
 
 # Include platform-specific Makefile
 MAKEDEPS	+= arch/loong64/Makefile.$(PLATFORM)
