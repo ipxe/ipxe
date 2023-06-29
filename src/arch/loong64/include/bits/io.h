@@ -12,4 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Page shift */
 #define PAGE_SHIFT 12
 
+#include <ipxe/loong64_io.h>
+
 #endif /* _BITS_IO_H */
