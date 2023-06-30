@@ -1,3 +1,4 @@
+	.section ".note.GNU-stack", "", @progbits
 	.arch i386
 
 	.section ".data", "aw", @progbits

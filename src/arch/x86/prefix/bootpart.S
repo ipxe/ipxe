@@ -5,6 +5,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define STACK_SEG 	0x0200
 #define STACK_SIZE	0x2000
 	
+	.section ".note.GNU-stack", "", @progbits
 	.text
 	.arch i386
 	.section ".prefix", "awx", @progbits
