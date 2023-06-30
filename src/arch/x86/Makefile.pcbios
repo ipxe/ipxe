@@ -54,9 +54,15 @@ LIST_NAME_mrom := ROMS
 LIST_NAME_pcirom := ROMS
 LIST_NAME_isarom := ROMS
 
-# ISO or FAT filesystem images
+# ISO images
 NON_AUTO_MEDIA	+= iso
-$(BIN)/%.iso $(BIN)/%.sdsk: $(BIN)/%.lkrn util/genfsimg
+$(BIN)/%.iso : $(BIN)/%.lkrn util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<
+
+# FAT filesystem images (via syslinux)
+NON_AUTO_MEDIA	+= sdsk
+$(BIN)/%.sdsk : $(BIN)/%.lkrn util/genfsimg
 	$(QM)$(ECHO) "  [GENFSIMG] $@"
 	$(Q)util/genfsimg -o $@ $<
 

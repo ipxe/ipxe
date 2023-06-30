@@ -50,6 +50,10 @@ $(BIN)/efidrv.cab : $(BIN)/alldrv.efis # $(ALL_drv.efi) is not yet defined
 	$(QM)$(ECHO) "  [CAB] $@"
 	$(Q)$(LCAB) -n -q $(ALL_drv.efi) $@
 
-$(BIN)/%.iso $(BIN)/%.usb : $(BIN)/%.efi util/genfsimg
+$(BIN)/%.iso : $(BIN)/%.efi util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<
+
+$(BIN)/%.usb : $(BIN)/%.efi util/genfsimg
 	$(QM)$(ECHO) "  [GENFSIMG] $@"
 	$(Q)util/genfsimg -o $@ $<
