@@ -502,6 +502,13 @@ LDFLAGS		+= --gc-sections
 #
 LDFLAGS		+= -static
 
+# Use separate code segment if supported by linker
+#
+ZSC_TEST	= $(LD) -z separate-code --version 2>&1 > /dev/null
+ZSC_FLAGS	:= $(shell [ -z "`$(ZSC_TEST)`" ] && \
+		     $(ECHO) '-z separate-code -z max-page-size=4096')
+LDFLAGS		+= $(ZSC_FLAGS)
+
 # compiler.h is needed for our linking and debugging system
 #
 CFLAGS		+= -include include/compiler.h
