@@ -58,13 +58,13 @@ LIST_NAME_isarom := ROMS
 NON_AUTO_MEDIA	+= iso
 $(BIN)/%.iso : $(BIN)/%.lkrn util/genfsimg
 	$(QM)$(ECHO) "  [GENFSIMG] $@"
-	$(Q)util/genfsimg -o $@ $<
+	$(Q)util/genfsimg -a x86 -o $@ $<
 
 # FAT filesystem images (via syslinux)
 NON_AUTO_MEDIA	+= sdsk
 $(BIN)/%.sdsk : $(BIN)/%.lkrn util/genfsimg
 	$(QM)$(ECHO) "  [GENFSIMG] $@"
-	$(Q)util/genfsimg -o $@ $<
+	$(Q)util/genfsimg -a x86 -o $@ $<
 
 # rule to write disk images to /dev/fd0
 NON_AUTO_MEDIA	+= fd0

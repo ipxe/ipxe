@@ -122,11 +122,15 @@ copy_syslinux_file() {
 OUTFILE=
 PAD=0
 SCRIPT=
-while getopts "hlo:p:s:" OPTION ; do
+ARCH=
+while getopts "hla:o:p:s:" OPTION ; do
     case "${OPTION}" in
 	h)
 	    help
 	    exit 0
+	    ;;
+	a)
+	    ARCH="${OPTARG}"
 	    ;;
 	o)
 	    OUTFILE="${OPTARG}"
@@ -234,10 +238,14 @@ done
 #
 if [ -n "${ISOIMG}" ] ; then
     ISOARGS="-J -R -l"
-    copy_syslinux_file "isolinux.bin" "${ISODIR}"
-    copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
-    ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
-    ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
+    case ${ARCH} in
+      i386|x86|x86_64)
+	copy_syslinux_file "isolinux.bin" "${ISODIR}"
+	copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
+	ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
+	ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
+	;;
+    esac
     if [ -n "${EFI}" ] ; then
 	ISOARGS="${ISOARGS} -eltorito-alt-boot -no-emul-boot -e esp.img"
     else
@@ -273,7 +281,11 @@ if [ -n "${FATIMG}" ] ; then
     mformat -v iPXE -i "${FATIMG}" ${FATARGS} ::
     mcopy -i "${FATIMG}" -s "${FATDIR}"/* ::
     if [ "${BIOSDIR}" = "${FATDIR}" ] ; then
-	syslinux "${FATIMG}"
+      case ${ARCH} in
+	i386|x86|x86_64)
+	  syslinux "${FATIMG}"
+	  ;;
+      esac
     fi
 fi
 
