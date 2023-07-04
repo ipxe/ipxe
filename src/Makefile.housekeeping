@@ -1009,6 +1009,7 @@ endif
 # Device ID tables (using IDs from ROM definition file)
 #
 define obj_pci_id_asm
+	.section ".note.GNU-stack", "", $(ASM_TCHAR)progbits
 	.section ".pci_devlist.$(1)", "a", $(ASM_TCHAR)progbits
 	.globl pci_devlist_$(1)
 pci_devlist_$(1):
