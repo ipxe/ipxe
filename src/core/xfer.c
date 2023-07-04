@@ -60,7 +60,7 @@ static struct xfer_metadata dummy_metadata;
  * @ret rc		Return status code
  */
 int xfer_vredirect ( struct interface *intf, int type, va_list args ) {
-	struct interface tmp = INTF_INIT ( null_intf_desc );
+	struct interface tmp;
 	struct interface *dest;
 	xfer_vredirect_TYPE ( void * ) *op =
 		intf_get_dest_op_no_passthru ( intf, xfer_vredirect, &dest );
@@ -85,6 +85,7 @@ int xfer_vredirect ( struct interface *intf, int type, va_list args ) {
 		 * If redirection fails, then send intf_close() to the
 		 * parent interface.
 		 */
+		intf_temp_init ( &tmp, intf );
 		intf_plug ( &tmp, dest );
 		rc = xfer_vreopen ( dest, type, args );
 		if ( rc == 0 ) {
