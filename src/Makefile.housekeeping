@@ -1178,7 +1178,7 @@ BLIB		= $(BIN)/blib.a
 $(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RM) $(BLIB)
 	$(QM)$(ECHO) "  [AR] $@"
-	$(Q)$(AR) rD $@ $(sort $(BLIB_OBJS))
+	$(Q)$(AR) rcD $@ $(sort $(BLIB_OBJS))
 	$(Q)$(OBJCOPY) --enable-deterministic-archives \
 		       --prefix-symbols=$(SYMBOL_PREFIX) $@
 	$(Q)$(RANLIB) -D $@
