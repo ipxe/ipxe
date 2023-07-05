@@ -656,7 +656,7 @@ static void free_netdev ( struct refcnt *refcnt ) {
 	struct net_device *netdev =
 		container_of ( refcnt, struct net_device, refcnt );
 
-	stop_timer ( &netdev->link_block );
+	assert ( ! timer_running ( &netdev->link_block ) );
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
 	clear_settings ( netdev_settings ( netdev ) );
@@ -878,6 +878,9 @@ void netdev_close ( struct net_device *netdev ) {
 
 	/* Close the device */
 	netdev->op->close ( netdev );
+
+	/* Stop link block timer */
+	stop_timer ( &netdev->link_block );
 
 	/* Flush TX and RX queues */
 	netdev_tx_flush ( netdev );
