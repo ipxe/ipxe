@@ -54,6 +54,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * The names are chosen to match those used by curses.  The values are
  * chosen to facilitate easy conversion from a received ANSI escape
  * sequence to a KEY_XXX constant.
+ *
+ * Note that the values are exposed to iPXE commands via parse_key()
+ * and therefore may not be changed without breaking existing scripts.
  */
 
 /**
@@ -79,7 +82,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v terminator	ANSI escape sequence terminating character
  * @ret key		Key value
  */
-#define KEY_ANSI( n, terminator ) ( KEY_MIN + ( (n) << 8 ) + (terminator) )
+#define KEY_ANSI( n, terminator ) \
+	( KEY_MIN + ( ( (n) + 1 ) << 8 ) + (terminator) )
 
 /**
  * Extract ANSI escape sequence numeric portion
@@ -87,7 +91,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v key		Key value (or relative key value)
  * @ret n		ANSI escape sequence numeric portion, or 0 for none
  */
-#define KEY_ANSI_N( key ) ( ( (key) >> 8 ) & 0xff )
+#define KEY_ANSI_N( key ) ( ( ( (key) >> 8 ) & 0xff ) - 1 )
 
 /**
  * Extract ANSI escape sequence terminating character
