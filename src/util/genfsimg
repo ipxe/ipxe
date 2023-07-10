@@ -4,6 +4,7 @@
 
 set -e
 set -u
+set -x
 
 # Print usage message
 #
@@ -17,28 +18,58 @@ help() {
     echo " -s SCRIPT  use executable script"
 }
 
+# Get big-endian hex value from binary file
+#
+get_be() {
+    local FILENAME
+    local OFFSET
+    local LEN
+
+    FILENAME="${1}"
+    OFFSET="${2}"
+    LEN="${3}"
+
+    od -j "${OFFSET}" -N "${LEN}" -A n -t x1 -- "${FILENAME}" | tr -d " "
+}
+
+# Get little-endian hex value from binary file
+#
+get_le() {
+    local FILENAME
+    local OFFSET
+    local LEN
+    local BYTE
+    local VALUE
+
+    FILENAME="${1}"
+    OFFSET="${2}"
+    LEN="${3}"
+
+    VALUE=""
+    while [ "${LEN}" -gt 0 ] ; do
+	LEN=$(( "${LEN}" - 1 ))
+	BYTE=$(get_be "${FILENAME}" $(( "${OFFSET}" + "${LEN}" )) 1)
+	VALUE="${VALUE}${BYTE}"
+    done
+    echo "${VALUE}"
+}
+
 # Get hex byte from binary file
 #
 get_byte() {
-    local FILENAME
-    local OFFSET
-
-    FILENAME="${1}"
-    OFFSET="${2}"
-
-    od -j "${OFFSET}" -N 1 -A n -t x1 -- "${FILENAME}" | tr -d " "
+    get_be "${1}" "${2}" 1
 }
 
-# Get hex word from binary file
+# Get little-endian hex word from binary file
 #
 get_word() {
-    local FILENAME
-    local OFFSET
+    get_le "${1}" "${2}" 2
+}
 
-    FILENAME="${1}"
-    OFFSET="${2}"
-
-    od -j "${OFFSET}" -N 2 -A n -t x1 -- "${FILENAME}" | tr -d " "
+# Get little-endian hex dword from binary file
+#
+get_dword() {
+    get_le "${1}" "${2}" 4
 }
 
 # Get appropriate EFI boot filename for CPU architecture
@@ -51,31 +82,31 @@ efi_boot_name() {
     FILENAME="${1}"
 
     MZSIG=$(get_word "${FILENAME}" 0)
-    if [ "${MZSIG}" != "4d5a" ] ; then
+    if [ "${MZSIG}" != "5a4d" ] ; then
 	echo "${FILENAME}: invalid MZ header" >&2
 	exit 1
     fi
     PEOFF=$(get_byte "${FILENAME}" 0x3c)
     PESIG=$(get_word "${FILENAME}" 0x${PEOFF})
-    if [ "${PESIG}" != "5045" ] ; then
+    if [ "${PESIG}" != "4550" ] ; then
 	echo "${FILENAME}: invalid PE header" >&2
 	exit 1
     fi
     ARCH=$(get_word "${FILENAME}" $(( 0x${PEOFF} + 4 )) )
     case "${ARCH}" in
-	"4c01" )
+	"014c" )
 	    echo "BOOTIA32.EFI"
 	    ;;
-	"6486" )
+	"8664" )
 	    echo "BOOTX64.EFI"
 	    ;;
-	"c201" )
+	"01c2" )
 	    echo "BOOTARM.EFI"
 	    ;;
-	"6462" )
+	"6264" )
 	    echo "BOOTLOONGARCH64.EFI"
 	    ;;
-	"64aa" )
+	"aa64" )
 	    echo "BOOTAA64.EFI"
 	    ;;
 	* )
@@ -115,6 +146,28 @@ copy_syslinux_file() {
     done
     echo "${0}: could not find ${FILENAME}" >&2
     return 1
+}
+
+# Create EFI boot partition
+#
+create_esp() {
+    local FILENAME
+    local BOOTCAT
+    local PLATFORM
+    local START
+    local COUNT
+
+    FILENAME="${1}"
+
+    BOOTCAT=$(( 0x$(get_dword "${FILENAME}" 0x8847) * 0x800 ))
+    PLATFORM=$(get_byte "${FILENAME}" $(( ${BOOTCAT} + 0x01 )) )
+    if [ "${PLATFORM}" != "ef" ] ; then
+	echo "${FILENAME}: missing EFI boot catalog" >&2
+	exit 1
+    fi
+    START=$(( 0x$(get_dword "${FILENAME}" $(( ${BOOTCAT} + 0x28 )) ) * 4 ))
+    COUNT=$(( 0x$(get_word "${FILENAME}" $(( ${BOOTCAT} + 0x26 )) ) * 4 ))
+    echo "${START},${COUNT},0xef;" | sfdisk -f -w never "${FILENAME}"
 }
 
 # Parse command-line options
@@ -234,12 +287,17 @@ done
 #
 if [ -n "${ISOIMG}" ] ; then
     ISOARGS="-J -R -l"
-    copy_syslinux_file "isolinux.bin" "${ISODIR}"
-    copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
-    ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
-    ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
+    if [ -n "${LKRN}" ] ; then
+	copy_syslinux_file "isolinux.bin" "${ISODIR}"
+	copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
+	ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
+	ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
+    fi
+    if [ -n "${LKRN}" -a -n "${EFI}" ] ; then
+	ISOARGS="${ISOARGS} -eltorito-alt-boot"
+    fi
     if [ -n "${EFI}" ] ; then
-	ISOARGS="${ISOARGS} -eltorito-alt-boot -no-emul-boot -e esp.img"
+	ISOARGS="${ISOARGS} -no-emul-boot -e esp.img"
     else
 	FATIMG=
     fi
@@ -309,6 +367,7 @@ if [ -n "${ISOIMG}" ] ; then
 	    -appid "iPXE - Open Source Network Boot Firmware" \
 	    -publisher "ipxe.org" -sysid "iPXE" -o "${ISOIMG}" \
 	    ${ISOARGS} "${ISODIR}"
+    create_esp "${ISOIMG}"
     if isohybrid --version >/dev/null 2>&1 ; then
 	ISOHYBRIDARGS=
 	if [ -n "${EFI}" ] ; then
