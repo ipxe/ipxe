@@ -36,6 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/timer.h>
 #include <ipxe/time.h>
 #include <ipxe/tcpip.h>
+#include <ipxe/dhcp.h>
+#include <ipxe/settings.h>
 #include <ipxe/ntp.h>
 
 /** @file
@@ -273,3 +275,11 @@ int start_ntp ( struct interface *job, const char *hostname ) {
  err_alloc:
 	return rc;
 }
+
+/** IPv4 NTP server setting */
+const struct setting ntp_setting __setting ( SETTING_IP4_EXTRA, ntp ) = {
+	.name = "ntp",
+	.description = "NTP server",
+	.tag = DHCP_NTP_SERVERS,
+	.type = &setting_type_ipv4,
+};
