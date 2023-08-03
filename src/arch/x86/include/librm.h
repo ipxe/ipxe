@@ -250,8 +250,10 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 /* CODE_DEFAULT: restore default .code32/.code64 directive */
 #ifdef __x86_64__
 #define CODE_DEFAULT ".code64"
+#define PUSH "pushq"
 #else
 #define CODE_DEFAULT ".code32"
+#define PUSH "pushl"
 #endif
 
 /* LINE_SYMBOL: declare a symbol for the current source code line */
@@ -268,7 +270,7 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 
 /* REAL_CODE: declare a fragment of code that executes in real mode */
 #define REAL_CODE( asm_code_str )			\
-	"push $1f\n\t"					\
+	PUSH " $1f\n\t"					\
 	"call real_call\n\t"				\
 	TEXT16_CODE ( "\n1:\n\t"			\
 		      asm_code_str			\
@@ -277,7 +279,7 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 
 /* PHYS_CODE: declare a fragment of code that executes in flat physical mode */
 #define PHYS_CODE( asm_code_str )			\
-	"push $1f\n\t"					\
+	PUSH " $1f\n\t"					\
 	"call phys_call\n\t"				\
 	".section \".text.phys\", \"ax\", @progbits\n\t"\
 	"\n" LINE_SYMBOL "\n\t"				\
