@@ -50,6 +50,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define EFI_SETTINGS		/* EFI variable settings */
 
+#define TPM_SETTINGS /* EFI TPM settings */
+
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define NAP_EFIX86

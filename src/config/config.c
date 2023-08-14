@@ -358,6 +358,9 @@ REQUIRE_OBJECT ( acpi_settings );
 #ifdef EFI_SETTINGS
 REQUIRE_OBJECT ( efi_settings );
 #endif
+#ifdef TPM_SETTINGS
+REQUIRE_OBJECT ( tpm );
+#endif
 
 /*
  * Drag in selected keyboard map
