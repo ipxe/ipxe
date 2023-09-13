@@ -186,7 +186,7 @@ vxge_xmit(struct net_device *dev, struct io_buffer *iobuf)
 
 	vxge_trace();
 
-	vdev = (struct vxgedev *)netdev_priv(dev);
+	vdev = (struct vxgedev *)dev->priv;
 
 	if (!is_vxge_card_up(vdev)) {
 		vxge_debug(VXGE_ERR,
@@ -235,7 +235,7 @@ static void vxge_poll(struct net_device *ndev)
 
 	vxge_debug(VXGE_POLL, "%s:%d \n", __func__, __LINE__);
 
-	vdev = (struct vxgedev *)netdev_priv(ndev);
+	vdev = (struct vxgedev *)ndev->priv;
 	hldev = (struct __vxge_hw_device *)pci_get_drvdata(vdev->pdev);
 
 	if (!is_vxge_card_up(vdev))
@@ -263,7 +263,7 @@ static void vxge_irq(struct net_device *netdev __unused, int action)
 	vxge_debug(VXGE_INFO,
 		"%s:%d action(%d)\n", __func__, __LINE__, action);
 
-	vdev = (struct vxgedev *)netdev_priv(netdev);
+	vdev = (struct vxgedev *)netdev->priv;
 	hldev = (struct __vxge_hw_device *)pci_get_drvdata(vdev->pdev);
 
 	switch (action) {
@@ -297,7 +297,7 @@ vxge_open(struct net_device *dev)
 	vxge_debug(VXGE_INFO, "%s: %s:%d\n",
 			VXGE_DRIVER_NAME, __func__, __LINE__);
 
-	vdev = (struct vxgedev *)netdev_priv(dev);
+	vdev = (struct vxgedev *)dev->priv;
 	hldev = (struct __vxge_hw_device *)pci_get_drvdata(vdev->pdev);
 
 	/* make sure you have link off by default every time Nic is
@@ -369,7 +369,7 @@ static void vxge_close(struct net_device *dev)
 	vxge_debug(VXGE_INFO, "%s: %s:%d\n",
 		dev->name, __func__, __LINE__);
 
-	vdev = (struct vxgedev *)netdev_priv(dev);
+	vdev = (struct vxgedev *)dev->priv;
 	hldev = (struct __vxge_hw_device *)pci_get_drvdata(vdev->pdev);
 
 	if (!is_vxge_card_up(vdev))
@@ -420,7 +420,7 @@ int vxge_device_register(struct __vxge_hw_device *hldev,
 
 	vxge_debug(VXGE_INFO, "%s:%d  netdev registering\n",
 		__func__, __LINE__);
-	vdev = netdev_priv(ndev);
+	vdev = ndev->priv;
 	memset(vdev, 0, sizeof(struct vxgedev));
 
 	vdev->ndev = ndev;
@@ -683,7 +683,7 @@ vxge_remove(struct pci_device *pdev)
 		return;
 
 	ndev = hldev->ndev;
-	vdev = netdev_priv(ndev);
+	vdev = ndev->priv;
 
 	iounmap(vdev->bar0);
 

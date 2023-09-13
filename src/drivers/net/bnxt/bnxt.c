@@ -307,7 +307,7 @@ void bnxt_set_txq ( struct bnxt *bp, int entry, dma_addr_t mapping, int len )
 
 static void bnxt_tx_complete ( struct net_device *dev, u16 hw_idx )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct io_buffer *iob;
 
 	iob = bp->tx.iob[hw_idx];
@@ -484,7 +484,7 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 static int bnxt_rx_complete ( struct net_device *dev,
 		struct rx_pkt_cmpl *rx_cmp )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct rx_pkt_cmpl_hi *rx_cmp_hi;
 	u8  cmpl_bit = bp->cq.completion_bit;
 
@@ -1927,7 +1927,7 @@ int bnxt_hwrm_run ( hwrm_func_t cmds[], struct bnxt *bp )
 
 static int bnxt_open ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 
 	DBGP ( "%s\n", __func__ );
 	bnxt_mm_nic ( bp );
@@ -1952,7 +1952,7 @@ static void bnxt_tx_adjust_pkt ( struct bnxt *bp, struct io_buffer *iob )
 
 static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	u16 len, entry;
 	dma_addr_t mapping;
 
@@ -2009,7 +2009,7 @@ void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt )
 
 static void bnxt_service_cq ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct cmpl_base *cmp;
 	struct tx_cmpl *tx;
 	u16 old_cid = bp->cq.cons_id;
@@ -2057,7 +2057,7 @@ static void bnxt_service_cq ( struct net_device *dev )
 
 static void bnxt_service_nq ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct nq_base *nqp;
 	u16 old_cid = bp->nq.cons_id;
 	int done = SERVICE_NEXT_NQ_BD;
@@ -2102,7 +2102,7 @@ static void bnxt_poll ( struct net_device *dev )
 
 static void bnxt_close ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 
 	DBGP ( "%s\n", __func__ );
 	bnxt_down_nic (bp);
@@ -2143,7 +2143,7 @@ static int bnxt_init_one ( struct pci_device *pci )
 	netdev_init ( netdev, &bnxt_netdev_ops );
 
 	/* Driver private area for this device */
-	bp = netdev_priv ( netdev );
+	bp = netdev->priv;
 
 	/* Set PCI driver private data */
 	pci_set_drvdata ( pci, netdev );
@@ -2197,7 +2197,7 @@ disable_pdev:
 static void bnxt_remove_one ( struct pci_device *pci )
 {
 	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct bnxt *bp = netdev_priv ( netdev );
+	struct bnxt *bp = netdev->priv;
 
 	DBGP ( "%s\n", __func__ );
 	/* Unregister network device */

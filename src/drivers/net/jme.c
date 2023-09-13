@@ -1153,7 +1153,7 @@ jme_reload_eeprom(struct jme_adapter *jme)
 static void
 jme_load_macaddr(struct net_device *netdev)
 {
-	struct jme_adapter *jme = netdev_priv(netdev);
+	struct jme_adapter *jme = netdev->priv;
 	unsigned char macaddr[6];
 	u32 val;
 

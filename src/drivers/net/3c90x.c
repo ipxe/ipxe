@@ -272,7 +272,7 @@ static int a3c90x_setup_tx_ring(struct INF_3C90X *p)
  */
 static void a3c90x_process_tx_packets(struct net_device *netdev)
 {
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 	unsigned int downlist_ptr;
 
 	DBGP("a3c90x_process_tx_packets\n");
@@ -320,7 +320,7 @@ static void a3c90x_free_tx_ring(struct INF_3C90X *p)
 static int a3c90x_transmit(struct net_device *netdev,
 			   struct io_buffer *iob)
 {
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 	struct TXD *tx_cur_desc;
 	struct TXD *tx_prev_desc;
 
@@ -518,7 +518,7 @@ static void a3c90x_process_rx_packets(struct net_device *netdev)
 {
 	int i;
 	unsigned int rx_status;
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 	struct RXD *rx_cur_desc;
 
 	DBGP("a3c90x_process_rx_packets\n");
@@ -567,7 +567,7 @@ static void a3c90x_process_rx_packets(struct net_device *netdev)
  */
 static void a3c90x_poll(struct net_device *netdev)
 {
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 	uint16_t raw_status, int_status;
 
 	DBGP("a3c90x_poll\n");
@@ -611,7 +611,7 @@ static void a3c90x_free_resources(struct INF_3C90X *p)
 static void a3c90x_remove(struct pci_device *pci)
 {
 	struct net_device *netdev = pci_get_drvdata(pci);
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_remove\n");
 
@@ -628,7 +628,7 @@ static void a3c90x_remove(struct pci_device *pci)
 
 static void a3c90x_irq(struct net_device *netdev, int enable)
 {
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 
 	DBGP("a3c90x_irq\n");
 
@@ -657,7 +657,7 @@ static void a3c90x_hw_start(struct net_device *netdev)
 	unsigned int cfg;
 	unsigned int mopt;
 	unsigned short linktype;
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_hw_start\n");
 
@@ -796,7 +796,7 @@ static void a3c90x_hw_start(struct net_device *netdev)
 static int a3c90x_open(struct net_device *netdev)
 {
 	int rc;
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_open\n");
 
@@ -845,7 +845,7 @@ static int a3c90x_open(struct net_device *netdev)
  */
 static void a3c90x_close(struct net_device *netdev)
 {
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_close\n");
 
@@ -895,7 +895,7 @@ static int a3c90x_probe(struct pci_device *pci)
 	pci_set_drvdata(pci, netdev);
 	netdev->dev = &pci->dev;
 
-	inf_3c90x = netdev_priv(netdev);
+	inf_3c90x = netdev->priv;
 	memset(inf_3c90x, 0, sizeof(*inf_3c90x));
 
 	adjust_pci_device(pci);

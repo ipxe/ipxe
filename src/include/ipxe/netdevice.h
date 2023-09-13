@@ -569,17 +569,6 @@ netdev_put ( struct net_device *netdev ) {
 }
 
 /**
- * Get driver private area for this network device
- *
- * @v netdev		Network device
- * @ret priv		Driver private area for this network device
- */
-static inline __attribute__ (( always_inline )) void *
-netdev_priv ( struct net_device *netdev ) {
-        return netdev->priv;
-}
-
-/**
  * Get per-netdevice configuration settings block
  *
  * @v netdev		Network device
