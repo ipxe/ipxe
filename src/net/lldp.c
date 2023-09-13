@@ -296,9 +296,10 @@ struct net_protocol lldp_protocol __net_protocol = {
  * Create LLDP settings block
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int lldp_probe ( struct net_device *netdev ) {
+static int lldp_probe ( struct net_device *netdev, void *priv __unused ) {
 	struct lldp_settings *lldpset;
 	int rc;
 

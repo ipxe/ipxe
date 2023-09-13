@@ -375,9 +375,10 @@ int pxe_start_nbp ( void ) {
  * Notify BIOS of existence of network device
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int pxe_notify ( struct net_device *netdev ) {
+static int pxe_notify ( struct net_device *netdev, void *priv __unused ) {
 
 	/* Do nothing if we already have a network device */
 	if ( pxe_netdev )

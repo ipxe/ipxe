@@ -473,22 +473,27 @@ struct net_device {
 struct net_driver {
 	/** Name */
 	const char *name;
+	/** Size of private data */
+	size_t priv_len;
 	/** Probe device
 	 *
 	 * @v netdev		Network device
+	 * @v priv		Private data
 	 * @ret rc		Return status code
 	 */
-	int ( * probe ) ( struct net_device *netdev );
+	int ( * probe ) ( struct net_device *netdev, void *priv );
 	/** Notify of device or link state change
 	 *
 	 * @v netdev		Network device
+	 * @v priv		Private data
 	 */
-	void ( * notify ) ( struct net_device *netdev );
+	void ( * notify ) ( struct net_device *netdev, void *priv );
 	/** Remove device
 	 *
 	 * @v netdev		Network device
+	 * @v priv		Private data
 	 */
-	void ( * remove ) ( struct net_device *netdev );
+	void ( * remove ) ( struct net_device *netdev, void *priv );
 };
 
 /** Network driver table */
@@ -688,6 +693,8 @@ netdev_rx_frozen ( struct net_device *netdev ) {
 	return ( netdev->state & NETDEV_RX_FROZEN );
 }
 
+extern void * netdev_priv ( struct net_device *netdev,
+			    struct net_driver *driver );
 extern void netdev_rx_freeze ( struct net_device *netdev );
 extern void netdev_rx_unfreeze ( struct net_device *netdev );
 extern void netdev_link_err ( struct net_device *netdev, int rc );

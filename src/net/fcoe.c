@@ -1110,9 +1110,10 @@ static void fcoe_expired ( struct retry_timer *timer, int over __unused ) {
  * Create FCoE port
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int fcoe_probe ( struct net_device *netdev ) {
+static int fcoe_probe ( struct net_device *netdev, void *priv __unused ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct fcoe_port *fcoe;
 	int rc;
@@ -1162,8 +1163,9 @@ static int fcoe_probe ( struct net_device *netdev ) {
  * Handle FCoE port device or link state change
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void fcoe_notify ( struct net_device *netdev ) {
+static void fcoe_notify ( struct net_device *netdev, void *priv __unused ) {
 	struct fcoe_port *fcoe;
 
 	/* Sanity check */
@@ -1185,8 +1187,9 @@ static void fcoe_notify ( struct net_device *netdev ) {
  * Destroy FCoE port
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void fcoe_remove ( struct net_device *netdev ) {
+static void fcoe_remove ( struct net_device *netdev, void *priv __unused ) {
 	struct fcoe_port *fcoe;
 
 	/* Sanity check */

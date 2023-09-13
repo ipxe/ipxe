@@ -1224,9 +1224,11 @@ struct ipv6_settings {
  * Register IPv6 link-local address settings
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int ipv6_register_settings ( struct net_device *netdev ) {
+static int ipv6_register_settings ( struct net_device *netdev,
+				    void *priv __unused ) {
 	struct settings *parent = netdev_settings ( netdev );
 	struct ipv6_settings *ipv6set;
 	int rc;

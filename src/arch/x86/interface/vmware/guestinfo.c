@@ -207,9 +207,11 @@ struct init_fn guestinfo_init_fn __init_fn ( INIT_NORMAL ) = {
  * Create per-netdevice GuestInfo settings
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int guestinfo_net_probe ( struct net_device *netdev ) {
+static int guestinfo_net_probe ( struct net_device *netdev,
+				 void *priv __unused ) {
 	struct settings *settings;
 	int rc;
 
@@ -247,8 +249,10 @@ static int guestinfo_net_probe ( struct net_device *netdev ) {
  * Remove per-netdevice GuestInfo settings
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void guestinfo_net_remove ( struct net_device *netdev ) {
+static void guestinfo_net_remove ( struct net_device *netdev,
+				   void *priv __unused ) {
 	struct settings *parent = netdev_settings ( netdev );
 	struct settings *settings;
 
