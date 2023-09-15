@@ -30,6 +30,9 @@ struct eapol_header {
 /** EAPoL-encapsulated EAP packets */
 #define EAPOL_TYPE_EAP 0
 
+/** EAPoL start */
+#define EAPOL_TYPE_START 1
+
 /** EAPoL key */
 #define EAPOL_TYPE_KEY 5
 
@@ -37,7 +40,12 @@ struct eapol_header {
 struct eapol_supplicant {
 	/** EAP supplicant */
 	struct eap_supplicant eap;
+	/** EAPoL-Start retransmission timer */
+	struct retry_timer timer;
 };
+
+/** Delay between EAPoL-Start packets */
+#define EAPOL_START_INTERVAL ( 2 * TICKS_PER_SEC )
 
 /** An EAPoL handler */
 struct eapol_handler {
