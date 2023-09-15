@@ -761,13 +761,14 @@ static int wpa_handle_1_of_2 ( struct wpa_common_ctx *ctx,
 /**
  * Handle receipt of EAPOL-Key frame for WPA
  *
- * @v iob	I/O buffer
- * @v netdev	Network device
- * @v ll_source	Source link-layer address
+ * @v supplicant	EAPoL supplicant
+ * @v iob		I/O buffer
+ * @v ll_source		Source link-layer address
  */
-static int eapol_key_rx ( struct io_buffer *iob, struct net_device *netdev,
-			  const void *ll_source )
+static int eapol_key_rx ( struct eapol_supplicant *supplicant,
+			  struct io_buffer *iob, const void *ll_source )
 {
+	struct net_device *netdev = supplicant->eap.netdev;
 	struct net80211_device *dev = net80211_get ( netdev );
 	struct eapol_header *eapol;
 	struct eapol_key_pkt *pkt;
