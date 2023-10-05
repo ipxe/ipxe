@@ -64,6 +64,25 @@ union eap_packet {
  */
 #define EAP_BLOCK_TIMEOUT ( 45 * TICKS_PER_SEC )
 
-extern int eap_rx ( struct net_device *netdev, const void *data, size_t len );
+/** An EAP supplicant */
+struct eap_supplicant {
+	/** Network device */
+	struct net_device *netdev;
+	/** Authentication outcome is final */
+	int done;
+	/**
+	 * Transmit EAP response
+	 *
+	 * @v supplicant	EAP supplicant
+	 * @v data		Response data
+	 * @v len		Length of response data
+	 * @ret rc		Return status code
+	 */
+	int ( * tx ) ( struct eap_supplicant *supplicant,
+		       const void *data, size_t len );
+};
+
+extern int eap_rx ( struct eap_supplicant *supplicant,
+		    const void *data, size_t len );
 
 #endif /* _IPXE_EAP_H */

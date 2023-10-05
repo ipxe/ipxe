@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/tables.h>
+#include <ipxe/eap.h>
 
 /** EAPoL header */
 struct eapol_header {
@@ -29,8 +30,22 @@ struct eapol_header {
 /** EAPoL-encapsulated EAP packets */
 #define EAPOL_TYPE_EAP 0
 
+/** EAPoL start */
+#define EAPOL_TYPE_START 1
+
 /** EAPoL key */
 #define EAPOL_TYPE_KEY 5
+
+/** An EAPoL supplicant */
+struct eapol_supplicant {
+	/** EAP supplicant */
+	struct eap_supplicant eap;
+	/** EAPoL-Start retransmission timer */
+	struct retry_timer timer;
+};
+
+/** Delay between EAPoL-Start packets */
+#define EAPOL_START_INTERVAL ( 2 * TICKS_PER_SEC )
 
 /** An EAPoL handler */
 struct eapol_handler {
@@ -39,15 +54,15 @@ struct eapol_handler {
 	/**
 	 * Process received packet
 	 *
+	 * @v supplicant	EAPoL supplicant
 	 * @v iobuf		I/O buffer
-	 * @v netdev		Network device
 	 * @v ll_source		Link-layer source address
 	 * @ret rc		Return status code
 	 *
 	 * This method takes ownership of the I/O buffer.
 	 */
-	int ( * rx ) ( struct io_buffer *iobuf, struct net_device *netdev,
-		       const void *ll_source );
+	int ( * rx ) ( struct eapol_supplicant *supplicant,
+		       struct io_buffer *iobuf, const void *ll_source );
 };
 
 /** EAPoL handler table */

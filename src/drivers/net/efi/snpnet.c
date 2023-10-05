@@ -97,7 +97,7 @@ static const char * snpnet_mac_text ( EFI_MAC_ADDRESS *mac, size_t len ) {
  * @v netdev		Network device
  */
 static void snpnet_dump_mode ( struct net_device *netdev ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
 	size_t mac_len = mode->HwAddressSize;
 	unsigned int i;
@@ -136,7 +136,7 @@ static void snpnet_dump_mode ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void snpnet_check_link ( struct net_device *netdev ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
 
 	/* Do nothing unless media presence detection is supported */
@@ -160,7 +160,7 @@ static void snpnet_check_link ( struct net_device *netdev ) {
  */
 static int snpnet_transmit ( struct net_device *netdev,
 			     struct io_buffer *iobuf ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_STATUS efirc;
 	int rc;
 

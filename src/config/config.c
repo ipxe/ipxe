@@ -290,6 +290,9 @@ REQUIRE_OBJECT ( cert_cmd );
 #ifdef IMAGE_MEM_CMD
 REQUIRE_OBJECT ( image_mem_cmd );
 #endif
+#ifdef SHIM_CMD
+REQUIRE_OBJECT ( shim_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
@@ -351,6 +354,9 @@ REQUIRE_OBJECT ( vram_settings );
 #endif
 #ifdef ACPI_SETTINGS
 REQUIRE_OBJECT ( acpi_settings );
+#endif
+#ifdef EFI_SETTINGS
+REQUIRE_OBJECT ( efi_settings );
 #endif
 
 /*

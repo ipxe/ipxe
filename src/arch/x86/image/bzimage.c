@@ -355,6 +355,10 @@ static size_t bzimage_load_initrd ( struct image *image,
 	size_t offset;
 	size_t pad_len;
 
+	/* Skip hidden images */
+	if ( initrd->flags & IMAGE_HIDDEN )
+		return 0;
+
 	/* Create cpio header for non-prebuilt images */
 	offset = cpio_header ( initrd, &cpio );
 

@@ -230,10 +230,10 @@ u32 vpm_ioread32(struct virtio_pci_modern_device *vdev,
     uint32_t data;
     switch (region->flags & VIRTIO_PCI_REGION_TYPE_MASK) {
     case VIRTIO_PCI_REGION_MEMORY:
-        data = readw(region->base + offset);
+        data = readl(region->base + offset);
         break;
     case VIRTIO_PCI_REGION_PORT:
-        data = inw(region->base + offset);
+        data = inl(region->base + offset);
         break;
     case VIRTIO_PCI_REGION_PCI_CONFIG:
         prep_pci_cfg_cap(vdev, region, offset, 4);

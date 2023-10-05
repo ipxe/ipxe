@@ -424,6 +424,8 @@ extern int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
 				   struct asn1_algorithm **algorithm );
 extern int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 				      struct asn1_algorithm **algorithm );
+extern int asn1_check_algorithm ( const struct asn1_cursor *cursor,
+				  struct asn1_algorithm *expected );
 extern int asn1_generalized_time ( const struct asn1_cursor *cursor,
 				   time_t *time );
 extern int asn1_grow ( struct asn1_builder *builder, size_t extra );

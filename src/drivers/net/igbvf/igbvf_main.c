@@ -179,7 +179,7 @@ static void igbvf_irq_enable ( struct igbvf_adapter *adapter )
  **/
 static void igbvf_irq ( struct net_device *netdev, int enable )
 {
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
 
 	DBG ( "igbvf_irq\n" );
 
@@ -197,7 +197,7 @@ static void igbvf_irq ( struct net_device *netdev, int enable )
  **/
 static void igbvf_process_tx_packets ( struct net_device *netdev )
 {
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
 	uint32_t i;
 	uint32_t tx_status;
 	union e1000_adv_tx_desc *tx_curr_desc;
@@ -243,7 +243,7 @@ static void igbvf_process_tx_packets ( struct net_device *netdev )
  **/
 static void igbvf_process_rx_packets ( struct net_device *netdev )
 {
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
 	struct e1000_hw *hw = &adapter->hw;
 	uint32_t i;
 	uint32_t rx_status;
@@ -306,7 +306,7 @@ static void igbvf_process_rx_packets ( struct net_device *netdev )
  */
 static void igbvf_poll ( struct net_device *netdev )
 {
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
 	uint32_t rx_status;
 	union e1000_adv_rx_desc *rx_curr_desc;
 
@@ -612,7 +612,7 @@ int igbvf_setup_rx_resources ( struct igbvf_adapter *adapter )
  **/
 static int igbvf_open ( struct net_device *netdev )
 {
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
 	int err;
 
 	DBG ("igbvf_open\n");
@@ -667,7 +667,7 @@ err_setup_tx:
  **/
 static void igbvf_close ( struct net_device *netdev )
 {
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
         struct e1000_hw *hw = &adapter->hw;
         uint32_t rxdctl;
 
@@ -698,7 +698,7 @@ static void igbvf_close ( struct net_device *netdev )
  */
 static int igbvf_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 {
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
 	struct e1000_hw *hw = &adapter->hw;
 	uint32_t tx_curr = adapter->tx_tail;
 	union e1000_adv_tx_desc *tx_curr_desc;
@@ -810,7 +810,7 @@ int igbvf_probe ( struct pci_device *pdev )
 	netdev->dev = &pdev->dev;
 
 	/* Initialize driver private storage */
-	adapter = netdev_priv ( netdev );
+	adapter = netdev->priv;
 	memset ( adapter, 0, ( sizeof ( *adapter ) ) );
 
 	adapter->pdev = pdev;
@@ -924,7 +924,7 @@ err_alloc_etherdev:
 void igbvf_remove ( struct pci_device *pdev )
 {
 	struct net_device *netdev = pci_get_drvdata ( pdev );
-	struct igbvf_adapter *adapter = netdev_priv ( netdev );
+	struct igbvf_adapter *adapter = netdev->priv;
 
 	DBG ( "igbvf_remove\n" );
 

@@ -213,7 +213,7 @@ static void skge_led(struct skge_port *skge, enum led_mode mode)
  *
  * static int skge_get_eeprom_len(struct net_device *dev)
  * {
- * 	struct skge_port *skge = netdev_priv(dev);
+ * 	struct skge_port *skge = dev->priv;
  * 	u32 reg2;
  *
  * 	pci_read_config_dword(skge->hw->pdev, PCI_DEV_REG2, &reg2);
@@ -248,7 +248,7 @@ static void skge_led(struct skge_port *skge, enum led_mode mode)
  * static int skge_get_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom,
  * 			   u8 *data)
  * {
- * 	struct skge_port *skge = netdev_priv(dev);
+ * 	struct skge_port *skge = dev->priv;
  * 	struct pci_dev *pdev = skge->hw->pdev;
  * 	int cap = pci_find_capability(pdev, PCI_CAP_ID_VPD);
  * 	int length = eeprom->len;
@@ -274,7 +274,7 @@ static void skge_led(struct skge_port *skge, enum led_mode mode)
  * static int skge_set_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom,
  * 			   u8 *data)
  * {
- * 	struct skge_port *skge = netdev_priv(dev);
+ * 	struct skge_port *skge = dev->priv;
  * 	struct pci_dev *pdev = skge->hw->pdev;
  * 	int cap = pci_find_capability(pdev, PCI_CAP_ID_VPD);
  * 	int length = eeprom->len;
@@ -415,7 +415,7 @@ static void skge_link_down(struct skge_port *skge)
 static void xm_link_down(struct skge_hw *hw, int port)
 {
 	struct net_device *dev = hw->dev[port];
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 
 	xm_write16(hw, port, XM_IMSK, XM_IMSK_DISABLE);
 
@@ -553,7 +553,7 @@ static const u16 fiber_pause_map[] = {
 static void bcom_check_link(struct skge_hw *hw, int port)
 {
 	struct net_device *dev = hw->dev[port];
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	u16 status;
 
 	/* read twice because of latch */
@@ -751,7 +751,7 @@ static void xm_phy_init(struct skge_port *skge)
 
 static int xm_check_link(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_hw *hw = skge->hw;
 	int port = skge->port;
 	u16 status;
@@ -852,7 +852,7 @@ static void xm_link_timer(struct skge_port *skge)
 static void genesis_mac_init(struct skge_hw *hw, int port)
 {
 	struct net_device *dev = hw->dev[port];
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	int i;
 	u32 r;
 	const u8 zero[6]  = { 0 };
@@ -1209,7 +1209,7 @@ static u16 gm_phy_read(struct skge_hw *hw, int port, u16 reg)
 /* Marvell Phy Initialization */
 static void yukon_init(struct skge_hw *hw, int port)
 {
-	struct skge_port *skge = netdev_priv(hw->dev[port]);
+	struct skge_port *skge = hw->dev[port]->priv;
 	u16 ctrl, ct1000, adv;
 
 	if (skge->autoneg == AUTONEG_ENABLE) {
@@ -1325,7 +1325,7 @@ static int is_yukon_lite_a0(struct skge_hw *hw)
 
 static void yukon_mac_init(struct skge_hw *hw, int port)
 {
-	struct skge_port *skge = netdev_priv(hw->dev[port]);
+	struct skge_port *skge = hw->dev[port]->priv;
 	int i;
 	u32 reg;
 	const u8 *addr = hw->dev[port]->ll_addr;
@@ -1691,7 +1691,7 @@ static void skge_qset(struct skge_port *skge, u16 q,
 
 void skge_free(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 
 	free(skge->rx_ring.start);
 	skge->rx_ring.start = NULL;
@@ -1706,7 +1706,7 @@ void skge_free(struct net_device *dev)
 
 static int skge_up(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_hw *hw = skge->hw;
 	int port = skge->port;
 	u32 chunk, ram_addr;
@@ -1789,7 +1789,7 @@ static void skge_rx_stop(struct skge_hw *hw, int port)
 
 static void skge_down(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_hw *hw = skge->hw;
 	int port = skge->port;
 
@@ -1862,7 +1862,7 @@ static inline int skge_tx_avail(const struct skge_ring *ring)
 
 static int skge_xmit_frame(struct net_device *dev, struct io_buffer *iob)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_hw *hw = skge->hw;
 	struct skge_element *e;
 	struct skge_tx_desc *td;
@@ -1908,7 +1908,7 @@ static int skge_xmit_frame(struct net_device *dev, struct io_buffer *iob)
 /* Free all buffers in transmit ring */
 static void skge_tx_clean(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_element *e;
 
 	for (e = skge->tx_ring.to_clean; e != skge->tx_ring.to_use; e = e->next) {
@@ -1939,7 +1939,7 @@ static inline int bad_phy_status(const struct skge_hw *hw, u32 status)
 /* Free all buffers in Tx ring which are no longer owned by device */
 static void skge_tx_done(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_ring *ring = &skge->tx_ring;
 	struct skge_element *e;
 
@@ -1961,7 +1961,7 @@ static void skge_tx_done(struct net_device *dev)
 
 static void skge_rx_refill(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_ring *ring = &skge->rx_ring;
 	struct skge_element *e;
 	struct io_buffer *iob;
@@ -2003,7 +2003,7 @@ static void skge_rx_refill(struct net_device *dev)
 
 static void skge_rx_done(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_ring *ring = &skge->rx_ring;
 	struct skge_rx_desc *rd;
 	struct skge_element *e;
@@ -2050,7 +2050,7 @@ static void skge_rx_done(struct net_device *dev)
 
 static void skge_poll(struct net_device *dev)
 {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_hw *hw = skge->hw;
 	u32 status;
 
@@ -2085,7 +2085,7 @@ static void skge_phyirq(struct skge_hw *hw)
 
 	for (port = 0; port < hw->ports; port++) {
 		struct net_device *dev = hw->dev[port];
-		struct skge_port *skge = netdev_priv(dev);
+		struct skge_port *skge = dev->priv;
 
 		if (hw->chip_id != CHIP_ID_GENESIS)
 			yukon_phy_intr(skge);
@@ -2302,7 +2302,7 @@ static struct net_device *skge_devinit(struct skge_hw *hw, int port,
 
 	dev->dev = &hw->pdev->dev;
 
-	skge = netdev_priv(dev);
+	skge = dev->priv;
 	skge->netdev = dev;
 	skge->hw = hw;
 
@@ -2446,7 +2446,7 @@ static void skge_remove(struct pci_device *pdev)
  * This is a iPXE Network Driver API function.
  */
 static void skge_net_irq ( struct net_device *dev, int enable ) {
-	struct skge_port *skge = netdev_priv(dev);
+	struct skge_port *skge = dev->priv;
 	struct skge_hw *hw = skge->hw;
 
 	if (enable)

@@ -36,10 +36,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Handle EAP Request-Identity
  *
- * @v netdev		Network device
+ * @v supplicant	EAP supplicant
  * @ret rc		Return status code
  */
-static int eap_rx_request_identity ( struct net_device *netdev ) {
+static int eap_rx_request_identity ( struct eap_supplicant *supplicant ) {
+	struct net_device *netdev = supplicant->netdev;
 
 	/* Treat Request-Identity as blocking the link */
 	DBGC ( netdev, "EAP %s Request-Identity blocking link\n",
@@ -52,13 +53,14 @@ static int eap_rx_request_identity ( struct net_device *netdev ) {
 /**
  * Handle EAP Request
  *
- * @v netdev		Network device
+ * @v supplicant	EAP supplicant
  * @v req		EAP request
  * @v len		Length of EAP request
  * @ret rc		Return status code
  */
-static int eap_rx_request ( struct net_device *netdev,
+static int eap_rx_request ( struct eap_supplicant *supplicant,
 			    const struct eap_request *req, size_t len ) {
+	struct net_device *netdev = supplicant->netdev;
 
 	/* Sanity check */
 	if ( len < sizeof ( *req ) ) {
@@ -67,10 +69,13 @@ static int eap_rx_request ( struct net_device *netdev,
 		return -EINVAL;
 	}
 
+	/* Mark authentication as incomplete */
+	supplicant->done = 0;
+
 	/* Handle according to type */
 	switch ( req->type ) {
 	case EAP_TYPE_IDENTITY:
-		return eap_rx_request_identity ( netdev );
+		return eap_rx_request_identity ( supplicant );
 	default:
 		DBGC ( netdev, "EAP %s requested type %d unknown:\n",
 		       netdev->name, req->type );
@@ -82,10 +87,14 @@ static int eap_rx_request ( struct net_device *netdev,
 /**
  * Handle EAP Success
  *
- * @v netdev		Network device
+ * @v supplicant	EAP supplicant
  * @ret rc		Return status code
  */
-static int eap_rx_success ( struct net_device *netdev ) {
+static int eap_rx_success ( struct eap_supplicant *supplicant ) {
+	struct net_device *netdev = supplicant->netdev;
+
+	/* Mark authentication as complete */
+	supplicant->done = 1;
 
 	/* Mark link as unblocked */
 	DBGC ( netdev, "EAP %s Success\n", netdev->name );
@@ -97,10 +106,14 @@ static int eap_rx_success ( struct net_device *netdev ) {
 /**
  * Handle EAP Failure
  *
- * @v netdev		Network device
+ * @v supplicant	EAP supplicant
  * @ret rc		Return status code
  */
-static int eap_rx_failure ( struct net_device *netdev ) {
+static int eap_rx_failure ( struct eap_supplicant *supplicant ) {
+	struct net_device *netdev = supplicant->netdev;
+
+	/* Mark authentication as complete */
+	supplicant->done = 1;
 
 	/* Record error */
 	DBGC ( netdev, "EAP %s Failure\n", netdev->name );
@@ -110,12 +123,14 @@ static int eap_rx_failure ( struct net_device *netdev ) {
 /**
  * Handle EAP packet
  *
- * @v netdev		Network device
+ * @v supplicant	EAP supplicant
  * @v data		EAP packet
  * @v len		Length of EAP packet
  * @ret rc		Return status code
  */
-int eap_rx ( struct net_device *netdev, const void *data, size_t len ) {
+int eap_rx ( struct eap_supplicant *supplicant, const void *data,
+	     size_t len ) {
+	struct net_device *netdev = supplicant->netdev;
 	const union eap_packet *eap = data;
 
 	/* Sanity check */
@@ -128,11 +143,11 @@ int eap_rx ( struct net_device *netdev, const void *data, size_t len ) {
 	/* Handle according to code */
 	switch ( eap->hdr.code ) {
 	case EAP_CODE_REQUEST:
-		return eap_rx_request ( netdev, &eap->req, len );
+		return eap_rx_request ( supplicant, &eap->req, len );
 	case EAP_CODE_SUCCESS:
-		return eap_rx_success ( netdev );
+		return eap_rx_success ( supplicant );
 	case EAP_CODE_FAILURE:
-		return eap_rx_failure ( netdev );
+		return eap_rx_failure ( supplicant );
 	default:
 		DBGC ( netdev, "EAP %s unsupported code %d\n",
 		       netdev->name, eap->hdr.code );

@@ -690,7 +690,7 @@ static void ifec_reset ( struct net_device *netdev )
  */
 static void ifec_free ( struct net_device *netdev )
 {
-	struct ifec_private *priv = netdev_priv ( netdev );
+	struct ifec_private *priv = netdev->priv;
 	int i;
 
 	DBGP ( "ifec_free\n" );

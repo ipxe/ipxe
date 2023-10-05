@@ -470,9 +470,10 @@ void vlan_auto ( const void *ll_addr, unsigned int tag ) {
  * Create automatic VLAN device
  *
  * @v trunk		Trunk network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int vlan_probe ( struct net_device *trunk ) {
+static int vlan_probe ( struct net_device *trunk, void *priv __unused ) {
 	int rc;
 
 	/* Do nothing unless an automatic VLAN exists */
@@ -498,8 +499,9 @@ static int vlan_probe ( struct net_device *trunk ) {
  * Handle trunk network device link state change
  *
  * @v trunk		Trunk network device
+ * @v priv		Private data
  */
-static void vlan_notify ( struct net_device *trunk ) {
+static void vlan_notify ( struct net_device *trunk, void *priv __unused ) {
 	struct net_device *netdev;
 	struct vlan_device *vlan;
 
@@ -538,8 +540,9 @@ static int vlan_remove_first ( struct net_device *trunk ) {
  * Destroy all VLAN devices for a given trunk
  *
  * @v trunk		Trunk network device
+ * @v priv		Private data
  */
-static void vlan_remove ( struct net_device *trunk ) {
+static void vlan_remove ( struct net_device *trunk, void *priv __unused ) {
 
 	/* Remove all VLAN devices attached to this trunk, safe
 	 * against arbitrary net device removal.

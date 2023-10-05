@@ -49,19 +49,58 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ESC		0x1b
 
 /*
- * Special keys outside the normal ASCII range 
- *
+ * Special keys outside the normal Unicode range
  *
  * The names are chosen to match those used by curses.  The values are
  * chosen to facilitate easy conversion from a received ANSI escape
  * sequence to a KEY_XXX constant.
+ *
+ * Note that the values are exposed to iPXE commands via parse_key()
+ * and therefore may not be changed without breaking existing scripts.
  */
 
-#define KEY_ANSI( n, terminator ) ( 0x100 * ( (n) + 1 ) + (terminator) )
-#define KEY_ANSI_N( key ) ( ( (key) / 0x100 ) - 1 )
+/**
+ * Minimum value for special keypresses
+ *
+ * This value is chosen to lie above the maximum Unicode code point
+ * value 0x10ffff.
+ */
+#define KEY_MIN		0x110000
+
+/**
+ * Construct relative key value for special key
+ *
+ * @v key		Key value
+ * @ret rkey		Relative key value
+ */
+#define KEY_REL( key ) ( (key) - KEY_MIN )
+
+/**
+ * Construct ANSI escape sequence key value
+ *
+ * @v n			ANSI escape sequence numeric portion, or 0 for none
+ * @v terminator	ANSI escape sequence terminating character
+ * @ret key		Key value
+ */
+#define KEY_ANSI( n, terminator ) \
+	( KEY_MIN + ( ( (n) + 1 ) << 8 ) + (terminator) )
+
+/**
+ * Extract ANSI escape sequence numeric portion
+ *
+ * @v key		Key value (or relative key value)
+ * @ret n		ANSI escape sequence numeric portion, or 0 for none
+ */
+#define KEY_ANSI_N( key ) ( ( ( (key) >> 8 ) & 0xff ) - 1 )
+
+/**
+ * Extract ANSI escape sequence terminating character
+ *
+ * @v key		Key value (or relative key value)
+ * @ret terminator	ANSI escape sequence terminating character
+ */
 #define KEY_ANSI_TERMINATOR( key ) ( (key) & 0xff )
 
-#define KEY_MIN		0x101
 #define KEY_UP		KEY_ANSI ( 0, 'A' )	/**< Up arrow */
 #define KEY_DOWN	KEY_ANSI ( 0, 'B' )	/**< Down arrow */
 #define KEY_RIGHT	KEY_ANSI ( 0, 'C' )	/**< Right arrow */

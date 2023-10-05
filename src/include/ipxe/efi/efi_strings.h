@@ -19,6 +19,8 @@ extern int efi_vssnprintf ( wchar_t *wbuf, ssize_t swsize, const char *fmt,
 			    va_list args );
 extern int efi_ssnprintf ( wchar_t *wbuf, ssize_t swsize,
 			   const char *fmt, ... );
+extern int efi_vasprintf ( wchar_t **strp, const char *fmt, va_list args );
+extern int efi_asprintf ( wchar_t **strp, const char *fmt, ... );
 
 /**
  * Write a formatted string to a wide-character buffer

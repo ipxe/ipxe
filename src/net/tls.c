@@ -388,6 +388,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
+	free_iob ( tls->rx_handshake );
 	x509_chain_put ( tls->certs );
 	x509_chain_put ( tls->chain );
 	x509_root_put ( tls->root );
@@ -1682,9 +1683,14 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_change_cipher ( struct tls_connection *tls ) {
-	static const uint8_t change_cipher[1] = { 1 };
+	static const struct {
+		uint8_t spec;
+	} __attribute__ (( packed )) change_cipher = {
+		.spec = TLS_CHANGE_CIPHER_SPEC,
+	};
+
 	return tls_send_plaintext ( tls, TLS_TYPE_CHANGE_CIPHER,
-				    change_cipher, sizeof ( change_cipher ) );
+				    &change_cipher, sizeof ( change_cipher ) );
 }
 
 /**
@@ -1731,20 +1737,27 @@ static int tls_send_finished ( struct tls_connection *tls ) {
  * Receive new Change Cipher record
  *
  * @v tls		TLS connection
- * @v data		Plaintext record
- * @v len		Length of plaintext record
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static int tls_new_change_cipher ( struct tls_connection *tls,
-				   const void *data, size_t len ) {
+				   struct io_buffer *iobuf ) {
+	const struct {
+		uint8_t spec;
+	} __attribute__ (( packed )) *change_cipher = iobuf->data;
+	size_t len = iob_len ( iobuf );
 	int rc;
 
-	if ( ( len != 1 ) || ( *( ( uint8_t * ) data ) != 1 ) ) {
+	/* Sanity check */
+	if ( ( sizeof ( *change_cipher ) != len ) ||
+	     ( change_cipher->spec != TLS_CHANGE_CIPHER_SPEC ) ) {
 		DBGC ( tls, "TLS %p received invalid Change Cipher\n", tls );
-		DBGC_HD ( tls, data, len );
+		DBGC_HD ( tls, change_cipher, len );
 		return -EINVAL_CHANGE_CIPHER;
 	}
+	iob_pull ( iobuf, sizeof ( *change_cipher ) );
 
+	/* Change receive cipher spec */
 	if ( ( rc = tls_change_cipher ( tls, &tls->rx_cipherspec_pending,
 					&tls->rx_cipherspec ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not activate RX cipher: %s\n",
@@ -1760,25 +1773,27 @@ static int tls_new_change_cipher ( struct tls_connection *tls,
  * Receive new Alert record
  *
  * @v tls		TLS connection
- * @v data		Plaintext record
- * @v len		Length of plaintext record
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int tls_new_alert ( struct tls_connection *tls, const void *data,
-			   size_t len ) {
+static int tls_new_alert ( struct tls_connection *tls,
+			   struct io_buffer *iobuf ) {
 	const struct {
 		uint8_t level;
 		uint8_t description;
 		char next[0];
-	} __attribute__ (( packed )) *alert = data;
+	} __attribute__ (( packed )) *alert = iobuf->data;
+	size_t len = iob_len ( iobuf );
 
 	/* Sanity check */
 	if ( sizeof ( *alert ) != len ) {
 		DBGC ( tls, "TLS %p received overlength Alert\n", tls );
-		DBGC_HD ( tls, data, len );
+		DBGC_HD ( tls, alert, len );
 		return -EINVAL_ALERT;
 	}
+	iob_pull ( iobuf, sizeof ( *alert ) );
 
+	/* Handle alert */
 	switch ( alert->level ) {
 	case TLS_ALERT_WARNING:
 		DBGC ( tls, "TLS %p received warning alert %d\n",
@@ -2392,38 +2407,33 @@ static int tls_new_finished ( struct tls_connection *tls,
  * Receive new Handshake record
  *
  * @v tls		TLS connection
- * @v data		Plaintext record
- * @v len		Length of plaintext record
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
 static int tls_new_handshake ( struct tls_connection *tls,
-			       const void *data, size_t len ) {
-	size_t remaining = len;
+			       struct io_buffer *iobuf ) {
+	size_t remaining;
 	int rc;
 
-	while ( remaining ) {
+	while ( ( remaining = iob_len ( iobuf ) ) ) {
 		const struct {
 			uint8_t type;
 			tls24_t length;
 			uint8_t payload[0];
-		} __attribute__ (( packed )) *handshake = data;
+		} __attribute__ (( packed )) *handshake = iobuf->data;
 		const void *payload;
 		size_t payload_len;
 		size_t record_len;
 
 		/* Parse header */
 		if ( sizeof ( *handshake ) > remaining ) {
-			DBGC ( tls, "TLS %p received underlength Handshake\n",
-			       tls );
-			DBGC_HD ( tls, data, remaining );
-			return -EINVAL_HANDSHAKE;
+			/* Leave remaining fragment unconsumed */
+			break;
 		}
 		payload_len = tls_uint24 ( &handshake->length );
 		if ( payload_len > ( remaining - sizeof ( *handshake ) ) ) {
-			DBGC ( tls, "TLS %p received overlength Handshake\n",
-			       tls );
-			DBGC_HD ( tls, data, len );
-			return -EINVAL_HANDSHAKE;
+			/* Leave remaining fragment unconsumed */
+			break;
 		}
 		payload = &handshake->payload;
 		record_len = ( sizeof ( *handshake ) + payload_len );
@@ -2470,15 +2480,60 @@ static int tls_new_handshake ( struct tls_connection *tls,
 		 * which are explicitly excluded).
 		 */
 		if ( handshake->type != TLS_HELLO_REQUEST )
-			tls_add_handshake ( tls, data, record_len );
+			tls_add_handshake ( tls, handshake, record_len );
 
 		/* Abort on failure */
 		if ( rc != 0 )
 			return rc;
 
 		/* Move to next handshake record */
-		data += record_len;
-		remaining -= record_len;
+		iob_pull ( iobuf, record_len );
+	}
+
+	return 0;
+}
+
+/**
+ * Receive new unknown record
+ *
+ * @v tls		TLS connection
+ * @v iobuf		I/O buffer
+ * @ret rc		Return status code
+ */
+static int tls_new_unknown ( struct tls_connection *tls __unused,
+			     struct io_buffer *iobuf ) {
+
+	/* RFC4346 says that we should just ignore unknown record types */
+	iob_pull ( iobuf, iob_len ( iobuf ) );
+	return 0;
+}
+
+/**
+ * Receive new data record
+ *
+ * @v tls		TLS connection
+ * @v rx_data		List of received data buffers
+ * @ret rc		Return status code
+ */
+static int tls_new_data ( struct tls_connection *tls,
+			  struct list_head *rx_data ) {
+	struct io_buffer *iobuf;
+	int rc;
+
+	/* Fail unless we are ready to receive data */
+	if ( ! tls_ready ( tls ) )
+		return -ENOTCONN;
+
+	/* Deliver each I/O buffer in turn */
+	while ( ( iobuf = list_first_entry ( rx_data, struct io_buffer,
+					     list ) ) ) {
+		list_del ( &iobuf->list );
+		if ( ( rc = xfer_deliver_iob ( &tls->plainstream,
+					       iobuf ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not deliver data: "
+			       "%s\n", tls, strerror ( rc ) );
+			return rc;
+		}
 	}
 
 	return 0;
@@ -2494,41 +2549,18 @@ static int tls_new_handshake ( struct tls_connection *tls,
  */
 static int tls_new_record ( struct tls_connection *tls, unsigned int type,
 			    struct list_head *rx_data ) {
-	struct io_buffer *iobuf;
-	int ( * handler ) ( struct tls_connection *tls, const void *data,
-			    size_t len );
+	int ( * handler ) ( struct tls_connection *tls,
+			    struct io_buffer *iobuf );
+	struct io_buffer *tmp = NULL;
+	struct io_buffer **iobuf;
 	int rc;
 
-	/* Deliver data records to the plainstream interface */
-	if ( type == TLS_TYPE_DATA ) {
+	/* Deliver data records as-is to the plainstream interface */
+	if ( type == TLS_TYPE_DATA )
+		return tls_new_data ( tls, rx_data );
 
-		/* Fail unless we are ready to receive data */
-		if ( ! tls_ready ( tls ) )
-			return -ENOTCONN;
-
-		/* Deliver each I/O buffer in turn */
-		while ( ( iobuf = list_first_entry ( rx_data, struct io_buffer,
-						     list ) ) ) {
-			list_del ( &iobuf->list );
-			if ( ( rc = xfer_deliver_iob ( &tls->plainstream,
-						       iobuf ) ) != 0 ) {
-				DBGC ( tls, "TLS %p could not deliver data: "
-				       "%s\n", tls, strerror ( rc ) );
-				return rc;
-			}
-		}
-		return 0;
-	}
-
-	/* For all other records, merge into a single I/O buffer */
-	iobuf = iob_concatenate ( rx_data );
-	if ( ! iobuf ) {
-		DBGC ( tls, "TLS %p could not concatenate non-data record "
-		       "type %d\n", tls, type );
-		return -ENOMEM_RX_CONCAT;
-	}
-
-	/* Determine handler */
+	/* Determine handler and fragment buffer */
+	iobuf = &tmp;
 	switch ( type ) {
 	case TLS_TYPE_CHANGE_CIPHER:
 		handler = tls_new_change_cipher;
@@ -2538,19 +2570,44 @@ static int tls_new_record ( struct tls_connection *tls, unsigned int type,
 		break;
 	case TLS_TYPE_HANDSHAKE:
 		handler = tls_new_handshake;
+		iobuf = &tls->rx_handshake;
 		break;
 	default:
-		/* RFC4346 says that we should just ignore unknown
-		 * record types.
-		 */
-		handler = NULL;
-		DBGC ( tls, "TLS %p ignoring record type %d\n", tls, type );
+		DBGC ( tls, "TLS %p unknown record type %d\n", tls, type );
+		handler = tls_new_unknown;
 		break;
 	}
 
-	/* Handle record and free I/O buffer */
-	rc = ( handler ? handler ( tls, iobuf->data, iob_len ( iobuf ) ) : 0 );
-	free_iob ( iobuf );
+	/* Merge into a single I/O buffer */
+	if ( *iobuf )
+		list_add ( &(*iobuf)->list, rx_data );
+	*iobuf = iob_concatenate ( rx_data );
+	if ( ! *iobuf ) {
+		DBGC ( tls, "TLS %p could not concatenate non-data record "
+		       "type %d\n", tls, type );
+		rc = -ENOMEM_RX_CONCAT;
+		goto err_concatenate;
+	}
+
+	/* Handle record */
+	if ( ( rc = handler ( tls, *iobuf ) ) != 0 )
+		goto err_handle;
+
+	/* Discard I/O buffer if empty */
+	if ( ! iob_len ( *iobuf ) ) {
+		free_iob ( *iobuf );
+		*iobuf = NULL;
+	}
+
+	/* Sanity check */
+	assert ( tmp == NULL );
+
+	return 0;
+
+ err_handle:
+	free_iob ( *iobuf );
+	*iobuf = NULL;
+ err_concatenate:
 	return rc;
 }
 

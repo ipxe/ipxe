@@ -48,6 +48,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define	REBOOT_CMD		/* Reboot command */
 
+#define EFI_SETTINGS		/* EFI variable settings */
+
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define NAP_EFIX86
@@ -63,6 +65,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #if defined ( __aarch64__ )
 #define	IMAGE_GZIP		/* GZIP image support */
+#endif
+
+#if defined ( __loongarch__ )
+#define IOAPI_LOONG64
+#define NAP_EFILOONG64
 #endif
 
 #endif /* CONFIG_DEFAULTS_EFI_H */

@@ -13,6 +13,13 @@ LDSCRIPT_PREFIX	= arch/x86/scripts/prefixonly.lds
 #
 LDFLAGS		+= -N --no-check-sections
 
+# Do not warn about RWX segments (required by most prefixes)
+#
+WRWX_TEST	= $(LD) --warn-rwx-segments --version 2>&1 > /dev/null
+WRWX_FLAGS	:= $(shell [ -z "`$(WRWX_TEST)`" ] && \
+		     $(ECHO) '--no-warn-rwx-segments')
+LDFLAGS		+= $(WRWX_FLAGS)
+
 # Media types.
 #
 MEDIA		+= rom
@@ -54,9 +61,15 @@ LIST_NAME_mrom := ROMS
 LIST_NAME_pcirom := ROMS
 LIST_NAME_isarom := ROMS
 
-# ISO or FAT filesystem images
+# ISO images
 NON_AUTO_MEDIA	+= iso
-$(BIN)/%.iso $(BIN)/%.sdsk: $(BIN)/%.lkrn util/genfsimg
+$(BIN)/%.iso : $(BIN)/%.lkrn util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<
+
+# FAT filesystem images (via syslinux)
+NON_AUTO_MEDIA	+= sdsk
+$(BIN)/%.sdsk : $(BIN)/%.lkrn util/genfsimg
 	$(QM)$(ECHO) "  [GENFSIMG] $@"
 	$(Q)util/genfsimg -o $@ $<
 

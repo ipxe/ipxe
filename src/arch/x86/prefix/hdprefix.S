@@ -2,6 +2,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 #include <librm.h>
 
+	.section ".note.GNU-stack", "", @progbits
 	.text
 	.arch i386
 	.section ".prefix", "awx", @progbits

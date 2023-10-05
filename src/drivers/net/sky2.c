@@ -296,7 +296,7 @@ static const u16 gm_fc_disable[] = {
 
 static void sky2_phy_init(struct sky2_hw *hw, unsigned port)
 {
-	struct sky2_port *sky2 = netdev_priv(hw->dev[port]);
+	struct sky2_port *sky2 = hw->dev[port]->priv;
 	u16 ctrl, ct1000, adv, pg, ledctrl, ledover, reg;
 
 	if (sky2->autoneg == AUTONEG_ENABLE &&
@@ -1128,7 +1128,7 @@ static void sky2_free_rings(struct sky2_port *sky2)
 /* Bring up network interface. */
 static int sky2_up(struct net_device *dev)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	struct sky2_hw *hw = sky2->hw;
 	unsigned port = sky2->port;
 	u32 imask, ramsize;
@@ -1237,7 +1237,7 @@ static inline int tx_avail(const struct sky2_port *sky2)
  */
 static int sky2_xmit_frame(struct net_device *dev, struct io_buffer *iob)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	struct sky2_hw *hw = sky2->hw;
 	struct sky2_tx_le *le = NULL;
 	struct tx_ring_info *re;
@@ -1303,7 +1303,7 @@ static void sky2_tx_complete(struct sky2_port *sky2, u16 done)
 /* Cleanup all untransmitted buffers, assume transmitter not running */
 static void sky2_tx_clean(struct net_device *dev)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 
 	sky2_tx_complete(sky2, sky2->tx_prod);
 }
@@ -1311,7 +1311,7 @@ static void sky2_tx_clean(struct net_device *dev)
 /* Network shutdown */
 static void sky2_down(struct net_device *dev)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	struct sky2_hw *hw = sky2->hw;
 	unsigned port = sky2->port;
 	u16 ctrl;
@@ -1511,7 +1511,7 @@ static int sky2_autoneg_done(struct sky2_port *sky2, u16 aux)
 static void sky2_phy_intr(struct sky2_hw *hw, unsigned port)
 {
 	struct net_device *dev = hw->dev[port];
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	u16 istatus, phystat;
 
 	istatus = gm_phy_read(hw, port, PHY_MARV_INT_STAT);
@@ -1570,7 +1570,7 @@ static struct io_buffer *receive_new(struct sky2_port *sky2,
 static struct io_buffer *sky2_receive(struct net_device *dev,
 				      u16 length, u32 status)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	struct rx_ring_info *re = sky2->rx_ring + sky2->rx_next;
 	struct io_buffer *iob = NULL;
 	u16 count = (status & GMR_FS_LEN) >> 16;
@@ -1634,7 +1634,7 @@ error:
 /* Transmit complete */
 static inline void sky2_tx_done(struct net_device *dev, u16 last)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 
 	sky2_tx_complete(sky2, last);
 }
@@ -1700,10 +1700,10 @@ static void sky2_status_intr(struct sky2_hw *hw, u16 idx)
 	sky2_write32(hw, STAT_CTRL, SC_STAT_CLR_IRQ);
 
 	if (rx[0])
-		sky2_rx_update(netdev_priv(hw->dev[0]), Q_R1);
+		sky2_rx_update(hw->dev[0]->priv, Q_R1);
 
 	if (rx[1])
-		sky2_rx_update(netdev_priv(hw->dev[1]), Q_R2);
+		sky2_rx_update(hw->dev[1]->priv, Q_R2);
 }
 
 static void sky2_hw_error(struct sky2_hw *hw, unsigned port, u32 status)
@@ -1809,7 +1809,7 @@ static void sky2_le_error(struct sky2_hw *hw, unsigned port,
 			  u16 q, unsigned ring_size __unused)
 {
 	struct net_device *dev = hw->dev[port];
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	int idx;
 	const u64 *le = (q == Q_R1 || q == Q_R2)
 		? (u64 *) sky2->rx_le : (u64 *) sky2->tx_le;
@@ -1853,7 +1853,7 @@ static void sky2_err_intr(struct sky2_hw *hw, u32 status)
 
 static void sky2_poll(struct net_device *dev)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	struct sky2_hw *hw = sky2->hw;
 	u32 status = sky2_read32(hw, B0_Y2_SP_EISR);
 	u16 idx;
@@ -2152,7 +2152,7 @@ static u32 sky2_supported_modes(const struct sky2_hw *hw)
 
 static void sky2_set_multicast(struct net_device *dev)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	struct sky2_hw *hw = sky2->hw;
 	unsigned port = sky2->port;
 	u16 reg;
@@ -2189,7 +2189,7 @@ static struct net_device *sky2_init_netdev(struct sky2_hw *hw,
 
 	dev->dev = &hw->pdev->dev;
 
-	sky2 = netdev_priv(dev);
+	sky2 = dev->priv;
 	sky2->netdev = dev;
 	sky2->hw = hw;
 
@@ -2241,7 +2241,7 @@ static const char *sky2_name(u8 chipid, char *buf, int sz)
 
 static void sky2_net_irq(struct net_device *dev, int enable)
 {
-	struct sky2_port *sky2 = netdev_priv(dev);
+	struct sky2_port *sky2 = dev->priv;
 	struct sky2_hw *hw = sky2->hw;
 
 	u32 imask = sky2_read32(hw, B0_IMSK);

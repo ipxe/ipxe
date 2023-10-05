@@ -233,7 +233,7 @@ int tg3_init_rings(struct tg3 *tp)
 static int tg3_open(struct net_device *dev)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 	struct tg3_rx_prodring_set *tpr = &tp->prodring;
 	int err = 0;
 
@@ -299,7 +299,7 @@ static void __unused tw32_mailbox2(struct tg3 *tp, uint32_t reg, uint32_t val)
 static int tg3_transmit(struct net_device *dev, struct io_buffer *iob)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 	u32 len, entry;
 	dma_addr_t mapping;
 
@@ -333,7 +333,7 @@ static int tg3_transmit(struct net_device *dev, struct io_buffer *iob)
 static void tg3_tx_complete(struct net_device *dev)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 	u32 hw_idx = tp->hw_status->idx[0].tx_consumer;
 	u32 sw_idx = tp->tx_cons;
 
@@ -427,7 +427,7 @@ static void tg3_refill_prod_ring(struct tg3 *tp)
 static void tg3_rx_complete(struct net_device *dev)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 
 	u32 sw_idx = tp->rx_rcb_ptr;
 	u16 hw_idx;
@@ -478,7 +478,7 @@ static void tg3_rx_complete(struct net_device *dev)
 static void tg3_poll(struct net_device *dev)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 
 	/* ACK interrupts */
 	/*
@@ -496,7 +496,7 @@ static void tg3_poll(struct net_device *dev)
 static void tg3_close(struct net_device *dev)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 
 	DBGP("%s\n", __func__);
 
@@ -511,7 +511,7 @@ static void tg3_close(struct net_device *dev)
 static void tg3_irq(struct net_device *dev, int enable)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 
 	DBGP("%s: %d\n", __func__, enable);
 
@@ -735,7 +735,7 @@ static int tg3_init_one(struct pci_device *pdev)
 
 	dev->dev = &pdev->dev;
 
-	tp = netdev_priv(dev);
+	tp = dev->priv;
 	tp->pdev = pdev;
 	tp->dev = dev;
 	tp->rx_mode = TG3_DEF_RX_MODE;

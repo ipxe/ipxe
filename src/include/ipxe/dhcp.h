@@ -86,6 +86,9 @@ struct dhcp_packet;
 /** Maximum transmission unit */
 #define DHCP_MTU 26
 
+/** NTP servers */
+#define DHCP_NTP_SERVERS 42
+
 /** Vendor encapsulated options */
 #define DHCP_VENDOR_ENCAP 43
 

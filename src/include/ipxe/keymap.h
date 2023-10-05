@@ -52,10 +52,10 @@ struct keymap {
 #define KEYMAP_PSEUDO 0x80
 
 /** Ctrl key flag */
-#define KEYMAP_CTRL 0x0100
+#define KEYMAP_CTRL 0x01000000
 
 /** CapsLock key flag */
-#define KEYMAP_CAPSLOCK 0x0200
+#define KEYMAP_CAPSLOCK 0x02000000
 
 /** Undo CapsLock key flag
  *
@@ -64,13 +64,13 @@ struct keymap {
  * in order to correctly handle keyboard mappings that swap alphabetic
  * and non-alphabetic keys.
  */
-#define KEYMAP_CAPSLOCK_UNDO 0x0400
+#define KEYMAP_CAPSLOCK_UNDO 0x04000000
 
 /** Undo and redo CapsLock key flags */
 #define KEYMAP_CAPSLOCK_REDO ( KEYMAP_CAPSLOCK | KEYMAP_CAPSLOCK_UNDO )
 
 /** AltGr key flag */
-#define KEYMAP_ALTGR 0x0800
+#define KEYMAP_ALTGR 0x08000000
 
 extern unsigned int key_remap ( unsigned int character );
 extern struct keymap * keymap_find ( const char *name );

@@ -677,7 +677,7 @@ set_speed:
 static int
 forcedeth_open ( struct net_device *netdev )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 	void *ioaddr = priv->mmio_addr;
 	int i;
 	int rc;
@@ -794,7 +794,7 @@ err_init_rings:
 static int
 forcedeth_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 	void *ioaddr = priv->mmio_addr;
 	struct ring_desc *tx_curr_desc;
 	u32 size = iob_len ( iobuf );
@@ -853,7 +853,7 @@ forcedeth_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 static void
 nv_process_tx_packets ( struct net_device *netdev )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 	struct ring_desc *tx_curr_desc;
 	u32 flaglen;
 
@@ -899,7 +899,7 @@ nv_process_tx_packets ( struct net_device *netdev )
 static void
 nv_process_rx_packets ( struct net_device *netdev )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 	struct io_buffer *curr_iob;
 	struct ring_desc *rx_curr_desc;
 	u32 flags, len;
@@ -960,7 +960,7 @@ nv_process_rx_packets ( struct net_device *netdev )
 static void
 forcedeth_link_status ( struct net_device *netdev )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 	void *ioaddr = priv->mmio_addr;
 
 	/* Clear the MII link change status by reading the MIIStatus register */
@@ -981,7 +981,7 @@ forcedeth_link_status ( struct net_device *netdev )
 static void
 forcedeth_poll ( struct net_device *netdev )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 	void *ioaddr = priv->mmio_addr;
 	u32 status;
 
@@ -1018,7 +1018,7 @@ forcedeth_poll ( struct net_device *netdev )
 static void
 forcedeth_close ( struct net_device *netdev )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 
 	DBGP ( "forcedeth_close\n" );
 
@@ -1045,7 +1045,7 @@ forcedeth_close ( struct net_device *netdev )
 static void
 forcedeth_irq ( struct net_device *netdev, int action )
 {
-	struct forcedeth_private *priv = netdev_priv ( netdev );
+	struct forcedeth_private *priv = netdev->priv;
 
 	DBGP ( "forcedeth_irq\n" );
 
@@ -1814,7 +1814,7 @@ forcedeth_probe ( struct pci_device *pdev )
 	netdev->dev = &pdev->dev;
 
 	/* Get a reference to our private data */
-	priv = netdev_priv ( netdev );
+	priv = netdev->priv;
 
 	/* We'll need these set up for the rest of the routines */
 	priv->pci_dev = pdev;

@@ -1212,50 +1212,33 @@ static struct settings_operations ipv6_settings_operations = {
 	.fetch = ipv6_fetch,
 };
 
-/** IPv6 link-local address settings */
-struct ipv6_settings {
-	/** Reference counter */
-	struct refcnt refcnt;
-	/** Settings interface */
-	struct settings settings;
-};
-
 /**
  * Register IPv6 link-local address settings
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int ipv6_register_settings ( struct net_device *netdev ) {
+static int ipv6_register_settings ( struct net_device *netdev, void *priv ) {
 	struct settings *parent = netdev_settings ( netdev );
-	struct ipv6_settings *ipv6set;
+	struct settings *settings = priv;
 	int rc;
 
-	/* Allocate and initialise structure */
-	ipv6set = zalloc ( sizeof ( *ipv6set ) );
-	if ( ! ipv6set ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	ref_init ( &ipv6set->refcnt, NULL );
-	settings_init ( &ipv6set->settings, &ipv6_settings_operations,
-			&ipv6set->refcnt, &ipv6_settings_scope );
-	ipv6set->settings.order = IPV6_ORDER_LINK_LOCAL;
-
-	/* Register settings */
-	if ( ( rc = register_settings ( &ipv6set->settings, parent,
+	/* Initialise and register settings */
+	settings_init ( settings, &ipv6_settings_operations,
+			&netdev->refcnt, &ipv6_settings_scope );
+	settings->order = IPV6_ORDER_LINK_LOCAL;
+	if ( ( rc = register_settings ( settings, parent,
 					IPV6_SETTINGS_NAME ) ) != 0 )
-		goto err_register;
+		return rc;
 
- err_register:
-	ref_put ( &ipv6set->refcnt );
- err_alloc:
-	return rc;
+	return 0;
 }
 
 /** IPv6 network device driver */
 struct net_driver ipv6_driver __net_driver = {
 	.name = "IPv6",
+	.priv_len = sizeof ( struct settings ),
 	.probe = ipv6_register_settings,
 };
 

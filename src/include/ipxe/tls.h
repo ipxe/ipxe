@@ -52,6 +52,9 @@ struct tls_header {
 /** Change cipher content type */
 #define TLS_TYPE_CHANGE_CIPHER 20
 
+/** Change cipher spec magic byte */
+#define TLS_CHANGE_CIPHER_SPEC 1
+
 /** Alert content type */
 #define TLS_TYPE_ALERT 21
 
@@ -395,6 +398,8 @@ struct tls_connection {
 	struct io_buffer rx_header_iobuf;
 	/** List of received data buffers */
 	struct list_head rx_data;
+	/** Received handshake fragment */
+	struct io_buffer *rx_handshake;
 };
 
 /** RX I/O buffer size

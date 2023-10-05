@@ -70,7 +70,7 @@ efx_readl(struct efx_nic *efx, efx_dword_t *value, unsigned int reg)
  ******************************************************************************/
 void efx_probe(struct net_device *netdev, enum efx_revision revision)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	struct pci_device *pci = container_of(netdev->dev,
 					      struct pci_device, dev);
 	unsigned int reg = PCI_BASE_ADDRESS_0;
@@ -97,7 +97,7 @@ void efx_probe(struct net_device *netdev, enum efx_revision revision)
 
 void efx_remove(struct net_device *netdev)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 
 	iounmap(efx->membase);
 	efx->membase = NULL;
