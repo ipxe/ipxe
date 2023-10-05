@@ -9,7 +9,7 @@ if [ ${ARCH} = "arm64" ] ; then
   iso_sources=""
 fi
 
-EMBED="${EMBED:-"autoboot.txt"}"
+EMBED="${EMBED:-"ipxe-autoboot.txt"}"
 target="$(echo ${EMBED%.txt} | sed 's!-ipxe!!; s!ipxe-!!')"
 
 echo "Compiling ${ARCH} bootloaders with target: ${target}...."
