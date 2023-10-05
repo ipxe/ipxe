@@ -2,7 +2,7 @@ Source: yandex-ipxe-images
 Section: unknown
 Priority: optional
 Maintainer: Pavel Krotkiy <potsh@yandex-team.ru>
-Build-Depends: debhelper (>= 8.0.0)
+Build-Depends: debhelper (>= 10.0.0), dh-exec
 Rules-Requires-Root: binary-targets
 Standards-Version: 3.9.4
 Homepage: http://netboot.yandex.net
