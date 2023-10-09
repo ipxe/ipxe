@@ -19,20 +19,20 @@ all: build
 
 # kpxe kernels
 kernels/x86_64/ipxe-autoboot.lkrn: src/ipxe-autoboot-with-ib.txt
-	$(call make_with_name,bin-x86_64-pcbios/net--ecm--ncm.lkrn,$<,$@,x86_64)
+	$(call make_with_name,bin-x86_64-pcbios/ipxe--ecm--ncm.lkrn,$<,$@,x86_64)
 
 kernels/x86_64/ipxe-shell.lkrn: src/ipxe-shell.txt
 	$(call make_with_name,bin-x86_64-pcbios/ipxe--ecm--ncm.lkrn,$<,$@,x86_64)
 
 # UEFI kernels
 kernels/x86_64/ipxe-autoboot.efi: src/ipxe-autoboot-with-ib.txt
-	$(call make_with_name,bin-x86_64-efi/net--ecm--ncm.efi,$<,$@,x86_64)
+	$(call make_with_name,bin-x86_64-efi/ipxe--ecm--ncm.efi,$<,$@,x86_64)
 kernels/x86_64/ipxe-shell.efi: src/ipxe-shell.txt
 	$(call make_with_name,bin-x86_64-efi/ipxe--ecm--ncm.efi,$<,$@,x86_64)
 
 # Arm64 UEFI kernels
 kernels/arm64/ipxe-autoboot.efi: src/ipxe-autoboot-with-ib.txt
-	$(call make_with_name,bin-arm64-efi/net--ecm--ncm.efi,$<,$@,aarch64)
+	$(call make_with_name,bin-arm64-efi/ipxe--ecm--ncm.efi,$<,$@,aarch64)
 
 kernels/arm64/ipxe-shell.efi: src/ipxe-shell.txt
 	$(call make_with_name,bin-arm64-efi/ipxe--ecm--ncm.efi,$<,$@,aarch64)
