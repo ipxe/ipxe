@@ -273,6 +273,7 @@ int ifconf ( struct net_device *netdev,
 	     struct net_device_configurator *configurator,
 	     unsigned long timeout ) {
 	int rc;
+	struct in_addr ip;
 
 	/* Ensure device is open and link is up */
 	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_TIMEOUT ) ) != 0 )
