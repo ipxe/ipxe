@@ -35,6 +35,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/timer.h>
 #include <ipxe/errortab.h>
 #include <usr/ifmgmt.h>
+#include <ipxe/settings.h>
+#include <ipxe/in.h>
 
 /** @file
  *
@@ -298,5 +300,12 @@ int ifconf ( struct net_device *netdev,
 		 ( configurator ? configurator->name : "" ),
 		 ( configurator ? "] " : "" ),
 		 netdev->name, netdev->ll_protocol->ntoa ( netdev->ll_addr ) );
-	return ifpoller_wait ( netdev, configurator, timeout, ifconf_progress );
+      rc = ifpoller_wait ( netdev, configurator, timeout, ifconf_progress );
+      fetch_ipv4_setting ( netdev_settings ( netdev ), &ip_setting, &ip );
+     //netdevice linked no dhcp ip  return failed.
+     if(!ip.s_addr){
+        rc = -1;
+      }
+      printf("dhcp-ip is %s\n",inet_ntoa(ip));
+    return rc;
 }
