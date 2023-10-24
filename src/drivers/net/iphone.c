@@ -1304,7 +1304,9 @@ ipair_tx ( struct ipair *ipair, const char *fmt, ... ) {
 	memset ( hdr, 0, sizeof ( *hdr ) );
 	hdr->len = htonl ( len );
 	msg = iob_put ( iobuf, len );
+	va_start ( args, fmt );
 	vsnprintf ( msg, len, fmt, args );
+	va_end ( args );
 	DBGC2 ( ipair, "IPAIR %p transmitting:\n%s\n", ipair, msg );
 
 	/* Transmit message */
