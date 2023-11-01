@@ -235,7 +235,7 @@ int ecam_write ( struct pci_device *pci, unsigned int location,
 	if ( ( rc = ecam_access ( pci ) ) != 0 )
 		return rc;
 
-	/* Read from address */
+	/* Write to address */
 	index = ( pci->busdevfn - ecam.range.start );
 	addr = ( ecam.regs + ( index * ECAM_SIZE ) + where );
 	switch ( len ) {
@@ -251,6 +251,15 @@ int ecam_write ( struct pci_device *pci, unsigned int location,
 	default:
 		assert ( 0 );
 	}
+
+	/* Read from address, to guarantee completion of the write
+	 *
+	 * PCIe configuration space registers may not have read side
+	 * effects.  Reading back is therefore always safe to do, and
+	 * guarantees that the write has reached the device.
+	 */
+	mb();
+	ecam_read ( pci, location, &value );
 
 	return 0;
 }
