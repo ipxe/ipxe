@@ -150,6 +150,7 @@ static int ecam_access ( struct pci_device *pci ) {
 
 	/* Map configuration space for this allocation */
 	base = le64_to_cpu ( ecam.alloc.base );
+	base += ( ecam.alloc.start * ECAM_SIZE * PCI_BUSDEVFN ( 0, 1, 0, 0 ) );
 	len = ( ecam.range.count * ECAM_SIZE );
 	ecam.regs = ioremap ( base, len );
 	if ( ! ecam.regs ) {
