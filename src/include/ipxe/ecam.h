@@ -50,6 +50,8 @@ struct ecam_mapping {
 	struct pci_range range;
 	/** MMIO base address */
 	void *regs;
+	/** Mapping result */
+	int rc;
 };
 
 extern struct pci_api ecam_api;
