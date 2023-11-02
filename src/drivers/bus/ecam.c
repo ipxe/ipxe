@@ -153,6 +153,14 @@ static int ecam_access ( struct pci_device *pci ) {
 	base = le64_to_cpu ( ecam.alloc.base );
 	base += ( ecam.alloc.start * ECAM_SIZE * PCI_BUSDEVFN ( 0, 1, 0, 0 ) );
 	len = ( ecam.range.count * ECAM_SIZE );
+	if ( base != ( ( unsigned long ) base ) ) {
+		DBGC ( &ecam, "ECAM %04x:[%02x-%02x] could not map "
+		       "[%08llx,%08llx) outside CPU range\n",
+		       le16_to_cpu ( ecam.alloc.segment ), ecam.alloc.start,
+		       ecam.alloc.end, base, ( base + len ) );
+		rc = -ERANGE;
+		goto err_range;
+	}
 	ecam.regs = ioremap ( base, len );
 	if ( ! ecam.regs ) {
 		DBGC ( &ecam, "ECAM %04x:[%02x-%02x] could not map "
@@ -171,6 +179,7 @@ static int ecam_access ( struct pci_device *pci ) {
 
 	iounmap ( ecam.regs );
  err_ioremap:
+ err_range:
  err_find:
 	ecam.rc = rc;
 	return rc;
