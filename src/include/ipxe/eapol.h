@@ -42,10 +42,15 @@ struct eapol_supplicant {
 	struct eap_supplicant eap;
 	/** EAPoL-Start retransmission timer */
 	struct retry_timer timer;
+	/** EAPoL-Start transmission count */
+	unsigned int count;
 };
 
 /** Delay between EAPoL-Start packets */
 #define EAPOL_START_INTERVAL ( 2 * TICKS_PER_SEC )
+
+/** Maximum number of EAPoL-Start packets to transmit */
+#define EAPOL_START_COUNT 3
 
 /** An EAPoL handler */
 struct eapol_handler {
