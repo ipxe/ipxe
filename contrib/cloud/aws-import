@@ -46,11 +46,19 @@ def create_snapshot(region, description, image):
     return snapshot_id
 
 
-def import_image(region, name, architecture, image, public):
+def import_image(region, name, architecture, image, public, overwrite):
     """Import an AMI image"""
     client = boto3.client('ec2', region_name=region)
     resource = boto3.resource('ec2', region_name=region)
     description = '%s (%s)' % (name, architecture)
+    images = client.describe_images(Filters=[{'Name': 'name',
+                                              'Values': [description]}])
+    if overwrite and images['Images']:
+        images = images['Images'][0]
+        image_id = images['ImageId']
+        snapshot_id = images['BlockDeviceMappings'][0]['Ebs']['SnapshotId']
+        resource.Image(image_id).deregister()
+        resource.Snapshot(snapshot_id).delete()
     snapshot_id = create_snapshot(region=region, description=description,
                                   image=image)
     client.get_waiter('snapshot_completed').wait(SnapshotIds=[snapshot_id])
@@ -88,6 +96,8 @@ parser.add_argument('--name', '-n',
                     help="Image name")
 parser.add_argument('--public', '-p', action='store_true',
                     help="Make image public")
+parser.add_argument('--overwrite', action='store_true',
+                    help="Overwrite any existing image with same name")
 parser.add_argument('--region', '-r', action='append',
                     help="AWS region(s)")
 parser.add_argument('--wiki', '-w', metavar='FILE',
@@ -115,7 +125,8 @@ with ThreadPoolExecutor(max_workers=len(imports)) as executor:
                                name=args.name,
                                architecture=architectures[image],
                                image=image,
-                               public=args.public): (region, image)
+                               public=args.public,
+                               overwrite=args.overwrite): (region, image)
                for region, image in imports}
     results = {futures[future]: future.result()
                for future in as_completed(futures)}
