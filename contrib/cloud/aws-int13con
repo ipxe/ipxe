@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+
+import argparse
+
+import boto3
+
+BLOCKSIZE = 512 * 1024
+
+IPXELOG_OFFSET = 16 * 1024
+
+IPXELOG_MAGIC = b'iPXE LOG'
+
+
+def create_snapshot(region, instance_id):
+    """Create root volume snapshot"""
+    client = boto3.client('ec2', region_name=region)
+    resource = boto3.resource('ec2', region_name=region)
+    instance = resource.Instance(instance_id)
+    volumes = list(instance.volumes.all())
+    snapshot = volumes[0].create_snapshot()
+    snapshot.wait_until_completed()
+    return snapshot.id
+
+
+def get_snapshot_block(region, snapshot_id, index):
+    """Get block content from snapshot"""
+    client = boto3.client('ebs', region_name=region)
+    blocks = client.list_snapshot_blocks(SnapshotId=snapshot_id,
+                                         StartingBlockIndex=index)
+    token = blocks['Blocks'][0]['BlockToken']
+    block = client.get_snapshot_block(SnapshotId=snapshot_id,
+                                      BlockIndex=index,
+                                      BlockToken=token)
+    return block['BlockData'].read()
+
+
+def get_block0_content(region, instance_id):
+    """Get content of root volume block zero from instance"""
+    client = boto3.client('ec2', region_name=region)
+    resource = boto3.resource('ec2', region_name=region)
+    snapshot_id = create_snapshot(region, instance_id)
+    block = get_snapshot_block(region, snapshot_id, 0)
+    resource.Snapshot(snapshot_id).delete()
+    return block
+
+
+def get_int13con_output(region, instance_id):
+    """Get INT13 console output"""
+    block = get_block0_content(region, instance_id)
+    logpart = block[IPXELOG_OFFSET:]
+    magic = logpart[:len(IPXELOG_MAGIC)]
+    if magic != IPXELOG_MAGIC:
+        raise ValueError("Invalid log magic signature")
+    log = logpart[len(IPXELOG_MAGIC):].split(b'\0')[0]
+    return log.decode()
+
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Get AWS INT13 console output")
+parser.add_argument('--region', '-r', help="AWS region")
+parser.add_argument('id', help="Instance ID")
+args = parser.parse_args()
+
+# Get console output from INT13CON partition
+output = get_int13con_output(args.region, args.id)
+
+# Print console output
+print(output)
