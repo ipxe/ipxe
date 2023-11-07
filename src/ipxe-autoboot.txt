@@ -1,17 +1,9 @@
 #!ipxe
 
 echo [Autoboot iPXE] Trying to boot using automatic settings...
-echo IPoIB protocol is disabled by default. Use an iPXE command line to enable it.
 
 set dhcp6.user-class einebox
-set idx:int32 0
-
-:loop
-isset ${net${idx}/mac} || exit 0
-iseq ${net${idx}/ll-protocol} IPoIB && goto try_next ||
-autoboot net${idx} ||
-:try_next
-inc idx && goto loop
+autoboot ||
 
 echo Autoconfiguration has failed...
 

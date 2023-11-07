@@ -2,7 +2,8 @@ Source: yandex-ipxe-images
 Section: unknown
 Priority: optional
 Maintainer: Pavel Krotkiy <potsh@yandex-team.ru>
-Build-Depends: debhelper (>= 10.0.0), dh-exec
+Build-Depends: debhelper (>= 10.0.0), dh-exec, liblzma-dev, gcc-aarch64-linux-gnu, build-essential, binutils, perl,
+ mtools, mkisofs, genisoimage, xorriso, syslinux, isolinux
 Rules-Requires-Root: binary-targets
 Standards-Version: 3.9.4
 Homepage: http://netboot.yandex.net
