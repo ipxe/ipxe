@@ -47,10 +47,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
 
-/** Iscsi4Dxe module GUID */
+/** HttpBootDxe module GUID */
+static EFI_GUID efi_http_boot_dxe_guid = {
+	0xecebcb00, 0xd9c8, 0x11e4,
+	{ 0xaf, 0x3d, 0x8c, 0xdc, 0xd4, 0x26, 0xc9, 0x73 }
+};
+
+/** IScsiDxe module GUID */
+static EFI_GUID efi_iscsi_dxe_guid = {
+	0x86cddf93, 0x4872, 0x4597,
+	{ 0x8a, 0xf9, 0xa3, 0x5a, 0xe4, 0xd3, 0x72, 0x5f }
+};
+
+/** Old IScsi4Dxe module GUID */
 static EFI_GUID efi_iscsi4_dxe_guid = {
 	0x4579b72d, 0x7ec4, 0x4dd4,
 	{ 0x84, 0x86, 0x08, 0x3c, 0x86, 0xb1, 0x82, 0xa7 }
+};
+
+/** UefiPxeBcDxe module GUID */
+static EFI_GUID efi_uefi_pxe_bc_dxe_guid = {
+	0xb95e9fda, 0x26de, 0x48d2,
+	{ 0x88, 0x07, 0x1f, 0x91, 0x07, 0xac, 0x5e, 0x3a }
 };
 
 /** VlanConfigDxe module GUID */
@@ -99,20 +117,48 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Dhcp4" },
 	{ &efi_dhcp4_service_binding_protocol_guid,
 	  "Dhcp4Sb" },
+	{ &efi_dhcp6_protocol_guid,
+	  "Dhcp6" },
+	{ &efi_dhcp6_service_binding_protocol_guid,
+	  "Dhcp6Sb" },
 	{ &efi_disk_io_protocol_guid,
 	  "DiskIo" },
+	{ &efi_dns4_protocol_guid,
+	  "Dns4" },
+	{ &efi_dns4_service_binding_protocol_guid,
+	  "Dns4Sb" },
+	{ &efi_dns6_protocol_guid,
+	  "Dns6" },
+	{ &efi_dns6_service_binding_protocol_guid,
+	  "Dns6Sb" },
 	{ &efi_graphics_output_protocol_guid,
 	  "GraphicsOutput" },
 	{ &efi_hii_config_access_protocol_guid,
 	  "HiiConfigAccess" },
 	{ &efi_hii_font_protocol_guid,
 	  "HiiFont" },
+	{ &efi_http_boot_dxe_guid,
+	  "HttpBootDxe" },
+	{ &efi_http_protocol_guid,
+	  "Http" },
+	{ &efi_http_service_binding_protocol_guid,
+	  "HttpSb" },
 	{ &efi_ip4_protocol_guid,
 	  "Ip4" },
 	{ &efi_ip4_config_protocol_guid,
 	  "Ip4Config" },
+	{ &efi_ip4_config2_protocol_guid,
+	  "Ip4Config2" },
 	{ &efi_ip4_service_binding_protocol_guid,
 	  "Ip4Sb" },
+	{ &efi_ip6_protocol_guid,
+	  "Ip6" },
+	{ &efi_ip6_config_protocol_guid,
+	  "Ip6Config" },
+	{ &efi_ip6_service_binding_protocol_guid,
+	  "Ip6Sb" },
+	{ &efi_iscsi_dxe_guid,
+	  "IScsiDxe" },
 	{ &efi_iscsi4_dxe_guid,
 	  "IScsi4Dxe" },
 	{ &efi_load_file_protocol_guid,
@@ -131,6 +177,10 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Mtftp4" },
 	{ &efi_mtftp4_service_binding_protocol_guid,
 	  "Mtftp4Sb" },
+	{ &efi_mtftp6_protocol_guid,
+	  "Mtftp6" },
+	{ &efi_mtftp6_service_binding_protocol_guid,
+	  "Mtftp6Sb" },
 	{ &efi_nii_protocol_guid,
 	  "Nii" },
 	{ &efi_nii31_protocol_guid,
@@ -143,6 +193,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "PxeBaseCode" },
 	{ &efi_serial_io_protocol_guid,
 	  "SerialIo" },
+	{ &efi_shim_lock_protocol_guid,
+	  "ShimLock" },
 	{ &efi_simple_file_system_protocol_guid,
 	  "SimpleFileSystem" },
 	{ &efi_simple_network_protocol_guid,
@@ -161,12 +213,22 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Tcp4" },
 	{ &efi_tcp4_service_binding_protocol_guid,
 	  "Tcp4Sb" },
+	{ &efi_tcp6_protocol_guid,
+	  "Tcp6" },
+	{ &efi_tcp6_service_binding_protocol_guid,
+	  "Tcp6Sb" },
 	{ &efi_tree_protocol_guid,
 	  "TrEE" },
 	{ &efi_udp4_protocol_guid,
 	  "Udp4" },
 	{ &efi_udp4_service_binding_protocol_guid,
 	  "Udp4Sb" },
+	{ &efi_udp6_protocol_guid,
+	  "Udp6" },
+	{ &efi_udp6_service_binding_protocol_guid,
+	  "Udp6Sb" },
+	{ &efi_uefi_pxe_bc_dxe_guid,
+	  "UefiPxeBcDxe" },
 	{ &efi_uga_draw_protocol_guid,
 	  "UgaDraw" },
 	{ &efi_unicode_collation_protocol_guid,
@@ -325,6 +387,34 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 }
 
 /**
+ * Print protocol information on a given handle
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ */
+void dbg_efi_protocol ( EFI_HANDLE handle, EFI_GUID *protocol ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	VOID *interface;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Get protocol instance */
+	if ( ( efirc = bs->HandleProtocol ( handle, protocol,
+					    &interface ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		printf ( "HANDLE %s could not identify %s: %s\n",
+			 efi_handle_name ( handle ),
+			 efi_guid_ntoa ( protocol ), strerror ( rc ) );
+		return;
+	}
+	printf ( "HANDLE %s %s at %p\n", efi_handle_name ( handle ),
+		 efi_guid_ntoa ( protocol ), interface );
+
+	/* Dump list of openers */
+	dbg_efi_openers ( handle, protocol );
+}
+
+/**
  * Print list of protocol handlers attached to a handle
  *
  * @v handle		EFI handle
@@ -332,7 +422,6 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
 void dbg_efi_protocols ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_GUID **protocols;
-	EFI_GUID *protocol;
 	UINTN count;
 	unsigned int i;
 	EFI_STATUS efirc;
@@ -355,10 +444,7 @@ void dbg_efi_protocols ( EFI_HANDLE handle ) {
 
 	/* Dump list of protocols */
 	for ( i = 0 ; i < count ; i++ ) {
-		protocol = protocols[i];
-		printf ( "HANDLE %s %s supported\n", efi_handle_name ( handle ),
-			 efi_guid_ntoa ( protocol ) );
-		dbg_efi_openers ( handle, protocol );
+		dbg_efi_protocol ( handle, protocols[i] );
 	}
 
 	/* Free list */

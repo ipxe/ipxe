@@ -285,6 +285,7 @@ void intf_shutdown ( struct interface *intf, int rc ) {
 	intf_nullify ( intf );
 
 	/* Transfer destination to temporary interface */
+	intf_temp_init ( &tmp, intf );
 	tmp.dest = intf->dest;
 	intf->dest = &null_intf;
 

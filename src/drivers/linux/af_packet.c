@@ -300,9 +300,9 @@ static int af_packet_nic_probe ( struct linux_device *device,
 
 	return 0;
 
-err_settings:
 	unregister_netdev(netdev);
 err_register:
+err_settings:
 	netdev_nullify(netdev);
 	netdev_put(netdev);
 	return rc;

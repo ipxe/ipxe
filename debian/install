@@ -1,3 +1,5 @@
+#!/usr/bin/env dh-exec
+
 # x64 ISO/IMG
 binaries/x86_64/ipxe-autoboot.iso /srv/www/install/images/ipxe/x86_64/
 binaries/x86_64/ipxe-autoboot.img /srv/www/install/images/ipxe/x86_64/
@@ -9,5 +11,5 @@ binaries/arm64/ipxe-autoboot.iso /srv/www/install/images/ipxe/arm64/
 binaries/arm64/ipxe-shell.iso /srv/www/install/images/ipxe/arm64/
 
 # UEFI kernels
-binaries/x86_64/ipxe-autoboot.efi /srv/tftpboot/
-binaries/arm64/ipxe-autoboot-arm64.efi  /srv/tftpboot/
+kernels/x86_64/ipxe-autoboot.efi /srv/tftpboot/
+kernels/arm64/ipxe-autoboot.efi => /srv/tftpboot/ipxe-autoboot-arm64.efi

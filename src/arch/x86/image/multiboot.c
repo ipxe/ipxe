@@ -204,6 +204,10 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 			break;
 		}
 
+		/* Skip hidden images */
+		if ( module_image->flags & IMAGE_HIDDEN )
+			continue;
+
 		/* Page-align the module */
 		start = ( ( start + 0xfff ) & ~0xfff );
 

@@ -107,14 +107,14 @@ static int mdio_read(void *ioaddr, int phy_id, int reg)
 
 static void __mdio_write(struct net_device *dev, int phy_id, int reg, int val)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 
 	mdio_write(tp->mmio_addr, phy_id, reg, val);
 }
 
 static int __mdio_read(struct net_device *dev, int phy_id, int reg)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 
 	return mdio_read(tp->mmio_addr, phy_id, reg);
 }
@@ -343,7 +343,7 @@ static void sis190_process_tx(struct sis190_private *tp)
  */
 static void sis190_poll(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void  *ioaddr = tp->mmio_addr;
 	u32 status;
 
@@ -374,7 +374,7 @@ static inline void sis190_init_ring_indexes(struct sis190_private *tp)
 
 static int sis190_init_ring(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 
 	sis190_init_ring_indexes(tp);
 
@@ -395,7 +395,7 @@ err:
 
 static void sis190_set_rx_mode(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	u32 mc_filter[2];	/* Multicast hash filter */
 	u16 rx_mode;
@@ -419,7 +419,7 @@ static void sis190_soft_reset(void  *ioaddr)
 
 static void sis190_hw_start(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 
 	sis190_soft_reset(ioaddr);
@@ -548,7 +548,7 @@ static void sis190_phy_task(struct sis190_private *tp)
 
 static int sis190_open(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	int rc;
 
 	/* Allocate TX ring */
@@ -587,7 +587,7 @@ error:
 
 static void sis190_down(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void  *ioaddr = tp->mmio_addr;
 
 	do {
@@ -597,7 +597,7 @@ static void sis190_down(struct net_device *dev)
 
 static void sis190_free(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	int i;
 
 	free_phys(tp->TxDescRing, TX_RING_BYTES);
@@ -630,7 +630,7 @@ static void sis190_close(struct net_device *dev)
 
 static int sis190_transmit(struct net_device *dev, struct io_buffer *iob)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void  *ioaddr = tp->mmio_addr;
 	u32 len, entry;
 	struct TxDesc *desc;
@@ -804,7 +804,7 @@ static void sis190_mii_probe_88e1111_fixup(struct sis190_private *tp)
  */
 static int sis190_mii_probe(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	struct mii_if_info *mii_if = &tp->mii_if;
 	void *ioaddr = tp->mmio_addr;
 	int phy_id;
@@ -858,7 +858,7 @@ out:
 
 static void sis190_mii_remove(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 
 	sis190_free_phy(&tp->first_phy);
 }
@@ -879,7 +879,7 @@ static int sis190_init_board(struct pci_device *pdev, struct net_device **netdev
 
 	dev->dev = &pdev->dev;
 
-	tp = netdev_priv(dev);
+	tp = dev->priv;
 	memset(tp, 0, sizeof(*tp));
 
 	tp->dev = dev;
@@ -916,7 +916,7 @@ static void sis190_set_rgmii(struct sis190_private *tp, u8 reg)
 static int sis190_get_mac_addr_from_eeprom(struct pci_device *pdev __unused,
 						     struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	u16 sig;
 	int i;
@@ -955,7 +955,7 @@ static int sis190_get_mac_addr_from_eeprom(struct pci_device *pdev __unused,
 static int sis190_get_mac_addr_from_apc(struct pci_device *pdev,
 					struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	struct pci_device *isa_bridge = NULL;
 	struct device *d;
 	u8 reg, tmp8;
@@ -1018,7 +1018,7 @@ static int sis190_get_mac_addr_from_apc(struct pci_device *pdev,
  */
 static inline void sis190_init_rxfilter(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	u16 ctl;
 	int i;
@@ -1057,7 +1057,7 @@ static int sis190_get_mac_addr(struct pci_device *pdev,
 
 static void sis190_set_speed_auto(struct net_device *dev)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	int phy_id = tp->mii_if.phy_id;
 	int val;
@@ -1082,7 +1082,7 @@ static void sis190_set_speed_auto(struct net_device *dev)
 
 static void sis190_irq(struct net_device *dev, int enable)
 {
-	struct sis190_private *tp = netdev_priv(dev);
+	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 
 	SIS_W32(IntrStatus, 0xffffffff);
@@ -1116,7 +1116,7 @@ static int sis190_probe(struct pci_device *pdev)
 
 	pci_set_drvdata(pdev, dev);
 
-	tp = netdev_priv(dev);
+	tp = dev->priv;
 
 	rc = sis190_get_mac_addr(pdev, dev);
 	if (rc < 0)

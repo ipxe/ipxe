@@ -41,6 +41,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define _pcirom_start _mrom_start
 #include "pciromprefix.S"
 
+	.section ".note.GNU-stack", "", @progbits
 	.text
 	.arch i386
 	.code16

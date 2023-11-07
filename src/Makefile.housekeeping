@@ -502,6 +502,13 @@ LDFLAGS		+= --gc-sections
 #
 LDFLAGS		+= -static
 
+# Use separate code segment if supported by linker
+#
+ZSC_TEST	= $(LD) -z separate-code --version 2>&1 > /dev/null
+ZSC_FLAGS	:= $(shell [ -z "`$(ZSC_TEST)`" ] && \
+		     $(ECHO) '-z separate-code -z max-page-size=4096')
+LDFLAGS		+= $(ZSC_FLAGS)
+
 # compiler.h is needed for our linking and debugging system
 #
 CFLAGS		+= -include include/compiler.h
@@ -1002,6 +1009,7 @@ endif
 # Device ID tables (using IDs from ROM definition file)
 #
 define obj_pci_id_asm
+	.section ".note.GNU-stack", "", $(ASM_TCHAR)progbits
 	.section ".pci_devlist.$(1)", "a", $(ASM_TCHAR)progbits
 	.globl pci_devlist_$(1)
 pci_devlist_$(1):
@@ -1171,7 +1179,7 @@ BLIB		= $(BIN)/blib.a
 $(BLIB) : $(BLIB_OBJS) $(BLIB_LIST) $(MAKEDEPS)
 	$(Q)$(RM) $(BLIB)
 	$(QM)$(ECHO) "  [AR] $@"
-	$(Q)$(AR) rD $@ $(sort $(BLIB_OBJS))
+	$(Q)$(AR) rcD $@ $(sort $(BLIB_OBJS))
 	$(Q)$(OBJCOPY) --enable-deterministic-archives \
 		       --prefix-symbols=$(SYMBOL_PREFIX) $@
 	$(Q)$(RANLIB) -D $@

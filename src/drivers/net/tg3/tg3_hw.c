@@ -1717,7 +1717,7 @@ int tg3_get_device_address(struct tg3 *tp)
 static void __tg3_set_rx_mode(struct net_device *dev)
 {	DBGP("%s\n", __func__);
 
-	struct tg3 *tp = netdev_priv(dev);
+	struct tg3 *tp = dev->priv;
 	u32 rx_mode;
 
 	rx_mode = tp->rx_mode & ~(RX_MODE_PROMISC |

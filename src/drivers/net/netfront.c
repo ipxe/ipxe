@@ -1056,9 +1056,11 @@ struct xen_driver netfront_driver __xen_driver = {
  * Inhibit emulated PCI devices
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int netfront_net_probe ( struct net_device *netdev ) {
+static int netfront_net_probe ( struct net_device *netdev,
+				void *priv __unused ) {
 	struct netfront_nic *netfront;
 
 	/* Inhibit emulated PCI devices matching an existing netfront device */

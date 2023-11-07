@@ -31,6 +31,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_wrap.h>
 #include <ipxe/efi/efi_pxe.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_image.h>
+#include <ipxe/efi/efi_shim.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -109,18 +111,14 @@ efi_image_path ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
  */
 static wchar_t * efi_image_cmdline ( struct image *image ) {
 	wchar_t *cmdline;
-	size_t len;
 
-	len = ( strlen ( image->name ) +
-		( image->cmdline ?
-		  ( 1 /* " " */ + strlen ( image->cmdline ) ) : 0 ) );
-	cmdline = zalloc ( ( len + 1 /* NUL */ ) * sizeof ( wchar_t ) );
-	if ( ! cmdline )
+	/* Allocate and construct command line */
+	if ( efi_asprintf ( &cmdline, "%s%s%s", image->name,
+			    ( image->cmdline ? " " : "" ),
+			    ( image->cmdline ? image->cmdline : "" ) ) < 0 ) {
 		return NULL;
-	efi_snprintf ( cmdline, ( len + 1 /* NUL */ ), "%s%s%s",
-		       image->name,
-		       ( image->cmdline ? " " : "" ),
-		       ( image->cmdline ? image->cmdline : "" ) );
+	}
+
 	return cmdline;
 }
 
@@ -138,9 +136,12 @@ static int efi_image_exec ( struct image *image ) {
 		EFI_LOADED_IMAGE_PROTOCOL *image;
 		void *interface;
 	} loaded;
+	struct image *shim;
+	struct image *exec;
 	EFI_HANDLE handle;
 	EFI_MEMORY_TYPE type;
 	wchar_t *cmdline;
+	unsigned int toggle;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -152,6 +153,21 @@ static int efi_image_exec ( struct image *image ) {
 		rc = -ENODEV;
 		goto err_no_snpdev;
 	}
+
+	/* Use shim instead of directly executing image if applicable */
+	shim = ( efi_can_load ( image ) ?
+		 NULL : find_image_tag ( &efi_shim ) );
+	exec = ( shim ? shim : image );
+	if ( shim ) {
+		DBGC ( image, "EFIIMAGE %s executing via %s\n",
+		       image->name, shim->name );
+	}
+
+	/* Re-register as a hidden image to allow for access via file I/O */
+	toggle = ( ~image->flags & IMAGE_HIDDEN );
+	image->flags |= IMAGE_HIDDEN;
+	if ( ( rc = register_image ( image ) ) != 0 )
+		goto err_register_image;
 
 	/* Install file I/O protocols */
 	if ( ( rc = efi_file_install ( snpdev->handle ) ) != 0 ) {
@@ -175,7 +191,7 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Create device path for image */
-	path = efi_image_path ( image, snpdev->path );
+	path = efi_image_path ( exec, snpdev->path );
 	if ( ! path ) {
 		DBGC ( image, "EFIIMAGE %s could not create device path\n",
 		       image->name );
@@ -192,11 +208,20 @@ static int efi_image_exec ( struct image *image ) {
 		goto err_cmdline;
 	}
 
+	/* Install shim special handling if applicable */
+	if ( shim &&
+	     ( ( rc = efi_shim_install ( shim, snpdev->handle,
+					 &cmdline ) ) != 0 ) ){
+		DBGC ( image, "EFIIMAGE %s could not install shim handling: "
+		       "%s\n", image->name, strerror ( rc ) );
+		goto err_shim_install;
+	}
+
 	/* Attempt loading image */
 	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path,
-				       user_to_virt ( image->data, 0 ),
-				       image->len, &handle ) ) != 0 ) {
+				       user_to_virt ( exec->data, 0 ),
+				       exec->len, &handle ) ) != 0 ) {
 		/* Not an EFI image */
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %s could not load: %s\n",
@@ -286,6 +311,9 @@ static int efi_image_exec ( struct image *image ) {
 	if ( rc != 0 )
 		bs->UnloadImage ( handle );
  err_load_image:
+	if ( shim )
+		efi_shim_uninstall();
+ err_shim_install:
 	free ( cmdline );
  err_cmdline:
 	free ( path );
@@ -296,6 +324,9 @@ static int efi_image_exec ( struct image *image ) {
  err_pxe_install:
 	efi_file_uninstall ( snpdev->handle );
  err_file_install:
+	unregister_image ( image );
+ err_register_image:
+	image->flags ^= toggle;
  err_no_snpdev:
 	return rc;
 }
@@ -346,9 +377,75 @@ static int efi_image_probe ( struct image *image ) {
 	return rc;
 }
 
-/** EFI image type */
-struct image_type efi_image_type __image_type ( PROBE_NORMAL ) = {
-	.name = "EFI",
-	.probe = efi_image_probe,
-	.exec = efi_image_exec,
+/**
+ * Probe EFI PE image
+ *
+ * @v image		EFI file
+ * @ret rc		Return status code
+ *
+ * The extremely broken UEFI Secure Boot model provides no way for us
+ * to unambiguously determine that a valid EFI executable image was
+ * rejected by LoadImage() because it failed signature verification.
+ * We must therefore use heuristics to guess whether not an image that
+ * was rejected by LoadImage() could still be loaded via a separate PE
+ * loader such as the UEFI shim.
+ */
+static int efi_pe_image_probe ( struct image *image ) {
+	const UINT16 magic = ( ( sizeof ( UINTN ) == sizeof ( uint32_t ) ) ?
+			       EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC :
+			       EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC );
+	union {
+		EFI_IMAGE_DOS_HEADER dos;
+		EFI_IMAGE_OPTIONAL_HEADER_UNION pe;
+	} u;
+
+	/* Check for existence of DOS header */
+	if ( image->len < sizeof ( u.dos ) ) {
+		DBGC ( image, "EFIIMAGE %s too short for DOS header\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+	copy_from_user ( &u.dos, image->data, 0, sizeof ( u.dos ) );
+	if ( u.dos.e_magic != EFI_IMAGE_DOS_SIGNATURE ) {
+		DBGC ( image, "EFIIMAGE %s missing MZ signature\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+
+	/* Check for existence of PE header */
+	if ( ( image->len < u.dos.e_lfanew ) ||
+	     ( ( image->len - u.dos.e_lfanew ) < sizeof ( u.pe ) ) ) {
+		DBGC ( image, "EFIIMAGE %s too short for PE header\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+	copy_from_user ( &u.pe, image->data, u.dos.e_lfanew, sizeof ( u.pe ) );
+	if ( u.pe.Pe32.Signature != EFI_IMAGE_NT_SIGNATURE ) {
+		DBGC ( image, "EFIIMAGE %s missing PE signature\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+
+	/* Check PE header magic */
+	if ( u.pe.Pe32.OptionalHeader.Magic != magic ) {
+		DBGC ( image, "EFIIMAGE %s incorrect magic %04x\n",
+		       image->name, u.pe.Pe32.OptionalHeader.Magic );
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
+/** EFI image types */
+struct image_type efi_image_type[] __image_type ( PROBE_NORMAL ) = {
+	{
+		.name = "EFI",
+		.probe = efi_image_probe,
+		.exec = efi_image_exec,
+	},
+	{
+		.name = "EFIPE",
+		.probe = efi_pe_image_probe,
+		.exec = efi_image_exec,
+	},
 };

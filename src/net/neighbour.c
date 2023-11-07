@@ -383,8 +383,9 @@ int neighbour_define ( struct net_device *netdev,
  * Update neighbour cache on network device state change or removal
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void neighbour_flush ( struct net_device *netdev ) {
+static void neighbour_flush ( struct net_device *netdev, void *priv __unused ) {
 	struct neighbour *neighbour;
 	struct neighbour *tmp;
 

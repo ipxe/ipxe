@@ -295,9 +295,10 @@ struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
  * Apply cached DHCPACK to network device, if applicable
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int cachedhcp_probe ( struct net_device *netdev ) {
+static int cachedhcp_probe ( struct net_device *netdev, void *priv __unused ) {
 
 	/* Apply cached DHCPACK to network device, if applicable */
 	return cachedhcp_apply ( &cached_dhcpack, netdev );

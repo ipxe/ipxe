@@ -250,6 +250,10 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 	len = 0;
 	for_each_image ( image ) {
 
+		/* Skip hidden images */
+		if ( image->flags & IMAGE_HIDDEN )
+			continue;
+
 		/* Pad to alignment boundary */
 		pad_len = ( ( -reader->pos ) & ( INITRD_ALIGN - 1 ) );
 		if ( pad_len ) {
@@ -291,10 +295,12 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
  * Open fixed file
  *
  * @v file		EFI file
+ * @v wname		Filename
  * @v new		New EFI file
  * @ret efirc		EFI status code
  */
 static EFI_STATUS efi_file_open_fixed ( struct efi_file *file,
+					const wchar_t *wname,
 					EFI_FILE_PROTOCOL **new ) {
 
 	/* Increment reference count */
@@ -303,7 +309,8 @@ static EFI_STATUS efi_file_open_fixed ( struct efi_file *file,
 	/* Return opened file */
 	*new = &file->file;
 
-	DBGC ( file, "EFIFILE %s opened\n", efi_file_name ( file ) );
+	DBGC ( file, "EFIFILE %s opened via %ls\n",
+	       efi_file_name ( file ), wname );
 	return 0;
 }
 
@@ -321,6 +328,36 @@ static void efi_file_image ( struct efi_file *file, struct image *image ) {
 }
 
 /**
+ * Open image-backed file
+ *
+ * @v image		Image
+ * @v wname		Filename
+ * @v new		New EFI file
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS efi_file_open_image ( struct image *image,
+					const wchar_t *wname,
+					EFI_FILE_PROTOCOL **new ) {
+	struct efi_file *file;
+
+	/* Allocate and initialise file */
+	file = zalloc ( sizeof ( *file ) );
+	if ( ! file )
+		return EFI_OUT_OF_RESOURCES;
+	ref_init ( &file->refcnt, efi_file_free );
+	memcpy ( &file->file, &efi_file_root.file, sizeof ( file->file ) );
+	memcpy ( &file->load, &efi_file_root.load, sizeof ( file->load ) );
+	efi_file_image ( file, image_get ( image ) );
+
+	/* Return opened file */
+	*new = &file->file;
+
+	DBGC ( file, "EFIFILE %s opened via %ls\n",
+	       efi_file_name ( file ), wname );
+	return 0;
+}
+
+/**
  * Open file
  *
  * @v this		EFI file
@@ -335,9 +372,9 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 		CHAR16 *wname, UINT64 mode, UINT64 attributes __unused ) {
 	struct efi_file *file = container_of ( this, struct efi_file, file );
 	char buf[ wcslen ( wname ) + 1 /* NUL */ ];
-	struct efi_file *new_file;
 	struct image *image;
 	char *name;
+	char *sep;
 
 	/* Convert name to ASCII */
 	snprintf ( buf, sizeof ( buf ), "%ls", wname );
@@ -351,7 +388,7 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 
 	/* Allow root directory itself to be opened */
 	if ( ( name[0] == '\0' ) || ( name[0] == '.' ) )
-		return efi_file_open_fixed ( &efi_file_root, new );
+		return efi_file_open_fixed ( &efi_file_root, wname, new );
 
 	/* Fail unless opening from the root */
 	if ( file != &efi_file_root ) {
@@ -367,31 +404,28 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 		return EFI_WRITE_PROTECTED;
 	}
 
-	/* Allow magic initrd to be opened */
-	if ( strcasecmp ( name, efi_file_initrd.file.name ) == 0 )
-		return efi_file_open_fixed ( &efi_file_initrd.file, new );
+	/* Allow registered images to be opened */
+	if ( ( image = efi_file_find ( name ) ) != NULL )
+		return efi_file_open_image ( image, wname, new );
 
-	/* Identify image */
-	image = efi_file_find ( name );
-	if ( ! image ) {
-		DBGC ( file, "EFIFILE %s does not exist\n", name );
-		return EFI_NOT_FOUND;
+	/* Allow magic initrd to be opened */
+	if ( strcasecmp ( name, efi_file_initrd.file.name ) == 0 ) {
+		return efi_file_open_fixed ( &efi_file_initrd.file, wname,
+					     new );
 	}
 
-	/* Allocate and initialise file */
-	new_file = zalloc ( sizeof ( *new_file ) );
-	if ( ! new_file )
-		return EFI_OUT_OF_RESOURCES;
-	ref_init ( &file->refcnt, efi_file_free );
-	memcpy ( &new_file->file, &efi_file_root.file,
-		 sizeof ( new_file->file ) );
-	memcpy ( &new_file->load, &efi_file_root.load,
-		 sizeof ( new_file->load ) );
-	efi_file_image ( new_file, image_get ( image ) );
-	*new = &new_file->file;
-	DBGC ( new_file, "EFIFILE %s opened\n", efi_file_name ( new_file ) );
+	/* Allow currently selected image to be opened as "grub*.efi",
+	 * to work around buggy versions of the UEFI shim.
+	 */
+	if ( ( strncasecmp ( name, "grub", 4 ) == 0 ) &&
+	     ( ( sep = strrchr ( name, '.' ) ) != NULL ) &&
+	     ( strcasecmp ( sep, ".efi" ) == 0 ) &&
+	     ( ( image = find_image_tag ( &selected_image ) ) != NULL ) ) {
+		return efi_file_open_image ( image, wname, new );
+	}
 
-	return 0;
+	DBGC ( file, "EFIFILE %ls does not exist\n", wname );
+	return EFI_NOT_FOUND;
 }
 
 /**
@@ -505,13 +539,21 @@ static EFI_STATUS efi_file_read_dir ( struct efi_file *file, UINTN *len,
 	/* Construct directory entries for image-backed files */
 	index = file->pos;
 	for_each_image ( image ) {
-		if ( index-- == 0 ) {
-			efi_file_image ( &entry, image );
-			efirc = efi_file_info ( &entry, len, data );
-			if ( efirc == 0 )
-				file->pos++;
-			return efirc;
-		}
+
+		/* Skip hidden images */
+		if ( image->flags & IMAGE_HIDDEN )
+			continue;
+
+		/* Skip preceding images */
+		if ( index-- )
+			continue;
+
+		/* Construct directory entry */
+		efi_file_image ( &entry, image );
+		efirc = efi_file_info ( &entry, len, data );
+		if ( efirc == 0 )
+			file->pos++;
+		return efirc;
 	}
 
 	/* No more entries */
@@ -821,7 +863,7 @@ efi_file_open_volume ( EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *filesystem __unused,
 		       EFI_FILE_PROTOCOL **file ) {
 
 	DBGC ( &efi_file_root, "EFIFILE open volume\n" );
-	return efi_file_open_fixed ( &efi_file_root, file );
+	return efi_file_open_fixed ( &efi_file_root, L"<volume>", file );
 }
 
 /** EFI simple file system protocol */
@@ -1074,6 +1116,7 @@ int efi_file_install ( EFI_HANDLE handle ) {
 		EFI_DISK_IO_PROTOCOL *diskio;
 		void *interface;
 	} diskio;
+	struct image *image;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -1137,9 +1180,12 @@ int efi_file_install ( EFI_HANDLE handle ) {
 		goto err_initrd_claim;
 
 	/* Install Linux initrd fixed device path file if non-empty */
-	if ( have_images() &&
-	     ( ( rc = efi_file_path_install ( &efi_file_initrd ) ) != 0 ) ) {
-		goto err_initrd_install;
+	for_each_image ( image ) {
+		if ( image->flags & IMAGE_HIDDEN )
+			continue;
+		if ( ( rc = efi_file_path_install ( &efi_file_initrd ) ) != 0 )
+			goto err_initrd_install;
+		break;
 	}
 
 	return 0;

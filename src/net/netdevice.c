@@ -110,16 +110,63 @@ static int netdev_has_ll_addr ( struct net_device *netdev ) {
 }
 
 /**
+ * Get offset of network device driver private data
+ *
+ * @v driver		Upper-layer driver, or NULL for device driver
+ * @ret offset		Offset of driver private data
+ */
+static size_t netdev_priv_offset ( struct net_driver *driver ) {
+	struct net_device *netdev;
+	unsigned int num_configs;
+	size_t offset;
+
+	/* Allow space for network device */
+	offset = sizeof ( *netdev );
+
+	/* Allow space for configurations */
+	num_configs = table_num_entries ( NET_DEVICE_CONFIGURATORS );
+	offset += ( num_configs * sizeof ( netdev->configs[0] ) );
+
+	/* Place variable-length device driver private data at end */
+	if ( ! driver )
+		driver = table_end ( NET_DRIVERS );
+
+	/* Allow space for preceding upper-layer drivers' private data */
+	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS ) {
+		offset += driver->priv_len;
+	}
+
+	/* Sanity check */
+	assert ( ( offset & ( sizeof ( void * ) - 1 ) ) == 0 );
+
+	return offset;
+}
+
+/**
+ * Get network device driver private data
+ *
+ * @v netdev		Network device
+ * @v driver		Upper-layer driver, or NULL for device driver
+ * @ret priv		Driver private data
+ */
+void * netdev_priv ( struct net_device *netdev, struct net_driver *driver ) {
+
+	return ( ( ( void * ) netdev ) + netdev_priv_offset ( driver ) );
+}
+
+/**
  * Notify drivers of network device or link state change
  *
  * @v netdev		Network device
  */
 static void netdev_notify ( struct net_device *netdev ) {
 	struct net_driver *driver;
+	void *priv;
 
 	for_each_table_entry ( driver, NET_DRIVERS ) {
+		priv = netdev_priv ( netdev, driver );
 		if ( driver->notify )
-			driver->notify ( netdev );
+			driver->notify ( netdev, priv );
 	}
 }
 
@@ -656,7 +703,7 @@ static void free_netdev ( struct refcnt *refcnt ) {
 	struct net_device *netdev =
 		container_of ( refcnt, struct net_device, refcnt );
 
-	stop_timer ( &netdev->link_block );
+	assert ( ! timer_running ( &netdev->link_block ) );
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
 	clear_settings ( netdev_settings ( netdev ) );
@@ -675,14 +722,8 @@ struct net_device * alloc_netdev ( size_t priv_len ) {
 	struct net_device *netdev;
 	struct net_device_configurator *configurator;
 	struct net_device_configuration *config;
-	unsigned int num_configs;
-	size_t confs_len;
-	size_t total_len;
 
-	num_configs = table_num_entries ( NET_DEVICE_CONFIGURATORS );
-	confs_len = ( num_configs * sizeof ( netdev->configs[0] ) );
-	total_len = ( sizeof ( *netdev ) + confs_len + priv_len );
-	netdev = zalloc ( total_len );
+	netdev = zalloc ( netdev_priv_offset ( NULL ) + priv_len );
 	if ( netdev ) {
 		ref_init ( &netdev->refcnt, free_netdev );
 		netdev->link_rc = -EUNKNOWN_LINK_STATUS;
@@ -701,8 +742,7 @@ struct net_device * alloc_netdev ( size_t priv_len ) {
 				    &netdev->refcnt );
 			config++;
 		}
-		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) +
-				 confs_len );
+		netdev->priv = netdev_priv ( netdev, NULL );
 	}
 	return netdev;
 }
@@ -722,6 +762,7 @@ int register_netdev ( struct net_device *netdev ) {
 	struct net_device *duplicate;
 	unsigned int i;
 	uint32_t seed;
+	void *priv;
 	int rc;
 
 	/* Set initial link-layer address, if not already set */
@@ -784,7 +825,9 @@ int register_netdev ( struct net_device *netdev ) {
 
 	/* Probe device */
 	for_each_table_entry ( driver, NET_DRIVERS ) {
-		if ( driver->probe && ( rc = driver->probe ( netdev ) ) != 0 ) {
+		priv = netdev_priv ( netdev, driver );
+		if ( driver->probe &&
+		     ( rc = driver->probe ( netdev, priv ) ) != 0 ) {
 			DBGC ( netdev, "NETDEV %s could not add %s device: "
 			       "%s\n", netdev->name, driver->name,
 			       strerror ( rc ) );
@@ -796,8 +839,9 @@ int register_netdev ( struct net_device *netdev ) {
 
  err_probe:
 	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS ) {
+		priv = netdev_priv ( netdev, driver );
 		if ( driver->remove )
-			driver->remove ( netdev );
+			driver->remove ( netdev, priv );
 	}
 	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
@@ -879,6 +923,9 @@ void netdev_close ( struct net_device *netdev ) {
 	/* Close the device */
 	netdev->op->close ( netdev );
 
+	/* Stop link block timer */
+	stop_timer ( &netdev->link_block );
+
 	/* Flush TX and RX queues */
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
@@ -893,14 +940,16 @@ void netdev_close ( struct net_device *netdev ) {
  */
 void unregister_netdev ( struct net_device *netdev ) {
 	struct net_driver *driver;
+	void *priv;
 
 	/* Ensure device is closed */
 	netdev_close ( netdev );
 
 	/* Remove device */
 	for_each_table_entry_reverse ( driver, NET_DRIVERS ) {
+		priv = netdev_priv ( netdev, driver );
 		if ( driver->remove )
-			driver->remove ( netdev );
+			driver->remove ( netdev, priv );
 	}
 
 	/* Unregister per-netdev configuration settings */

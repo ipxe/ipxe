@@ -78,6 +78,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_dma		       ( ERRFILE_CORE | 0x00260000 )
 #define ERRFILE_cachedhcp	       ( ERRFILE_CORE | 0x00270000 )
 #define ERRFILE_acpimac		       ( ERRFILE_CORE | 0x00280000 )
+#define ERRFILE_efi_strings	       ( ERRFILE_CORE | 0x00290000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
@@ -404,6 +405,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_dhe		      ( ERRFILE_OTHER | 0x005a0000 )
 #define ERRFILE_efi_cmdline	      ( ERRFILE_OTHER | 0x005b0000 )
 #define ERRFILE_efi_rng		      ( ERRFILE_OTHER | 0x005c0000 )
+#define ERRFILE_efi_shim	      ( ERRFILE_OTHER | 0x005d0000 )
+#define ERRFILE_efi_settings	      ( ERRFILE_OTHER | 0x005e0000 )
 
 /** @} */
 

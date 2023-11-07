@@ -690,7 +690,7 @@ pcnet32_hw_start ( struct pcnet32_private *priv )
 static int
 pcnet32_open ( struct net_device *netdev )
 {
-	struct pcnet32_private *priv = netdev_priv ( netdev );
+	struct pcnet32_private *priv = netdev->priv;
 	unsigned long ioaddr = priv->pci_dev->ioaddr;
 	int rc;
 	u16 val;
@@ -754,7 +754,7 @@ err_setup_tx:
 static int
 pcnet32_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 {
-	struct pcnet32_private *priv = netdev_priv ( netdev );
+	struct pcnet32_private *priv = netdev->priv;
 	unsigned long ioaddr = priv->pci_dev->ioaddr;
 	uint32_t tx_len = iob_len ( iobuf );
 	struct pcnet32_tx_desc *tx_curr_desc;
@@ -802,7 +802,7 @@ pcnet32_transmit ( struct net_device *netdev, struct io_buffer *iobuf )
 static void
 pcnet32_process_tx_packets ( struct net_device *netdev )
 {
-	struct pcnet32_private *priv = netdev_priv ( netdev );
+	struct pcnet32_private *priv = netdev->priv;
 	struct pcnet32_tx_desc *tx_curr_desc;
 
 	DBGP ( "pcnet32_process_tx_packets\n" );
@@ -848,7 +848,7 @@ pcnet32_process_tx_packets ( struct net_device *netdev )
 static void
 pcnet32_process_rx_packets ( struct net_device *netdev )
 {
-	struct pcnet32_private *priv = netdev_priv ( netdev );
+	struct pcnet32_private *priv = netdev->priv;
 	struct pcnet32_rx_desc *rx_curr_desc;
 	u16 status;
 	u32 len;
@@ -913,7 +913,7 @@ pcnet32_process_rx_packets ( struct net_device *netdev )
 static void
 pcnet32_poll ( struct net_device *netdev )
 {
-	struct pcnet32_private *priv = netdev_priv ( netdev );
+	struct pcnet32_private *priv = netdev->priv;
 	unsigned long ioaddr = priv->pci_dev->ioaddr;
 	u16 status;
 
@@ -946,7 +946,7 @@ pcnet32_poll ( struct net_device *netdev )
 static void
 pcnet32_close ( struct net_device *netdev )
 {
-	struct pcnet32_private *priv = netdev_priv ( netdev );
+	struct pcnet32_private *priv = netdev->priv;
 	unsigned long ioaddr = priv->pci_dev->ioaddr;
 
 	DBGP ( "pcnet32_close\n" );
@@ -1003,7 +1003,7 @@ static void pcnet32_irq_disable ( struct pcnet32_private *priv )
 static void
 pcnet32_irq ( struct net_device *netdev, int action )
 {
-	struct pcnet32_private *priv = netdev_priv ( netdev );
+	struct pcnet32_private *priv = netdev->priv;
 
 	DBGP ( "pcnet32_irq\n" );
 
@@ -1061,7 +1061,7 @@ pcnet32_probe ( struct pci_device *pdev )
 	netdev->dev = &pdev->dev;
 
 	/* Get a reference to our private data */
-	priv = netdev_priv ( netdev );
+	priv = netdev->priv;
 
 	/* We'll need these set up for the rest of the routines */
 	priv->pci_dev = pdev;

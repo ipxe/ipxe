@@ -69,10 +69,6 @@ FEATURE ( FEATURE_PROTOCOL, "FCoE", DHCP_EB_FEATURE_FCOE, 1 );
 
 /** An FCoE port */
 struct fcoe_port {
-	/** Reference count */
-	struct refcnt refcnt;
-	/** List of FCoE ports */
-	struct list_head list;
 	/** Transport interface */
 	struct interface transport;
 	/** Network device */
@@ -115,6 +111,7 @@ enum fcoe_flags {
 	FCOE_VLAN_TIMED_OUT = 0x0020,
 };
 
+struct net_driver fcoe_driver __net_driver;
 struct net_protocol fcoe_protocol __net_protocol;
 struct net_protocol fip_protocol __net_protocol;
 
@@ -152,31 +149,12 @@ static uint8_t default_fcf_mac[ETH_ALEN] =
 /** Maximum number of missing discovery advertisements */
 #define FCOE_MAX_FIP_MISSING_KEEPALIVES 4
 
-/** List of FCoE ports */
-static LIST_HEAD ( fcoe_ports );
-
 /******************************************************************************
  *
  * FCoE protocol
  *
  ******************************************************************************
  */
-
-/**
- * Identify FCoE port by network device
- *
- * @v netdev		Network device
- * @ret fcoe		FCoE port, or NULL
- */
-static struct fcoe_port * fcoe_demux ( struct net_device *netdev ) {
-	struct fcoe_port *fcoe;
-
-	list_for_each_entry ( fcoe, &fcoe_ports, list ) {
-		if ( fcoe->netdev == netdev )
-			return fcoe;
-	}
-	return NULL;
-}
 
 /**
  * Reset FCoE port
@@ -348,7 +326,8 @@ static int fcoe_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	int rc;
 
 	/* Identify FCoE port */
-	if ( ( fcoe = fcoe_demux ( netdev ) ) == NULL ) {
+	fcoe = netdev_priv ( netdev, &fcoe_driver );
+	if ( ! fcoe->netdev ) {
 		DBG ( "FCoE received frame for net device %s missing FCoE "
 		      "port\n", netdev->name );
 		rc = -ENOTCONN;
@@ -448,9 +427,6 @@ static void fcoe_close ( struct fcoe_port *fcoe, int rc ) {
 
 	stop_timer ( &fcoe->timer );
 	intf_shutdown ( &fcoe->transport, rc );
-	netdev_put ( fcoe->netdev );
-	list_del ( &fcoe->list );
-	ref_put ( &fcoe->refcnt );
 }
 
 /**
@@ -947,7 +923,8 @@ static int fcoe_fip_rx ( struct io_buffer *iobuf,
 	int rc;
 
 	/* Identify FCoE port */
-	if ( ( fcoe = fcoe_demux ( netdev ) ) == NULL ) {
+	fcoe = netdev_priv ( netdev, &fcoe_driver );
+	if ( ! fcoe->netdev ) {
 		DBG ( "FCoE received FIP frame for net device %s missing FCoE "
 		      "port\n", netdev->name );
 		rc = -ENOTCONN;
@@ -1110,31 +1087,24 @@ static void fcoe_expired ( struct retry_timer *timer, int over __unused ) {
  * Create FCoE port
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int fcoe_probe ( struct net_device *netdev ) {
+static int fcoe_probe ( struct net_device *netdev, void *priv ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
-	struct fcoe_port *fcoe;
-	int rc;
+	struct fcoe_port *fcoe = priv;
 
 	/* Sanity check */
 	if ( ll_protocol->ll_proto != htons ( ARPHRD_ETHER ) ) {
 		/* Not an error; simply skip this net device */
 		DBG ( "FCoE skipping non-Ethernet device %s\n", netdev->name );
-		rc = 0;
-		goto err_non_ethernet;
+		return 0;
 	}
 
-	/* Allocate and initialise structure */
-	fcoe = zalloc ( sizeof ( *fcoe ) );
-	if ( ! fcoe ) {
-		rc = -ENOMEM;
-		goto err_zalloc;
-	}
-	ref_init ( &fcoe->refcnt, NULL );
-	intf_init ( &fcoe->transport, &fcoe_transport_desc, &fcoe->refcnt );
-	timer_init ( &fcoe->timer, fcoe_expired, &fcoe->refcnt );
-	fcoe->netdev = netdev_get ( netdev );
+	/* Initialise structure */
+	intf_init ( &fcoe->transport, &fcoe_transport_desc, &netdev->refcnt );
+	timer_init ( &fcoe->timer, fcoe_expired, &netdev->refcnt );
+	fcoe->netdev = netdev;
 
 	/* Construct node and port names */
 	fcoe->node_wwn.fcoe.authority = htons ( FCOE_AUTHORITY_IEEE );
@@ -1148,30 +1118,21 @@ static int fcoe_probe ( struct net_device *netdev ) {
 	       fc_ntoa ( &fcoe->node_wwn.fc ) );
 	DBGC ( fcoe, " port %s\n", fc_ntoa ( &fcoe->port_wwn.fc ) );
 
-	/* Transfer reference to port list */
-	list_add ( &fcoe->list, &fcoe_ports );
 	return 0;
-
-	netdev_put ( fcoe->netdev );
- err_zalloc:
- err_non_ethernet:
-	return rc;
 }
 
 /**
  * Handle FCoE port device or link state change
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void fcoe_notify ( struct net_device *netdev ) {
-	struct fcoe_port *fcoe;
+static void fcoe_notify ( struct net_device *netdev, void *priv ) {
+	struct fcoe_port *fcoe = priv;
 
-	/* Sanity check */
-	if ( ( fcoe = fcoe_demux ( netdev ) ) == NULL ) {
-		DBG ( "FCoE notification for net device %s missing FCoE "
-		      "port\n", netdev->name );
+	/* Skip non-FCoE net devices */
+	if ( ! fcoe->netdev )
 		return;
-	}
 
 	/* Reset the FCoE link if necessary */
 	if ( ! ( netdev_is_open ( netdev ) &&
@@ -1185,16 +1146,14 @@ static void fcoe_notify ( struct net_device *netdev ) {
  * Destroy FCoE port
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void fcoe_remove ( struct net_device *netdev ) {
-	struct fcoe_port *fcoe;
+static void fcoe_remove ( struct net_device *netdev __unused, void *priv ) {
+	struct fcoe_port *fcoe = priv;
 
-	/* Sanity check */
-	if ( ( fcoe = fcoe_demux ( netdev ) ) == NULL ) {
-		DBG ( "FCoE removal of net device %s missing FCoE port\n",
-		      netdev->name );
+	/* Skip non-FCoE net devices */
+	if ( ! fcoe->netdev )
 		return;
-	}
 
 	/* Close FCoE device */
 	fcoe_close ( fcoe, 0 );
@@ -1203,6 +1162,7 @@ static void fcoe_remove ( struct net_device *netdev ) {
 /** FCoE driver */
 struct net_driver fcoe_driver __net_driver = {
 	.name = "FCoE",
+	.priv_len = sizeof ( struct fcoe_port ),
 	.probe = fcoe_probe,
 	.notify = fcoe_notify,
 	.remove = fcoe_remove,

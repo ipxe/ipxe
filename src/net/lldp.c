@@ -40,12 +40,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** An LLDP settings block */
 struct lldp_settings {
-	/** Reference counter */
-	struct refcnt refcnt;
 	/** Settings interface */
 	struct settings settings;
-	/** List of LLDP settings blocks */
-	struct list_head list;
 	/** Name */
 	const char *name;
 	/** LLDP data */
@@ -54,44 +50,11 @@ struct lldp_settings {
 	size_t len;
 };
 
+/* Forward declaration */
+struct net_driver lldp_driver __net_driver;
+
 /** LLDP settings scope */
 static const struct settings_scope lldp_settings_scope;
-
-/** List of LLDP settings blocks */
-static LIST_HEAD ( lldp_settings );
-
-/**
- * Free LLDP settings block
- *
- * @v refcnt		Reference counter
- */
-static void lldp_free ( struct refcnt *refcnt ) {
-	struct lldp_settings *lldpset =
-		container_of ( refcnt, struct lldp_settings, refcnt );
-
-	DBGC ( lldpset, "LLDP %s freed\n", lldpset->name );
-	list_del ( &lldpset->list );
-	free ( lldpset->data );
-	free ( lldpset );
-}
-
-/**
- * Find LLDP settings block
- *
- * @v netdev		Network device
- * @ret lldpset		LLDP settings block
- */
-static struct lldp_settings * lldp_find ( struct net_device *netdev ) {
-	struct lldp_settings *lldpset;
-
-	/* Find matching LLDP settings block */
-	list_for_each_entry ( lldpset, &lldp_settings, list ) {
-		if ( netdev_settings ( netdev ) == lldpset->settings.parent )
-			return lldpset;
-	}
-
-	return NULL;
-}
 
 /**
  * Check applicability of LLDP setting
@@ -246,13 +209,7 @@ static int lldp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	int rc;
 
 	/* Find matching LLDP settings block */
-	lldpset = lldp_find ( netdev );
-	if ( ! lldpset ) {
-		DBGC ( netdev, "LLDP %s has no \"%s\" settings block\n",
-		       netdev->name, LLDP_SETTINGS_NAME );
-		rc = -ENOENT;
-		goto err_find;
-	}
+	lldpset = netdev_priv ( netdev, &lldp_driver );
 
 	/* Create trimmed copy of received LLDP data */
 	len = iob_len ( iobuf );
@@ -280,7 +237,6 @@ static int lldp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 
 	free ( data );
  err_alloc:
- err_find:
 	free_iob ( iobuf );
 	return rc;
 }
@@ -296,26 +252,21 @@ struct net_protocol lldp_protocol __net_protocol = {
  * Create LLDP settings block
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int lldp_probe ( struct net_device *netdev ) {
-	struct lldp_settings *lldpset;
+static int lldp_probe ( struct net_device *netdev, void *priv ) {
+	struct lldp_settings *lldpset = priv;
 	int rc;
 
-	/* Allocate LLDP settings block */
-	lldpset = zalloc ( sizeof ( *lldpset ) );
-	if ( ! lldpset ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	ref_init ( &lldpset->refcnt, lldp_free );
+	/* Initialise LLDP settings block */
 	settings_init ( &lldpset->settings, &lldp_settings_operations,
-			&lldpset->refcnt, &lldp_settings_scope );
-	list_add_tail ( &lldpset->list, &lldp_settings );
+			&netdev->refcnt, &lldp_settings_scope );
 	lldpset->name = netdev->name;
 
 	/* Register settings */
-	if ( ( rc = register_settings ( &lldpset->settings, netdev_settings ( netdev ),
+	if ( ( rc = register_settings ( &lldpset->settings,
+					netdev_settings ( netdev ),
 					LLDP_SETTINGS_NAME ) ) != 0 ) {
 		DBGC ( lldpset, "LLDP %s could not register settings: %s\n",
 		       lldpset->name, strerror ( rc ) );
@@ -323,18 +274,36 @@ static int lldp_probe ( struct net_device *netdev ) {
 	}
 	DBGC ( lldpset, "LLDP %s registered\n", lldpset->name );
 
-	ref_put ( &lldpset->refcnt );
 	return 0;
 
 	unregister_settings ( &lldpset->settings );
  err_register:
-	ref_put ( &lldpset->refcnt );
- err_alloc:
+	assert ( lldpset->data == NULL );
 	return rc;
+}
+
+/**
+ * Remove LLDP settings block
+ *
+ * @v netdev		Network device
+ * @v priv		Private data
+ */
+static void lldp_remove ( struct net_device *netdev __unused, void *priv ) {
+	struct lldp_settings *lldpset = priv;
+
+	/* Unregister settings */
+	unregister_settings ( &lldpset->settings );
+	DBGC ( lldpset, "LLDP %s unregistered\n", lldpset->name );
+
+	/* Free any LLDP data */
+	free ( lldpset->data );
+	lldpset->data = NULL;
 }
 
 /** LLDP driver */
 struct net_driver lldp_driver __net_driver = {
 	.name = "LLDP",
+	.priv_len = sizeof ( struct lldp_settings ),
 	.probe = lldp_probe,
+	.remove = lldp_remove,
 };

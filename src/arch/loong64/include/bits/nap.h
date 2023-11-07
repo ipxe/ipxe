@@ -9,4 +9,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#endif /* _BITS_MAP_H */
+#include <ipxe/efi/efiloong64_nap.h>
+
+#endif /* _BITS_NAP_H */

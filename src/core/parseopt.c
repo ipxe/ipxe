@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
 #include <ipxe/netdevice.h>
@@ -35,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/settings.h>
 #include <ipxe/params.h>
 #include <ipxe/timer.h>
+#include <ipxe/keys.h>
 #include <ipxe/parseopt.h>
 #include <config/branding.h>
 
@@ -213,6 +215,7 @@ int parse_flag ( char *text __unused, int *flag ) {
  * @ret rc		Return status code
  */
 int parse_key ( char *text, unsigned int *key ) {
+	int rc;
 
 	/* Interpret single characters as being a literal key character */
 	if ( text[0] && ! text[1] ) {
@@ -221,7 +224,17 @@ int parse_key ( char *text, unsigned int *key ) {
 	}
 
 	/* Otherwise, interpret as an integer */
-	return parse_integer ( text, key );
+	if ( ( rc = parse_integer ( text, key ) ) < 0 )
+		return rc;
+
+	/* For backwards compatibility with existing scripts, treat
+	 * integers between the ASCII range and special key range as
+	 * being relative special key values.
+	 */
+	if ( ( ! isascii ( *key ) ) && ( *key < KEY_MIN ) )
+		*key += KEY_MIN;
+
+	return 0;
 }
 
 /**

@@ -168,6 +168,9 @@
  */
 #define EFI_IMAGE_ALIGN 0x1000
 
+/** Number of data directory entries */
+#define NUMBER_OF_DIRECTORY_ENTRIES 8
+
 struct elf_file {
 	void *data;
 	size_t len;
@@ -178,6 +181,7 @@ struct pe_section {
 	struct pe_section *next;
 	EFI_IMAGE_SECTION_HEADER hdr;
 	void ( * fixup ) ( struct pe_section *section );
+	int hidden;
 	uint8_t contents[0];
 };
 
@@ -191,7 +195,6 @@ struct pe_relocs {
 
 struct pe_header {
 	EFI_IMAGE_DOS_HEADER dos;
-	uint8_t padding[128];
 	EFI_IMAGE_NT_HEADERS nt;
 };
 
@@ -205,7 +208,11 @@ static struct pe_header efi_pe_header = {
 		.FileHeader = {
 			.TimeDateStamp = 0x10d1a884,
 			.SizeOfOptionalHeader =
-				sizeof ( efi_pe_header.nt.OptionalHeader ),
+				( sizeof ( efi_pe_header.nt.OptionalHeader ) -
+				  ( ( EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES -
+				      NUMBER_OF_DIRECTORY_ENTRIES ) *
+				    sizeof ( efi_pe_header.nt.OptionalHeader.
+					     DataDirectory[0] ) ) ),
 			.Characteristics = ( EFI_IMAGE_FILE_DLL |
 					     EFI_IMAGE_FILE_MACHINE |
 					     EFI_IMAGE_FILE_EXECUTABLE_IMAGE ),
@@ -218,15 +225,17 @@ static struct pe_header efi_pe_header = {
 			.FileAlignment = EFI_FILE_ALIGN,
 			.SizeOfImage = EFI_IMAGE_ALIGN,
 			.SizeOfHeaders = sizeof ( efi_pe_header ),
-			.NumberOfRvaAndSizes =
-				EFI_IMAGE_NUMBER_OF_DIRECTORY_ENTRIES,
+			.NumberOfRvaAndSizes = NUMBER_OF_DIRECTORY_ENTRIES,
 		},
 	},
 };
 
 /** Command-line options */
 struct options {
+	/** PE32+ subsystem type */
 	unsigned int subsystem;
+	/** Create hybrid BIOS/UEFI binary */
+	int hybrid;
 };
 
 /**
@@ -633,10 +642,12 @@ static struct pe_section * process_section ( struct elf_file *elf,
 	/* Update RVA limits */
 	start = new->hdr.VirtualAddress;
 	end = ( start + new->hdr.Misc.VirtualSize );
-	if ( ( ! *applicable_start ) || ( *applicable_start >= start ) )
-		*applicable_start = start;
-	if ( *applicable_end < end )
-		*applicable_end = end;
+	if ( ! new->hidden ) {
+		if ( ( ! *applicable_start ) || ( *applicable_start >= start ) )
+			*applicable_start = start;
+		if ( *applicable_end < end )
+			*applicable_end = end;
+	}
 	if ( data_start < code_end )
 		data_start = code_end;
 	if ( data_mid < data_start )
@@ -656,8 +667,11 @@ static struct pe_section * process_section ( struct elf_file *elf,
 		( data_end - data_mid );
 
 	/* Update remaining file header fields */
-	pe_header->nt.FileHeader.NumberOfSections++;
-	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( new->hdr );
+	if ( ! new->hidden ) {
+		pe_header->nt.FileHeader.NumberOfSections++;
+		pe_header->nt.OptionalHeader.SizeOfHeaders +=
+			sizeof ( new->hdr );
+	}
 	pe_header->nt.OptionalHeader.SizeOfImage =
 		efi_image_align ( data_end );
 
@@ -673,10 +687,12 @@ static struct pe_section * process_section ( struct elf_file *elf,
  * @v nsyms		Number of symbol table entries
  * @v rel		Relocation record
  * @v pe_reltab		PE relocation table to fill in
+ * @v opts		Options
  */
 static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 			    const Elf_Sym *syms, unsigned int nsyms,
-			    const Elf_Rel *rel, struct pe_relocs **pe_reltab ) {
+			    const Elf_Rel *rel, struct pe_relocs **pe_reltab,
+			    struct options *opts ) {
 	unsigned int type = ELF_R_TYPE ( rel->r_info );
 	unsigned int sym = ELF_R_SYM ( rel->r_info );
 	unsigned int mrel = ELF_MREL ( elf->ehdr->e_machine, type );
@@ -739,6 +755,15 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
 			 * loaded.
 			 */
 			break;
+		case ELF_MREL ( EM_X86_64, R_X86_64_32 ) :
+			/* Ignore 32-bit relocations in a hybrid
+			 * 32-bit BIOS and 64-bit UEFI binary,
+			 * otherwise fall through to treat as an
+			 * unknown type.
+			 */
+			if ( opts->hybrid )
+				break;
+			/* fallthrough */
 		default:
 			eprintf ( "Unrecognised relocation type %d\n", type );
 			exit ( 1 );
@@ -753,9 +778,11 @@ static void process_reloc ( struct elf_file *elf, const Elf_Shdr *shdr,
  * @v shdr		ELF section header
  * @v stride		Relocation record size
  * @v pe_reltab		PE relocation table to fill in
+ * @v opts		Options
  */
 static void process_relocs ( struct elf_file *elf, const Elf_Shdr *shdr,
-			     size_t stride, struct pe_relocs **pe_reltab ) {
+			     size_t stride, struct pe_relocs **pe_reltab,
+			     struct options *opts ) {
 	const Elf_Shdr *symtab;
 	const Elf_Sym *syms;
 	const Elf_Rel *rel;
@@ -773,7 +800,7 @@ static void process_relocs ( struct elf_file *elf, const Elf_Shdr *shdr,
 	rel = ( elf->data + shdr->sh_offset );
 	nrels = ( shdr->sh_size / stride );
 	for ( i = 0 ; i < nrels ; i++ ) {
-		process_reloc ( elf, shdr, syms, nsyms, rel, pe_reltab );
+		process_reloc ( elf, shdr, syms, nsyms, rel, pe_reltab, opts );
 		rel = ( ( ( const void * ) rel ) + stride );
 	}
 }
@@ -914,6 +941,7 @@ static void write_pe_file ( struct pe_header *pe_header,
 			    FILE *pe ) {
 	struct pe_section *section;
 	unsigned long fpos = 0;
+	unsigned int count = 0;
 
 	/* Align length of headers */
 	fpos = pe_header->nt.OptionalHeader.SizeOfHeaders =
@@ -931,19 +959,26 @@ static void write_pe_file ( struct pe_header *pe_header,
 	}
 
 	/* Write file header */
-	if ( fwrite ( pe_header, sizeof ( *pe_header ), 1, pe ) != 1 ) {
+	if ( fwrite ( pe_header,
+		      ( offsetof ( typeof ( *pe_header ), nt.OptionalHeader ) +
+			pe_header->nt.FileHeader.SizeOfOptionalHeader ),
+		      1, pe ) != 1 ) {
 		perror ( "Could not write PE header" );
 		exit ( 1 );
 	}
 
 	/* Write section headers */
 	for ( section = pe_sections ; section ; section = section->next ) {
+		if ( section->hidden )
+			continue;
 		if ( fwrite ( &section->hdr, sizeof ( section->hdr ),
 			      1, pe ) != 1 ) {
 			perror ( "Could not write section header" );
 			exit ( 1 );
 		}
+		count++;
 	}
+	assert ( count == pe_header->nt.FileHeader.NumberOfSections );
 
 	/* Write sections */
 	for ( section = pe_sections ; section ; section = section->next ) {
@@ -969,6 +1004,7 @@ static void write_pe_file ( struct pe_header *pe_header,
  *
  * @v elf_name		ELF file name
  * @v pe_name		PE file name
+ * @v opts		Options
  */
 static void elf2pe ( const char *elf_name, const char *pe_name,
 		     struct options *opts ) {
@@ -1012,13 +1048,13 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 
 			/* Process .rel relocations */
 			process_relocs ( &elf, shdr, sizeof ( Elf_Rel ),
-					 &pe_reltab );
+					 &pe_reltab, opts );
 
 		} else if ( shdr->sh_type == SHT_RELA ) {
 
 			/* Process .rela relocations */
 			process_relocs ( &elf, shdr, sizeof ( Elf_Rela ),
-					 &pe_reltab );
+					 &pe_reltab, opts );
 		}
 	}
 
@@ -1071,11 +1107,12 @@ static int parse_options ( const int argc, char **argv,
 		int option_index = 0;
 		static struct option long_options[] = {
 			{ "subsystem", required_argument, NULL, 's' },
+			{ "hybrid", no_argument, NULL, 'H' },
 			{ "help", 0, NULL, 'h' },
 			{ 0, 0, 0, 0 }
 		};
 
-		if ( ( c = getopt_long ( argc, argv, "s:h",
+		if ( ( c = getopt_long ( argc, argv, "s:Hh",
 					 long_options,
 					 &option_index ) ) == -1 ) {
 			break;
@@ -1089,6 +1126,9 @@ static int parse_options ( const int argc, char **argv,
 					  optarg );
 				exit ( 2 );
 			}
+			break;
+		case 'H':
+			opts->hybrid = 1;
 			break;
 		case 'h':
 			print_help ( argv[0] );

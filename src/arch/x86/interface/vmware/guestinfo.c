@@ -207,65 +207,35 @@ struct init_fn guestinfo_init_fn __init_fn ( INIT_NORMAL ) = {
  * Create per-netdevice GuestInfo settings
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int guestinfo_net_probe ( struct net_device *netdev ) {
-	struct settings *settings;
+static int guestinfo_net_probe ( struct net_device *netdev, void *priv ) {
+	struct settings *settings = priv;
 	int rc;
 
 	/* Do nothing unless we have a GuestInfo channel available */
 	if ( guestinfo_channel < 0 )
 		return 0;
 
-	/* Allocate and initialise settings block */
-	settings = zalloc ( sizeof ( *settings ) );
-	if ( ! settings ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	settings_init ( settings, &guestinfo_settings_operations, NULL, NULL );
-
-	/* Register settings */
+	/* Initialise and register settings */
+	settings_init ( settings, &guestinfo_settings_operations,
+			&netdev->refcnt, NULL );
 	if ( ( rc = register_settings ( settings, netdev_settings ( netdev ),
 					"vmware" ) ) != 0 ) {
 		DBGC ( settings, "GuestInfo %p could not register for %s: %s\n",
 		       settings, netdev->name, strerror ( rc ) );
-		goto err_register;
+		return rc;
 	}
 	DBGC ( settings, "GuestInfo %p registered for %s\n",
 	       settings, netdev->name );
 
 	return 0;
-
- err_register:
-	free ( settings );
- err_alloc:
-	return rc;
-}
-
-/**
- * Remove per-netdevice GuestInfo settings
- *
- * @v netdev		Network device
- */
-static void guestinfo_net_remove ( struct net_device *netdev ) {
-	struct settings *parent = netdev_settings ( netdev );
-	struct settings *settings;
-
-	list_for_each_entry ( settings, &parent->children, siblings ) {
-		if ( settings->op == &guestinfo_settings_operations ) {
-			DBGC ( settings, "GuestInfo %p unregistered for %s\n",
-			       settings, netdev->name );
-			unregister_settings ( settings );
-			free ( settings );
-			return;
-		}
-	}
 }
 
 /** GuestInfo per-netdevice driver */
 struct net_driver guestinfo_net_driver __net_driver = {
 	.name = "GuestInfo",
+	.priv_len = sizeof ( struct settings ),
 	.probe = guestinfo_net_probe,
-	.remove = guestinfo_net_remove,
 };

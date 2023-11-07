@@ -6,8 +6,3 @@
 
 %:
 	dh $@
-
-override_dh_install:
-	cp $(CURDIR)/binaries/arm64/ipxe-autoboot.efi $(CURDIR)/binaries/arm64/ipxe-autoboot-arm64.efi
-	dh_install
-	rm -f binaries/arm64/ipxe-autoboot-arm64.efi
