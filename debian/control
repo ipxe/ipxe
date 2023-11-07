@@ -13,6 +13,8 @@ Package: eine-ipxe-images
 Architecture: any
 #Pre-Depends:
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: yandex-ipxe-images
+Replaces: yandex-ipxe-images
 Description: Eine ipxe images & kernels collection
  Provide x64/arm64 vCDROM ISO/IMG to boot server from network using iPXE
  even if server has no IPv6 or iPXE boot is not supported.
