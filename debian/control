@@ -1,7 +1,7 @@
-Source: yandex-ipxe-images
+Source: eine-ipxe-images
 Section: unknown
 Priority: optional
-Maintainer: Pavel Krotkiy <potsh@yandex-team.ru>
+Maintainer: Pavel Krotkiy <porsh@yandex-team.ru>
 Build-Depends: debhelper (>= 10.0.0), dh-exec, liblzma-dev, gcc-aarch64-linux-gnu, build-essential, binutils, perl,
  mtools, mkisofs, genisoimage, xorriso, syslinux, isolinux
 Rules-Requires-Root: binary-targets
@@ -9,11 +9,11 @@ Standards-Version: 3.9.4
 Homepage: http://netboot.yandex.net
 Vcs-Git: https://a.yandex-team.ru/arcadia/haas/netboot/ipxe
 
-Package: yandex-ipxe-images
+Package: eine-ipxe-images
 Architecture: any
 #Pre-Depends:
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Yandex ipxe images collection
+Description: Eine ipxe images & kernels collection
  Provide x64/arm64 vCDROM ISO/IMG to boot server from network using iPXE
  even if server has no IPv6 or iPXE boot is not supported.
  Contains selected images:
@@ -26,3 +26,12 @@ Description: Yandex ipxe images collection
        ├── ipxe-autoboot.iso
        ├── ipxe-shell.img
        └── ipxe-shell.iso
+ kernels
+ ├── arm64
+ │    ├── ipxe-autoboot.efi
+ │    └── ipxe-shell.efi
+ └── x86_64
+     ├── ipxe-autoboot.efi
+     ├── ipxe-autoboot.lkrn
+     ├── ipxe-shell.efi
+     └── ipxe-shell.lkrn

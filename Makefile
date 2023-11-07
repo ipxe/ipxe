@@ -7,6 +7,7 @@
 TMPDIR=$(CURDIR)/tmp
 
 #MAKEARGS:=DEBUG="device,pci,init,nii,snp,snpnet,snponly,efi_watchdog,efi_image,image_cmd,image,efi_autoboot,efi_timer,efi_driver:3,efi_debug,efi_init,efi_pci,efi_wrap,intel" LOG_LEVEL=LOG_ALL
+#MAKEARGS:=DEBUG="lldp" LOG_LEVEL=LOG_ALL
 
 # parameters
 # $(1) = target, $(2) = embedded file, $(3) = output file, $(4) = architecture
