@@ -49,37 +49,6 @@ static const uint8_t eapol_mac[ETH_ALEN] = {
 };
 
 /**
- * Update EAPoL supplicant state
- *
- * @v supplicant	EAPoL supplicant
- * @v timeout		Timer ticks until next EAPoL-Start (if applicable)
- */
-static void eapol_update ( struct eapol_supplicant *supplicant,
-			   unsigned long timeout ) {
-	struct net_device *netdev = supplicant->eap.netdev;
-
-	/* Check device and EAP state */
-	if ( netdev_is_open ( netdev ) && netdev_link_ok ( netdev ) ) {
-		if ( supplicant->eap.done ) {
-
-			/* EAP has completed: stop sending EAPoL-Start */
-			stop_timer ( &supplicant->timer );
-
-		} else if ( ! timer_running ( &supplicant->timer ) ) {
-
-			/* EAP has not yet begun: start sending EAPoL-Start */
-			start_timer_fixed ( &supplicant->timer, timeout );
-		}
-
-	} else {
-
-		/* Not ready: clear completion and stop sending EAPoL-Start */
-		supplicant->eap.done = 0;
-		stop_timer ( &supplicant->timer );
-	}
-}
-
-/**
  * Process EAPoL packet
  *
  * @v iobuf		I/O buffer
@@ -186,8 +155,19 @@ static int eapol_eap_rx ( struct eapol_supplicant *supplicant,
 		goto drop;
 	}
 
-	/* Update supplicant state */
-	eapol_update ( supplicant, EAPOL_START_INTERVAL );
+	/* Update EAPoL-Start transmission timer */
+	if ( supplicant->eap.flags & EAP_FL_PASSIVE ) {
+		/* Stop sending EAPoL-Start */
+		if ( timer_running ( &supplicant->timer ) ) {
+			DBGC ( netdev, "EAPOL %s becoming passive\n",
+			       netdev->name );
+		}
+		stop_timer ( &supplicant->timer );
+	} else if ( supplicant->eap.flags & EAP_FL_ONGOING ) {
+		/* Delay EAPoL-Start until after next expected packet */
+		DBGC ( netdev, "EAPOL %s deferring Start\n", netdev->name );
+		start_timer_fixed ( &supplicant->timer, EAP_WAIT_TIMEOUT );
+	}
 
  drop:
 	free_iob ( iobuf );
@@ -309,15 +289,35 @@ static int eapol_probe ( struct net_device *netdev, void *priv ) {
  * @v netdev		Network device
  * @v priv		Private data
  */
-static void eapol_notify ( struct net_device *netdev __unused, void *priv ) {
+static void eapol_notify ( struct net_device *netdev, void *priv ) {
 	struct eapol_supplicant *supplicant = priv;
 
 	/* Ignore non-EAPoL devices */
 	if ( ! supplicant->eap.netdev )
 		return;
 
-	/* Update supplicant state */
-	eapol_update ( supplicant, 0 );
+	/* Terminate and reset EAP when link goes down */
+	if ( ! ( netdev_is_open ( netdev ) && netdev_link_ok ( netdev ) ) ) {
+		if ( timer_running ( &supplicant->timer ) ) {
+			DBGC ( netdev, "EAPOL %s shutting down\n",
+			       netdev->name );
+		}
+		supplicant->eap.flags = 0;
+		stop_timer ( &supplicant->timer );
+		return;
+	}
+
+	/* Do nothing if EAP is already in progress */
+	if ( timer_running ( &supplicant->timer ) )
+		return;
+
+	/* Do nothing if EAP has already finished transmitting */
+	if ( supplicant->eap.flags & EAP_FL_PASSIVE )
+		return;
+
+	/* Otherwise, start sending EAPoL-Start */
+	start_timer_nodelay ( &supplicant->timer );
+	DBGC ( netdev, "EAPOL %s starting up\n", netdev->name );
 }
 
 /** EAPoL driver */

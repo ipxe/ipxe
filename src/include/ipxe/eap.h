@@ -51,7 +51,7 @@ union eap_packet {
 	struct eap_request req;
 };
 
-/** Link block timeout
+/** EAP link block timeout
  *
  * We mark the link as blocked upon receiving a Request-Identity, on
  * the basis that this most likely indicates that the switch will not
@@ -64,12 +64,30 @@ union eap_packet {
  */
 #define EAP_BLOCK_TIMEOUT ( 45 * TICKS_PER_SEC )
 
+/** EAP protocol wait timeout
+ *
+ * In the EAP model, the supplicant is a pure responder.  The model
+ * also defines no acknowledgement response for the final Success or
+ * Failure "requests".  This leaves open the possibility that the
+ * final Success or Failure packet is lost, with the supplicant having
+ * no way to determine the final authentication status.
+ *
+ * Sideband mechanisms such as EAPoL-Start may be used to restart the
+ * entire EAP process, as a (crude) workaround for this protocol flaw.
+ * When expecting to receive a further EAP request (e.g. an
+ * authentication challenge), we may wait for some length of time
+ * before triggering this restart.  Choose a duration that is shorter
+ * than the link block timeout, so that there is no period during
+ * which we erroneously leave the link marked as not blocked.
+ */
+#define EAP_WAIT_TIMEOUT ( EAP_BLOCK_TIMEOUT * 7 / 8 )
+
 /** An EAP supplicant */
 struct eap_supplicant {
 	/** Network device */
 	struct net_device *netdev;
-	/** Authentication outcome is final */
-	int done;
+	/** Flags */
+	unsigned int flags;
 	/**
 	 * Transmit EAP response
 	 *
@@ -81,6 +99,23 @@ struct eap_supplicant {
 	int ( * tx ) ( struct eap_supplicant *supplicant,
 		       const void *data, size_t len );
 };
+
+/** EAP authentication is in progress
+ *
+ * This indicates that we have received an EAP Request-Identity, but
+ * have not yet received a final EAP Success or EAP Failure.
+ */
+#define EAP_FL_ONGOING 0x0001
+
+/** EAP supplicant is passive
+ *
+ * This indicates that the supplicant should not transmit any futher
+ * unsolicited packets (e.g. EAPoL-Start for a supplicant running over
+ * EAPoL).  This could be because authentication has already
+ * completed, or because we are relying upon MAC Authentication Bypass
+ * (MAB) which may have a very long timeout.
+ */
+#define EAP_FL_PASSIVE 0x0002
 
 extern int eap_rx ( struct eap_supplicant *supplicant,
 		    const void *data, size_t len );

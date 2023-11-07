@@ -47,6 +47,14 @@ static int eap_rx_request_identity ( struct eap_supplicant *supplicant ) {
 	       netdev->name );
 	netdev_link_block ( netdev, EAP_BLOCK_TIMEOUT );
 
+	/* Mark EAP as in progress */
+	supplicant->flags |= EAP_FL_ONGOING;
+
+	/* We have no identity to offer, so wait until the switch
+	 * times out and switches to MAC Authentication Bypass (MAB).
+	 */
+	supplicant->flags |= EAP_FL_PASSIVE;
+
 	return 0;
 }
 
@@ -68,9 +76,6 @@ static int eap_rx_request ( struct eap_supplicant *supplicant,
 		DBGC_HDA ( netdev, 0, req, len );
 		return -EINVAL;
 	}
-
-	/* Mark authentication as incomplete */
-	supplicant->done = 0;
 
 	/* Handle according to type */
 	switch ( req->type ) {
@@ -94,7 +99,7 @@ static int eap_rx_success ( struct eap_supplicant *supplicant ) {
 	struct net_device *netdev = supplicant->netdev;
 
 	/* Mark authentication as complete */
-	supplicant->done = 1;
+	supplicant->flags = EAP_FL_PASSIVE;
 
 	/* Mark link as unblocked */
 	DBGC ( netdev, "EAP %s Success\n", netdev->name );
@@ -113,7 +118,7 @@ static int eap_rx_failure ( struct eap_supplicant *supplicant ) {
 	struct net_device *netdev = supplicant->netdev;
 
 	/* Mark authentication as complete */
-	supplicant->done = 1;
+	supplicant->flags = EAP_FL_PASSIVE;
 
 	/* Record error */
 	DBGC ( netdev, "EAP %s Failure\n", netdev->name );
