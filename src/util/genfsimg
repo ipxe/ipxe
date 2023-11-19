@@ -269,6 +269,7 @@ if [ -n "${FATIMG}" ] ; then
 	FATSIZE=$(( FATCYLS * 504 ))
 	FATARGS="-s 63 -h 16 -t ${FATCYLS}"
     fi
+    FATARGS="${FATARGS} -N 0x$(sha1sum "${FATDIR}"/* | cut -c 1-40 | sha1sum | cut -c 1-8)"
     truncate -s "${FATSIZE}K" "${FATIMG}"
     mformat -v iPXE -i "${FATIMG}" ${FATARGS} ::
     mcopy -i "${FATIMG}" -s "${FATDIR}"/* ::
