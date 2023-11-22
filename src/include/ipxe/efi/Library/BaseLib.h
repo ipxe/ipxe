@@ -184,6 +184,11 @@ RiscVSetSupervisorAddressTranslationRegister (
   );
 
 UINT64
+RiscVGetSupervisorAddressTranslationRegister (
+  VOID
+  );
+
+UINT64
 RiscVReadTimer (
   VOID
   );
