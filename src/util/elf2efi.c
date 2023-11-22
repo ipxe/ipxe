@@ -215,6 +215,7 @@ static struct pe_header efi_pe_header = {
 					     DataDirectory[0] ) ) ),
 			.Characteristics = ( EFI_IMAGE_FILE_DLL |
 					     EFI_IMAGE_FILE_MACHINE |
+					     EFI_IMAGE_FILE_LARGE_ADDRESS_AWARE|
 					     EFI_IMAGE_FILE_EXECUTABLE_IMAGE ),
 		},
 		.OptionalHeader = {
