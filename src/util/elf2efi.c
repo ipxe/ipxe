@@ -50,6 +50,7 @@
 #define EFI_IMAGE_FILE_MACHINE		EFI_IMAGE_FILE_32BIT_MACHINE
 #define ELFCLASS   ELFCLASS32
 #define Elf_Ehdr   Elf32_Ehdr
+#define Elf_Phdr   Elf32_Phdr
 #define Elf_Shdr   Elf32_Shdr
 #define Elf_Sym    Elf32_Sym
 #define Elf_Addr   Elf32_Addr
@@ -65,6 +66,7 @@
 #define EFI_IMAGE_FILE_MACHINE		0
 #define ELFCLASS   ELFCLASS64
 #define Elf_Ehdr   Elf64_Ehdr
+#define Elf_Phdr   Elf64_Phdr
 #define Elf_Shdr   Elf64_Shdr
 #define Elf_Sym    Elf64_Sym
 #define Elf_Addr   Elf64_Addr
@@ -167,6 +169,9 @@
  * enforce section attributes at runtime.
  */
 #define EFI_IMAGE_ALIGN 0x1000
+
+/** Set PointerToRawData automatically */
+#define PTRD_AUTO 0xffffffffUL
 
 /** Number of data directory entries */
 #define NUMBER_OF_DIRECTORY_ENTRIES 8
@@ -429,6 +434,14 @@ static void read_elf_file ( const char *name, struct elf_file *elf ) {
 	}
 	elf->ehdr = ehdr;
 
+	/* Check program headers */
+	if ( ( elf->len < ehdr->e_phoff ) ||
+	     ( ( elf->len - ehdr->e_phoff ) < ( ehdr->e_phnum *
+						ehdr->e_phentsize ) ) ) {
+		eprintf ( "ELF program headers outside file in %s\n", name );
+		exit ( 1 );
+	}
+
 	/* Check section headers */
 	for ( i = 0 ; i < ehdr->e_shnum ; i++ ) {
 		offset = ( ehdr->e_shoff + ( i * ehdr->e_shentsize ) );
@@ -499,6 +512,39 @@ static const char * elf_string ( struct elf_file *elf, unsigned int section,
 }
 
 /**
+ * Get section load memory address
+ *
+ * @v elf		ELF file
+ * @v shdr		ELF section header
+ * @v name		ELF section name
+ * @ret lma		Load memory address
+ */
+static unsigned long elf_lma ( struct elf_file *elf, const Elf_Shdr *shdr,
+			       const char *name ) {
+	const Elf_Ehdr *ehdr = elf->ehdr;
+	const Elf_Phdr *phdr;
+	size_t offset;
+	unsigned int i;
+
+	/* Find containing segment */
+	for ( i = 0 ; i < ehdr->e_phnum ; i++ ) {
+		offset = ( ehdr->e_phoff + ( i * ehdr->e_phentsize ) );
+		phdr = ( elf->data + offset );
+		if ( ( phdr->p_type == PT_LOAD ) &&
+		     ( phdr->p_vaddr <= shdr->sh_addr ) &&
+		     ( ( shdr->sh_addr - phdr->p_vaddr + shdr->sh_size ) <=
+		       phdr->p_memsz ) ) {
+			/* Found matching segment */
+			return ( phdr->p_paddr +
+				 ( shdr->sh_addr - phdr->p_vaddr ) );
+		}
+	}
+
+	eprintf ( "No containing segment for section %s\n", name );
+	exit ( 1 );
+}
+
+/**
  * Set machine architecture
  *
  * @v elf		ELF file
@@ -540,11 +586,13 @@ static void set_machine ( struct elf_file *elf, struct pe_header *pe_header ) {
  * @v elf		ELF file
  * @v shdr		ELF section header
  * @v pe_header		PE file header
+ * @v opts		Options
  * @ret new		New PE section
  */
 static struct pe_section * process_section ( struct elf_file *elf,
 					     const Elf_Shdr *shdr,
-					     struct pe_header *pe_header ) {
+					     struct pe_header *pe_header,
+					     struct options *opts ) {
 	struct pe_section *new;
 	const char *name;
 	size_t name_len;
@@ -591,6 +639,13 @@ static struct pe_section * process_section ( struct elf_file *elf,
 	new->hdr.Misc.VirtualSize = section_memsz;
 	new->hdr.VirtualAddress = shdr->sh_addr;
 	new->hdr.SizeOfRawData = section_filesz;
+	if ( shdr->sh_type == SHT_PROGBITS ) {
+		if ( opts->hybrid ) {
+			new->hdr.PointerToRawData = elf_lma ( elf, shdr, name );
+		} else {
+			new->hdr.PointerToRawData = PTRD_AUTO;
+		}
+	}
 
 	/* Fill in section characteristics and update RVA limits */
 	if ( ( shdr->sh_type == SHT_PROGBITS ) &&
@@ -835,6 +890,7 @@ create_reloc_section ( struct pe_header *pe_header,
 	reloc->hdr.Misc.VirtualSize = section_memsz;
 	reloc->hdr.VirtualAddress = pe_header->nt.OptionalHeader.SizeOfImage;
 	reloc->hdr.SizeOfRawData = section_filesz;
+	reloc->hdr.PointerToRawData = PTRD_AUTO;
 	reloc->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
 				       EFI_IMAGE_SCN_MEM_DISCARDABLE |
 				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
@@ -901,6 +957,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	debug->hdr.Misc.VirtualSize = section_memsz;
 	debug->hdr.VirtualAddress = pe_header->nt.OptionalHeader.SizeOfImage;
 	debug->hdr.SizeOfRawData = section_filesz;
+	debug->hdr.PointerToRawData = PTRD_AUTO;
 	debug->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
 				       EFI_IMAGE_SCN_MEM_DISCARDABLE |
 				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
@@ -944,19 +1001,25 @@ static void write_pe_file ( struct pe_header *pe_header,
 			    FILE *pe ) {
 	struct pe_section *section;
 	unsigned long fpos = 0;
+	unsigned long fposmax = 0;
 	unsigned int count = 0;
 
 	/* Align length of headers */
-	fpos = pe_header->nt.OptionalHeader.SizeOfHeaders =
+	fpos = fposmax = pe_header->nt.OptionalHeader.SizeOfHeaders =
 		efi_file_align ( pe_header->nt.OptionalHeader.SizeOfHeaders );
 
 	/* Assign raw data pointers */
 	for ( section = pe_sections ; section ; section = section->next ) {
-		if ( section->hdr.SizeOfRawData ) {
-			section->hdr.PointerToRawData = fpos;
-			fpos += section->hdr.SizeOfRawData;
-			fpos = efi_file_align ( fpos );
+		if ( section->hdr.PointerToRawData == PTRD_AUTO ) {
+			fpos = fposmax;
+		} else {
+			fpos = section->hdr.PointerToRawData;
 		}
+		section->hdr.PointerToRawData = fpos;
+		fpos += section->hdr.SizeOfRawData;
+		fpos = efi_file_align ( fpos );
+		if ( fpos > fposmax )
+			fposmax = fpos;
 		if ( section->fixup )
 			section->fixup ( section );
 	}
@@ -985,6 +1048,12 @@ static void write_pe_file ( struct pe_header *pe_header,
 
 	/* Write sections */
 	for ( section = pe_sections ; section ; section = section->next ) {
+		if ( section->hdr.PointerToRawData & ( EFI_FILE_ALIGN - 1 ) ) {
+			eprintf ( "Section %.8s file offset %x is "
+				  "misaligned\n", section->hdr.Name,
+				  section->hdr.PointerToRawData );
+			exit ( 1 );
+		}
 		if ( fseek ( pe, section->hdr.PointerToRawData,
 			     SEEK_SET ) != 0 ) {
 			eprintf ( "Could not seek to %x: %s\n",
@@ -1044,7 +1113,8 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 
 			/* Create output section */
 			*(next_pe_section) = process_section ( &elf, shdr,
-							       &pe_header );
+							       &pe_header,
+							       opts );
 			next_pe_section = &(*next_pe_section)->next;
 
 		} else if ( shdr->sh_type == SHT_REL ) {
