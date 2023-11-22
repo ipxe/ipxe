@@ -225,6 +225,8 @@ static struct pe_header efi_pe_header = {
 			.FileAlignment = EFI_FILE_ALIGN,
 			.SizeOfImage = EFI_IMAGE_ALIGN,
 			.SizeOfHeaders = sizeof ( efi_pe_header ),
+			.DllCharacteristics =
+				IMAGE_DLLCHARACTERISTICS_NX_COMPAT,
 			.NumberOfRvaAndSizes = NUMBER_OF_DIRECTORY_ENTRIES,
 		},
 	},
