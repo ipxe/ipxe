@@ -185,7 +185,6 @@ struct elf_file {
 struct pe_section {
 	struct pe_section *next;
 	EFI_IMAGE_SECTION_HEADER hdr;
-	void ( * fixup ) ( struct pe_section *section );
 	int hidden;
 	uint8_t contents[0];
 };
@@ -920,20 +919,6 @@ create_reloc_section ( struct pe_header *pe_header,
 }
 
 /**
- * Fix up debug section
- *
- * @v debug		Debug section
- */
-static void fixup_debug_section ( struct pe_section *debug ) {
-	EFI_IMAGE_DEBUG_DIRECTORY_ENTRY *contents;
-
-	/* Fix up FileOffset */
-	contents = ( ( void * ) debug->contents );
-	contents->FileOffset += ( debug->hdr.PointerToRawData -
-				  debug->hdr.VirtualAddress );
-}
-
-/**
  * Create debug section
  *
  * @v pe_header		PE file header
@@ -952,24 +937,27 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	} *contents;
 
 	/* Allocate PE section */
-	section_memsz = sizeof ( *contents );
-	section_filesz = efi_file_align ( section_memsz );
+	section_filesz = section_memsz = sizeof ( *contents );
 	debug = xmalloc ( sizeof ( *debug ) + section_filesz );
 	memset ( debug, 0, sizeof ( *debug ) + section_filesz );
 	contents = ( void * ) debug->contents;
+
+	/* Place at end of headers */
+	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( *contents );
+	pe_header->nt.OptionalHeader.SizeOfHeaders =
+		efi_file_align ( pe_header->nt.OptionalHeader.SizeOfHeaders );
+	pe_header->nt.OptionalHeader.SizeOfHeaders -= sizeof ( *contents );
 
 	/* Fill in section header details */
 	strncpy ( ( char * ) debug->hdr.Name, ".debug",
 		  sizeof ( debug->hdr.Name ) );
 	debug->hdr.Misc.VirtualSize = section_memsz;
-	debug->hdr.VirtualAddress = pe_header->nt.OptionalHeader.SizeOfImage;
+	debug->hdr.VirtualAddress =
+		pe_header->nt.OptionalHeader.SizeOfHeaders;
 	debug->hdr.SizeOfRawData = section_filesz;
-	debug->hdr.PointerToRawData = PTRD_AUTO;
-	debug->hdr.Characteristics = ( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
-				       EFI_IMAGE_SCN_MEM_DISCARDABLE |
-				       EFI_IMAGE_SCN_MEM_NOT_PAGED |
-				       EFI_IMAGE_SCN_MEM_READ );
-	debug->fixup = fixup_debug_section;
+	debug->hdr.PointerToRawData =
+		pe_header->nt.OptionalHeader.SizeOfHeaders;
+	debug->hidden = 1;
 
 	/* Create section contents */
 	contents->debug.TimeDateStamp = 0x10d1a884;
@@ -984,10 +972,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 		   filename );
 
 	/* Update file header details */
-	pe_header->nt.FileHeader.NumberOfSections++;
-	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( debug->hdr );
-	pe_header->nt.OptionalHeader.SizeOfImage +=
-		efi_image_align ( section_memsz );
+	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( *contents );
 	debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
 		     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
 	debugdir->VirtualAddress = debug->hdr.VirtualAddress;
@@ -1027,13 +1012,12 @@ static void write_pe_file ( struct pe_header *pe_header,
 		fpos = efi_file_align ( fpos );
 		if ( fpos > fposmax )
 			fposmax = fpos;
-		if ( section->fixup )
-			section->fixup ( section );
 	}
 
 	/* Write sections */
 	for ( section = pe_sections ; section ; section = section->next ) {
-		if ( section->hdr.PointerToRawData & ( EFI_FILE_ALIGN - 1 ) ) {
+		if ( ( section->hdr.PointerToRawData & ( EFI_FILE_ALIGN - 1 ) )
+		     && ( ! section->hidden ) ) {
 			eprintf ( "Section %.8s file offset %x is "
 				  "misaligned\n", section->hdr.Name,
 				  section->hdr.PointerToRawData );
