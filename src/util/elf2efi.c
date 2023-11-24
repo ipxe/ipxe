@@ -653,6 +653,12 @@ static struct pe_section * process_section ( struct elf_file *elf,
 		}
 	}
 
+	/* Treat 16-bit sections as hidden in hybrid binaries */
+	if ( opts->hybrid && ( strlen ( name ) > 2 ) &&
+	     ( strcmp ( &name[ strlen ( name ) - 2 ], "16" ) == 0 ) ) {
+		new->hidden = 1;
+	}
+
 	/* Fill in section characteristics and update RVA limits */
 	if ( ( shdr->sh_type == SHT_PROGBITS ) &&
 	     ( shdr->sh_flags & SHF_WRITE ) ) {
