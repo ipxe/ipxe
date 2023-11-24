@@ -602,31 +602,29 @@ static struct pe_section * process_section ( struct elf_file *elf,
 	size_t name_len;
 	size_t section_memsz;
 	size_t section_filesz;
-	unsigned long code_start;
-	unsigned long code_end;
-	unsigned long data_start;
-	unsigned long data_mid;
-	unsigned long data_end;
-	unsigned long start;
-	unsigned long end;
-	unsigned long *applicable_start;
-	unsigned long *applicable_end;
+	uint32_t start;
+	uint32_t end;
+	uint32_t *code_start;
+	uint32_t *data_start;
+	uint32_t *code_size;
+	uint32_t *data_size;
+	uint32_t *bss_size;
+	uint32_t *applicable_start;
+	uint32_t *applicable_size;
 
 	/* Get section name */
 	name = elf_string ( elf, elf->ehdr->e_shstrndx, shdr->sh_name );
 
-	/* Extract current RVA limits from file header */
-	code_start = pe_header->nt.OptionalHeader.BaseOfCode;
-	code_end = ( code_start + pe_header->nt.OptionalHeader.SizeOfCode );
+	/* Identify start and size limit fields from file header */
+	code_start = &pe_header->nt.OptionalHeader.BaseOfCode;
+	code_size = &pe_header->nt.OptionalHeader.SizeOfCode;
 #if defined(EFI_TARGET32)
-	data_start = pe_header->nt.OptionalHeader.BaseOfData;
+	data_start = &pe_header->nt.OptionalHeader.BaseOfData;
 #elif defined(EFI_TARGET64)
-	data_start = code_end;
+	data_start = NULL;
 #endif
-	data_mid = ( data_start +
-		     pe_header->nt.OptionalHeader.SizeOfInitializedData );
-	data_end = ( data_mid +
-		     pe_header->nt.OptionalHeader.SizeOfUninitializedData );
+	data_size = &pe_header->nt.OptionalHeader.SizeOfInitializedData;
+	bss_size = &pe_header->nt.OptionalHeader.SizeOfUninitializedData;
 
 	/* Allocate PE section */
 	section_memsz = shdr->sh_size;
@@ -659,7 +657,7 @@ static struct pe_section * process_section ( struct elf_file *elf,
 		new->hidden = 1;
 	}
 
-	/* Fill in section characteristics and update RVA limits */
+	/* Fill in section characteristics and identify applicable limits */
 	if ( ( shdr->sh_type == SHT_PROGBITS ) &&
 	     ( shdr->sh_flags & SHF_WRITE ) ) {
 		/* .data-type section */
@@ -668,8 +666,8 @@ static struct pe_section * process_section ( struct elf_file *elf,
 			  EFI_IMAGE_SCN_MEM_NOT_PAGED |
 			  EFI_IMAGE_SCN_MEM_READ |
 			  EFI_IMAGE_SCN_MEM_WRITE );
-		applicable_start = &data_start;
-		applicable_end = &data_mid;
+		applicable_start = data_start;
+		applicable_size = data_size;
 	} else if ( ( shdr->sh_type == SHT_PROGBITS ) &&
 		    ( shdr->sh_flags & SHF_EXECINSTR ) ) {
 		/* .text-type section */
@@ -678,16 +676,16 @@ static struct pe_section * process_section ( struct elf_file *elf,
 			  EFI_IMAGE_SCN_MEM_NOT_PAGED |
 			  EFI_IMAGE_SCN_MEM_EXECUTE |
 			  EFI_IMAGE_SCN_MEM_READ );
-		applicable_start = &code_start;
-		applicable_end = &code_end;
+		applicable_start = code_start;
+		applicable_size = code_size;
 	} else if ( shdr->sh_type == SHT_PROGBITS ) {
 		/* .rodata-type section */
 		new->hdr.Characteristics =
 			( EFI_IMAGE_SCN_CNT_INITIALIZED_DATA |
 			  EFI_IMAGE_SCN_MEM_NOT_PAGED |
 			  EFI_IMAGE_SCN_MEM_READ );
-		applicable_start = &data_start;
-		applicable_end = &data_mid;
+		applicable_start = data_start;
+		applicable_size = data_size;
 	} else if ( shdr->sh_type == SHT_NOBITS ) {
 		/* .bss-type section */
 		new->hdr.Characteristics =
@@ -695,8 +693,8 @@ static struct pe_section * process_section ( struct elf_file *elf,
 			  EFI_IMAGE_SCN_MEM_NOT_PAGED |
 			  EFI_IMAGE_SCN_MEM_READ |
 			  EFI_IMAGE_SCN_MEM_WRITE );
-		applicable_start = &data_mid;
-		applicable_end = &data_end;
+		applicable_start = data_start;
+		applicable_size = bss_size;
 	} else {
 		eprintf ( "Unrecognised characteristics for section %s\n",
 			  name );
@@ -709,41 +707,24 @@ static struct pe_section * process_section ( struct elf_file *elf,
 			 shdr->sh_size );
 	}
 
-	/* Update RVA limits */
+	/* Update file header fields */
 	start = new->hdr.VirtualAddress;
-	end = ( start + new->hdr.Misc.VirtualSize );
-	if ( ! new->hidden ) {
-		if ( ( ! *applicable_start ) || ( *applicable_start >= start ) )
-			*applicable_start = start;
-		if ( *applicable_end < end )
-			*applicable_end = end;
-	}
-	if ( data_start < code_end )
-		data_start = code_end;
-	if ( data_mid < data_start )
-		data_mid = data_start;
-	if ( data_end < data_mid )
-		data_end = data_mid;
-
-	/* Write RVA limits back to file header */
-	pe_header->nt.OptionalHeader.BaseOfCode = code_start;
-	pe_header->nt.OptionalHeader.SizeOfCode = ( code_end - code_start );
-#if defined(EFI_TARGET32)
-	pe_header->nt.OptionalHeader.BaseOfData = data_start;
-#endif
-	pe_header->nt.OptionalHeader.SizeOfInitializedData =
-		( data_mid - data_start );
-	pe_header->nt.OptionalHeader.SizeOfUninitializedData =
-		( data_end - data_mid );
-
-	/* Update remaining file header fields */
 	if ( ! new->hidden ) {
 		pe_header->nt.FileHeader.NumberOfSections++;
 		pe_header->nt.OptionalHeader.SizeOfHeaders +=
 			sizeof ( new->hdr );
+		if ( applicable_start && ( ( *applicable_start == 0 ) ||
+					   ( start < *applicable_start ) ) ) {
+			*applicable_start = start;
+		}
+		if ( applicable_size ) {
+			*applicable_size += section_memsz;
+		}
 	}
-	pe_header->nt.OptionalHeader.SizeOfImage =
-		efi_image_align ( data_end );
+	end = efi_image_align ( start + section_memsz );
+	if ( end > pe_header->nt.OptionalHeader.SizeOfImage ) {
+		pe_header->nt.OptionalHeader.SizeOfImage = end;
+	}
 
 	return new;
 }
