@@ -730,6 +730,47 @@ static struct pe_section * process_section ( struct elf_file *elf,
 }
 
 /**
+ * Update image base address
+ *
+ * @v pe_header		PE file header
+ * @v pe_sections	List of PE sections
+ * @v pe_reltab		PE relocation table
+ */
+static void update_image_base ( struct pe_header *pe_header,
+				struct pe_section *pe_sections,
+				struct pe_relocs *pe_reltab ) {
+	struct pe_section *section;
+	struct pe_relocs *pe_rel;
+	unsigned long base = -1UL;
+
+	/* Set ImageBase to the highest possible value, leaving space
+	 * for the PE header itself.
+	 */
+	for ( section = pe_sections ; section ; section = section->next ) {
+		if ( ! section->hidden ) {
+			if ( base > section->hdr.VirtualAddress )
+				base = section->hdr.VirtualAddress;
+		}
+	}
+	base -= EFI_IMAGE_ALIGN;
+	pe_header->nt.OptionalHeader.ImageBase = base;
+
+	/* Adjust RVAs to match ImageBase */
+	pe_header->nt.OptionalHeader.AddressOfEntryPoint -= base;
+	pe_header->nt.OptionalHeader.BaseOfCode -= base;
+#if defined(EFI_TARGET32)
+	pe_header->nt.OptionalHeader.BaseOfData -= base;
+#endif
+	pe_header->nt.OptionalHeader.SizeOfImage -= base;
+	for ( section = pe_sections ; section ; section = section->next ) {
+		section->hdr.VirtualAddress -= base;
+	}
+	for ( pe_rel = pe_reltab ; pe_rel ; pe_rel = pe_rel->next ) {
+		pe_rel->start_rva -= base;
+	}
+}
+
+/**
  * Process relocation record
  *
  * @v elf		ELF file
@@ -1112,6 +1153,9 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 					 &pe_reltab, opts );
 		}
 	}
+
+	/* Update image base address */
+	update_image_base ( &pe_header, pe_sections, pe_reltab );
 
 	/* Create the .reloc section */
 	*(next_pe_section) = create_reloc_section ( &pe_header, pe_reltab );
