@@ -1020,13 +1020,34 @@ static void write_pe_file ( struct pe_header *pe_header,
 			    struct pe_section *pe_sections,
 			    FILE *pe ) {
 	struct pe_section *section;
-	unsigned long fpos = 0;
-	unsigned long fposmax = 0;
+	unsigned long hdrmax;
+	unsigned long fpos;
+	unsigned long fposmax;
 	unsigned int count = 0;
+
+	/* Extend header length to reach first explicitly placed section */
+	hdrmax = -1UL;
+	for ( section = pe_sections ; section ; section = section->next ) {
+		if ( ( section->hdr.PointerToRawData != PTRD_AUTO ) &&
+		     ( section->hdr.SizeOfRawData > 0 ) &&
+		     ( ! section->hidden ) &&
+		     ( hdrmax > section->hdr.PointerToRawData ) ) {
+			hdrmax = section->hdr.PointerToRawData;
+		}
+	}
+	if ( ( hdrmax != -1UL ) &&
+	     ( pe_header->nt.OptionalHeader.SizeOfHeaders < hdrmax ) ) {
+		pe_header->nt.OptionalHeader.SizeOfHeaders = hdrmax;
+	}
 
 	/* Align length of headers */
 	fpos = fposmax = pe_header->nt.OptionalHeader.SizeOfHeaders =
 		efi_file_align ( pe_header->nt.OptionalHeader.SizeOfHeaders );
+	if ( fpos > hdrmax ) {
+		eprintf ( "Cannot fit %lx bytes of headers before section at "
+			  "file offset %lx\n", fpos, hdrmax );
+		exit ( 1 );
+	}
 
 	/* Assign raw data pointers */
 	for ( section = pe_sections ; section ; section = section->next ) {
