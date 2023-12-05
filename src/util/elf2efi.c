@@ -961,7 +961,7 @@ create_debug_section ( struct pe_header *pe_header, const char *filename ) {
 	struct {
 		EFI_IMAGE_DEBUG_DIRECTORY_ENTRY debug;
 		EFI_IMAGE_DEBUG_CODEVIEW_RSDS_ENTRY rsds;
-		char name[ strlen ( filename ) + 1 ];
+		char name[32];
 	} *contents;
 
 	/* Allocate PE section */
