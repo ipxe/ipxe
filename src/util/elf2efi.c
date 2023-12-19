@@ -440,8 +440,8 @@ static void read_elf_file ( const char *name, struct elf_file *elf ) {
 
 	/* Check program headers */
 	if ( ( elf->len < ehdr->e_phoff ) ||
-	     ( ( elf->len - ehdr->e_phoff ) < ( ehdr->e_phnum *
-						ehdr->e_phentsize ) ) ) {
+	     ( ( elf->len - ehdr->e_phoff ) <
+	       ( ( ( unsigned int ) ehdr->e_phnum ) * ehdr->e_phentsize ) ) ) {
 		eprintf ( "ELF program headers outside file in %s\n", name );
 		exit ( 1 );
 	}
