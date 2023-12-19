@@ -269,6 +269,10 @@ if [ -n "${FATIMG}" ] ; then
 	FATSIZE=$(( FATCYLS * 504 ))
 	FATARGS="-s 63 -h 16 -t ${FATCYLS}"
     fi
+    if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+	FATSERIAL=$(( SOURCE_DATE_EPOCH % 100000000 ))
+	FATARGS="${FATARGS} -N ${FATSERIAL}"
+    fi
     truncate -s "${FATSIZE}K" "${FATIMG}"
     mformat -v iPXE -i "${FATIMG}" ${FATARGS} ::
     mcopy -i "${FATIMG}" -s "${FATDIR}"/* ::
