@@ -7,12 +7,13 @@ set dhcp6.user-class einebox
 set idx:int32 0
 
 :loop
-isset ${net${idx}/mac} || exit 0
+isset ${net${idx}/mac} || goto failed
 iseq ${net${idx}/ll-protocol} IPoIB && goto try_next ||
 autoboot net${idx} ||
 :try_next
 inc idx && goto loop
 
+:failed
 echo Autoconfiguration has failed...
 
 prompt --key 0x02 --timeout 5000 Press Ctrl-B for the iPXE command line... && shell ||
