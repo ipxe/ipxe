@@ -227,6 +227,8 @@ struct smbios {
 extern int find_smbios ( struct smbios *smbios );
 extern int find_smbios_entry ( userptr_t start, size_t len,
 			       struct smbios_entry *entry );
+extern int find_smbios3_entry ( userptr_t start, size_t len,
+				struct smbios3_entry *entry );
 extern int find_smbios_structure ( unsigned int type, unsigned int instance,
 				   struct smbios_structure *structure );
 extern int read_smbios_structure ( struct smbios_structure *structure,
