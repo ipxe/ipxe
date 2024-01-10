@@ -49,6 +49,17 @@ struct eap_message {
 /** EAP NAK */
 #define EAP_TYPE_NAK 3
 
+/** EAP MD5 challenge request/response */
+#define EAP_TYPE_MD5 4
+
+/** EAP MD5 challenge request/response type data */
+struct eap_md5 {
+	/** Value length */
+	uint8_t len;
+	/** Value */
+	uint8_t value[0];
+} __attribute__ (( packed ));
+
 /** EAP success */
 #define EAP_CODE_SUCCESS 3
 
