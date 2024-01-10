@@ -149,6 +149,9 @@ int eap_rx ( struct eap_supplicant *supplicant, const void *data,
 	switch ( eap->hdr.code ) {
 	case EAP_CODE_REQUEST:
 		return eap_rx_request ( supplicant, &eap->req, len );
+	case EAP_CODE_RESPONSE:
+		DBGC2 ( netdev, "EAP %s ignoring response\n", netdev->name );
+		return 0;
 	case EAP_CODE_SUCCESS:
 		return eap_rx_success ( supplicant );
 	case EAP_CODE_FAILURE:

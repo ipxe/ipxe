@@ -26,6 +26,9 @@ struct eap_header {
 /** EAP request */
 #define EAP_CODE_REQUEST 1
 
+/** EAP response */
+#define EAP_CODE_RESPONSE 2
+
 /** EAP request */
 struct eap_request {
 	/** Header */
