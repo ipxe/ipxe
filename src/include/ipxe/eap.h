@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/timer.h>
+#include <ipxe/tables.h>
 
 /** EAP header */
 struct eap_header {
@@ -29,16 +30,24 @@ struct eap_header {
 /** EAP response */
 #define EAP_CODE_RESPONSE 2
 
-/** EAP request */
-struct eap_request {
+/** EAP request/response message */
+struct eap_message {
 	/** Header */
 	struct eap_header hdr;
 	/** Type */
 	uint8_t type;
+	/** Type data */
+	uint8_t data[0];
 } __attribute__ (( packed ));
+
+/** EAP "no available types" marker */
+#define EAP_TYPE_NONE 0
 
 /** EAP identity */
 #define EAP_TYPE_IDENTITY 1
+
+/** EAP NAK */
+#define EAP_TYPE_NAK 3
 
 /** EAP success */
 #define EAP_CODE_SUCCESS 3
@@ -50,8 +59,8 @@ struct eap_request {
 union eap_packet {
 	/** Header */
 	struct eap_header hdr;
-	/** Request */
-	struct eap_request req;
+	/** Request/response message */
+	struct eap_message msg;
 };
 
 /** EAP link block timeout
@@ -90,7 +99,11 @@ struct eap_supplicant {
 	/** Network device */
 	struct net_device *netdev;
 	/** Flags */
-	unsigned int flags;
+	uint16_t flags;
+	/** ID for current request/response */
+	uint8_t id;
+	/** Type for current request/response */
+	uint8_t type;
 	/**
 	 * Transmit EAP response
 	 *
@@ -119,6 +132,28 @@ struct eap_supplicant {
  * (MAB) which may have a very long timeout.
  */
 #define EAP_FL_PASSIVE 0x0002
+
+/** An EAP method */
+struct eap_method {
+	/** Type */
+	uint8_t type;
+	/**
+	 * Handle EAP request
+	 *
+	 * @v supplicant	EAP supplicant
+	 * @v req		Request type data
+	 * @v req_len		Length of request type data
+	 * @ret rc		Return status code
+	 */
+	int ( * rx ) ( struct eap_supplicant *supplicant,
+		       const void *req, size_t req_len );
+};
+
+/** EAP method table */
+#define EAP_METHODS __table ( struct eap_method, "eap_methods" )
+
+/** Declare an EAP method */
+#define __eap_method __table_entry ( EAP_METHODS, 01 )
 
 extern int eap_rx ( struct eap_supplicant *supplicant,
 		    const void *data, size_t len );
