@@ -32,7 +32,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define BOCHSBP xchgw %bx, %bx
 
 	.section ".note.GNU-stack", "", @progbits
-	.text
 	.arch i386
 	.section ".text16", "awx", @progbits
 	.code16
