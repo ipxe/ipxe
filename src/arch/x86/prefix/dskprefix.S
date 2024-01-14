@@ -26,9 +26,9 @@ FILE_LICENCE ( GPL2_ONLY )
 
 	.section ".note.GNU-stack", "", @progbits
 	.org	0
+	.code16
 	.arch i386
 	.section ".prefix", "ax", @progbits
-	.code16
 	.globl	_dsk_start
 _dsk_start:
 

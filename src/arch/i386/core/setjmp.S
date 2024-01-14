@@ -2,8 +2,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 	.section ".note.GNU-stack", "", @progbits
 	.text
-	.arch i386
 	.code32
+	.arch i386
 
 	/* Must match jmp_buf structure layout */
 	.struct	0
