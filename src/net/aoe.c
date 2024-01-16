@@ -374,7 +374,7 @@ static void aoecmd_ata_cmd ( struct aoe_command *aoecmd,
 	struct aoeata *aoeata = &aoehdr->payload[0].ata;
 
 	/* Sanity check */
-	linker_assert ( AOE_FL_DEV_HEAD	== ATA_DEV_SLAVE, __fix_ata_h__ );
+	static_assert ( AOE_FL_DEV_HEAD == ATA_DEV_SLAVE );
 	assert ( len == ( sizeof ( *aoehdr ) + sizeof ( *aoeata ) +
 			  command->data_out_len ) );
 

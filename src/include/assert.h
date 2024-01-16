@@ -56,6 +56,15 @@ assert_printf ( const char *fmt, ... ) asm ( "printf" );
 	} while ( 0 )
 
 /**
+ * Assert a condition at build time
+ *
+ * If the compiler cannot prove that the condition is true, the build
+ * will fail with an error message.
+ */
+#undef static_assert
+#define static_assert(x) _Static_assert( x, #x )
+
+/**
  * Assert a condition at link-time.
  *
  * If the condition is not true, the link will fail with an unresolved

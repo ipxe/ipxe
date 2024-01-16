@@ -779,8 +779,8 @@ static int hermon_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
 	union hermonprm_mad mad_ifc;
 	int rc;
 
-	linker_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ),
-			mad_size_mismatch );
+	/* Sanity check */
+	static_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ) );
 
 	/* Copy in request packet */
 	memcpy ( &mad_ifc.mad, mad, sizeof ( mad_ifc.mad ) );
