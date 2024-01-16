@@ -150,15 +150,17 @@ void bigint_shrink_sample ( const bigint_element_t *source0,
 }
 
 void bigint_multiply_sample ( const bigint_element_t *multiplicand0,
+			      unsigned int multiplicand_size,
 			      const bigint_element_t *multiplier0,
-			      bigint_element_t *result0,
-			      unsigned int size ) {
-	const bigint_t ( size ) *multiplicand __attribute__ (( may_alias ))
-		= ( ( const void * ) multiplicand0 );
-	const bigint_t ( size ) *multiplier __attribute__ (( may_alias ))
-		= ( ( const void * ) multiplier0 );
-	bigint_t ( size * 2 ) *result __attribute__ (( may_alias ))
-		= ( ( void * ) result0 );
+			      unsigned int multiplier_size,
+			      bigint_element_t *result0 ) {
+	unsigned int result_size = ( multiplicand_size + multiplier_size );
+	const bigint_t ( multiplicand_size ) __attribute__ (( may_alias ))
+		*multiplicand = ( ( const void * ) multiplicand0 );
+	const bigint_t ( multiplier_size ) __attribute__ (( may_alias ))
+		*multiplier = ( ( const void * ) multiplier0 );
+	bigint_t ( result_size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
 
 	bigint_multiply ( multiplicand, multiplier, result );
 }
@@ -430,17 +432,18 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	static const uint8_t multiplier_raw[] = multiplier;		\
 	static const uint8_t expected_raw[] = expected;			\
 	uint8_t result_raw[ sizeof ( expected_raw ) ];			\
-	unsigned int size =						\
+	unsigned int multiplicand_size =				\
 		bigint_required_size ( sizeof ( multiplicand_raw ) );	\
-	bigint_t ( size ) multiplicand_temp;				\
-	bigint_t ( size ) multiplier_temp;				\
-	bigint_t ( size * 2 ) result_temp;				\
+	unsigned int multiplier_size =					\
+		bigint_required_size ( sizeof ( multiplier_raw ) );	\
+	bigint_t ( multiplicand_size ) multiplicand_temp;		\
+	bigint_t ( multiplier_size ) multiplier_temp;			\
+	bigint_t ( multiplicand_size + multiplier_size ) result_temp;	\
 	{} /* Fix emacs alignment */					\
 									\
-	assert ( bigint_size ( &multiplier_temp ) ==			\
-		 bigint_size ( &multiplicand_temp ) );			\
 	assert ( bigint_size ( &result_temp ) ==			\
-		 ( 2 * bigint_size ( &multiplicand_temp ) ) );		\
+		 ( bigint_size ( &multiplicand_temp ) +			\
+		   bigint_size ( &multiplier_temp ) ) );		\
 	bigint_init ( &multiplicand_temp, multiplicand_raw,		\
 		      sizeof ( multiplicand_raw ) );			\
 	bigint_init ( &multiplier_temp, multiplier_raw,			\
@@ -1373,6 +1376,12 @@ static void bigint_test_exec ( void ) {
 			     BIGINT ( 0x67, 0x3c, 0x5a, 0x16 ),
 			     BIGINT ( 0x3c, 0xdb, 0x7f, 0xae, 0x12, 0x7e,
 				      0xef, 0x16 ) );
+	bigint_multiply_ok ( BIGINT ( 0x39, 0x1f, 0xc8, 0x6a ),
+			     BIGINT ( 0xba, 0x39, 0x4a, 0xb8, 0xac, 0xb3,
+				      0x4f, 0x64, 0x28, 0x46, 0xa6, 0x99 ),
+			     BIGINT ( 0x29, 0x8d, 0xe0, 0x5d, 0x08, 0xea,
+				      0x0d, 0xc7, 0x82, 0x5d, 0xba, 0x96,
+				      0x1c, 0xef, 0x83, 0x5a ) );
 	bigint_multiply_ok ( BIGINT ( 0xe8, 0x08, 0x0b, 0xe9, 0x29, 0x36,
 				      0xea, 0x51, 0x1d, 0x75, 0x1a, 0xd5,
 				      0xba, 0xc6, 0xa0, 0xf3, 0x48, 0x5c,

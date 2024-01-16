@@ -184,10 +184,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v result		Big integer to hold result
  */
 #define bigint_multiply( multiplicand, multiplier, result ) do {	\
-	unsigned int size = bigint_size (multiplicand);			\
+	unsigned int multiplicand_size = bigint_size (multiplicand);	\
+	unsigned int multiplier_size = bigint_size (multiplier);	\
 	bigint_multiply_raw ( (multiplicand)->element,			\
-			      (multiplier)->element, (result)->element,	\
-			      size );					\
+			      multiplicand_size, (multiplier)->element,	\
+			      multiplier_size, (result)->element );	\
 	} while ( 0 )
 
 /**
@@ -283,9 +284,10 @@ void bigint_shrink_raw ( const bigint_element_t *source0,
 			 unsigned int source_size, bigint_element_t *dest0,
 			 unsigned int dest_size );
 void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
+			   unsigned int multiplicand_size,
 			   const bigint_element_t *multiplier0,
-			   bigint_element_t *result0,
-			   unsigned int size );
+			   unsigned int multiplier_size,
+			   bigint_element_t *result0 );
 void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 			       const bigint_element_t *multiplier0,
 			       const bigint_element_t *modulus0,
