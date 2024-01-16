@@ -390,10 +390,9 @@ asn1_built ( struct asn1_builder *builder ) {
 	} *u = container_of ( builder, typeof ( *u ), builder );
 
 	/* Sanity check */
-	linker_assert ( ( ( const void * ) &u->builder.data ) ==
-			&u->cursor.data, asn1_builder_cursor_data_mismatch );
-	linker_assert ( &u->builder.len == &u->cursor.len,
-			asn1_builder_cursor_len_mismatch );
+	build_assert ( ( ( const void * ) &u->builder.data ) ==
+		       &u->cursor.data );
+	build_assert ( &u->builder.len == &u->cursor.len );
 
 	return &u->cursor;
 }

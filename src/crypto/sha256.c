@@ -140,15 +140,15 @@ static void sha256_digest ( struct sha256_context *context ) {
 
 	/* Sanity checks */
 	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-	linker_assert ( &u.ddd.dd.digest.h[0] == a, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[1] == b, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[2] == c, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[3] == d, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[4] == e, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[5] == f, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[6] == g, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[7] == h, sha256_bad_layout );
-	linker_assert ( &u.ddd.dd.data.dword[0] == w, sha256_bad_layout );
+	build_assert ( &u.ddd.dd.digest.h[0] == a );
+	build_assert ( &u.ddd.dd.digest.h[1] == b );
+	build_assert ( &u.ddd.dd.digest.h[2] == c );
+	build_assert ( &u.ddd.dd.digest.h[3] == d );
+	build_assert ( &u.ddd.dd.digest.h[4] == e );
+	build_assert ( &u.ddd.dd.digest.h[5] == f );
+	build_assert ( &u.ddd.dd.digest.h[6] == g );
+	build_assert ( &u.ddd.dd.digest.h[7] == h );
+	build_assert ( &u.ddd.dd.data.dword[0] == w );
 
 	DBGC ( context, "SHA256 digesting:\n" );
 	DBGC_HDA ( context, 0, &context->ddd.dd.digest,

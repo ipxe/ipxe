@@ -472,10 +472,10 @@ void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
 	union gcm_block *check = ( ( void * ) context );
 
 	/* Sanity checks */
-	linker_assert ( &context->hash == check, gcm_bad_layout );
-	linker_assert ( &context->len == check + 1, gcm_bad_layout );
-	linker_assert ( &context->ctr == check + 2, gcm_bad_layout );
-	linker_assert ( &context->key == check + 3, gcm_bad_layout );
+	build_assert ( &context->hash == check );
+	build_assert ( &context->len == check + 1 );
+	build_assert ( &context->ctr == check + 2 );
+	build_assert ( &context->key == check + 3 );
 
 	/* Reset non-key state */
 	memset ( context, 0, offsetof ( typeof ( *context ), key ) );

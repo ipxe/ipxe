@@ -156,15 +156,15 @@ static void sha512_digest ( struct sha512_context *context ) {
 
 	/* Sanity checks */
 	assert ( ( context->len % sizeof ( context->ddq.dd.data ) ) == 0 );
-	linker_assert ( &u.ddq.dd.digest.h[0] == a, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.digest.h[1] == b, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.digest.h[2] == c, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.digest.h[3] == d, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.digest.h[4] == e, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.digest.h[5] == f, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.digest.h[6] == g, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.digest.h[7] == h, sha512_bad_layout );
-	linker_assert ( &u.ddq.dd.data.qword[0] == w, sha512_bad_layout );
+	build_assert ( &u.ddq.dd.digest.h[0] == a );
+	build_assert ( &u.ddq.dd.digest.h[1] == b );
+	build_assert ( &u.ddq.dd.digest.h[2] == c );
+	build_assert ( &u.ddq.dd.digest.h[3] == d );
+	build_assert ( &u.ddq.dd.digest.h[4] == e );
+	build_assert ( &u.ddq.dd.digest.h[5] == f );
+	build_assert ( &u.ddq.dd.digest.h[6] == g );
+	build_assert ( &u.ddq.dd.digest.h[7] == h );
+	build_assert ( &u.ddq.dd.data.qword[0] == w );
 
 	DBGC ( context, "SHA512 digesting:\n" );
 	DBGC_HDA ( context, 0, &context->ddq.dd.digest,
