@@ -149,6 +149,16 @@ void bigint_shrink_sample ( const bigint_element_t *source0,
 	bigint_shrink ( source, dest );
 }
 
+void bigint_copy_sample ( const bigint_element_t *source0,
+			  bigint_element_t *dest0, unsigned int size ) {
+	const bigint_t ( size ) *source __attribute__ (( may_alias ))
+		= ( ( const void * ) source0 );
+	bigint_t ( size ) *dest __attribute__ (( may_alias ))
+		= ( ( void * ) dest0 );
+
+	bigint_copy ( source, dest );
+}
+
 void bigint_multiply_sample ( const bigint_element_t *multiplicand0,
 			      unsigned int multiplicand_size,
 			      const bigint_element_t *multiplier0,

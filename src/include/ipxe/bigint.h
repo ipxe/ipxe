@@ -8,6 +8,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <assert.h>
+
 /**
  * Define a big-integer type
  *
@@ -174,6 +176,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	unsigned int dest_size = bigint_size (dest);			\
 	bigint_shrink_raw ( (source)->element, source_size,		\
 			    (dest)->element, dest_size );		\
+	} while ( 0 )
+
+/**
+ * Copy big integer
+ *
+ * @v source		Source big integer
+ * @v dest		Destination big integer
+ */
+#define bigint_copy( source, dest ) do {				\
+	build_assert ( sizeof ( *(source) ) == sizeof ( *(dest) ) );	\
+	bigint_shrink ( (source), (dest) );				\
 	} while ( 0 )
 
 /**
