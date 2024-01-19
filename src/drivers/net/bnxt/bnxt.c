@@ -722,7 +722,9 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 		 ( resp->dev_caps_cfg & SHORT_CMD_REQUIRED ) )
 		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_SUPP );
 	bp->hwrm_max_ext_req_len = resp->max_ext_req_len;
-	if ( bp->chip_num == CHIP_NUM_57500 )
+	if ( ( bp->chip_num == CHIP_NUM_57508 ) ||
+	     ( bp->chip_num == CHIP_NUM_57504 ) ||
+	     ( bp->chip_num == CHIP_NUM_57502 ) )
 		bp->thor = 1;
 	dbg_fw_ver ( resp, bp->hwrm_cmd_timeout );
 	return STATUS_SUCCESS;
