@@ -51,6 +51,31 @@ static struct profiler bigint_mod_multiply_subtract_profiler __profiler =
 	{ .name = "bigint_mod_multiply.subtract" };
 
 /**
+ * Conditionally swap big integers (in constant time)
+ *
+ * @v first0		Element 0 of big integer to be conditionally swapped
+ * @v second0		Element 0 of big integer to be conditionally swapped
+ * @v size		Number of elements in big integers
+ * @v swap		Swap first and second big integers
+ */
+void bigint_swap_raw ( bigint_element_t *first0, bigint_element_t *second0,
+		       unsigned int size, int swap ) {
+	bigint_element_t mask;
+	bigint_element_t xor;
+	unsigned int i;
+
+	/* Construct mask */
+	mask = ( ( bigint_element_t ) ( ! swap ) - 1 );
+
+	/* Conditionally swap elements */
+	for ( i = 0 ; i < size ; i++ ) {
+		xor = ( mask & ( first0[i] ^ second0[i] ) );
+		first0[i] ^= xor;
+		second0[i] ^= xor;
+	}
+}
+
+/**
  * Perform modular multiplication of big integers
  *
  * @v multiplicand0	Element 0 of big integer to be multiplied
