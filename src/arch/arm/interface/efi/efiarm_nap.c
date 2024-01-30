@@ -46,8 +46,12 @@ static void efiarm_cpu_nap ( void ) {
 	 * The EFI shell doesn't seem to bother sleeping the CPU; it
 	 * just sits there idly burning power.
 	 *
+	 * If a shutdown is in progess, there may be nothing to
+	 * generate an interrupt since the timer is disabled in the
+	 * first step of ExitBootServices().
 	 */
-	__asm__ __volatile__ ( "wfi" );
+	if ( ! efi_shutdown_in_progress )
+		__asm__ __volatile__ ( "wfi" );
 }
 
 PROVIDE_NAP ( efiarm, cpu_nap, efiarm_cpu_nap );

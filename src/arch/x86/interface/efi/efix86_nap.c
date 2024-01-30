@@ -46,8 +46,12 @@ static void efix86_cpu_nap ( void ) {
 	 * The EFI shell doesn't seem to bother sleeping the CPU; it
 	 * just sits there idly burning power.
 	 *
+	 * If a shutdown is in progess, there may be nothing to
+	 * generate an interrupt since the timer is disabled in the
+	 * first step of ExitBootServices().
 	 */
-	__asm__ __volatile__ ( "hlt" );
+	if ( ! efi_shutdown_in_progress )
+		__asm__ __volatile__ ( "hlt" );
 }
 
 PROVIDE_NAP ( efix86, cpu_nap, efix86_cpu_nap );
