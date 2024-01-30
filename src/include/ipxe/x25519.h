@@ -84,8 +84,8 @@ extern void x25519_multiply ( const union x25519_oct258 *multiplicand,
 extern void x25519_invert ( const union x25519_oct258 *invertend,
 			    union x25519_quad257 *result );
 extern void x25519_reduce ( union x25519_quad257 *value );
-extern void x25519_key ( const struct x25519_value *base,
-			 const struct x25519_value *scalar,
-			 struct x25519_value *result );
+extern int x25519_key ( const struct x25519_value *base,
+			const struct x25519_value *scalar,
+			struct x25519_value *result );
 
 #endif /* _IPXE_X25519_H */
