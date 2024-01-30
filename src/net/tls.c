@@ -1363,13 +1363,6 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	tls_generate_master_secret ( tls, &pre_master_secret,
 				     sizeof ( pre_master_secret ) );
 
-	/* Generate keys */
-	if ( ( rc = tls_generate_keys ( tls ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not generate keys: %s\n",
-		       tls, strerror ( rc ) );
-		return rc;
-	}
-
 	/* Encrypt pre-master secret using server's public key */
 	memset ( &key_xchg, 0, sizeof ( key_xchg ) );
 	len = pubkey_encrypt ( pubkey, cipherspec->pubkey_ctx,
@@ -1567,13 +1560,6 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 		/* Generate master secret */
 		tls_generate_master_secret ( tls, pre_master_secret, len );
 
-		/* Generate keys */
-		if ( ( rc = tls_generate_keys ( tls ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not generate keys: %s\n",
-			       tls, strerror ( rc ) );
-			goto err_generate_keys;
-		}
-
 		/* Transmit Client Key Exchange record */
 		if ( ( rc = tls_send_handshake ( tls, key_xchg,
 						 sizeof ( *key_xchg ) ) ) !=0){
@@ -1581,7 +1567,6 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 		}
 
 	err_send_handshake:
-	err_generate_keys:
 	err_dhe_key:
 		free ( dynamic );
 	}
@@ -1608,9 +1593,23 @@ struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct tls_cipher_suite *suite = cipherspec->suite;
+	int rc;
 
 	/* Transmit Client Key Exchange record via key exchange algorithm */
-	return suite->exchange->exchange ( tls );
+	if ( ( rc = suite->exchange->exchange ( tls ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not exchange keys: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Generate keys from master secret */
+	if ( ( rc = tls_generate_keys ( tls ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not generate keys: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
