@@ -187,6 +187,11 @@ struct asn1_builder_header {
 	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 2 ),		\
 	ASN1_OID_SINGLE ( 26 )
 
+/** ASN.1 OID for id-x25519 (1.3.101.110) */
+#define ASN1_OID_X25519						\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 101 ),	\
+	ASN1_OID_SINGLE ( 110 )
+
 /** ASN.1 OID for id-sha256 (2.16.840.1.101.3.4.2.1) */
 #define ASN1_OID_SHA256						\
 	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
@@ -312,6 +317,8 @@ struct asn1_algorithm {
 	struct pubkey_algorithm *pubkey;
 	/** Digest algorithm (if applicable) */
 	struct digest_algorithm *digest;
+	/** Elliptic curve (if applicable) */
+	struct elliptic_curve *curve;
 };
 
 /** ASN.1 OID-identified algorithms */

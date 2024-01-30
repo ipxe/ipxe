@@ -83,6 +83,11 @@ REQUIRE_OBJECT ( oid_sha512_224 );
 REQUIRE_OBJECT ( oid_sha512_256 );
 #endif
 
+/* X25519 */
+#if defined ( CRYPTO_CURVE_X25519 )
+REQUIRE_OBJECT ( oid_x25519 );
+#endif
+
 /* RSA and MD5 */
 #if defined ( CRYPTO_PUBKEY_RSA ) && defined ( CRYPTO_DIGEST_MD5 )
 REQUIRE_OBJECT ( rsa_md5 );

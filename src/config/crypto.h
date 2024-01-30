@@ -48,6 +48,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** SHA-512/256 digest algorithm */
 //#define CRYPTO_DIGEST_SHA512_256
 
+/** X25519 elliptic curve */
+#define CRYPTO_CURVE_X25519
+
 /** Margin of error (in seconds) allowed in signed timestamps
  *
  * We default to allowing a reasonable margin of error: 12 hours to
