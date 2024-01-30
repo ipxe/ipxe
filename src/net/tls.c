@@ -1394,21 +1394,18 @@ struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 };
 
 /**
- * Transmit Client Key Exchange record using DHE key exchange
+ * Verify Diffie-Hellman parameter signature
  *
  * @v tls		TLS connection
+ * @v param_len		Diffie-Hellman parameter length
  * @ret rc		Return status code
  */
-static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
+static int tls_verify_dh_params ( struct tls_connection *tls,
+				  size_t param_len ) {
 	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
 	struct pubkey_algorithm *pubkey;
 	struct digest_algorithm *digest;
 	int use_sig_hash = tls_version ( tls, TLS_VERSION_TLS_1_2 );
-	uint8_t private[ sizeof ( tls->client_random.random ) ];
-	const struct {
-		uint16_t len;
-		uint8_t data[0];
-	} __attribute__ (( packed )) *dh_val[3];
 	const struct {
 		struct tls_signature_hash_id sig_hash[use_sig_hash];
 		uint16_t signature_len;
@@ -1416,7 +1413,91 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 	} __attribute__ (( packed )) *sig;
 	const void *data;
 	size_t remaining;
+	int rc;
+
+	/* Signature follows parameters */
+	assert ( param_len <= tls->server_key_len );
+	data = ( tls->server_key + param_len );
+	remaining = ( tls->server_key_len - param_len );
+
+	/* Parse signature from ServerKeyExchange */
+	sig = data;
+	if ( ( sizeof ( *sig ) > remaining ) ||
+	     ( ntohs ( sig->signature_len ) > ( remaining -
+						sizeof ( *sig ) ) ) ) {
+		DBGC ( tls, "TLS %p received underlength ServerKeyExchange\n",
+		       tls );
+		DBGC_HDA ( tls, 0, tls->server_key, tls->server_key_len );
+		return -EINVAL_KEY_EXCHANGE;
+	}
+
+	/* Identify signature and hash algorithm */
+	if ( use_sig_hash ) {
+		pubkey = tls_signature_hash_pubkey ( sig->sig_hash[0] );
+		digest = tls_signature_hash_digest ( sig->sig_hash[0] );
+		if ( ( ! pubkey ) || ( ! digest ) ) {
+			DBGC ( tls, "TLS %p ServerKeyExchange unsupported "
+			       "signature and hash algorithm\n", tls );
+			return -ENOTSUP_SIG_HASH;
+		}
+		if ( pubkey != cipherspec->suite->pubkey ) {
+			DBGC ( tls, "TLS %p ServerKeyExchange incorrect "
+			       "signature algorithm %s (expected %s)\n", tls,
+			       pubkey->name, cipherspec->suite->pubkey->name );
+			return -EPERM_KEY_EXCHANGE;
+		}
+	} else {
+		pubkey = cipherspec->suite->pubkey;
+		digest = &md5_sha1_algorithm;
+	}
+
+	/* Verify signature */
+	{
+		const void *signature = sig->signature;
+		size_t signature_len = ntohs ( sig->signature_len );
+		uint8_t ctx[digest->ctxsize];
+		uint8_t hash[digest->digestsize];
+
+		/* Calculate digest */
+		digest_init ( digest, ctx );
+		digest_update ( digest, ctx, &tls->client_random,
+				sizeof ( tls->client_random ) );
+		digest_update ( digest, ctx, tls->server_random,
+				sizeof ( tls->server_random ) );
+		digest_update ( digest, ctx, tls->server_key, param_len );
+		digest_final ( digest, ctx, hash );
+
+		/* Verify signature */
+		if ( ( rc = pubkey_verify ( pubkey, cipherspec->pubkey_ctx,
+					    digest, hash, signature,
+					    signature_len ) ) != 0 ) {
+			DBGC ( tls, "TLS %p ServerKeyExchange failed "
+			       "verification\n", tls );
+			DBGC_HDA ( tls, 0, tls->server_key,
+				   tls->server_key_len );
+			return -EPERM_KEY_EXCHANGE;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Transmit Client Key Exchange record using DHE key exchange
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
+	uint8_t private[ sizeof ( tls->client_random.random ) ];
+	const struct {
+		uint16_t len;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *dh_val[3];
+	const void *data;
+	size_t remaining;
 	size_t frag_len;
+	size_t param_len;
 	unsigned int i;
 	int rc;
 
@@ -1439,68 +1520,11 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 		data += frag_len;
 		remaining -= frag_len;
 	}
-	sig = data;
-	if ( ( sizeof ( *sig ) > remaining ) ||
-	     ( ntohs ( sig->signature_len ) > ( remaining -
-						sizeof ( *sig ) ) ) ) {
-		DBGC ( tls, "TLS %p received underlength ServerKeyExchange\n",
-		       tls );
-		DBGC_HDA ( tls, 0, tls->server_key, tls->server_key_len );
-		rc = -EINVAL_KEY_EXCHANGE;
-		goto err_header;
-	}
+	param_len = ( tls->server_key_len - remaining );
 
-	/* Identify signature and hash algorithm */
-	if ( use_sig_hash ) {
-		pubkey = tls_signature_hash_pubkey ( sig->sig_hash[0] );
-		digest = tls_signature_hash_digest ( sig->sig_hash[0] );
-		if ( ( ! pubkey ) || ( ! digest ) ) {
-			DBGC ( tls, "TLS %p ServerKeyExchange unsupported "
-			       "signature and hash algorithm\n", tls );
-			rc = -ENOTSUP_SIG_HASH;
-			goto err_sig_hash;
-		}
-		if ( pubkey != cipherspec->suite->pubkey ) {
-			DBGC ( tls, "TLS %p ServerKeyExchange incorrect "
-			       "signature algorithm %s (expected %s)\n", tls,
-			       pubkey->name, cipherspec->suite->pubkey->name );
-			rc = -EPERM_KEY_EXCHANGE;
-			goto err_sig_hash;
-		}
-	} else {
-		pubkey = cipherspec->suite->pubkey;
-		digest = &md5_sha1_algorithm;
-	}
-
-	/* Verify signature */
-	{
-		const void *signature = sig->signature;
-		size_t signature_len = ntohs ( sig->signature_len );
-		uint8_t ctx[digest->ctxsize];
-		uint8_t hash[digest->digestsize];
-
-		/* Calculate digest */
-		digest_init ( digest, ctx );
-		digest_update ( digest, ctx, &tls->client_random,
-				sizeof ( tls->client_random ) );
-		digest_update ( digest, ctx, tls->server_random,
-				sizeof ( tls->server_random ) );
-		digest_update ( digest, ctx, tls->server_key,
-				( tls->server_key_len - remaining ) );
-		digest_final ( digest, ctx, hash );
-
-		/* Verify signature */
-		if ( ( rc = pubkey_verify ( pubkey, cipherspec->pubkey_ctx,
-					    digest, hash, signature,
-					    signature_len ) ) != 0 ) {
-			DBGC ( tls, "TLS %p ServerKeyExchange failed "
-			       "verification\n", tls );
-			DBGC_HDA ( tls, 0, tls->server_key,
-				   tls->server_key_len );
-			rc = -EPERM_KEY_EXCHANGE;
-			goto err_verify;
-		}
-	}
+	/* Verify parameter signature */
+	if ( ( rc = tls_verify_dh_params ( tls, param_len ) ) != 0 )
+		goto err_verify;
 
 	/* Generate Diffie-Hellman private key */
 	if ( ( rc = tls_generate_random ( tls, private,
@@ -1573,7 +1597,6 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
  err_alloc:
  err_random:
  err_verify:
- err_sig_hash:
  err_header:
 	return rc;
 }
