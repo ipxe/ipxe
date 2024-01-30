@@ -1122,6 +1122,57 @@ static int tls_client_hello ( struct tls_connection *tls,
 	struct tls_session *session = tls->session;
 	size_t name_len = strlen ( session->name );
 	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint16_t len;
+			struct {
+				uint8_t type;
+				uint16_t len;
+				uint8_t name[name_len];
+			} __attribute__ (( packed )) list[1];
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *server_name_ext;
+	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint8_t max;
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *max_fragment_length_ext;
+	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint16_t len;
+			struct tls_signature_hash_id
+				code[TLS_NUM_SIG_HASH_ALGORITHMS];
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *signature_algorithms_ext;
+	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint8_t len;
+			uint8_t data[ tls->secure_renegotiation ?
+				      sizeof ( tls->verify.client ) :0 ];
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *renegotiation_info_ext;
+	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint8_t data[session->ticket_len];
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *session_ticket_ext;
+	struct {
+		typeof ( *server_name_ext ) server_name;
+		typeof ( *max_fragment_length_ext ) max_fragment_length;
+		typeof ( *signature_algorithms_ext ) signature_algorithms;
+		typeof ( *renegotiation_info_ext ) renegotiation_info;
+		typeof ( *session_ticket_ext ) session_ticket;
+	} __attribute__ (( packed )) *extensions;
+	struct {
 		uint32_t type_length;
 		uint16_t version;
 		uint8_t random[32];
@@ -1132,42 +1183,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 		uint8_t compression_methods_len;
 		uint8_t compression_methods[1];
 		uint16_t extensions_len;
-		struct {
-			uint16_t server_name_type;
-			uint16_t server_name_len;
-			struct {
-				uint16_t len;
-				struct {
-					uint8_t type;
-					uint16_t len;
-					uint8_t name[name_len];
-				} __attribute__ (( packed )) list[1];
-			} __attribute__ (( packed )) server_name;
-			uint16_t max_fragment_length_type;
-			uint16_t max_fragment_length_len;
-			struct {
-				uint8_t max;
-			} __attribute__ (( packed )) max_fragment_length;
-			uint16_t signature_algorithms_type;
-			uint16_t signature_algorithms_len;
-			struct {
-				uint16_t len;
-				struct tls_signature_hash_id
-					code[TLS_NUM_SIG_HASH_ALGORITHMS];
-			} __attribute__ (( packed )) signature_algorithms;
-			uint16_t renegotiation_info_type;
-			uint16_t renegotiation_info_len;
-			struct {
-				uint8_t len;
-				uint8_t data[ tls->secure_renegotiation ?
-					      sizeof ( tls->verify.client ) :0];
-			} __attribute__ (( packed )) renegotiation_info;
-			uint16_t session_ticket_type;
-			uint16_t session_ticket_len;
-			struct {
-				uint8_t data[session->ticket_len];
-			} __attribute__ (( packed )) session_ticket;
-		} __attribute__ (( packed )) extensions;
+		typeof ( *extensions ) extensions;
 	} __attribute__ (( packed )) hello;
 	struct tls_cipher_suite *suite;
 	struct tls_signature_hash_algorithm *sighash;
@@ -1188,43 +1204,54 @@ static int tls_client_hello ( struct tls_connection *tls,
 		hello.cipher_suites[i++] = suite->code;
 	hello.compression_methods_len = sizeof ( hello.compression_methods );
 	hello.extensions_len = htons ( sizeof ( hello.extensions ) );
-	hello.extensions.server_name_type = htons ( TLS_SERVER_NAME );
-	hello.extensions.server_name_len
-		= htons ( sizeof ( hello.extensions.server_name ) );
-	hello.extensions.server_name.len
-		= htons ( sizeof ( hello.extensions.server_name.list ) );
-	hello.extensions.server_name.list[0].type = TLS_SERVER_NAME_HOST_NAME;
-	hello.extensions.server_name.list[0].len
-		= htons ( sizeof ( hello.extensions.server_name.list[0].name ));
-	memcpy ( hello.extensions.server_name.list[0].name, session->name,
-		 sizeof ( hello.extensions.server_name.list[0].name ) );
-	hello.extensions.max_fragment_length_type
-		= htons ( TLS_MAX_FRAGMENT_LENGTH );
-	hello.extensions.max_fragment_length_len
-		= htons ( sizeof ( hello.extensions.max_fragment_length ) );
-	hello.extensions.max_fragment_length.max
-		= TLS_MAX_FRAGMENT_LENGTH_4096;
-	hello.extensions.signature_algorithms_type
-		= htons ( TLS_SIGNATURE_ALGORITHMS );
-	hello.extensions.signature_algorithms_len
-		= htons ( sizeof ( hello.extensions.signature_algorithms ) );
-	hello.extensions.signature_algorithms.len
-		= htons ( sizeof ( hello.extensions.signature_algorithms.code));
+	extensions = &hello.extensions;
+
+	/* Construct server name extension */
+	server_name_ext = &extensions->server_name;
+	server_name_ext->type = htons ( TLS_SERVER_NAME );
+	server_name_ext->len = htons ( sizeof ( server_name_ext->data ) );
+	server_name_ext->data.len
+		= htons ( sizeof ( server_name_ext->data.list ) );
+	server_name_ext->data.list[0].type = TLS_SERVER_NAME_HOST_NAME;
+	server_name_ext->data.list[0].len
+		= htons ( sizeof ( server_name_ext->data.list[0].name ) );
+	memcpy ( server_name_ext->data.list[0].name, session->name,
+		 sizeof ( server_name_ext->data.list[0].name ) );
+
+	/* Construct maximum fragment length extension */
+	max_fragment_length_ext = &extensions->max_fragment_length;
+	max_fragment_length_ext->type = htons ( TLS_MAX_FRAGMENT_LENGTH );
+	max_fragment_length_ext->len
+		= htons ( sizeof ( max_fragment_length_ext->data ) );
+	max_fragment_length_ext->data.max = TLS_MAX_FRAGMENT_LENGTH_4096;
+
+	/* Construct supported signature algorithms extension */
+	signature_algorithms_ext = &extensions->signature_algorithms;
+	signature_algorithms_ext->type = htons ( TLS_SIGNATURE_ALGORITHMS );
+	signature_algorithms_ext->len
+		= htons ( sizeof ( signature_algorithms_ext->data ) );
+	signature_algorithms_ext->data.len
+		= htons ( sizeof ( signature_algorithms_ext->data.code ) );
 	i = 0 ; for_each_table_entry ( sighash, TLS_SIG_HASH_ALGORITHMS )
-		hello.extensions.signature_algorithms.code[i++] = sighash->code;
-	hello.extensions.renegotiation_info_type
-		= htons ( TLS_RENEGOTIATION_INFO );
-	hello.extensions.renegotiation_info_len
-		= htons ( sizeof ( hello.extensions.renegotiation_info ) );
-	hello.extensions.renegotiation_info.len
-		= sizeof ( hello.extensions.renegotiation_info.data );
-	memcpy ( hello.extensions.renegotiation_info.data, tls->verify.client,
-		 sizeof ( hello.extensions.renegotiation_info.data ) );
-	hello.extensions.session_ticket_type = htons ( TLS_SESSION_TICKET );
-	hello.extensions.session_ticket_len
-		= htons ( sizeof ( hello.extensions.session_ticket ) );
-	memcpy ( hello.extensions.session_ticket.data, session->ticket,
-		 sizeof ( hello.extensions.session_ticket.data ) );
+		signature_algorithms_ext->data.code[i++] = sighash->code;
+
+	/* Construct renegotiation information extension */
+	renegotiation_info_ext = &extensions->renegotiation_info;
+	renegotiation_info_ext->type = htons ( TLS_RENEGOTIATION_INFO );
+	renegotiation_info_ext->len
+		= htons ( sizeof ( renegotiation_info_ext->data ) );
+	renegotiation_info_ext->data.len
+		= sizeof ( renegotiation_info_ext->data.data );
+	memcpy ( renegotiation_info_ext->data.data, tls->verify.client,
+		 sizeof ( renegotiation_info_ext->data.data ) );
+
+	/* Construct session ticket extension */
+	session_ticket_ext = &extensions->session_ticket;
+	session_ticket_ext->type = htons ( TLS_SESSION_TICKET );
+	session_ticket_ext->len
+		= htons ( sizeof ( session_ticket_ext->data ) );
+	memcpy ( session_ticket_ext->data.data, session->ticket,
+		 sizeof ( session_ticket_ext->data.data ) );
 
 	return action ( tls, &hello, sizeof ( hello ) );
 }
