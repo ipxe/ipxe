@@ -158,6 +158,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_ENOTSUP_VERSION						\
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x04,				\
 			  "Unsupported protocol version" )
+#define ENOTSUP_CURVE __einfo_error ( EINFO_ENOTSUP_CURVE )
+#define EINFO_ENOTSUP_CURVE						\
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x05,				\
+			  "Unsupported elliptic curve" )
 #define EPERM_ALERT __einfo_error ( EINFO_EPERM_ALERT )
 #define EINFO_EPERM_ALERT						\
 	__einfo_uniqify ( EINFO_EPERM, 0x01,				\
@@ -1044,6 +1048,35 @@ tls_signature_hash_digest ( struct tls_signature_hash_id code ) {
 
 /******************************************************************************
  *
+ * Ephemeral Elliptic Curve Diffie-Hellman key exchange
+ *
+ ******************************************************************************
+ */
+
+/** Number of supported named curves */
+#define TLS_NUM_NAMED_CURVES table_num_entries ( TLS_NAMED_CURVES )
+
+/**
+ * Identify named curve
+ *
+ * @v named_curve	Named curve specification
+ * @ret curve		Named curve, or NULL
+ */
+static struct tls_named_curve *
+tls_find_named_curve ( unsigned int named_curve ) {
+	struct tls_named_curve *curve;
+
+	/* Identify named curve */
+	for_each_table_entry ( curve, TLS_NAMED_CURVES ) {
+		if ( curve->code == named_curve )
+			return curve;
+	}
+
+	return NULL;
+}
+
+/******************************************************************************
+ *
  * Record handling
  *
  ******************************************************************************
@@ -1166,11 +1199,21 @@ static int tls_client_hello ( struct tls_connection *tls,
 		} __attribute__ (( packed )) data;
 	} __attribute__ (( packed )) *session_ticket_ext;
 	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint16_t len;
+			uint16_t code[TLS_NUM_NAMED_CURVES];
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *named_curve_ext;
+	struct {
 		typeof ( *server_name_ext ) server_name;
 		typeof ( *max_fragment_length_ext ) max_fragment_length;
 		typeof ( *signature_algorithms_ext ) signature_algorithms;
 		typeof ( *renegotiation_info_ext ) renegotiation_info;
 		typeof ( *session_ticket_ext ) session_ticket;
+		typeof ( *named_curve_ext )
+			named_curve[TLS_NUM_NAMED_CURVES ? 1 : 0];
 	} __attribute__ (( packed )) *extensions;
 	struct {
 		uint32_t type_length;
@@ -1187,6 +1230,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	} __attribute__ (( packed )) hello;
 	struct tls_cipher_suite *suite;
 	struct tls_signature_hash_algorithm *sighash;
+	struct tls_named_curve *curve;
 	unsigned int i;
 
 	/* Construct record */
@@ -1252,6 +1296,18 @@ static int tls_client_hello ( struct tls_connection *tls,
 		= htons ( sizeof ( session_ticket_ext->data ) );
 	memcpy ( session_ticket_ext->data.data, session->ticket,
 		 sizeof ( session_ticket_ext->data.data ) );
+
+	/* Construct named curves extension, if applicable */
+	if ( sizeof ( extensions->named_curve ) ) {
+		named_curve_ext = &extensions->named_curve[0];
+		named_curve_ext->type = htons ( TLS_NAMED_CURVE );
+		named_curve_ext->len
+			= htons ( sizeof ( named_curve_ext->data ) );
+		named_curve_ext->data.len
+			= htons ( sizeof ( named_curve_ext->data.code ) );
+		i = 0 ; for_each_table_entry ( curve, TLS_NAMED_CURVES )
+			named_curve_ext->data.code[i++] = curve->code;
+	}
 
 	return action ( tls, &hello, sizeof ( hello ) );
 }
@@ -1605,6 +1661,119 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 	.name = "dhe",
 	.exchange = tls_send_client_key_exchange_dhe,
+};
+
+/**
+ * Transmit Client Key Exchange record using ECDHE key exchange
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
+	struct tls_named_curve *curve;
+	const struct {
+		uint8_t curve_type;
+		uint16_t named_curve;
+		uint8_t public_len;
+		uint8_t public[0];
+	} __attribute__ (( packed )) *ecdh;
+	size_t param_len;
+	int rc;
+
+	/* Parse ServerKeyExchange record */
+	ecdh = tls->server_key;
+	if ( ( sizeof ( *ecdh ) > tls->server_key_len ) ||
+	     ( ecdh->public_len > ( tls->server_key_len - sizeof ( *ecdh ) ))){
+		DBGC ( tls, "TLS %p received underlength ServerKeyExchange\n",
+		       tls );
+		DBGC_HDA ( tls, 0, tls->server_key, tls->server_key_len );
+		return -EINVAL_KEY_EXCHANGE;
+	}
+	param_len = ( sizeof ( *ecdh ) + ecdh->public_len );
+
+	/* Verify parameter signature */
+	if ( ( rc = tls_verify_dh_params ( tls, param_len ) ) != 0 )
+		return rc;
+
+	/* Identify named curve */
+	if ( ecdh->curve_type != TLS_NAMED_CURVE_TYPE ) {
+		DBGC ( tls, "TLS %p unsupported curve type %d\n",
+		       tls, ecdh->curve_type );
+		DBGC_HDA ( tls, 0, tls->server_key, tls->server_key_len );
+		return -ENOTSUP_CURVE;
+	}
+	curve = tls_find_named_curve ( ecdh->named_curve );
+	if ( ! curve ) {
+		DBGC ( tls, "TLS %p unsupported named curve %d\n",
+		       tls, ntohs ( ecdh->named_curve ) );
+		DBGC_HDA ( tls, 0, tls->server_key, tls->server_key_len );
+		return -ENOTSUP_CURVE;
+	}
+
+	/* Check key length */
+	if ( ecdh->public_len != curve->curve->keysize ) {
+		DBGC ( tls, "TLS %p invalid %s key\n",
+		       tls, curve->curve->name );
+		DBGC_HDA ( tls, 0, tls->server_key, tls->server_key_len );
+		return -EINVAL_KEY_EXCHANGE;
+	}
+
+	/* Construct pre-master secret and ClientKeyExchange record */
+	{
+		size_t len = curve->curve->keysize;
+		uint8_t private[len];
+		uint8_t pre_master_secret[len];
+		struct {
+			uint32_t type_length;
+			uint8_t public_len;
+			uint8_t public[len];
+		} __attribute__ (( packed )) key_xchg;
+
+		/* Generate ephemeral private key */
+		if ( ( rc = tls_generate_random ( tls, private,
+						  sizeof ( private ) ) ) != 0){
+			return rc;
+		}
+
+		/* Calculate pre-master secret */
+		if ( ( rc = elliptic_multiply ( curve->curve,
+						ecdh->public, private,
+						pre_master_secret ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not exchange ECDHE key: %s\n",
+			       tls, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Generate master secret */
+		tls_generate_master_secret ( tls, pre_master_secret, len );
+
+		/* Generate Client Key Exchange record */
+		key_xchg.type_length =
+			( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
+			  htonl ( sizeof ( key_xchg ) -
+				  sizeof ( key_xchg.type_length ) ) );
+		key_xchg.public_len = len;
+		if ( ( rc = elliptic_multiply ( curve->curve, NULL, private,
+						key_xchg.public ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not generate ECDHE key: %s\n",
+			       tls, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Transmit Client Key Exchange record */
+		if ( ( rc = tls_send_handshake ( tls, &key_xchg,
+						 sizeof ( key_xchg ) ) ) !=0){
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
+/** Ephemeral Elliptic Curve Diffie-Hellman key exchange algorithm */
+struct tls_key_exchange_algorithm tls_ecdhe_exchange_algorithm = {
+	.name = "ecdhe",
+	.exchange = tls_send_client_key_exchange_ecdhe,
 };
 
 /**
