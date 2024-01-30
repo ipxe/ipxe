@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2024 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -26,20 +26,36 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <byteswap.h>
 #include <ipxe/rsa.h>
 #include <ipxe/aes.h>
-#include <ipxe/sha512.h>
+#include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <ipxe/tls.h>
 
-/** TLS_DHE_RSA_WITH_AES_256_GCM_SHA384 cipher suite */
+/** TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA cipher suite */
 struct tls_cipher_suite
-tls_dhe_rsa_with_aes_256_gcm_sha384 __tls_cipher_suite ( 12 ) = {
-	.code = htons ( TLS_DHE_RSA_WITH_AES_256_GCM_SHA384 ),
-	.key_len = ( 256 / 8 ),
-	.fixed_iv_len = 4,
-	.record_iv_len = 8,
-	.mac_len = 0,
-	.exchange = &tls_dhe_exchange_algorithm,
+tls_ecdhe_rsa_with_aes_128_cbc_sha __tls_cipher_suite ( 05 ) = {
+	.code = htons ( TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA ),
+	.key_len = ( 128 / 8 ),
+	.fixed_iv_len = 0,
+	.record_iv_len = AES_BLOCKSIZE,
+	.mac_len = SHA1_DIGEST_SIZE,
+	.exchange = &tls_ecdhe_exchange_algorithm,
 	.pubkey = &rsa_algorithm,
-	.cipher = &aes_gcm_algorithm,
-	.digest = &sha384_algorithm,
-	.handshake = &sha384_algorithm,
+	.cipher = &aes_cbc_algorithm,
+	.digest = &sha1_algorithm,
+	.handshake = &sha256_algorithm,
+};
+
+/** TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA cipher suite */
+struct tls_cipher_suite
+tls_ecdhe_rsa_with_aes_256_cbc_sha __tls_cipher_suite ( 06 ) = {
+	.code = htons ( TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA ),
+	.key_len = ( 256 / 8 ),
+	.fixed_iv_len = 0,
+	.record_iv_len = AES_BLOCKSIZE,
+	.mac_len = SHA1_DIGEST_SIZE,
+	.exchange = &tls_ecdhe_exchange_algorithm,
+	.pubkey = &rsa_algorithm,
+	.cipher = &aes_cbc_algorithm,
+	.digest = &sha1_algorithm,
+	.handshake = &sha256_algorithm,
 };
