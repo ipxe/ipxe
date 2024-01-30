@@ -195,6 +195,23 @@ struct pubkey_algorithm {
 			  const void *public_key, size_t public_key_len );
 };
 
+/** An elliptic curve */
+struct elliptic_curve {
+	/** Curve name */
+	const char *name;
+	/** Key size */
+	size_t keysize;
+	/** Multiply scalar by curve point
+	 *
+	 * @v base		Base point (or NULL to use generator)
+	 * @v scalar		Scalar multiple
+	 * @v result		Result point to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * multiply ) ( const void *base, const void *scalar,
+			     void *result );
+};
+
 static inline void digest_init ( struct digest_algorithm *digest,
 				 void *ctx ) {
 	digest->init ( ctx );
@@ -300,6 +317,12 @@ static inline int pubkey_match ( struct pubkey_algorithm *pubkey,
 				 size_t public_key_len ) {
 	return pubkey->match ( private_key, private_key_len, public_key,
 			       public_key_len );
+}
+
+static inline int elliptic_multiply ( struct elliptic_curve *curve,
+				      const void *base, const void *scalar,
+				      void *result ) {
+	return curve->multiply ( base, scalar, result );
 }
 
 extern void digest_null_init ( void *ctx );

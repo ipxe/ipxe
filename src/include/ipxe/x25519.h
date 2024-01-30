@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/bigint.h>
+#include <ipxe/crypto.h>
 
 /** X25519 unsigned big integer size
  *
@@ -87,5 +88,7 @@ extern void x25519_reduce ( union x25519_quad257 *value );
 extern int x25519_key ( const struct x25519_value *base,
 			const struct x25519_value *scalar,
 			struct x25519_value *result );
+
+extern struct elliptic_curve x25519_curve;
 
 #endif /* _IPXE_X25519_H */
