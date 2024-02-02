@@ -77,19 +77,19 @@ static void _cbc_name ## _setiv ( void *ctx, const void *iv,		\
 				   size_t ivlen ) {			\
 	struct _cbc_name ## _context * _cbc_name ## _ctx = ctx;		\
 	cbc_setiv ( &_cbc_name ## _ctx->raw_ctx, iv, ivlen,		\
-		    &_raw_cipher, &aes_cbc_ctx->cbc_ctx );		\
+		    &_raw_cipher, &_cbc_name ## _ctx->cbc_ctx );	\
 }									\
 static void _cbc_name ## _encrypt ( void *ctx, const void *src,		\
 				    void *dst, size_t len ) {		\
 	struct _cbc_name ## _context * _cbc_name ## _ctx = ctx;		\
 	cbc_encrypt ( &_cbc_name ## _ctx->raw_ctx, src, dst, len,	\
-		      &_raw_cipher, &aes_cbc_ctx->cbc_ctx );		\
+		      &_raw_cipher, &_cbc_name ## _ctx->cbc_ctx );	\
 }									\
 static void _cbc_name ## _decrypt ( void *ctx, const void *src,		\
 				    void *dst, size_t len ) {		\
 	struct _cbc_name ## _context * _cbc_name ## _ctx = ctx;		\
 	cbc_decrypt ( &_cbc_name ## _ctx->raw_ctx, src, dst, len,	\
-		      &_raw_cipher, &aes_cbc_ctx->cbc_ctx );		\
+		      &_raw_cipher, &_cbc_name ## _ctx->cbc_ctx );	\
 }									\
 struct cipher_algorithm _cbc_cipher = {					\
 	.name		= #_cbc_name,					\
