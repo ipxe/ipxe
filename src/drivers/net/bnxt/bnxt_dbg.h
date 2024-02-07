@@ -475,7 +475,7 @@ void dbg_rx_stat(struct bnxt *bp)
 #endif
 
 #if defined(DEBUG_CQ)
-static void dump_cq(struct cmpl_base *cmp, u16 cid)
+static void dump_cq(struct cmpl_base *cmp, u16 cid, u8 toggle)
 {
 	dbg_prn("- CQ Type ");
 	switch (cmp->type & CMPL_BASE_TYPE_MASK) {
@@ -495,7 +495,7 @@ static void dump_cq(struct cmpl_base *cmp, u16 cid)
 		dbg_prn("%04x", (u16)(cmp->type & CMPL_BASE_TYPE_MASK));
 		break;
 	}
-	dbg_prn(" cid %d", cid);
+	dbg_prn(" cid %d, tog %d", cid, toggle);
 #if defined(DEBUG_CQ_DUMP)
 	dump_mem((u8 *)cmp, (u32)sizeof(struct cmpl_base), DISP_U8);
 #else
@@ -513,7 +513,7 @@ static void dump_nq(struct nq_base *nqp, u16 cid)
 #endif
 }
 #else
-#define dump_cq(cq, id)
+#define dump_cq(cq, id, toggle)
 #define dump_nq(nq, id)
 #endif
 
