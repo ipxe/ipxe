@@ -35,7 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #define	NET_PROTO_IPV4		/* IPv4 protocol */
-//#define NET_PROTO_IPV6	/* IPv6 protocol */
+#define NET_PROTO_IPV6	/* IPv6 protocol */
 #undef	NET_PROTO_FCOE		/* Fibre Channel over Ethernet protocol */
 #define	NET_PROTO_STP		/* Spanning Tree protocol */
 #define	NET_PROTO_LACP		/* Link Aggregation control protocol */
@@ -56,7 +56,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define	DOWNLOAD_PROTO_TFTP	/* Trivial File Transfer Protocol */
 #define	DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
-#undef	DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
+//#undef	DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
 #undef	DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
 #undef	DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
 #undef	DOWNLOAD_PROTO_NFS	/* Network File System Protocol */
@@ -105,21 +105,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * you want to use.
  *
  */
-//#define	IMAGE_NBI		/* NBI image support */
-//#define	IMAGE_ELF		/* ELF image support */
-//#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
-//#define	IMAGE_PXE		/* PXE image support */
-//#define	IMAGE_SCRIPT		/* iPXE script image support */
-//#define	IMAGE_BZIMAGE		/* Linux bzImage image support */
-//#define	IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
-//#define	IMAGE_EFI		/* EFI image support */
-//#define	IMAGE_SDI		/* SDI image support */
-//#define	IMAGE_PNM		/* PNM image support */
+#define	IMAGE_NBI		/* NBI image support */
+#define	IMAGE_ELF		/* ELF image support */
+#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
+#define	IMAGE_PXE		/* PXE image support */
+#define	IMAGE_SCRIPT		/* iPXE script image support */
+#define	IMAGE_BZIMAGE		/* Linux bzImage image support */
+#define	IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
+#define	IMAGE_EFI		/* EFI image support */
+#define	IMAGE_SDI		/* SDI image support */
+#define	IMAGE_PNM		/* PNM image support */
 #define	IMAGE_PNG		/* PNG image support */
 #define	IMAGE_DER		/* DER image support */
 #define	IMAGE_PEM		/* PEM image support */
-//#define	IMAGE_ZLIB		/* ZLIB image support */
-//#define	IMAGE_GZIP		/* GZIP image support */
+#define	IMAGE_ZLIB		/* ZLIB image support */
+#define	IMAGE_GZIP		/* GZIP image support */
 
 /*
  * Command-line commands to include
@@ -140,25 +140,25 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define LOGIN_CMD		/* Login command */
 #define SYNC_CMD		/* Sync command */
 #define SHELL_CMD		/* Shell command */
-//#define NSLOOKUP_CMD		/* DNS resolving command */
-//#define TIME_CMD		/* Time commands */
-//#define DIGEST_CMD		/* Image crypto digest commands */
-//#define LOTEST_CMD		/* Loopback testing commands */
-//#define VLAN_CMD		/* VLAN commands */
-//#define PXE_CMD		/* PXE commands */
-//#define REBOOT_CMD		/* Reboot command */
-//#define POWEROFF_CMD		/* Power off command */
-//#define IMAGE_TRUST_CMD	/* Image trust management commands */
-//#define PCI_CMD		/* PCI commands */
-//#define PARAM_CMD		/* Request parameter commands */
-//#define NEIGHBOUR_CMD		/* Neighbour management commands */
-//#define PING_CMD		/* Ping command */
-//#define CONSOLE_CMD		/* Console command */
-//#define IPSTAT_CMD		/* IP statistics commands */
-//#define PROFSTAT_CMD		/* Profiling commands */
-//#define NTP_CMD		/* NTP commands */
-//#define CERT_CMD		/* Certificate management commands */
-//#define IMAGE_MEM_CMD		/* Read memory command */
+#define NSLOOKUP_CMD		/* DNS resolving command */
+#define TIME_CMD		/* Time commands */
+#define DIGEST_CMD		/* Image crypto digest commands */
+#define LOTEST_CMD		/* Loopback testing commands */
+#define VLAN_CMD		/* VLAN commands */
+#define PXE_CMD		/* PXE commands */
+#define REBOOT_CMD		/* Reboot command */
+#define POWEROFF_CMD		/* Power off command */
+#define IMAGE_TRUST_CMD	/* Image trust management commands */
+#define PCI_CMD		/* PCI commands */
+#define PARAM_CMD		/* Request parameter commands */
+#define NEIGHBOUR_CMD		/* Neighbour management commands */
+#define PING_CMD		/* Ping command */
+#define CONSOLE_CMD		/* Console command */
+#define IPSTAT_CMD		/* IP statistics commands */
+#define PROFSTAT_CMD		/* Profiling commands */
+#define NTP_CMD		/* NTP commands */
+#define CERT_CMD		/* Certificate management commands */
+#define IMAGE_MEM_CMD		/* Read memory command */
 #define IMAGE_ARCHIVE_CMD	/* Archive image management commands */
 #define SHIM_CMD		/* EFI shim command (or dummy command) */
 
@@ -174,7 +174,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define VNIC_IPOIB		/* Infiniband IPoIB virtual NICs */
-//#define VNIC_XSIGO		/* Infiniband Xsigo virtual NICs */
+#define VNIC_XSIGO		/* Infiniband Xsigo virtual NICs */
 
 /*
  * Error message tables to include
