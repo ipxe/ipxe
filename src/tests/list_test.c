@@ -518,6 +518,38 @@ static void list_test_exec ( void ) {
 	list_iterate_entry_ok ( list_for_each_entry_continue_reverse, "",
 				pos, list, list );
 
+	/* Test list_for_each_entry_safe_continue() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[9].list, list );
+	list_add_tail ( &list_tests[4].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_add_tail ( &list_tests[5].list, list );
+	list_add_tail ( &list_tests[7].list, list );
+	{
+		char *expecteds[] = { "94257", "9457", "947", "94" };
+		char **expected = expecteds;
+		pos = &list_tests[4];
+		list_for_each_entry_safe_continue ( pos, tmp, list, list ) {
+			list_contents_ok ( list, *expected );
+			list_del ( &pos->list );
+			expected++;
+			list_contents_ok ( list, *expected );
+		}
+	}
+	list_contents_ok ( list, "94" );
+	{
+		char *expecteds[] = { "94", "4", "" };
+		char **expected = expecteds;
+		ok ( pos == list_entry ( list, struct list_test, list ) );
+		list_for_each_entry_safe_continue ( pos, tmp, list, list ) {
+			list_contents_ok ( list, *expected );
+			list_del ( &pos->list );
+			expected++;
+			list_contents_ok ( list, *expected );
+		}
+	}
+	ok ( list_empty ( list ) );
+
 	/* Test list_contains() and list_contains_entry() */
 	INIT_LIST_HEAD ( list );
 	INIT_LIST_HEAD ( &list_tests[3].list );
