@@ -1603,19 +1603,12 @@ int x509_check_name ( struct x509_certificate *cert, const char *name ) {
 static void x509_free_chain ( struct refcnt *refcnt ) {
 	struct x509_chain *chain =
 		container_of ( refcnt, struct x509_chain, refcnt );
-	struct x509_link *link;
-	struct x509_link *tmp;
 
 	DBGC2 ( chain, "X509 chain %p freed\n", chain );
 
-	/* Free each link in the chain */
-	list_for_each_entry_safe ( link, tmp, &chain->links, list ) {
-		x509_put ( link->cert );
-		list_del ( &link->list );
-		free ( link );
-	}
-
 	/* Free chain */
+	x509_truncate ( chain, NULL );
+	assert ( list_empty ( &chain->links ) );
 	free ( chain );
 }
 
@@ -1694,6 +1687,27 @@ int x509_append_raw ( struct x509_chain *chain, const void *data,
 	x509_put ( cert );
  err_parse:
 	return rc;
+}
+
+/**
+ * Truncate X.509 certificate chain
+ *
+ * @v chain		X.509 certificate chain
+ * @v link		Link after which to truncate chain, or NULL
+ */
+void x509_truncate ( struct x509_chain *chain, struct x509_link *link ) {
+	struct x509_link *tmp;
+
+	/* Truncate entire chain if no link is specified */
+	if ( ! link )
+		link = list_entry ( &chain->links, struct x509_link, list );
+
+	/* Free each link in the chain */
+	list_for_each_entry_safe_continue ( link, tmp, &chain->links, list ) {
+		x509_put ( link->cert );
+		list_del ( &link->list );
+		free ( link );
+	}
 }
 
 /**
