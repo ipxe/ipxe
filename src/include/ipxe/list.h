@@ -399,6 +399,17 @@ extern void extern_list_splice_tail_init ( struct list_head *list,
 	( (head)->prev == &(entry)->member )
 
 /**
+ * Test if entry is the list head
+ *
+ * @v entry		List entry
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ * @ret is_head		Entry is the list head
+ */
+#define list_is_head_entry( entry, head, member )		\
+	( (head) == &(entry)->member )
+
+/**
  * Iterate over a list
  *
  * @v pos		Iterator

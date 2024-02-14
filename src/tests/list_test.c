@@ -440,6 +440,22 @@ static void list_test_exec ( void ) {
 	ok ( list_is_first_entry ( &list_tests[3], list, list ) );
 	ok ( list_is_last_entry ( &list_tests[3], list, list ) );
 
+	/* Test list_is_head_entry() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[1].list, list );
+	list_add_tail ( &list_tests[6].list, list );
+	list_add_tail ( &list_tests[8].list, list );
+	ok ( list_is_head_entry ( list_entry ( list, typeof ( *pos ), list ),
+				  list, list ) );
+	ok ( ! list_is_head_entry ( &list_tests[1], list, list ) );
+	ok ( ! list_is_head_entry ( &list_tests[6], list, list ) );
+	ok ( ! list_is_head_entry ( &list_tests[8], list, list ) );
+	list_for_each_entry ( pos, list, list ) {
+		ok ( list_contains_entry ( pos, list, list ) );
+		ok ( ! list_is_head_entry ( pos, list, list ) );
+	}
+	ok ( list_is_head_entry ( pos, list, list ) );
+
 	/* Test list_for_each() */
 	INIT_LIST_HEAD ( list );
 	list_add_tail ( &list_tests[6].list, list );
