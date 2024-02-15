@@ -374,6 +374,16 @@ x509_root_put ( struct x509_root *root ) {
 	ref_put ( &root->refcnt );
 }
 
+/**
+ * Check if X.509 certificate is self-signed
+ *
+ * @v cert		X.509 certificate
+ * @ret is_self_signed	X.509 certificate is self-signed
+ */
+static inline int x509_is_self_signed ( struct x509_certificate *cert ) {
+	return ( asn1_compare ( &cert->issuer.raw, &cert->subject.raw ) == 0 );
+}
+
 extern const char * x509_name ( struct x509_certificate *cert );
 extern int x509_parse ( struct x509_certificate *cert,
 			const struct asn1_cursor *raw );

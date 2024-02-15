@@ -1102,6 +1102,10 @@ static void x509_test_exec ( void ) {
 	x509_validate_chain_fail_ok ( &server_chain, test_time,
 				      &empty_store, &test_root );
 
+	/* Check self-signedess */
+	ok ( x509_is_self_signed ( root_crt.cert ) );
+	ok ( ! x509_is_self_signed ( intermediate_crt.cert ) );
+
 	/* Sanity check */
 	assert ( list_empty ( &empty_store.links ) );
 
