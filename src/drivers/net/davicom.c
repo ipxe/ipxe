@@ -689,9 +689,9 @@ static struct nic_operations davicom_operations = {
 };
 
 static struct pci_device_id davicom_nics[] = {
+PCI_ROM(0x1282, 0x9009, "davicom9009", "Davicom 9009", 0),
 PCI_ROM(0x1282, 0x9100, "davicom9100", "Davicom 9100", 0),
 PCI_ROM(0x1282, 0x9102, "davicom9102", "Davicom 9102", 0),
-PCI_ROM(0x1282, 0x9009, "davicom9009", "Davicom 9009", 0),
 PCI_ROM(0x1282, 0x9132, "davicom9132", "Davicom 9132", 0),	/* Needs probably some fixing */
 };
 

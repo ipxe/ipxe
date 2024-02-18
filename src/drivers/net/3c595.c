@@ -523,10 +523,12 @@ static struct nic_operations t595_operations = {
 };
 
 static struct pci_device_id t595_nics[] = {
+PCI_ROM(0x10b7, 0x4500, "3c450-1",         "3Com450 HomePNA Tornado", 0),
 PCI_ROM(0x10b7, 0x5900, "3c590",           "3Com590", 0),		/* Vortex 10Mbps */
 PCI_ROM(0x10b7, 0x5950, "3c595",           "3Com595", 0),		/* Vortex 100baseTx */
 PCI_ROM(0x10b7, 0x5951, "3c595-1",         "3Com595", 0),		/* Vortex 100baseT4 */
 PCI_ROM(0x10b7, 0x5952, "3c595-2",         "3Com595", 0),		/* Vortex 100base-MII */
+PCI_ROM(0x10b7, 0x7646, "3csoho100-tx-1",  "3CSOHO100-TX", 0),	/* Hurricane */
 PCI_ROM(0x10b7, 0x9000, "3c900-tpo",       "3Com900-TPO", 0),	/* 10 Base TPO */
 PCI_ROM(0x10b7, 0x9001, "3c900-t4",        "3Com900-Combo", 0),	/* 10/100 T4 */
 PCI_ROM(0x10b7, 0x9004, "3c900b-tpo",      "3Com900B-TPO", 0),	/* 10 Base TPO */
@@ -535,8 +537,6 @@ PCI_ROM(0x10b7, 0x9006, "3c900b-tpb2",     "3Com900B-2/T", 0),	/* 10 Base TP and
 PCI_ROM(0x10b7, 0x900a, "3c900b-fl",       "3Com900B-FL", 0),	/* 10 Base F */
 PCI_ROM(0x10b7, 0x9800, "3c980-cyclone-1", "3Com980-Cyclone", 0),	/* Cyclone */
 PCI_ROM(0x10b7, 0x9805, "3c9805-1",        "3Com9805", 0),		/* Dual Port Server Cyclone */
-PCI_ROM(0x10b7, 0x7646, "3csoho100-tx-1",  "3CSOHO100-TX", 0),	/* Hurricane */
-PCI_ROM(0x10b7, 0x4500, "3c450-1",         "3Com450 HomePNA Tornado", 0),
 };
 
 PCI_DRIVER ( t595_driver, t595_nics, PCI_NO_CLASS );

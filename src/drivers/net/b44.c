@@ -945,8 +945,8 @@ static struct net_device_operations b44_operations = {
 
 
 static struct pci_device_id b44_nics[] = {
-	PCI_ROM(0x14e4, 0x4401, "BCM4401", "BCM4401", 0),
 	PCI_ROM(0x14e4, 0x170c, "BCM4401-B0", "BCM4401-B0", 0),
+	PCI_ROM(0x14e4, 0x4401, "BCM4401", "BCM4401", 0),
 	PCI_ROM(0x14e4, 0x4402, "BCM4401-B1", "BCM4401-B1", 0),
 };
 

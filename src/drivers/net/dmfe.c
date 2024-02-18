@@ -1208,9 +1208,9 @@ static struct nic_operations dmfe_operations = {
 };
 
 static struct pci_device_id dmfe_nics[] = {
+	PCI_ROM(0x1282, 0x9009, "dmfe9009", "Davicom 9009", 0),
 	PCI_ROM(0x1282, 0x9100, "dmfe9100", "Davicom 9100", 0),
 	PCI_ROM(0x1282, 0x9102, "dmfe9102", "Davicom 9102", 0),
-	PCI_ROM(0x1282, 0x9009, "dmfe9009", "Davicom 9009", 0),
 	PCI_ROM(0x1282, 0x9132, "dmfe9132", "Davicom 9132", 0),	/* Needs probably some fixing */
 };
 

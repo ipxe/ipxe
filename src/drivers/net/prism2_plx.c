@@ -104,9 +104,10 @@ static void prism2_plx_disable ( struct nic *nic ) {
 }
 
 static struct pci_device_id prism2_plx_nics[] = {
-PCI_ROM(0x1385, 0x4100, "ma301",         "Netgear MA301", 0),
 PCI_ROM(0x10b7, 0x7770, "3c-airconnect", "3Com AirConnect", 0),
 PCI_ROM(0x111a, 0x1023, "ss1023",        "Siemens SpeedStream SS1023", 0),
+PCI_ROM(0x126c, 0x8030, "emobility",     "Nortel emobility", 0),
+PCI_ROM(0x1385, 0x4100, "ma301",         "Netgear MA301", 0),
 PCI_ROM(0x15e8, 0x0130, "correga",       "Correga", 0),
 PCI_ROM(0x1638, 0x1100, "smc2602w",      "SMC EZConnect SMC2602W", 0),	/* or Eumitcom PCI WL11000, Addtron AWA-100 */
 PCI_ROM(0x16ab, 0x1100, "gl24110p",      "Global Sun Tech GL24110P", 0),
@@ -114,7 +115,6 @@ PCI_ROM(0x16ab, 0x1101, "16ab-1101",     "Unknown", 0),
 PCI_ROM(0x16ab, 0x1102, "wdt11",         "Linksys WDT11", 0),
 PCI_ROM(0x16ec, 0x3685, "usr2415",       "USR 2415", 0),
 PCI_ROM(0xec80, 0xec00, "f5d6000",       "Belkin F5D6000", 0),
-PCI_ROM(0x126c, 0x8030, "emobility",     "Nortel emobility", 0),
 };
 
 PCI_DRIVER ( prism2_plx_driver, prism2_plx_nics, PCI_NO_CLASS );

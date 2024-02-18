@@ -81,8 +81,8 @@ FILE_LICENCE ( GPL2_ONLY );
 static struct pci_device_id sky2_id_table[] = {
 	PCI_ROM(0x1148, 0x9000, "sk9sxx", "Syskonnect SK-9Sxx", 0),
 	PCI_ROM(0x1148, 0x9e00, "sk9exx", "Syskonnect SK-9Exx", 0),
-	PCI_ROM(0x1186, 0x4b00, "dge560t", "D-Link DGE-560T", 0),
 	PCI_ROM(0x1186, 0x4001, "dge550sx", "D-Link DGE-550SX", 0),
+	PCI_ROM(0x1186, 0x4b00, "dge560t", "D-Link DGE-560T", 0),
 	PCI_ROM(0x1186, 0x4b02, "dge560sx", "D-Link DGE-560SX", 0),
 	PCI_ROM(0x1186, 0x4b03, "dge550t", "D-Link DGE-550T", 0),
 	PCI_ROM(0x11ab, 0x4340, "m88e8021", "Marvell 88E8021", 0),

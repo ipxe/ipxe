@@ -7,9 +7,9 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 static struct pci_device_id rtl8180_nics[] = {
 	PCI_ROM(0x10ec, 0x8180, "rtl8180", "Realtek 8180", 0),
+	PCI_ROM(0x1186, 0x3300, "dwl510",  "D-Link DWL-510", 0),
 	PCI_ROM(0x1799, 0x6001, "f5d6001", "Belkin F5D6001", 0),
 	PCI_ROM(0x1799, 0x6020, "f5d6020", "Belkin F5D6020", 0),
-	PCI_ROM(0x1186, 0x3300, "dwl510",  "D-Link DWL-510", 0),
 };
 
 struct pci_driver rtl8180_driver __pci_driver = {
