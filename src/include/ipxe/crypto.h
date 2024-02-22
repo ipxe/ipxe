@@ -212,34 +212,37 @@ struct elliptic_curve {
 			     void *result );
 };
 
-static inline void digest_init ( struct digest_algorithm *digest,
-				 void *ctx ) {
+static inline __attribute__ (( always_inline )) void
+digest_init ( struct digest_algorithm *digest, void *ctx ) {
 	digest->init ( ctx );
 }
 
-static inline void digest_update ( struct digest_algorithm *digest,
-				   void *ctx, const void *data, size_t len ) {
+static inline __attribute__ (( always_inline )) void
+digest_update ( struct digest_algorithm *digest, void *ctx,
+		const void *data, size_t len ) {
 	digest->update ( ctx, data, len );
 }
 
-static inline void digest_final ( struct digest_algorithm *digest,
-				  void *ctx, void *out ) {
+static inline __attribute__ (( always_inline )) void
+digest_final ( struct digest_algorithm *digest, void *ctx, void *out ) {
 	digest->final ( ctx, out );
 }
 
-static inline int cipher_setkey ( struct cipher_algorithm *cipher,
-				  void *ctx, const void *key, size_t keylen ) {
+static inline __attribute__ (( always_inline )) int
+cipher_setkey ( struct cipher_algorithm *cipher, void *ctx,
+		const void *key, size_t keylen ) {
 	return cipher->setkey ( ctx, key, keylen );
 }
 
-static inline void cipher_setiv ( struct cipher_algorithm *cipher,
-				  void *ctx, const void *iv, size_t ivlen ) {
+static inline __attribute__ (( always_inline )) void
+cipher_setiv ( struct cipher_algorithm *cipher, void *ctx,
+	       const void *iv, size_t ivlen ) {
 	cipher->setiv ( ctx, iv, ivlen );
 }
 
-static inline void cipher_encrypt ( struct cipher_algorithm *cipher,
-				    void *ctx, const void *src, void *dst,
-				    size_t len ) {
+static inline __attribute__ (( always_inline )) void
+cipher_encrypt ( struct cipher_algorithm *cipher, void *ctx,
+		 const void *src, void *dst, size_t len ) {
 	cipher->encrypt ( ctx, src, dst, len );
 }
 #define cipher_encrypt( cipher, ctx, src, dst, len ) do {		\
@@ -247,9 +250,9 @@ static inline void cipher_encrypt ( struct cipher_algorithm *cipher,
 	cipher_encrypt ( (cipher), (ctx), (src), (dst), (len) );	\
 	} while ( 0 )
 
-static inline void cipher_decrypt ( struct cipher_algorithm *cipher,
-				    void *ctx, const void *src, void *dst,
-				    size_t len ) {
+static inline __attribute__ (( always_inline )) void
+cipher_decrypt ( struct cipher_algorithm *cipher, void *ctx,
+		 const void *src, void *dst, size_t len ) {
 	cipher->decrypt ( ctx, src, dst, len );
 }
 #define cipher_decrypt( cipher, ctx, src, dst, len ) do {		\
@@ -257,71 +260,79 @@ static inline void cipher_decrypt ( struct cipher_algorithm *cipher,
 	cipher_decrypt ( (cipher), (ctx), (src), (dst), (len) );	\
 	} while ( 0 )
 
-static inline void cipher_auth ( struct cipher_algorithm *cipher, void *ctx,
-				 void *auth ) {
+static inline __attribute__ (( always_inline )) void
+cipher_auth ( struct cipher_algorithm *cipher, void *ctx, void *auth ) {
 	cipher->auth ( ctx, auth );
 }
 
-static inline int is_stream_cipher ( struct cipher_algorithm *cipher ) {
+static inline __attribute__ (( always_inline )) int
+is_stream_cipher ( struct cipher_algorithm *cipher ) {
 	return ( cipher->blocksize == 1 );
 }
 
-static inline int is_block_cipher ( struct cipher_algorithm *cipher ) {
+static inline __attribute__ (( always_inline )) int
+is_block_cipher ( struct cipher_algorithm *cipher ) {
 	return ( cipher->blocksize > 1 );
 }
 
-static inline int is_auth_cipher ( struct cipher_algorithm *cipher ) {
+static inline __attribute__ (( always_inline )) int
+is_auth_cipher ( struct cipher_algorithm *cipher ) {
 	return cipher->authsize;
 }
 
-static inline int pubkey_init ( struct pubkey_algorithm *pubkey, void *ctx,
-				const void *key, size_t key_len ) {
+static inline __attribute__ (( always_inline )) int
+pubkey_init ( struct pubkey_algorithm *pubkey, void *ctx,
+	      const void *key, size_t key_len ) {
 	return pubkey->init ( ctx, key, key_len );
 }
 
-static inline size_t pubkey_max_len ( struct pubkey_algorithm *pubkey,
-				      void *ctx ) {
+static inline __attribute__ (( always_inline )) size_t
+pubkey_max_len ( struct pubkey_algorithm *pubkey, void *ctx ) {
 	return pubkey->max_len ( ctx );
 }
 
-static inline int pubkey_encrypt ( struct pubkey_algorithm *pubkey, void *ctx,
-				   const void *data, size_t len, void *out ) {
+static inline __attribute__ (( always_inline )) int
+pubkey_encrypt ( struct pubkey_algorithm *pubkey, void *ctx,
+		 const void *data, size_t len, void *out ) {
 	return pubkey->encrypt ( ctx, data, len, out );
 }
 
-static inline int pubkey_decrypt ( struct pubkey_algorithm *pubkey, void *ctx,
-				   const void *data, size_t len, void *out ) {
+static inline __attribute__ (( always_inline )) int
+pubkey_decrypt ( struct pubkey_algorithm *pubkey, void *ctx,
+		 const void *data, size_t len, void *out ) {
 	return pubkey->decrypt ( ctx, data, len, out );
 }
 
-static inline int pubkey_sign ( struct pubkey_algorithm *pubkey, void *ctx,
-				struct digest_algorithm *digest,
-				const void *value, void *signature ) {
+static inline __attribute__ (( always_inline )) int
+pubkey_sign ( struct pubkey_algorithm *pubkey, void *ctx,
+	      struct digest_algorithm *digest, const void *value,
+	      void *signature ) {
 	return pubkey->sign ( ctx, digest, value, signature );
 }
 
-static inline int pubkey_verify ( struct pubkey_algorithm *pubkey, void *ctx,
-				  struct digest_algorithm *digest,
-				  const void *value, const void *signature,
-				  size_t signature_len ) {
+static inline __attribute__ (( always_inline )) int
+pubkey_verify ( struct pubkey_algorithm *pubkey, void *ctx,
+		struct digest_algorithm *digest, const void *value,
+		const void *signature, size_t signature_len ) {
 	return pubkey->verify ( ctx, digest, value, signature, signature_len );
 }
 
-static inline void pubkey_final ( struct pubkey_algorithm *pubkey, void *ctx ) {
+static inline __attribute__ (( always_inline )) void
+pubkey_final ( struct pubkey_algorithm *pubkey, void *ctx ) {
 	pubkey->final ( ctx );
 }
 
-static inline int pubkey_match ( struct pubkey_algorithm *pubkey,
-				 const void *private_key,
-				 size_t private_key_len, const void *public_key,
-				 size_t public_key_len ) {
+static inline __attribute__ (( always_inline )) int
+pubkey_match ( struct pubkey_algorithm *pubkey,
+	       const void *private_key, size_t private_key_len,
+	       const void *public_key, size_t public_key_len ) {
 	return pubkey->match ( private_key, private_key_len, public_key,
 			       public_key_len );
 }
 
-static inline int elliptic_multiply ( struct elliptic_curve *curve,
-				      const void *base, const void *scalar,
-				      void *result ) {
+static inline __attribute__ (( always_inline )) int
+elliptic_multiply ( struct elliptic_curve *curve,
+		    const void *base, const void *scalar, void *result ) {
 	return curve->multiply ( base, scalar, result );
 }
 
