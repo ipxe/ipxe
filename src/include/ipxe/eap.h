@@ -166,6 +166,8 @@ struct eap_method {
 /** Declare an EAP method */
 #define __eap_method __table_entry ( EAP_METHODS, 01 )
 
+extern int eap_tx_response ( struct eap_supplicant *supplicant,
+			     const void *rsp, size_t rsp_len );
 extern int eap_rx ( struct eap_supplicant *supplicant,
 		    const void *data, size_t len );
 

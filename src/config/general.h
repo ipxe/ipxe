@@ -92,6 +92,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	CRYPTO_80211_WPA2	/* Add support for stronger WPA cryptography */
 
 /*
+ * 802.1x EAP authentication methods
+ *
+ */
+#define EAP_METHOD_MD5		/* MD5-Challenge port authentication */
+
+/*
  * Name resolution modules
  *
  */
