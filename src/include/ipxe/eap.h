@@ -60,6 +60,35 @@ struct eap_md5 {
 	uint8_t value[0];
 } __attribute__ (( packed ));
 
+/** EAP MS-CHAPv2 request/response */
+#define EAP_TYPE_MSCHAPV2 26
+
+/** EAP MS-CHAPv2 request/response type data */
+struct eap_mschapv2 {
+	/** Code
+	 *
+	 * This is in the same namespace as the EAP header's code
+	 * field, but is used to extend the handshake by allowing for
+	 * "success request" and "success response" packets.
+	 */
+	uint8_t code;
+	/** Identifier
+	 *
+	 * This field serves no purposes: it always has the same value
+	 * as the EAP header's identifier field (located 5 bytes
+	 * earlier in the same packet).
+	 */
+	uint8_t id;
+	/** Length
+	 *
+	 * This field serves no purpose: it always has the same value
+	 * as the EAP header's length field (located 5 bytes earlier
+	 * in the same packet), minus the 5 byte length of the EAP
+	 * header.
+	 */
+	uint16_t len;
+} __attribute__ (( packed ));
+
 /** EAP success */
 #define EAP_CODE_SUCCESS 3
 

@@ -96,6 +96,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #define EAP_METHOD_MD5		/* MD5-Challenge port authentication */
+//#define EAP_METHOD_MSCHAPV2	/* MS-CHAPv2 port authentication */
 
 /*
  * Name resolution modules
