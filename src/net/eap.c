@@ -65,6 +65,8 @@ static int eap_tx_response ( struct eap_supplicant *supplicant,
 	msg->hdr.len = htons ( len );
 	msg->type = supplicant->type;
 	memcpy ( msg->data, rsp, rsp_len );
+	DBGC ( netdev, "EAP %s Response id %#02x type %d\n",
+	       netdev->name, msg->hdr.id, msg->type );
 
 	/* Transmit response */
 	if ( ( rc = supplicant->tx ( supplicant, msg, len ) ) != 0 ) {
@@ -86,18 +88,24 @@ static int eap_tx_response ( struct eap_supplicant *supplicant,
  * @ret rc		Return status code
  */
 static int eap_tx_nak ( struct eap_supplicant *supplicant ) {
+	struct net_device *netdev = supplicant->netdev;
 	unsigned int max = table_num_entries ( EAP_METHODS );
 	uint8_t methods[ max + 1 /* potential EAP_TYPE_NONE */ ];
 	unsigned int count = 0;
 	struct eap_method *method;
 
 	/* Populate methods list */
+	DBGC ( netdev, "EAP %s Nak offering types {", netdev->name );
 	for_each_table_entry ( method, EAP_METHODS ) {
-		if ( method->type > EAP_TYPE_NAK )
+		if ( method->type > EAP_TYPE_NAK ) {
+			DBGC ( netdev, "%s%d",
+			       ( count ? ", " : "" ), method->type );
 			methods[count++] = method->type;
+		}
 	}
 	if ( ! count )
 		methods[count++] = EAP_TYPE_NONE;
+	DBGC ( netdev, "}\n" );
 	assert ( count <= max );
 
 	/* Transmit response */
@@ -269,6 +277,8 @@ static int eap_rx_request ( struct eap_supplicant *supplicant,
 	/* Record request details */
 	supplicant->id = msg->hdr.id;
 	supplicant->type = msg->type;
+	DBGC ( netdev, "EAP %s Request id %#02x type %d\n",
+	       netdev->name, msg->hdr.id, msg->type );
 
 	/* Handle according to type */
 	for_each_table_entry ( method, EAP_METHODS ) {
