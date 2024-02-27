@@ -618,9 +618,6 @@ struct ndp_settings {
 	union ndp_option options[0];
 };
 
-/** NDP settings scope */
-static const struct settings_scope ndp_settings_scope;
-
 /**
  * Construct NDP tag
  *
@@ -674,7 +671,31 @@ static const struct settings_scope ndp_settings_scope;
 static int ndp_applies ( struct settings *settings __unused,
 			 const struct setting *setting ) {
 
-	return ( setting->scope == &ndp_settings_scope );
+	return ( ( setting->scope == &ndp_settings_scope ) ||
+			 ( setting_cmp ( setting, &gateway6_setting ) == 0 ));
+}
+
+/**
+ * Fetch gateway of NDP
+ *
+ * @v ndpset	NDP settings
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int ndp_fetch_gateway6 ( struct ndp_settings *ndpset, void *data, size_t len ) {
+	struct in6_addr *gateway = &ndpset->router;
+
+	/* Do nothing unless a gateway address exists */
+	if ( IN6_IS_ADDR_UNSPECIFIED ( gateway ) )
+		return -ENOENT;
+
+	/* Copy gateway address */
+	if ( len > sizeof ( *gateway ) )
+		len = sizeof ( *gateway );
+	memcpy ( data, gateway, len );
+
+	return sizeof ( *gateway );
 }
 
 /**
@@ -702,6 +723,10 @@ static int ndp_fetch ( struct settings *settings,
 	size_t offset;
 	size_t option_len;
 	void *option_data;
+
+	/* Handle gateway address */
+	if ( setting_cmp ( setting, &gateway6_setting ) == 0 )
+		return ndp_fetch_gateway6 ( ndpset, data, len );
 
 	/* Parse setting tag */
 	tag_type = NDP_TAG_TYPE ( setting->tag );
