@@ -291,6 +291,9 @@ extern const struct settings_scope ipv6_settings_scope;
 /** DHCPv6 setting scope */
 extern const struct settings_scope dhcpv6_scope;
 
+/** NDP setting scope */
+extern const struct settings_scope ndp_settings_scope;
+
 /**
  * A generic settings block
  *

@@ -1242,6 +1242,35 @@ struct net_driver ipv6_driver __net_driver = {
 	.probe = ipv6_register_settings,
 };
 
+
+/**
+ * Get ndp IPv6 gateway
+ *
+ * @v netdev		Network device
+ * @v settings		Settings block
+ * @v gateway6		Buffer to fill with gateway info
+ * @ret rc		Return status code
+ */
+static int ipv6_get_ndp_gateway6 ( struct net_device *netdev,
+				struct settings *settings, struct in6_addr *gateway6) {
+	struct settings *child;
+	struct settings *origin;
+	size_t len;
+
+	list_for_each_entry_reverse ( child, &settings->children, siblings )
+		ipv6_get_ndp_gateway6 ( netdev, child, gateway6 );
+
+	if (settings->default_scope == &ndp_settings_scope) {
+		/* Fetch gateway, if defined */
+		len = fetch_setting ( settings, &gateway6_setting, &origin, NULL,
+					gateway6, sizeof ( *gateway6 ) );
+		if ( ( len != sizeof ( *gateway6 ) ) || ( origin != settings ) )
+			memset ( gateway6, 0, sizeof ( *gateway6 ) );
+	}
+
+	return 0;
+}
+
 /**
  * Create IPv6 routing table based on configured settings
  *
@@ -1250,7 +1279,7 @@ struct net_driver ipv6_driver __net_driver = {
  * @ret rc		Return status code
  */
 static int ipv6_create_routes ( struct net_device *netdev,
-				struct settings *settings ) {
+				struct settings *settings, struct in6_addr *ndp_gateway6) {
 	struct settings *child;
 	struct settings *origin;
 	struct in6_addr ip6_buf;
@@ -1267,7 +1296,7 @@ static int ipv6_create_routes ( struct net_device *netdev,
 	 * blocks.
 	 */
 	list_for_each_entry_reverse ( child, &settings->children, siblings )
-		ipv6_create_routes ( netdev, child );
+		ipv6_create_routes ( netdev, child, ndp_gateway6 );
 
 	/* Fetch IPv6 address, if any */
 	len = fetch_setting ( settings, &ip6_setting, &origin, NULL,
@@ -1289,6 +1318,15 @@ static int ipv6_create_routes ( struct net_device *netdev,
 	if ( ( len != sizeof ( *gateway6 ) ) || ( origin != settings ) )
 		gateway6 = NULL;
 
+	/* If we reach this point with dhcpv6 scope, we have dhcpv6 assigned ip
+	 * so use the gateway from ndp for dhcpv6 assigned ip, if any ndp
+	 * gateway assigned
+	 */
+	if ( !gateway6 && ndp_gateway6 && ( settings->default_scope == &dhcpv6_scope ) ) {
+		gateway6 = &gateway6_buf;
+		memcpy(gateway6, ndp_gateway6, sizeof(*gateway6));
+	}
+
 	/* Create or update route */
 	if ( ( rc = ipv6_add_miniroute ( netdev, ip6, len6, gateway6 ) ) != 0){
 		DBGC ( netdev, "IPv6 %s could not add route: %s\n",
@@ -1309,6 +1347,8 @@ static int ipv6_create_all_routes ( void ) {
 	struct ipv6_miniroute *tmp;
 	struct net_device *netdev;
 	struct settings *settings;
+	struct in6_addr ndp_gateway6_buf;
+	struct in6_addr *ndp_gateway6;
 	int rc;
 
 	/* Delete all existing routes */
@@ -1318,7 +1358,14 @@ static int ipv6_create_all_routes ( void ) {
 	/* Create routes for each configured network device */
 	for_each_netdev ( netdev ) {
 		settings = netdev_settings ( netdev );
-		if ( ( rc = ipv6_create_routes ( netdev, settings ) ) != 0 )
+
+		ndp_gateway6 = &ndp_gateway6_buf;
+		memset ( ndp_gateway6, 0, sizeof ( *ndp_gateway6 ) );
+		ipv6_get_ndp_gateway6( netdev, settings, ndp_gateway6 );
+		if ( IN6_IS_ADDR_UNSPECIFIED(ndp_gateway6) )
+			ndp_gateway6 = NULL;
+
+		if ( ( rc = ipv6_create_routes ( netdev, settings, ndp_gateway6 ) ) != 0 )
 			return rc;
 	}
 
