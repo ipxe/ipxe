@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stddef.h>
+#include <ipxe/uuid.h>
 #include <ipxe/settings.h>
 
 struct net_device;
@@ -128,6 +129,7 @@ struct named_setting {
 extern int parse_string ( char *text, char **value );
 extern int parse_integer ( char *text, unsigned int *value );
 extern int parse_timeout ( char *text, unsigned long *value );
+extern int parse_uuid ( char *text, union uuid *value );
 extern int parse_netdev ( char *text, struct net_device **netdev );
 extern int
 parse_netdev_configurator ( char *text,

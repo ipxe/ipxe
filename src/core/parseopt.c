@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <ipxe/uuid.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/menu.h>
 #include <ipxe/settings.h>
@@ -120,6 +121,28 @@ int parse_timeout ( char *text, unsigned long *value ) {
 
 	/* Convert to a number of timer ticks */
 	*value = ( value_ms * TICKS_PER_MS );
+
+	return 0;
+}
+
+/**
+ * Parse UUID
+ *
+ * @v text		Text
+ * @ret value		UUID value
+ * @ret rc		Return status code
+ */
+int parse_uuid ( char *text, union uuid *value ) {
+	int rc;
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Parse UUID */
+	if ( ( rc = uuid_aton ( text, value ) ) != 0 ) {
+		printf ( "\"%s\": invalid UUID\n", text );
+		return rc;
+	}
 
 	return 0;
 }
