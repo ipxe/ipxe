@@ -2195,6 +2195,37 @@ const struct setting_type setting_type_base64 __setting_type = {
 };
 
 /**
+ * Parse UUID/GUID setting value
+ *
+ * @v type		Setting type
+ * @v value		Formatted setting value
+ * @v buf		Buffer to contain raw value
+ * @v len		Length of buffer
+ * @v size		Integer size, in bytes
+ * @ret len		Length of raw value, or negative error
+ */
+static int parse_uuid_setting ( const struct setting_type *type,
+				const char *value, void *buf, size_t len ) {
+	union uuid uuid;
+	int rc;
+
+	/* Parse UUID */
+	if ( ( rc = uuid_aton ( value, &uuid ) ) != 0 )
+		return rc;
+
+	/* Mangle GUID byte ordering */
+	if ( type == &setting_type_guid )
+		uuid_mangle ( &uuid );
+
+	/* Copy value */
+	if ( len > sizeof ( uuid ) )
+		len = sizeof ( uuid );
+	memcpy ( buf, uuid.raw, len );
+
+	return ( sizeof ( uuid ) );
+}
+
+/**
  * Format UUID/GUID setting value
  *
  * @v type		Setting type
@@ -2227,12 +2258,14 @@ static int format_uuid_setting ( const struct setting_type *type,
 /** UUID setting type */
 const struct setting_type setting_type_uuid __setting_type = {
 	.name = "uuid",
+	.parse = parse_uuid_setting,
 	.format = format_uuid_setting,
 };
 
 /** GUID setting type */
 const struct setting_type setting_type_guid __setting_type = {
 	.name = "guid",
+	.parse = parse_uuid_setting,
 	.format = format_uuid_setting,
 };
 
