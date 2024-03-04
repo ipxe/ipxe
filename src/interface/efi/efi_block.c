@@ -211,25 +211,24 @@ efi_block_io_flush ( EFI_BLOCK_IO_PROTOCOL *block_io ) {
 /**
  * Connect all possible drivers to EFI block device
  *
- * @v sandev		SAN device
+ * @v drive		Drive number
+ * @v handle		Block device handle
  */
-static void efi_block_connect ( struct san_device *sandev ) {
+static void efi_block_connect ( unsigned int drive, EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	struct efi_block_data *block = sandev->priv;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Try to connect all possible drivers to this block device */
-	if ( ( efirc = bs->ConnectController ( block->handle, NULL,
-					       NULL, TRUE ) ) != 0 ) {
+	if ( ( efirc = bs->ConnectController ( handle, NULL, NULL,
+					       TRUE ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev->drive, "EFIBLK %#02x could not connect "
-		       "drivers: %s\n", sandev->drive, strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x could not connect drivers: %s\n",
+		       drive, strerror ( rc ) );
 		/* May not be an error; may already be connected */
 	}
-	DBGC2 ( sandev->drive, "EFIBLK %#02x supports protocols:\n",
-		sandev->drive );
-	DBGC2_EFI_PROTOCOLS ( sandev->drive, block->handle );
+	DBGC2 ( drive, "EFIBLK %#02x supports protocols:\n", drive );
+	DBGC2_EFI_PROTOCOLS ( drive, handle );
 }
 
 /**
@@ -316,7 +315,7 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 	}
 
 	/* Connect all possible protocols */
-	efi_block_connect ( sandev );
+	efi_block_connect ( drive, block->handle );
 
 	return drive;
 
@@ -507,12 +506,12 @@ static int efi_block_describe ( void ) {
 /**
  * Check for existence of a file within a filesystem
  *
- * @v sandev		SAN device
+ * @v drive		Drive number
  * @v handle		Filesystem handle
  * @v filename		Filename (or NULL to use default)
  * @ret rc		Return status code
  */
-static int efi_block_filename ( struct san_device *sandev, EFI_HANDLE handle,
+static int efi_block_filename ( unsigned int drive, EFI_HANDLE handle,
 				const char *filename ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_GUID *protocol = &efi_simple_file_system_protocol_guid;
@@ -540,8 +539,8 @@ static int efi_block_filename ( struct san_device *sandev, EFI_HANDLE handle,
 					  efi_image_handle, handle,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
 		rc = -EEFI ( efirc );
-		DBGC ( sandev->drive, "EFIBLK %#02x could not open %s device "
-		       "path: %s\n", sandev->drive, efi_handle_name ( handle ),
+		DBGC ( drive, "EFIBLK %#02x could not open %s device path: "
+		       "%s\n", drive, efi_handle_name ( handle ),
 		       strerror ( rc ) );
 		goto err_open;
 	}
@@ -549,9 +548,8 @@ static int efi_block_filename ( struct san_device *sandev, EFI_HANDLE handle,
 	/* Open root volume */
 	if ( ( efirc = u.fs->OpenVolume ( u.fs, &root ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev->drive, "EFIBLK %#02x could not open %s root: "
-		       "%s\n", sandev->drive, efi_handle_name ( handle ),
-		       strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x could not open %s root: %s\n",
+		       drive, efi_handle_name ( handle ), strerror ( rc ) );
 		goto err_volume;
 	}
 
@@ -559,9 +557,9 @@ static int efi_block_filename ( struct san_device *sandev, EFI_HANDLE handle,
 	if ( ( efirc = root->Open ( root, &file, wname,
 				    EFI_FILE_MODE_READ, 0 ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev->drive, "EFIBLK %#02x could not open %s/%ls: "
-		       "%s\n", sandev->drive, efi_handle_name ( handle ),
-		       wname, strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x could not open %s/%ls: %s\n",
+		       drive, efi_handle_name ( handle ), wname,
+		       strerror ( rc ) );
 		goto err_file;
 	}
 
@@ -580,14 +578,14 @@ static int efi_block_filename ( struct san_device *sandev, EFI_HANDLE handle,
 /**
  * Check EFI block device filesystem match
  *
- * @v sandev		SAN device
+ * @v drive		Drive number
  * @v handle		Filesystem handle
  * @v path		Block device path
  * @v filename		Filename (or NULL to use default)
  * @v fspath		Filesystem device path to fill in
  * @ret rc		Return status code
  */
-static int efi_block_match ( struct san_device *sandev, EFI_HANDLE handle,
+static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 			     EFI_DEVICE_PATH_PROTOCOL *path,
 			     const char *filename,
 			     EFI_DEVICE_PATH_PROTOCOL **fspath ) {
@@ -605,8 +603,8 @@ static int efi_block_match ( struct san_device *sandev, EFI_HANDLE handle,
 					  efi_image_handle, handle,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
 		rc = -EEFI ( efirc );
-		DBGC ( sandev->drive, "EFIBLK %#02x could not open %s device "
-		       "path: %s\n", sandev->drive, efi_handle_name ( handle ),
+		DBGC ( drive, "EFIBLK %#02x could not open %s device path: "
+		       "%s\n", drive, efi_handle_name ( handle ),
 		       strerror ( rc ) );
 		goto err_open;
 	}
@@ -616,15 +614,15 @@ static int efi_block_match ( struct san_device *sandev, EFI_HANDLE handle,
 	if ( memcmp ( u.path, path, efi_path_len ( path ) ) != 0 ) {
 		/* Not a child device */
 		rc = -ENOTTY;
-		DBGC2 ( sandev->drive, "EFIBLK %#02x is not parent of %s\n",
-			sandev->drive, efi_handle_name ( handle ) );
+		DBGC2 ( drive, "EFIBLK %#02x is not parent of %s\n",
+			drive, efi_handle_name ( handle ) );
 		goto err_not_child;
 	}
-	DBGC ( sandev->drive, "EFIBLK %#02x contains filesystem %s\n",
-	       sandev->drive, efi_devpath_text ( u.path ) );
+	DBGC ( drive, "EFIBLK %#02x contains filesystem %s\n",
+	       drive, efi_devpath_text ( u.path ) );
 
 	/* Check if filesystem contains boot filename */
-	if ( ( rc = efi_block_filename ( sandev, handle, filename ) ) != 0 )
+	if ( ( rc = efi_block_filename ( drive, handle, filename ) ) != 0 )
 		goto err_filename;
 
 	/* Success */
@@ -640,15 +638,21 @@ static int efi_block_match ( struct san_device *sandev, EFI_HANDLE handle,
 /**
  * Scan EFI block device for a matching filesystem
  *
- * @v sandev		SAN device
+ * @v drive		Drive number
+ * @v handle		Block device handle
  * @v filename		Filename (or NULL to use default)
  * @v fspath		Filesystem device path to fill in
  * @ret rc		Return status code
  */
-static int efi_block_scan ( struct san_device *sandev, const char *filename,
+static int efi_block_scan ( unsigned int drive, EFI_HANDLE handle,
+			    const char *filename,
 			    EFI_DEVICE_PATH_PROTOCOL **fspath ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	struct efi_block_data *block = sandev->priv;
+	EFI_GUID *protocol = &efi_device_path_protocol_guid;
+	union {
+		EFI_DEVICE_PATH_PROTOCOL *path;
+		void *interface;
+	} u;
 	EFI_HANDLE *handles;
 	UINTN count;
 	unsigned int i;
@@ -656,15 +660,25 @@ static int efi_block_scan ( struct san_device *sandev, const char *filename,
 	int rc;
 
 	/* Connect up possible file system drivers */
-	efi_block_connect ( sandev );
+	efi_block_connect ( drive, handle );
+
+	/* Identify device path */
+	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
+					  efi_image_handle, handle,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( drive, "EFIBLK %#02x could not open device path: %s\n",
+		       drive, strerror ( rc ) );
+		goto err_open;
+	}
 
 	/* Locate all Simple File System protocol handles */
 	if ( ( efirc = bs->LocateHandleBuffer (
 			ByProtocol, &efi_simple_file_system_protocol_guid,
 			NULL, &count, &handles ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev->drive, "EFIBLK %#02x cannot locate file "
-		       "systems: %s\n", sandev->drive, strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x cannot locate file systems: %s\n",
+		       drive, strerror ( rc ) );
 		goto err_locate;
 	}
 
@@ -673,7 +687,7 @@ static int efi_block_scan ( struct san_device *sandev, const char *filename,
 	for ( i = 0 ; i < count ; i++ ) {
 
 		/* Check for a matching filesystem */
-		if ( ( rc = efi_block_match ( sandev, handles[i], block->path,
+		if ( ( rc = efi_block_match ( drive, handles[i], u.path,
 					      filename, fspath ) ) != 0 )
 			continue;
 
@@ -682,18 +696,20 @@ static int efi_block_scan ( struct san_device *sandev, const char *filename,
 
 	bs->FreePool ( handles );
  err_locate:
+	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
+ err_open:
 	return rc;
 }
 
 /**
  * Boot from EFI block device filesystem boot image
  *
- * @v sandev		SAN device
+ * @v drive		Drive number
  * @v fspath		Filesystem device path
  * @v filename		Filename (or NULL to use default)
  * @ret rc		Return status code
  */
-static int efi_block_exec ( struct san_device *sandev,
+static int efi_block_exec ( unsigned int drive,
 			    EFI_DEVICE_PATH_PROTOCOL *fspath,
 			    const char *filename ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
@@ -735,16 +751,16 @@ static int efi_block_exec ( struct san_device *sandev,
 	}
 	end = ( ( ( void * ) filepath ) + filepath_len );
 	efi_path_terminate ( end );
-	DBGC ( sandev->drive, "EFIBLK %#02x trying to load %s\n",
-	       sandev->drive, efi_devpath_text ( path ) );
+	DBGC ( drive, "EFIBLK %#02x trying to load %s\n",
+	       drive, efi_devpath_text ( path ) );
 
 	/* Load image */
 	image = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path, NULL, 0,
 				       &image ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev->drive, "EFIBLK %#02x could not load: %s\n",
-		       sandev->drive, strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x could not load: %s\n",
+		       drive, strerror ( rc ) );
 		if ( efirc == EFI_SECURITY_VIOLATION ) {
 			goto err_load_security_violation;
 		} else {
@@ -755,8 +771,8 @@ static int efi_block_exec ( struct san_device *sandev,
 	/* Start image */
 	efirc = bs->StartImage ( image, NULL, NULL );
 	rc = ( efirc ? -EEFI ( efirc ) : 0 );
-	DBGC ( sandev->drive, "EFIBLK %#02x boot image returned: %s\n",
-	       sandev->drive, strerror ( rc ) );
+	DBGC ( drive, "EFIBLK %#02x boot image returned: %s\n",
+	       drive, strerror ( rc ) );
 
  err_load_security_violation:
 	bs->UnloadImage ( image );
@@ -776,6 +792,7 @@ static int efi_block_exec ( struct san_device *sandev,
 static int efi_block_boot ( unsigned int drive, const char *filename ) {
 	EFI_DEVICE_PATH_PROTOCOL *fspath = NULL;
 	struct san_device *sandev;
+	struct efi_block_data *block;
 	int rc;
 
 	/* Find SAN device */
@@ -785,17 +802,19 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 		rc = -ENODEV;
 		goto err_sandev_find;
 	}
+	block = sandev->priv;
 
 	/* Release SNP devices */
 	efi_snp_release();
 
 	/* Scan for a matching filesystem within this block device */
-	if ( ( rc = efi_block_scan ( sandev, filename, &fspath ) ) != 0 ) {
+	if ( ( rc = efi_block_scan ( drive, block->handle, filename,
+				     &fspath ) ) != 0 ) {
 		goto err_scan;
 	}
 
 	/* Attempt to boot from this filesystem */
-	if ( ( rc = efi_block_exec ( sandev, fspath, filename ) ) != 0 )
+	if ( ( rc = efi_block_exec ( drive, fspath, filename ) ) != 0 )
 		goto err_exec;
 
  err_exec:
