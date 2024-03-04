@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/settings.h>
 #include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_uripath.h>
 #include <ipxe/efi/efi_strings.h>
 
 /** EFI variable settings scope */
@@ -220,7 +221,12 @@ static struct settings efivars = {
  *
  */
 static void efivars_init ( void ) {
-	int rc;
+	int rc;	
+	EFI_HANDLE device = efi_loaded_image->DeviceHandle;
+	EFI_DEVICE_PATH_PROTOCOL *devpath = efi_loaded_image_path;
+	
+	/* Locate uri-path, if any */
+	efi_set_uri_path ( device, devpath );
 
 	/* Register settings block */
 	if ( ( rc = register_settings ( &efivars, NULL, "efi" ) ) != 0 ) {

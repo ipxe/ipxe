@@ -2443,6 +2443,13 @@ const struct setting root_path_setting __setting ( SETTING_SANBOOT, root-path)={
 	.type = &setting_type_string,
 };
 
+/** Root path setting */
+const struct setting uri_path_setting __setting ( SETTING_BOOT, uri-path)={
+	.name = "uri-path",
+	.description = "HTTPS uri source from uEFI",
+	.type = &setting_type_string,
+};
+
 /** SAN filename setting */
 const struct setting san_filename_setting __setting ( SETTING_SANBOOT,
 						      san-filename ) = {

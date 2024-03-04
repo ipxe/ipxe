@@ -453,6 +453,8 @@ filename_setting __setting ( SETTING_BOOT, filename );
 extern const struct setting
 root_path_setting __setting ( SETTING_SANBOOT, root-path );
 extern const struct setting
+uri_path_setting __setting ( SETTING_BOOT, uri-path );
+extern const struct setting
 san_filename_setting __setting ( SETTING_SANBOOT, san-filename );
 extern const struct setting
 username_setting __setting ( SETTING_AUTH, username );
