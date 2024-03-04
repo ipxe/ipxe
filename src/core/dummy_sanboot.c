@@ -55,7 +55,7 @@ static int dummy_san_hook ( unsigned int drive, struct uri **uris,
 
 	/* Register SAN device */
 	if ( ( rc = register_sandev ( sandev, drive, flags ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x could not register: %s\n",
+		DBGC ( sandev->drive, "SAN %#02x could not register: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		goto err_register;
 	}
@@ -80,7 +80,7 @@ static void dummy_san_unhook ( unsigned int drive ) {
 	/* Find drive */
 	sandev = sandev_find ( drive );
 	if ( ! sandev ) {
-		DBG ( "SAN %#02x does not exist\n", drive );
+		DBGC ( drive, "SAN %#02x does not exist\n", drive );
 		return;
 	}
 

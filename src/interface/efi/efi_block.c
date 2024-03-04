@@ -101,7 +101,7 @@ static int efi_block_rw ( struct san_device *sandev, uint64_t lba,
 	/* Sanity check */
 	count = ( len / block->media.BlockSize );
 	if ( ( count * block->media.BlockSize ) != len ) {
-		DBGC ( sandev, "EFIBLK %#02x impossible length %#zx\n",
+		DBGC ( sandev->drive, "EFIBLK %#02x impossible length %#zx\n",
 		       sandev->drive, len );
 		return -EINVAL;
 	}
@@ -109,7 +109,7 @@ static int efi_block_rw ( struct san_device *sandev, uint64_t lba,
 	/* Read from / write to block device */
 	if ( ( rc = sandev_rw ( sandev, lba, count,
 				virt_to_user ( data ) ) ) != 0 ) {
-		DBGC ( sandev, "EFIBLK %#02x I/O failed: %s\n",
+		DBGC ( sandev->drive, "EFIBLK %#02x I/O failed: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		return rc;
 	}
@@ -131,7 +131,7 @@ static EFI_STATUS EFIAPI efi_block_io_reset ( EFI_BLOCK_IO_PROTOCOL *block_io,
 	struct san_device *sandev = block->sandev;
 	int rc;
 
-	DBGC2 ( sandev, "EFIBLK %#02x reset\n", sandev->drive );
+	DBGC2 ( sandev->drive, "EFIBLK %#02x reset\n", sandev->drive );
 	efi_snp_claim();
 	rc = sandev_reset ( sandev );
 	efi_snp_release();
@@ -156,7 +156,7 @@ efi_block_io_read ( EFI_BLOCK_IO_PROTOCOL *block_io, UINT32 media __unused,
 	struct san_device *sandev = block->sandev;
 	int rc;
 
-	DBGC2 ( sandev, "EFIBLK %#02x read LBA %#08llx to %p+%#08zx\n",
+	DBGC2 ( sandev->drive, "EFIBLK %#02x read LBA %#08llx to %p+%#08zx\n",
 		sandev->drive, lba, data, ( ( size_t ) len ) );
 	efi_snp_claim();
 	rc = efi_block_rw ( sandev, lba, data, len, sandev_read );
@@ -182,8 +182,8 @@ efi_block_io_write ( EFI_BLOCK_IO_PROTOCOL *block_io, UINT32 media __unused,
 	struct san_device *sandev = block->sandev;
 	int rc;
 
-	DBGC2 ( sandev, "EFIBLK %#02x write LBA %#08llx from %p+%#08zx\n",
-		sandev->drive, lba, data, ( ( size_t ) len ) );
+	DBGC2 ( sandev->drive, "EFIBLK %#02x write LBA %#08llx from "
+		"%p+%#08zx\n", sandev->drive, lba, data, ( ( size_t ) len ) );
 	efi_snp_claim();
 	rc = efi_block_rw ( sandev, lba, data, len, sandev_write );
 	efi_snp_release();
@@ -202,7 +202,7 @@ efi_block_io_flush ( EFI_BLOCK_IO_PROTOCOL *block_io ) {
 		container_of ( block_io, struct efi_block_data, block_io );
 	struct san_device *sandev = block->sandev;
 
-	DBGC2 ( sandev, "EFIBLK %#02x flush\n", sandev->drive );
+	DBGC2 ( sandev->drive, "EFIBLK %#02x flush\n", sandev->drive );
 
 	/* Nothing to do */
 	return 0;
@@ -223,12 +223,13 @@ static void efi_block_connect ( struct san_device *sandev ) {
 	if ( ( efirc = bs->ConnectController ( block->handle, NULL,
 					       NULL, TRUE ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev, "EFIBLK %#02x could not connect drivers: %s\n",
-		       sandev->drive, strerror ( rc ) );
+		DBGC ( sandev->drive, "EFIBLK %#02x could not connect "
+		       "drivers: %s\n", sandev->drive, strerror ( rc ) );
 		/* May not be an error; may already be connected */
 	}
-	DBGC2 ( sandev, "EFIBLK %#02x supports protocols:\n", sandev->drive );
-	DBGC2_EFI_PROTOCOLS ( sandev, block->handle );
+	DBGC2 ( sandev->drive, "EFIBLK %#02x supports protocols:\n",
+		sandev->drive );
+	DBGC2_EFI_PROTOCOLS ( sandev->drive, block->handle );
 }
 
 /**
@@ -251,7 +252,7 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 
 	/* Sanity check */
 	if ( ! count ) {
-		DBG ( "EFIBLK has no URIs\n" );
+		DBGC ( drive, "EFIBLK %#02x has no URIs\n", drive );
 		rc = -ENOTTY;
 		goto err_no_uris;
 	}
@@ -275,7 +276,7 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 
 	/* Register SAN device */
 	if ( ( rc = register_sandev ( sandev, drive, flags ) ) != 0 ) {
-		DBGC ( sandev, "EFIBLK %#02x could not register: %s\n",
+		DBGC ( drive, "EFIBLK %#02x could not register: %s\n",
 		       drive, strerror ( rc ) );
 		goto err_register;
 	}
@@ -289,17 +290,17 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 	/* Construct device path */
 	if ( ! sandev->active ) {
 		rc = -ENODEV;
-		DBGC ( sandev, "EFIBLK %#02x not active after registration\n",
+		DBGC ( drive, "EFIBLK %#02x not active after registration\n",
 		       drive );
 		goto err_active;
 	}
 	block->path = efi_describe ( &sandev->active->block );
 	if ( ! block->path ) {
 		rc = -ENODEV;
-		DBGC ( sandev, "EFIBLK %#02x has no device path\n", drive );
+		DBGC ( drive, "EFIBLK %#02x has no device path\n", drive );
 		goto err_describe;
 	}
-	DBGC ( sandev, "EFIBLK %#02x has device path %s\n",
+	DBGC ( drive, "EFIBLK %#02x has device path %s\n",
 	       drive, efi_devpath_text ( block->path ) );
 
 	/* Install protocols */
@@ -309,8 +310,8 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 			&efi_device_path_protocol_guid, block->path,
 			NULL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev, "EFIBLK %#02x could not install protocols: %s\n",
-		       sandev->drive, strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x could not install protocols: %s\n",
+		       drive, strerror ( rc ) );
 		goto err_install;
 	}
 
@@ -324,8 +325,8 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 			&efi_block_io_protocol_guid, &block->block_io,
 			&efi_device_path_protocol_guid, block->path,
 			NULL ) ) != 0 ) {
-		DBGC ( sandev, "EFIBLK %#02x could not uninstall protocols: "
-		       "%s\n", sandev->drive, strerror ( -EEFI ( efirc ) ) );
+		DBGC ( drive, "EFIBLK %#02x could not uninstall protocols: "
+		       "%s\n", drive, strerror ( -EEFI ( efirc ) ) );
 		leak = 1;
 	}
 	efi_nullify_block ( &block->block_io );
@@ -342,10 +343,8 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 		sandev_put ( sandev );
  err_alloc:
  err_no_uris:
-	if ( leak ) {
-		DBGC ( sandev, "EFIBLK %#02x nullified and leaked\n",
-		       sandev->drive );
-	}
+	if ( leak )
+		DBGC ( drive, "EFIBLK %#02x nullified and leaked\n", drive );
 	return rc;
 }
 
@@ -364,7 +363,7 @@ static void efi_block_unhook ( unsigned int drive ) {
 	/* Find SAN device */
 	sandev = sandev_find ( drive );
 	if ( ! sandev ) {
-		DBG ( "EFIBLK cannot find drive %#02x\n", drive );
+		DBGC ( drive, "EFIBLK %#02x is not a SAN drive\n", drive );
 		return;
 	}
 	block = sandev->priv;
@@ -376,8 +375,8 @@ static void efi_block_unhook ( unsigned int drive ) {
 			&efi_block_io_protocol_guid, &block->block_io,
 			&efi_device_path_protocol_guid, block->path,
 			NULL ) ) != 0 ) ) {
-		DBGC ( sandev, "EFIBLK %#02x could not uninstall protocols: "
-		       "%s\n", sandev->drive, strerror ( -EEFI ( efirc ) ) );
+		DBGC ( drive, "EFIBLK %#02x could not uninstall protocols: "
+		       "%s\n", drive, strerror ( -EEFI ( efirc ) ) );
 		leak = 1;
 	}
 	efi_nullify_block ( &block->block_io );
@@ -396,10 +395,8 @@ static void efi_block_unhook ( unsigned int drive ) {
 		sandev_put ( sandev );
 
 	/* Report leakage, if applicable */
-	if ( leak && ( ! efi_shutdown_in_progress ) ) {
-		DBGC ( sandev, "EFIBLK %#02x nullified and leaked\n",
-		       sandev->drive );
-	}
+	if ( leak && ( ! efi_shutdown_in_progress ) )
+		DBGC ( drive, "EFIBLK %#02x nullified and leaked\n", drive );
 }
 
 /** An installed ACPI table */
@@ -539,8 +536,8 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 					  &path.interface, efi_image_handle,
 					  handle,
 					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		DBGC ( sandev, "EFIBLK %#02x found filesystem with no device "
-		       "path??", sandev->drive );
+		DBGC ( sandev->drive, "EFIBLK %#02x found filesystem with no "
+		       "device path??", sandev->drive );
 		rc = -EEFI ( efirc );
 		goto err_open_device_path;
 	}
@@ -552,7 +549,7 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 		rc = -ENOTTY;
 		goto err_not_child;
 	}
-	DBGC ( sandev, "EFIBLK %#02x found child device %s\n",
+	DBGC ( sandev->drive, "EFIBLK %#02x found child device %s\n",
 	       sandev->drive, efi_devpath_text ( path.path ) );
 
 	/* Construct device path for boot image */
@@ -583,7 +580,7 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 	}
 	end = ( ( ( void * ) filepath ) + filepath_len );
 	efi_path_terminate ( end );
-	DBGC ( sandev, "EFIBLK %#02x trying to load %s\n",
+	DBGC ( sandev->drive, "EFIBLK %#02x trying to load %s\n",
 	       sandev->drive, efi_devpath_text ( boot_path ) );
 
 	/* Try loading boot image from this device */
@@ -591,7 +588,7 @@ static int efi_block_boot_image ( struct san_device *sandev, EFI_HANDLE handle,
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, boot_path,
 				       NULL, 0, image ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev, "EFIBLK %#02x could not load image: %s\n",
+		DBGC ( sandev->drive, "EFIBLK %#02x could not load image: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		if ( efirc == EFI_SECURITY_VIOLATION )
 			bs->UnloadImage ( *image );
@@ -629,7 +626,7 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 	/* Find SAN device */
 	sandev = sandev_find ( drive );
 	if ( ! sandev ) {
-		DBG ( "EFIBLK cannot find drive %#02x\n", drive );
+		DBGC ( drive, "EFIBLK %#02x is not a SAN drive\n", drive );
 		rc = -ENODEV;
 		goto err_sandev_find;
 	}
@@ -645,8 +642,8 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 			ByProtocol, &efi_simple_file_system_protocol_guid,
 			NULL, &count, &handles ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( sandev, "EFIBLK %#02x cannot locate file systems: %s\n",
-		       sandev->drive, strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x cannot locate file systems: %s\n",
+		       drive, strerror ( rc ) );
 		goto err_locate_file_systems;
 	}
 
@@ -660,13 +657,12 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 		if ( ( rc = efi_block_boot_image ( sandev, handles[i], filename,
 						   &image ) ) != 0 )
 			continue;
-		DBGC ( sandev, "EFIBLK %#02x found boot image\n",
-		       sandev->drive );
+		DBGC ( drive, "EFIBLK %#02x found boot image\n", drive );
 		efirc = bs->StartImage ( image, NULL, NULL );
 		rc = ( efirc ? -EEFI ( efirc ) : 0 );
 		bs->UnloadImage ( image );
-		DBGC ( sandev, "EFIBLK %#02x boot image returned: %s\n",
-		       sandev->drive, strerror ( rc ) );
+		DBGC ( drive, "EFIBLK %#02x boot image returned: %s\n",
+		       drive, strerror ( rc ) );
 		break;
 	}
 
