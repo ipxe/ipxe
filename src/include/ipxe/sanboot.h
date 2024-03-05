@@ -234,6 +234,7 @@ static inline int sandev_needs_reopen ( struct san_device *sandev ) {
 }
 
 extern struct san_device * sandev_find ( unsigned int drive );
+extern struct san_device * sandev_next ( unsigned int drive );
 extern int sandev_reopen ( struct san_device *sandev );
 extern int sandev_reset ( struct san_device *sandev );
 extern int sandev_read ( struct san_device *sandev, uint64_t lba,

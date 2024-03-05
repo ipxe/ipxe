@@ -108,6 +108,22 @@ struct san_device * sandev_find ( unsigned int drive ) {
 }
 
 /**
+ * Find next SAN device by drive number
+ *
+ * @v drive		Minimum drive number
+ * @ret sandev		SAN device, or NULL
+ */
+struct san_device * sandev_next ( unsigned int drive ) {
+	struct san_device *sandev;
+
+	list_for_each_entry ( sandev, &san_devices, list ) {
+		if ( sandev->drive >= drive )
+			return sandev;
+	}
+	return NULL;
+}
+
+/**
  * Free SAN device
  *
  * @v refcnt		Reference count
@@ -870,6 +886,7 @@ struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
  */
 int register_sandev ( struct san_device *sandev, unsigned int drive,
 		      unsigned int flags ) {
+	struct san_device *before;
 	int rc;
 
 	/* Check that drive number is not in use */
@@ -903,8 +920,12 @@ int register_sandev ( struct san_device *sandev, unsigned int drive,
 	if ( ( rc = sandev_parse_iso9660 ( sandev ) ) != 0 )
 		goto err_iso9660;
 
-	/* Add to list of SAN devices */
-	list_add_tail ( &sandev->list, &san_devices );
+	/* Add to list of SAN devices, in drive order */
+	for_each_sandev ( before ) {
+		if ( before->drive > sandev->drive )
+			break;
+	}
+	list_add_tail ( &sandev->list, &before->list );
 	DBGC ( sandev->drive, "SAN %#02x registered\n", sandev->drive );
 
 	return 0;
