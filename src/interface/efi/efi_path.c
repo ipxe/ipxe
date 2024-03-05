@@ -22,9 +22,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <errno.h>
 #include <byteswap.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/vlan.h>
+#include <ipxe/uuid.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/uri.h>
 #include <ipxe/iscsi.h>
@@ -130,6 +132,47 @@ unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 
 	/* No VLAN device path found */
 	return 0;
+}
+
+/**
+ * Get partition GUID from device path
+ *
+ * @v path		Device path
+ * @v guid		Partition GUID to fill in
+ * @ret rc		Return status code
+ */
+int efi_path_guid ( EFI_DEVICE_PATH_PROTOCOL *path, union uuid *guid ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	HARDDRIVE_DEVICE_PATH *hd;
+	int rc;
+
+	/* Search for most specific partition device path */
+	rc = -ENOENT;
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+
+		/* Skip non-harddrive device paths */
+		if ( path->Type != MEDIA_DEVICE_PATH )
+			continue;
+		if ( path->SubType != MEDIA_HARDDRIVE_DP )
+			continue;
+
+		/* Skip non-GUID signatures */
+		hd = container_of ( path, HARDDRIVE_DEVICE_PATH, Header );
+		if ( hd->SignatureType != SIGNATURE_TYPE_GUID )
+			continue;
+
+		/* Extract GUID */
+		memcpy ( guid, hd->Signature, sizeof ( *guid ) );
+		uuid_mangle ( guid );
+
+		/* Record success, but continue searching in case
+		 * there exists a more specific GUID (e.g. a partition
+		 * GUID rather than a disk GUID).
+		 */
+		rc = 0;
+	}
+
+	return rc;
 }
 
 /**

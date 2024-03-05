@@ -20,6 +20,7 @@ struct aoe_device;
 struct fcp_description;
 struct ib_srp_device;
 struct usb_function;
+union uuid;
 
 /**
  * Terminate device path
@@ -43,6 +44,7 @@ extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern int efi_path_guid ( EFI_DEVICE_PATH_PROTOCOL *path, union uuid *uuid );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first,
 					      ... );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev );
