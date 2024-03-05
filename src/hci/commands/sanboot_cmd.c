@@ -100,6 +100,7 @@ static int sanboot_core_exec ( int argc, char **argv,
 			       struct command_descriptor *cmd,
 			       int default_flags, int no_root_path_flags ) {
 	struct sanboot_options opts;
+	struct san_boot_config config;
 	struct uri *uris[argc];
 	int count;
 	int flags;
@@ -124,6 +125,9 @@ static int sanboot_core_exec ( int argc, char **argv,
 		}
 	}
 
+	/* Construct configuration parameters */
+	config.filename = opts.filename;
+
 	/* Construct flags */
 	flags = default_flags;
 	if ( opts.no_describe )
@@ -134,7 +138,7 @@ static int sanboot_core_exec ( int argc, char **argv,
 		flags |= no_root_path_flags;
 
 	/* Boot from root path */
-	if ( ( rc = uriboot ( NULL, uris, count, opts.drive, opts.filename,
+	if ( ( rc = uriboot ( NULL, uris, count, opts.drive, &config,
 			      flags ) ) != 0 )
 		goto err_uriboot;
 

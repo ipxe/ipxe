@@ -583,13 +583,13 @@ static int efi_block_filename ( unsigned int drive, EFI_HANDLE handle,
  * @v drive		Drive number
  * @v handle		Filesystem handle
  * @v path		Block device path
- * @v filename		Filename (or NULL to use default)
+ * @v config		Boot configuration parameters
  * @v fspath		Filesystem device path to fill in
  * @ret rc		Return status code
  */
 static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 			     EFI_DEVICE_PATH_PROTOCOL *path,
-			     const char *filename,
+			     struct san_boot_config *config,
 			     EFI_DEVICE_PATH_PROTOCOL **fspath ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_GUID *protocol = &efi_device_path_protocol_guid;
@@ -624,8 +624,10 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 	       drive, efi_devpath_text ( u.path ) );
 
 	/* Check if filesystem contains boot filename */
-	if ( ( rc = efi_block_filename ( drive, handle, filename ) ) != 0 )
+	if ( ( rc = efi_block_filename ( drive, handle,
+					 config->filename ) ) != 0 ) {
 		goto err_filename;
+	}
 
 	/* Success */
 	rc = 0;
@@ -642,12 +644,12 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
  *
  * @v drive		Drive number
  * @v handle		Block device handle
- * @v filename		Filename (or NULL to use default)
+ * @v config		Boot configuration parameters
  * @v fspath		Filesystem device path to fill in
  * @ret rc		Return status code
  */
 static int efi_block_scan ( unsigned int drive, EFI_HANDLE handle,
-			    const char *filename,
+			    struct san_boot_config *config,
 			    EFI_DEVICE_PATH_PROTOCOL **fspath ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_GUID *protocol = &efi_device_path_protocol_guid;
@@ -690,7 +692,7 @@ static int efi_block_scan ( unsigned int drive, EFI_HANDLE handle,
 
 		/* Check for a matching filesystem */
 		if ( ( rc = efi_block_match ( drive, handles[i], u.path,
-					      filename, fspath ) ) != 0 )
+					      config, fspath ) ) != 0 )
 			continue;
 
 		break;
@@ -847,10 +849,11 @@ static int efi_block_local ( EFI_HANDLE handle ) {
  * Boot from EFI block device
  *
  * @v drive		Drive number
- * @v filename		Filename (or NULL to use default)
+ * @v config		Boot configuration parameters
  * @ret rc		Return status code
  */
-static int efi_block_boot ( unsigned int drive, const char *filename ) {
+static int efi_block_boot ( unsigned int drive,
+			    struct san_boot_config *config ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_DEVICE_PATH_PROTOCOL *fspath = NULL;
 	EFI_HANDLE *handles;
@@ -943,13 +946,13 @@ static int efi_block_boot ( unsigned int drive, const char *filename ) {
 		DBGC ( vdrive, "EFIBLK %#02x attempting to boot\n", vdrive );
 
 		/* Scan for a matching filesystem within this drive */
-		if ( ( rc = efi_block_scan ( vdrive, handle, filename,
+		if ( ( rc = efi_block_scan ( vdrive, handle, config,
 					     &fspath ) ) != 0 ) {
 			continue;
 		}
 
 		/* Attempt to boot from the matched filesystem */
-		rc = efi_block_exec ( vdrive, fspath, filename );
+		rc = efi_block_exec ( vdrive, fspath, config->filename );
 		break;
 	}
 
