@@ -299,8 +299,8 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 		DBGC ( drive, "EFIBLK %#02x has no device path\n", drive );
 		goto err_describe;
 	}
-	DBGC ( drive, "EFIBLK %#02x has device path %s\n",
-	       drive, efi_devpath_text ( block->path ) );
+	DBGC2 ( drive, "EFIBLK %#02x has device path %s\n",
+		drive, efi_devpath_text ( block->path ) );
 
 	/* Install protocols */
 	if ( ( efirc = bs->InstallMultipleProtocolInterfaces (
@@ -313,6 +313,8 @@ static int efi_block_hook ( unsigned int drive, struct uri **uris,
 		       drive, strerror ( rc ) );
 		goto err_install;
 	}
+	DBGC ( drive, "EFIBLK %#02x installed as SAN drive %s\n",
+	       drive, efi_handle_name ( block->handle ) );
 
 	/* Connect all possible protocols */
 	efi_block_connect ( drive, block->handle );
@@ -783,6 +785,65 @@ static int efi_block_exec ( unsigned int drive,
 }
 
 /**
+ * Check that EFI block device is eligible for a local virtual drive number
+ *
+ * @v handle		Block device handle
+ * @ret rc		Return status code
+ *
+ * We assign virtual drive numbers for local (non-SAN) EFI block
+ * devices that represent complete disks, to provide roughly
+ * equivalent functionality to BIOS drive numbers.
+ */
+static int efi_block_local ( EFI_HANDLE handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_GUID *protocol = &efi_block_io_protocol_guid;
+	struct san_device *sandev;
+	struct efi_block_data *block;
+	union {
+		EFI_BLOCK_IO_PROTOCOL *blockio;
+		void *interface;
+	} u;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Check if handle belongs to a SAN device */
+	for_each_sandev ( sandev ) {
+		block = sandev->priv;
+		if ( handle == block->handle ) {
+			rc = -ENOTTY;
+			goto err_sandev;
+		}
+	}
+
+	/* Open block I/O protocol */
+	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
+					  efi_image_handle, handle,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( handle, "EFIBLK %s could not open block I/O: %s\n",
+		       efi_handle_name ( handle ), strerror ( rc ) );
+		goto err_open;
+	}
+
+	/* Do not assign drive numbers for partitions */
+	if ( u.blockio->Media->LogicalPartition ) {
+		rc = -ENOTTY;
+		DBGC2 ( handle, "EFLBLK %s is a partition\n",
+			efi_handle_name ( handle ) );
+		goto err_partition;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_partition:
+	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
+ err_open:
+ err_sandev:
+	return rc;
+}
+
+/**
  * Boot from EFI block device
  *
  * @v drive		Drive number
@@ -790,37 +851,111 @@ static int efi_block_exec ( unsigned int drive,
  * @ret rc		Return status code
  */
 static int efi_block_boot ( unsigned int drive, const char *filename ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_DEVICE_PATH_PROTOCOL *fspath = NULL;
+	EFI_HANDLE *handles;
+	EFI_HANDLE handle;
+	UINTN count;
 	struct san_device *sandev;
 	struct efi_block_data *block;
+	unsigned int vdrive;
+	unsigned int index;
+	EFI_STATUS efirc;
 	int rc;
-
-	/* Find SAN device */
-	sandev = sandev_find ( drive );
-	if ( ! sandev ) {
-		DBGC ( drive, "EFIBLK %#02x is not a SAN drive\n", drive );
-		rc = -ENODEV;
-		goto err_sandev_find;
-	}
-	block = sandev->priv;
 
 	/* Release SNP devices */
 	efi_snp_release();
 
-	/* Scan for a matching filesystem within this block device */
-	if ( ( rc = efi_block_scan ( drive, block->handle, filename,
-				     &fspath ) ) != 0 ) {
-		goto err_scan;
+	/* Locate all block I/O protocol handles */
+	if ( ( efirc = bs->LocateHandleBuffer ( ByProtocol,
+						&efi_block_io_protocol_guid,
+						NULL, &count,
+						&handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( drive, "EFIBLK %#02x cannot locate block I/O: %s\n",
+		       drive, strerror ( rc ) );
+		goto err_locate_block_io;
 	}
 
-	/* Attempt to boot from this filesystem */
-	if ( ( rc = efi_block_exec ( drive, fspath, filename ) ) != 0 )
-		goto err_exec;
+	/* Try booting from the first matching block device, if any */
+	rc = -ENOENT;
+	for ( vdrive = 0, index = 0 ; ; vdrive++ ) {
 
- err_exec:
- err_scan:
+		/* Identify next drive number and block I/O handle */
+		if ( ( sandev = sandev_next ( vdrive ) ) &&
+		     ( ( sandev->drive == vdrive ) ||
+		       ( sandev->drive <= SAN_DEFAULT_DRIVE ) ||
+		       ( index >= count ) ) ) {
+
+			/* There is a SAN drive that either:
+			 *
+			 * a) has the current virtual drive number, or
+			 * b) has a drive number below SAN_DEFAULT_DRIVE, or
+			 * c) has a drive number higher than any local drive
+			 *
+			 * Use this SAN drive, since the explicit SAN
+			 * drive numbering takes precedence over the
+			 * implicit local drive numbering.
+			 */
+			block = sandev->priv;
+			handle = block->handle;
+
+			/* Use SAN drive's explicit drive number */
+			vdrive = sandev->drive;
+			DBGC ( vdrive, "EFIBLK %#02x is SAN drive %s\n",
+			       vdrive, efi_handle_name ( handle ) );
+
+		} else if ( index < count ) {
+
+			/* There is no SAN drive meeting any of the
+			 * above criteria.  Try the next block I/O
+			 * handle.
+			 */
+			handle = handles[index++];
+
+			/* Check if this handle is eligible to be
+			 * given a local virtual drive number.
+			 */
+			if ( ( rc = efi_block_local ( handle ) ) != 0 ) {
+				/* Do not consume virtual drive number */
+				vdrive--;
+				continue;
+			}
+
+			/* Use the current virtual drive number, with
+			 * a minimum of SAN_DEFAULT_DRIVE to match
+			 * typical BIOS drive numbering.
+			 */
+			if ( vdrive < SAN_DEFAULT_DRIVE )
+				vdrive = SAN_DEFAULT_DRIVE;
+			DBGC ( vdrive, "EFIBLK %#02x is local drive %s\n",
+			       vdrive, efi_handle_name ( handle ) );
+
+		} else {
+
+			/* No more SAN or local drives */
+			break;
+		}
+
+		/* Skip non-matching drives */
+		if ( drive && ( drive != vdrive ) )
+			continue;
+		DBGC ( vdrive, "EFIBLK %#02x attempting to boot\n", vdrive );
+
+		/* Scan for a matching filesystem within this drive */
+		if ( ( rc = efi_block_scan ( vdrive, handle, filename,
+					     &fspath ) ) != 0 ) {
+			continue;
+		}
+
+		/* Attempt to boot from the matched filesystem */
+		rc = efi_block_exec ( vdrive, fspath, filename );
+		break;
+	}
+
+	bs->FreePool ( handles );
+ err_locate_block_io:
 	efi_snp_claim();
- err_sandev_find:
 	return rc;
 }
 

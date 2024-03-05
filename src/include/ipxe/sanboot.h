@@ -21,6 +21,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/acpi.h>
 #include <config/sanboot.h>
 
+/**
+ * Default SAN drive number
+ *
+ * The drive number is an externally defined concept only in a BIOS
+ * environment, where it represents the INT13 drive number (0x80 for
+ * the first hard disk).  We retain it in other environments to allow
+ * for a simple way for iPXE commands to refer to SAN drives.
+ */
+#define SAN_DEFAULT_DRIVE 0x80
+
 /** A SAN path */
 struct san_path {
 	/** Containing SAN device */
