@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/bitops.h>
 #include <ipxe/uaccess.h>
 #include <xen/xen.h>
+#include <xen/console.h>
 #include <xen/event_channel.h>
 
 /* Memory barrier macros used by ring.h */
@@ -47,6 +48,16 @@ struct xen_store {
 	evtchn_port_t port;
 };
 
+/** A Xen Console */
+struct xencons_info {
+
+    /** Event Channel */
+	evtchn_port_t port;
+
+    /* Console interface */
+    volatile struct xencons_interface *intf;
+};
+
 /** A Xen hypervisor */
 struct xen_hypervisor {
 	/** Hypercall table */
@@ -57,6 +68,8 @@ struct xen_hypervisor {
 	struct xen_grant grant;
 	/** XenStore */
 	struct xen_store store;
+    /** Console */
+    struct xencons_info console;
 };
 
 /**
