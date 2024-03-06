@@ -445,6 +445,12 @@ len6_setting __setting ( SETTING_IP6, len6 );
 extern const struct setting
 gateway6_setting __setting ( SETTING_IP6, gateway6 );
 extern const struct setting
+server6_id_setting __setting ( SETTING_IP6_EXTRA, server-identifier);
+extern const struct setting
+client6_id_setting __setting ( SETTING_IP6_EXTRA, client-identifier);
+extern const struct setting
+client6_iana_setting __setting ( SETTING_IP6_EXTRA, client-iana);
+extern const struct setting
 hostname_setting __setting ( SETTING_HOST, hostname );
 extern const struct setting
 domain_setting __setting ( SETTING_IP_EXTRA, domain );
