@@ -139,4 +139,8 @@ struct bzimage_cmdline {
 /** Maximum size of command line */
 #define BZI_CMDLINE_SIZE 0x7ff
 
+/** E820 structures in zeropage */
+#define BZI_E820_SIZE_OFFSET 0x1e8
+#define BZI_E820_OFFSET 0x2d0
+
 #endif /* _BZIMAGE_H */
