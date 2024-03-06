@@ -357,6 +357,8 @@ struct prompt_options {
 	unsigned int key;
 	/** Timeout */
 	unsigned long timeout;
+	/** Set */
+	struct named_setting set;
 };
 
 /** "prompt" option list */
@@ -365,6 +367,9 @@ static struct option_descriptor prompt_opts[] = {
 		      struct prompt_options, key, parse_key ),
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct prompt_options, timeout, parse_timeout ),
+	OPTION_DESC ( "set", 's', required_argument,
+		      struct prompt_options, set,
+		      parse_autovivified_setting ),
 };
 
 /** "prompt" command descriptor */
@@ -382,6 +387,7 @@ static struct command_descriptor prompt_cmd =
 static int prompt_exec ( int argc, char **argv ) {
 	struct prompt_options opts;
 	char *text;
+	int key;
 	int rc;
 
 	/* Parse options */
@@ -396,14 +402,42 @@ static int prompt_exec ( int argc, char **argv ) {
 	}
 
 	/* Display prompt and wait for key */
-	if ( ( rc = prompt ( text, opts.timeout, opts.key ) ) != 0 )
+	key = prompt ( text, opts.timeout );
+	if ( key < 0 ) {
+		rc = key;
 		goto err_prompt;
+	}
+
+	/* Check for correct key, if specified */
+	if ( opts.key && ( key != ( ( int ) opts.key ) ) ) {
+		rc = -ECANCELED;
+		goto err_wrong_key;
+	}
+
+	/* Store key, if specified */
+	if ( opts.set.settings ) {
+
+		/* Apply default type if necessary */
+		if ( ! opts.set.setting.type )
+		       opts.set.setting.type = &setting_type_uint16;
+
+		/* Store setting */
+		if ( ( rc = storen_setting ( opts.set.settings,
+					     &opts.set.setting,
+					     key ) ) != 0 ) {
+			printf ( "Could not store \"%s\": %s\n",
+				 opts.set.setting.name, strerror ( rc ) );
+			goto err_store;
+		}
+	}
 
 	/* Free prompt text */
 	free ( text );
 
 	return 0;
 
+ err_store:
+ err_wrong_key:
  err_prompt:
 	free ( text );
  err_concat:
