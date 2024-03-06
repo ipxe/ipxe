@@ -597,6 +597,7 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 		EFI_DEVICE_PATH_PROTOCOL *path;
 		void *interface;
 	} u;
+	union uuid guid;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -623,6 +624,21 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 	DBGC ( drive, "EFIBLK %#02x contains filesystem %s\n",
 	       drive, efi_devpath_text ( u.path ) );
 
+	/* Check if filesystem matches GUID, if applicable */
+	if ( config->uuid ) {
+		if ( ( rc = efi_path_guid ( u.path, &guid ) ) != 0 ) {
+			DBGC ( drive, "EFIBLK %#02x could not determine GUID: "
+			       "%s\n", drive, strerror ( rc ) );
+			goto err_no_guid;
+		}
+		if ( memcmp ( config->uuid, &guid, sizeof ( guid ) ) != 0 ) {
+			DBGC ( drive, "EFIBLK %#02x has wrong GUID %s\n",
+			       drive, uuid_ntoa ( &guid ) );
+			rc = -ENOENT;
+			goto err_wrong_guid;
+		}
+	}
+
 	/* Check if filesystem contains boot filename */
 	if ( ( rc = efi_block_filename ( drive, handle,
 					 config->filename ) ) != 0 ) {
@@ -633,6 +649,8 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 	rc = 0;
 
  err_filename:
+ err_wrong_guid:
+ err_no_guid:
  err_not_child:
 	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
  err_open:

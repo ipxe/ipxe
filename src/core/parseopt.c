@@ -129,20 +129,21 @@ int parse_timeout ( char *text, unsigned long *value ) {
  * Parse UUID
  *
  * @v text		Text
- * @ret value		UUID value
+ * @ret uuid		UUID value
  * @ret rc		Return status code
  */
-int parse_uuid ( char *text, union uuid *value ) {
+int parse_uuid ( char *text, struct uuid_option *uuid ) {
 	int rc;
 
 	/* Sanity check */
 	assert ( text != NULL );
 
 	/* Parse UUID */
-	if ( ( rc = uuid_aton ( text, value ) ) != 0 ) {
+	if ( ( rc = uuid_aton ( text, &uuid->buf ) ) != 0 ) {
 		printf ( "\"%s\": invalid UUID\n", text );
 		return rc;
 	}
+	uuid->value = &uuid->buf;
 
 	return 0;
 }
