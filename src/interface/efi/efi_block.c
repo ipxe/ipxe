@@ -506,24 +506,65 @@ static int efi_block_describe ( void ) {
 }
 
 /**
- * Check for existence of a file within a filesystem
+ * Open root directory within a filesystem
  *
  * @v drive		Drive number
  * @v handle		Filesystem handle
- * @v filename		Filename (or NULL to use default)
+ * @v root		Root directory file to fill in
  * @ret rc		Return status code
  */
-static int efi_block_filename ( unsigned int drive, EFI_HANDLE handle,
-				const char *filename ) {
+static int efi_block_root ( unsigned int drive, EFI_HANDLE handle,
+			    EFI_FILE_PROTOCOL **root ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_GUID *protocol = &efi_simple_file_system_protocol_guid;
-	CHAR16 tmp[ filename ? ( strlen ( filename ) + 1 /* wNUL */ ) : 0 ];
 	union {
 		EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs;
 		void *interface;
 	} u;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Open filesystem protocol */
+	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
+					  efi_image_handle, handle,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( drive, "EFIBLK %#02x could not open %s filesystem: %s\n",
+		       drive, efi_handle_name ( handle ), strerror ( rc ) );
+		goto err_open;
+	}
+
+	/* Open root volume */
+	if ( ( efirc = u.fs->OpenVolume ( u.fs, root ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( drive, "EFIBLK %#02x could not open %s root: %s\n",
+		       drive, efi_handle_name ( handle ), strerror ( rc ) );
+		goto err_volume;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_volume:
+	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
+ err_open:
+	return rc;
+}
+
+/**
+ * Check for existence of a file within a filesystem
+ *
+ * @v drive		Drive number
+ * @v handle		Filesystem handle
+ * @v root		Root directory
+ * @v filename		Filename (or NULL to use default)
+ * @ret rc		Return status code
+ */
+static int efi_block_filename ( unsigned int drive, EFI_HANDLE handle,
+				EFI_FILE_PROTOCOL *root,
+				const char *filename ) {
+	CHAR16 tmp[ filename ? ( strlen ( filename ) + 1 /* wNUL */ ) : 0 ];
 	CHAR16 *wname;
-	EFI_FILE_PROTOCOL *root;
 	EFI_FILE_PROTOCOL *file;
 	EFI_STATUS efirc;
 	int rc;
@@ -534,25 +575,6 @@ static int efi_block_filename ( unsigned int drive, EFI_HANDLE handle,
 		wname = tmp;
 	} else {
 		wname = efi_block_boot_filename;
-	}
-
-	/* Open file system protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
-					  efi_image_handle, handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
-		DBGC ( drive, "EFIBLK %#02x could not open %s device path: "
-		       "%s\n", drive, efi_handle_name ( handle ),
-		       strerror ( rc ) );
-		goto err_open;
-	}
-
-	/* Open root volume */
-	if ( ( efirc = u.fs->OpenVolume ( u.fs, &root ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( drive, "EFIBLK %#02x could not open %s root: %s\n",
-		       drive, efi_handle_name ( handle ), strerror ( rc ) );
-		goto err_volume;
 	}
 
 	/* Try opening file */
@@ -570,10 +592,6 @@ static int efi_block_filename ( unsigned int drive, EFI_HANDLE handle,
 
 	file->Close ( file );
  err_file:
-	root->Close ( root );
- err_volume:
-	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
- err_open:
 	return rc;
 }
 
@@ -597,6 +615,7 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 		EFI_DEVICE_PATH_PROTOCOL *path;
 		void *interface;
 	} u;
+	EFI_FILE *root;
 	union uuid guid;
 	EFI_STATUS efirc;
 	int rc;
@@ -639,16 +658,30 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 		}
 	}
 
+	/* Open root directory */
+	if ( ( rc = efi_block_root ( drive, handle, &root ) ) != 0 )
+		goto err_root;
+
 	/* Check if filesystem contains boot filename */
-	if ( ( rc = efi_block_filename ( drive, handle,
+	if ( ( rc = efi_block_filename ( drive, handle, root,
 					 config->filename ) ) != 0 ) {
 		goto err_filename;
+	}
+
+	/* Check if filesystem contains additional filename, if applicable */
+	if ( config->extra &&
+	     ( ( rc = efi_block_filename ( drive, handle, root,
+					   config->extra ) ) != 0 ) ) {
+		goto err_extra;
 	}
 
 	/* Success */
 	rc = 0;
 
+ err_extra:
  err_filename:
+	root->Close ( root );
+ err_root:
  err_wrong_guid:
  err_no_guid:
  err_not_child:

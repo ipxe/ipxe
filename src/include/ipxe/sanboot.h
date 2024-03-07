@@ -110,6 +110,8 @@ enum san_device_flags {
 struct san_boot_config {
 	/** Boot filename (or NULL to use default) */
 	const char *filename;
+	/** Required extra filename (or NULL to ignore) */
+	const char *extra;
 	/** UUID (or NULL to ignore UUID) */
 	union uuid *uuid;
 };
