@@ -32,7 +32,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <ipxe/refcnt.h>
 #include <ipxe/list.h>
@@ -51,6 +53,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/BlockIo.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/AcpiTable.h>
+#include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_snp.h>
@@ -596,6 +599,68 @@ static int efi_block_filename ( unsigned int drive, EFI_HANDLE handle,
 }
 
 /**
+ * Check for EFI block device filesystem label
+ *
+ * @v drive		Drive number
+ * @v root		Root directory
+ * @v label		Volume label
+ * @ret rc		Return status code
+ */
+static int efi_block_label ( unsigned int drive, EFI_FILE_PROTOCOL *root,
+			     const char *label ) {
+	EFI_FILE_SYSTEM_INFO *info;
+	UINTN size;
+	char *actual;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Get length of file system information */
+	size = 0;
+	root->GetInfo ( root, &efi_file_system_info_id, &size, NULL );
+
+	/* Allocate file system information */
+	info = malloc ( size );
+	if ( ! info ) {
+		rc = -ENOMEM;
+		goto err_alloc_info;
+	}
+
+	/* Get file system information */
+	if ( ( efirc = root->GetInfo ( root, &efi_file_system_info_id, &size,
+				       info ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( drive, "EFIBLK %#02x could not get filesystem info: "
+		       "%s\n", drive, strerror ( rc ) );
+		goto err_get_info;
+	}
+
+	/* Construct volume label for comparison */
+	if ( asprintf ( &actual, "%ls", info->VolumeLabel ) < 0 ) {
+		rc = -ENOMEM;
+		goto err_alloc_label;
+	}
+
+	/* Compare volume label */
+	if ( strcasecmp ( label, actual ) != 0 ) {
+		DBGC ( drive, "EFIBLK %#02x has wrong label \"%s\"\n",
+		       drive, actual );
+		rc = -ENOENT;
+		goto err_compare;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_compare:
+	free ( actual );
+ err_alloc_label:
+ err_get_info:
+	free ( info );
+ err_alloc_info:
+	return rc;
+}
+
+/**
  * Check EFI block device filesystem match
  *
  * @v drive		Drive number
@@ -675,9 +740,17 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 		goto err_extra;
 	}
 
+	/* Check volume label, if applicable */
+	if ( config->label &&
+	     ( ( rc = efi_block_label ( drive, root,
+					config->label ) ) != 0 ) ) {
+		goto err_label;
+	}
+
 	/* Success */
 	rc = 0;
 
+ err_label:
  err_extra:
  err_filename:
 	root->Close ( root );

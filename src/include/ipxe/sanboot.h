@@ -112,6 +112,8 @@ struct san_boot_config {
 	const char *filename;
 	/** Required extra filename (or NULL to ignore) */
 	const char *extra;
+	/** Filesystem label (or NULL to ignore volume label) */
+	const char *label;
 	/** UUID (or NULL to ignore UUID) */
 	union uuid *uuid;
 };
