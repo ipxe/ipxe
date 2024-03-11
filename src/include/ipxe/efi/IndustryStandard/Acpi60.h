@@ -14,6 +14,16 @@ FILE_LICENCE ( BSD2_PATENT );
 
 #include <ipxe/efi/IndustryStandard/Acpi51.h>
 
+///
+/// _PSD Revision for ACPI 6.0
+///
+#define EFI_ACPI_6_0_AML_PSD_REVISION  0
+
+///
+/// _CPC Revision for ACPI 6.0
+///
+#define EFI_ACPI_6_0_AML_CPC_REVISION  2
+
 //
 // Ensure proper structure formats
 //
