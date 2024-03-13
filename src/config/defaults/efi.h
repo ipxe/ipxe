@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define REBOOT_EFI
 #define ACPI_EFI
 #define FDT_EFI
-#define MPAPI_NULL
+#define MPAPI_EFI
 
 #define	NET_PROTO_IPV6		/* IPv6 protocol */
 #define	NET_PROTO_LLDP		/* Link Layer Discovery protocol */

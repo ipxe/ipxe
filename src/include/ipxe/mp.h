@@ -102,6 +102,7 @@ extern void __asmcall mp_call ( mp_addr_t func, mp_addr_t opaque );
 
 /* Include all architecture-independent multiprocessor API headers */
 #include <ipxe/null_mp.h>
+#include <ipxe/efi/efi_mp.h>
 
 /* Include all architecture-dependent multiprocessor API headers */
 #include <bits/mp.h>
