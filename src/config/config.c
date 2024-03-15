@@ -188,6 +188,9 @@ REQUIRE_OBJECT ( zlib );
 #ifdef IMAGE_GZIP
 REQUIRE_OBJECT ( gzip );
 #endif
+#ifdef IMAGE_UCODE
+REQUIRE_OBJECT ( ucode );
+#endif
 
 /*
  * Drag in all requested commands
