@@ -1632,3 +1632,70 @@ init_pages:
 
 	/* Return */
 	ret
+
+/****************************************************************************
+ * sipi (real-mode jump)
+ *
+ * Handle Startup IPI
+ *
+ * This code must be copied to a page-aligned boundary in base memory.
+ * It will be entered with %cs:0000 pointing to the start of the code.
+ * The stack pointer is undefined and so no stack space can be used.
+ *
+ ****************************************************************************
+ */
+	.section ".text16.sipi", "ax", @progbits
+	.code16
+	.globl	sipi
+sipi:
+	/* Retrieve rm_ds from copy */
+	movw	%cs:( sipi_ds - sipi ), %ax
+	movw	%ax, %ds
+
+	/* Load GDT and switch to protected mode */
+	data32 lgdt gdtr
+	movl	%cr0, %eax
+	orb	$CR0_PE, %al
+	movl	%eax, %cr0
+	data32 ljmp $VIRTUAL_CS, $VIRTUAL(1f)
+
+	/* Copy of rm_ds required to access GDT */
+	.globl	sipi_ds
+sipi_ds:
+	.word	0
+
+	/* Length of real-mode SIPI handler to be copied */
+	.globl	sipi_len
+	.equ	sipi_len, . - sipi
+
+	.section ".text.sipi", "ax", @progbits
+	.code32
+1:	/* Set up protected-mode segment registers (with no stack) */
+	movw	$VIRTUAL_DS, %ax
+	movw	%ax, %ds
+	movw	%ax, %ss
+	movw	$PHYSICAL_DS, %ax
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+
+	/* Load register state and clear stack pointer */
+	movl	$VIRTUAL(sipi_regs), %esp
+	popal
+
+	/* Switch to flat physical addressing */
+	movw	$PHYSICAL_DS, %sp
+	movw	%sp, %ds
+	movw	%sp, %ss
+
+	/* Clear stack pointer */
+	xorl	%esp, %esp
+
+	/* Jump to protected-mode SIPI handler */
+	ljmp	%cs:*VIRTUAL(sipi_handler)
+
+	/* Protected-mode SIPI handler vector */
+	.section ".data.sipi_handler", "aw", @progbits
+	.globl	sipi_handler
+sipi_handler:
+	.long	0, PHYSICAL_CS

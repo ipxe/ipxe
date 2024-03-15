@@ -474,6 +474,26 @@ extern struct page_table io_pages;
  */
 #define IO_BASE ( ( void * ) 0x100000000ULL )
 
+/** Startup IPI real-mode handler */
+extern char __text16_array ( sipi, [] );
+#define sipi __use_text16 ( sipi )
+
+/** Length of startup IPI real-mode handler */
+extern char sipi_len[];
+
+/** Startup IPI real-mode handler copy of real-mode data segment */
+extern uint16_t __text16 ( sipi_ds );
+#define sipi_ds __use_text16 ( sipi_ds )
+
+/** Startup IPI protected-mode handler (physical address) */
+extern uint32_t sipi_handler;
+
+/** Startup IPI register state */
+extern struct i386_regs sipi_regs;
+
+extern void setup_sipi ( unsigned int vector, uint32_t handler,
+			 struct i386_regs *regs );
+
 #endif /* ASSEMBLY */
 
 #endif /* LIBRM_H */
