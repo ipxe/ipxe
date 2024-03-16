@@ -71,6 +71,19 @@ struct snp_nic {
 /** Delay between each initialisation retry */
 #define SNP_INITIALIZE_RETRY_DELAY_MS 10
 
+/** Additional padding for receive buffers
+ *
+ * Some SNP implementations seem to require additional space in the
+ * allocated receive buffers, otherwise full-length packets will be
+ * silently dropped.
+ *
+ * The EDK2 MnpDxe driver happens to allocate an additional 8 bytes of
+ * padding (4 for a VLAN tag, 4 for the Ethernet frame checksum).
+ * Match this behaviour since drivers are very likely to have been
+ * tested against MnpDxe.
+ */
+#define SNP_RX_PAD 8
+
 /**
  * Format SNP MAC address (for debugging)
  *
@@ -246,7 +259,7 @@ static void snpnet_poll_rx ( struct net_device *netdev ) {
 
 		/* Allocate buffer, if required */
 		if ( ! snp->rxbuf ) {
-			snp->rxbuf = alloc_iob ( snp->mtu );
+			snp->rxbuf = alloc_iob ( snp->mtu + SNP_RX_PAD );
 			if ( ! snp->rxbuf ) {
 				/* Leave for next poll */
 				break;
