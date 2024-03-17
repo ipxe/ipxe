@@ -165,6 +165,7 @@ static void bios_mp_start_all ( mp_func_t func, void *opaque ) {
 	/* No way to handle errors: caller must check that
 	 * multiprocessor function executed as expected.
 	 */
+	return;
 }
 
 PROVIDE_MPAPI_INLINE ( pcbios, mp_address );
