@@ -2502,7 +2502,7 @@ static mlx_status shomron_fill_eth_send_wqe ( struct ib_device *ibdev,
 	}
 
 #define SHOMRON_GENERATE_CQE 0x3
-#define SHOMRON_INLINE_HEADERS_SIZE 18
+#define SHOMRON_INLINE_HEADERS_SIZE ETH_HLEN
 #define SHOMRON_INLINE_HEADERS_OFFSET 32
 	MLX_FILL_2 ( &eth_wqe->ctrl, 0, opcode, FLEXBOOT_NODNIC_OPCODE_SEND,
 			wqe_index, wqe_index & 0xFFFF);
