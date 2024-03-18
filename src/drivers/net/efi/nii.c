@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
@@ -997,6 +998,12 @@ static int nii_transmit ( struct net_device *netdev,
 		netdev_tx_defer ( netdev, iobuf );
 		return 0;
 	}
+
+	/* Pad to minimum Ethernet length, to work around underlying
+	 * drivers that do not correctly handle frame padding
+	 * themselves.
+	 */
+	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Construct parameter block */
 	memset ( &cpb, 0, sizeof ( cpb ) );

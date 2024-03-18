@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/timer.h>
 #include <ipxe/efi/efi.h>
@@ -186,6 +187,12 @@ static int snpnet_transmit ( struct net_device *netdev,
 		netdev_tx_defer ( netdev, iobuf );
 		return 0;
 	}
+
+	/* Pad to minimum Ethernet length, to work around underlying
+	 * drivers that do not correctly handle frame padding
+	 * themselves.
+	 */
+	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Transmit packet */
 	if ( ( efirc = snp->snp->Transmit ( snp->snp, 0, iob_len ( iobuf ),
