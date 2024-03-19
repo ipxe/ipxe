@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <errno.h>
 #include <ipxe/device.h>
+#include <ipxe/uri.h>
 #include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
@@ -30,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_autoexec.h>
 #include <ipxe/efi/efi_cachedhcp.h>
 #include <ipxe/efi/efi_watchdog.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_veto.h>
 
 /**
@@ -80,6 +82,12 @@ static void efi_init_application ( void ) {
 	EFI_HANDLE device = efi_loaded_image->DeviceHandle;
 	EFI_DEVICE_PATH_PROTOCOL *devpath = efi_loaded_image_path;
 	EFI_DEVICE_PATH_PROTOCOL *filepath = efi_loaded_image->FilePath;
+	struct uri *uri;
+
+	/* Set current working URI from device path, if present */
+	uri = efi_path_uri ( devpath );
+	if ( uri )
+		churi ( uri );
 
 	/* Identify autoboot device, if any */
 	efi_set_autoboot_ll_addr ( device, devpath );
@@ -89,6 +97,9 @@ static void efi_init_application ( void ) {
 
 	/* Load autoexec script, if any */
 	efi_autoexec_load ( device, filepath );
+
+	/* Drop temporary reference to URI */
+	uri_put ( uri );
 }
 
 /** EFI application initialisation function */
