@@ -2651,6 +2651,113 @@ struct builtin_setting unixtime_builtin_setting __builtin_setting = {
 };
 
 /**
+ * Fetch current working URI-related setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @v rel		Relative URI string
+ * @ret len		Length of setting data, or negative error
+ */
+static int cwuri_fetch_uri ( void *data, size_t len, const char *rel ) {
+	struct uri *reluri;
+	struct uri *uri;
+	char *uristring;
+	int ret;
+
+	/* Check that current working URI is set */
+	if ( ! cwuri ) {
+		ret = -ENOENT;
+		goto err_unset;
+	}
+
+	/* Construct relative URI */
+	reluri = parse_uri ( rel );
+	if ( ! reluri ) {
+		ret = -ENOMEM;
+		goto err_parse;
+	}
+
+	/* Construct resolved URI */
+	uri = resolve_uri ( cwuri, reluri );
+	if ( ! uri ) {
+		ret = -ENOMEM;
+		goto err_resolve;
+	}
+
+	/* Format URI string into allocated buffer (with NUL) */
+	uristring = format_uri_alloc ( uri );
+	if ( ! uristring ) {
+		ret = -ENOMEM;
+		goto err_format;
+	}
+
+	/* Copy URI string to buffer */
+	strncpy ( data, uristring, len );
+	ret = strlen ( uristring );
+
+	free ( uristring );
+ err_format:
+	uri_put ( uri );
+ err_resolve:
+	uri_put ( reluri );
+ err_parse:
+ err_unset:
+	return ret;
+}
+
+/**
+ * Fetch current working URI setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int cwuri_fetch ( void *data, size_t len ) {
+
+	return cwuri_fetch_uri ( data, len, "" );
+}
+
+/**
+ * Fetch current working directory URI setting
+ *
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int cwduri_fetch ( void *data, size_t len ) {
+
+	return cwuri_fetch_uri ( data, len, "." );
+}
+
+/** Current working URI setting */
+const struct setting cwuri_setting __setting ( SETTING_MISC, cwuri ) = {
+	.name = "cwuri",
+	.description = "Current working URI",
+	.type = &setting_type_string,
+	.scope = &builtin_scope,
+};
+
+/** Current working directory URI setting */
+const struct setting cwduri_setting __setting ( SETTING_MISC, cwduri ) = {
+	.name = "cwduri",
+	.description = "Current working directory URI",
+	.type = &setting_type_string,
+	.scope = &builtin_scope,
+};
+
+/** Current working URI built-in setting */
+struct builtin_setting cwuri_builtin_setting __builtin_setting = {
+	.setting = &cwuri_setting,
+	.fetch = cwuri_fetch,
+};
+
+/** Current working directory URI built-in setting */
+struct builtin_setting cwduri_builtin_setting __builtin_setting = {
+	.setting = &cwduri_setting,
+	.fetch = cwduri_fetch,
+};
+
+/**
  * Fetch built-in setting
  *
  * @v settings		Settings block

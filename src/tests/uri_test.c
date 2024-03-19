@@ -754,6 +754,20 @@ static struct uri_resolve_test uri_fragment = {
 	"http://192.168.0.254/test#bar",
 };
 
+/** Empty relative URI resolution test */
+static struct uri_resolve_test uri_self = {
+	"http://192.168.0.1/path/to/me",
+	"",
+	"http://192.168.0.1/path/to/me",
+};
+
+/** Current directory URI resolution test */
+static struct uri_resolve_test uri_cwd = {
+	"http://192.168.0.1/path/to/me",
+	".",
+	"http://192.168.0.1/path/to/",
+};
+
 /** PXE URI with absolute URI */
 static struct uri_pxe_test uri_pxe_absolute = {
 	{
@@ -996,6 +1010,8 @@ static void uri_test_exec ( void ) {
 	uri_resolve_ok ( &uri_absolute_uri_path );
 	uri_resolve_ok ( &uri_query );
 	uri_resolve_ok ( &uri_fragment );
+	uri_resolve_ok ( &uri_self );
+	uri_resolve_ok ( &uri_cwd );
 
 	/* PXE URI construction tests */
 	uri_pxe_ok ( &uri_pxe_absolute );
