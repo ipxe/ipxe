@@ -176,6 +176,46 @@ int efi_path_guid ( EFI_DEVICE_PATH_PROTOCOL *path, union uuid *guid ) {
 }
 
 /**
+ * Parse URI from device path
+ *
+ * @v path		Device path
+ * @ret uri		URI, or NULL if not a URI
+ */
+struct uri * efi_path_uri ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	URI_DEVICE_PATH *uripath;
+	char *uristring;
+	struct uri *uri;
+	size_t len;
+
+	/* Search for URI device path */
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+		if ( ( path->Type == MESSAGING_DEVICE_PATH ) &&
+		     ( path->SubType == MSG_URI_DP ) ) {
+
+			/* Calculate path length */
+			uripath = container_of ( path, URI_DEVICE_PATH,
+						 Header );
+			len = ( ( ( path->Length[1] << 8 ) | path->Length[0] )
+				- offsetof ( typeof ( *uripath ), Uri ) );
+
+			/* Parse URI */
+			uristring = zalloc ( len + 1 /* NUL */ );
+			if ( ! uristring )
+				return NULL;
+			memcpy ( uristring, uripath->Uri, len );
+			uri = parse_uri ( uristring );
+			free ( uristring );
+
+			return uri;
+		}
+	}
+
+	/* No URI path found */
+	return NULL;
+}
+
+/**
  * Concatenate EFI device paths
  *
  * @v ...		List of device paths (NULL terminated)
