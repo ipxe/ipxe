@@ -82,6 +82,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_uuid		       ( ERRFILE_CORE | 0x002a0000 )
 #define ERRFILE_efi_path	       ( ERRFILE_CORE | 0x002b0000 )
 #define ERRFILE_efi_mp		       ( ERRFILE_CORE | 0x002c0000 )
+#define ERRFILE_efi_service	       ( ERRFILE_CORE | 0x002d0000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
