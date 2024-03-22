@@ -64,16 +64,22 @@ static int efi_driver_disconnecting;
 /**
  * Find EFI device
  *
- * @v device		EFI device handle
+ * @v device		EFI device handle (or child handle)
  * @ret efidev		EFI device, or NULL if not found
  */
 static struct efi_device * efidev_find ( EFI_HANDLE device ) {
 	struct efi_device *efidev;
 
+	/* Avoid false positive matches against NULL children */
+	if ( ! device )
+		return NULL;
+
 	/* Look for an existing EFI device */
 	list_for_each_entry ( efidev, &efi_devices, dev.siblings ) {
-		if ( efidev->device == device )
+		if ( ( device == efidev->device ) ||
+		     ( device == efidev->child ) ) {
 			return efidev;
+		}
 	}
 
 	return NULL;
