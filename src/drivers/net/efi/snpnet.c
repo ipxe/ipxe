@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_snp.h>
 #include "snpnet.h"
 
 /** @file
@@ -483,6 +484,53 @@ static struct net_device_operations snpnet_operations = {
 	.transmit = snpnet_transmit,
 	.poll = snpnet_poll,
 };
+
+/**
+ * Check to see if driver supports a device
+ *
+ * @v device		EFI device handle
+ * @v protocol		Protocol GUID
+ * @ret rc		Return status code
+ */
+int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE parent;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Check that this is not a device we are providing ourselves */
+	if ( find_snpdev ( device ) != NULL ) {
+		DBGCP ( device, "HANDLE %s is provided by this binary\n",
+			efi_handle_name ( device ) );
+		return -ENOTTY;
+	}
+
+	/* Test for presence of protocol */
+	if ( ( efirc = bs->OpenProtocol ( device, protocol,
+					  NULL, efi_image_handle, device,
+					  EFI_OPEN_PROTOCOL_TEST_PROTOCOL))!=0){
+		DBGCP ( device, "HANDLE %s is not a %s device\n",
+			efi_handle_name ( device ),
+			efi_guid_ntoa ( protocol ) );
+		return -EEFI ( efirc );
+	}
+
+	/* Check that there are no instances of this protocol further
+	 * up this device path.
+	 */
+	if ( ( rc = efi_locate_device ( device, protocol,
+					&parent, 1 ) ) == 0 ) {
+		DBGC2 ( device, "HANDLE %s has %s-supporting parent ",
+			efi_handle_name ( device ),
+			efi_guid_ntoa ( protocol ) );
+		DBGC2 ( device, "%s\n", efi_handle_name ( parent ) );
+		return -ENOTTY;
+	}
+
+	DBGC ( device, "HANDLE %s is a %s device\n",
+	       efi_handle_name ( device ), efi_guid_ntoa ( protocol ) );
+	return 0;
+}
 
 /**
  * Attach driver to device

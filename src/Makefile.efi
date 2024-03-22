@@ -23,9 +23,9 @@ NON_AUTO_MEDIA	+= efidrv
 NON_AUTO_MEDIA	+= drv.efi
 NON_AUTO_MEDIA	+= efirom
 
-# Include SNP driver in the all-drivers build
+# Include SNP and MNP drivers in the all-drivers build
 #
-DRIVERS_net += snp
+DRIVERS_net += snp mnp
 
 # Rules for building EFI files
 #

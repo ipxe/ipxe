@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
 #include "snpnet.h"
+#include "mnpnet.h"
 #include "nii.h"
 
 /** @file
@@ -72,6 +73,11 @@ static struct chained_protocol chained_snp = {
 /** Chainloaded NII protocol */
 static struct chained_protocol chained_nii = {
 	.protocol = &efi_nii31_protocol_guid,
+};
+
+/** Chainloaded MNP protocol */
+static struct chained_protocol chained_mnp = {
+	.protocol = &efi_managed_network_service_binding_protocol_guid,
 };
 
 /**
@@ -208,6 +214,17 @@ static int niionly_supported ( EFI_HANDLE device ) {
 	return chained_supported ( device, &chained_nii );
 }
 
+/**
+ * Check to see if driver supports a device
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+static int mnponly_supported ( EFI_HANDLE device ) {
+
+	return chained_supported ( device, &chained_mnp );
+}
+
 /** EFI SNP chainloading-device-only driver */
 struct efi_driver snponly_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
 	.name = "SNPONLY",
@@ -224,6 +241,14 @@ struct efi_driver niionly_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
 	.stop = nii_stop,
 };
 
+/** EFI MNP chainloading-device-only driver */
+struct efi_driver mnponly_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
+	.name = "MNPONLY",
+	.supported = mnponly_supported,
+	.start = mnpnet_start,
+	.stop = mnpnet_stop,
+};
+
 /**
  * Initialise EFI chainloaded-device-only driver
  *
@@ -232,6 +257,7 @@ static void chained_init ( void ) {
 
 	chained_locate ( &chained_snp );
 	chained_locate ( &chained_nii );
+	chained_locate ( &chained_mnp );
 }
 
 /** EFI chainloaded-device-only initialisation function */
