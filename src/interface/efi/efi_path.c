@@ -112,6 +112,30 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 }
 
 /**
+ * Get MAC address from device path
+ *
+ * @v path		Device path
+ * @ret mac		MAC address, or NULL if not found
+ */
+void * efi_path_mac ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	MAC_ADDR_DEVICE_PATH *mac;
+
+	/* Search for MAC address path */
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+		if ( ( path->Type == MESSAGING_DEVICE_PATH ) &&
+		     ( path->SubType == MSG_MAC_ADDR_DP ) ) {
+			mac = container_of ( path, MAC_ADDR_DEVICE_PATH,
+					     Header );
+			return &mac->MacAddress;
+		}
+	}
+
+	/* No MAC address found */
+	return NULL;
+}
+
+/**
  * Get VLAN tag from device path
  *
  * @v path		Device path
