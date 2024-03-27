@@ -109,6 +109,9 @@ static union gcm_block gcm_cached_mult[256];
  */
 static uint16_t gcm_cached_reduce[256];
 
+/** Offset of a field within GCM context */
+#define gcm_offset( field ) offsetof ( struct gcm_context, field )
+
 /**
  * Reverse bits in a byte
  *
@@ -470,17 +473,13 @@ int gcm_setkey ( struct gcm_context *context, const void *key, size_t keylen,
  */
 void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
 
-	/* Sanity check: ensure that memset()s will clear expected state */
-	build_assert ( &context->hash < &context->ctr );
-	build_assert ( &context->len < &context->ctr );
-	build_assert ( &context->ctr < &context->key );
-	build_assert ( ( ( void * ) &context->raw_cipher ) >
-		       ( ( void * ) &context->key ) );
-	build_assert ( ( ( void * ) context->raw_ctx ) >
-		       ( ( void * ) &context->key ) );
-
 	/* Reset non-key state */
-	memset ( context, 0, offsetof ( typeof ( *context ), key ) );
+	memset ( context, 0, gcm_offset ( key ) );
+	build_assert ( gcm_offset ( key ) > gcm_offset ( hash ) );
+	build_assert ( gcm_offset ( key ) > gcm_offset ( len ) );
+	build_assert ( gcm_offset ( key ) > gcm_offset ( ctr ) );
+	build_assert ( gcm_offset ( key ) < gcm_offset ( raw_cipher ) );
+	build_assert ( gcm_offset ( key ) < gcm_offset ( raw_ctx ) );
 
 	/* Reset counter */
 	context->ctr.ctr.value = cpu_to_be32 ( 1 );
@@ -499,7 +498,12 @@ void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
 		assert ( context->len.len.add == 0 );
 
 		/* Reset non-key, non-counter state */
-		memset ( context, 0, offsetof ( typeof ( *context ), ctr ) );
+		memset ( context, 0, gcm_offset ( ctr ) );
+		build_assert ( gcm_offset ( ctr ) > gcm_offset ( hash ) );
+		build_assert ( gcm_offset ( ctr ) > gcm_offset ( len ) );
+		build_assert ( gcm_offset ( ctr ) < gcm_offset ( key ) );
+		build_assert ( gcm_offset ( ctr ) < gcm_offset ( raw_cipher ) );
+		build_assert ( gcm_offset ( ctr ) < gcm_offset ( raw_ctx ) );
 	}
 
 	DBGC2 ( context, "GCM %p Y[0]:\n", context );
