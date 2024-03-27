@@ -65,6 +65,11 @@ const struct setting busid_setting __setting ( SETTING_NETDEV, busid ) = {
 	.description = "Bus ID",
 	.type = &setting_type_hex,
 };
+const struct setting ll_protocol_setting __setting ( SETTING_NETDEV, ll_protocol ) = {
+	.name = "ll-protocol",
+	.description = "Link-layer protocol name",
+	.type = &setting_type_string,
+};
 const struct setting chip_setting __setting ( SETTING_NETDEV, chip ) = {
 	.name = "chip",
 	.description = "Chip",
@@ -220,6 +225,22 @@ static int netdev_fetch_busid ( struct net_device *netdev, void *data,
 }
 
 /**
+ * Fetch ll_protocol setting
+ *
+ * @v netdev		Network device
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int netdev_fetch_ll_protocol ( struct net_device *netdev, void *data,
+							   size_t len ) {
+	const char *protocol = netdev->ll_protocol->name;
+
+	strncpy ( data, protocol, len );
+	return strlen ( protocol );
+}
+
+/**
  * Fetch chip setting
  *
  * @v netdev		Network device
@@ -281,6 +302,7 @@ static struct netdev_setting_operation netdev_setting_operations[] = {
 	{ &bustype_setting, NULL, netdev_fetch_bustype },
 	{ &busloc_setting, NULL, netdev_fetch_busloc },
 	{ &busid_setting, NULL, netdev_fetch_busid },
+	{ &ll_protocol_setting, NULL, netdev_fetch_ll_protocol },
 	{ &chip_setting, NULL, netdev_fetch_chip },
 	{ &ifname_setting, NULL, netdev_fetch_ifname },
 };
