@@ -373,7 +373,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		ntohs ( iphdr->chksum ) );
 
 	/* Calculate link-layer destination address, if possible */
-	if ( ( ( next_hop.s_addr ^ INADDR_BROADCAST ) & ~netmask.s_addr ) == 0){
+	if ( inaddr_is_broadcast ( &next_hop, &netmask ) ) {
 		/* Broadcast address */
 		ipv4_stats.out_bcast_pkts++;
 		ll_dest = netdev->ll_broadcast;
