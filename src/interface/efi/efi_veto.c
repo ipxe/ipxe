@@ -494,6 +494,38 @@ efi_veto_vmware_uefipxebc ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 	return 1;
 }
 
+/**
+ * Veto Apple Inc. Mac Mini 2018 T2 wifi driver crash on cold boot
+ *
+ * @v binding		Driver binding protocol
+ * @v loaded		Loaded image protocol
+ * @v wtf		Component name protocol, if present
+ * @v manufacturer	Manufacturer name, if present
+ * @v name		Driver name, if present
+ * @ret vetoed		Driver is to be vetoed
+ */
+static int
+efi_veto_apple_mac_mini_2018_t2 ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
+			    EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
+			    EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
+			    const char *manufacturer, const CHAR16 *name ) {
+	static const CHAR16 uefipxebc[] = L"Broadcom 802.11 Dongle Host Driver";
+	static const char *broadcom = "Apple Inc.";
+
+	/* Check manufacturer and driver name */
+	if ( ! manufacturer )
+		return 0;
+	if ( ! name )
+		return 0;
+	if ( strcmp ( manufacturer, broadcom ) != 0 )
+		return 0;
+	if ( memcmp ( name, uefipxebc, sizeof ( uefipxebc ) ) != 0 )
+		return 0;
+
+	return 1;
+}
+
+
 /** Driver vetoes */
 static struct efi_veto_candidate efi_vetoes[] = {
 	{
@@ -507,6 +539,10 @@ static struct efi_veto_candidate efi_vetoes[] = {
 	{
 		.name = "VMware UefiPxeBc",
 		.veto = efi_veto_vmware_uefipxebc,
+	},
+	{
+		.name = "Apple Inc Mac Mini 2018 T2 Cold boot",
+		.veto = efi_veto_apple_mac_mini_2018_t2,
 	},
 };
 
