@@ -283,7 +283,26 @@ static int dhcpv6_applies ( struct settings *settings __unused,
 			    const struct setting *setting ) {
 
 	return ( ( setting->scope == &dhcpv6_scope ) ||
-		 ( setting_cmp ( setting, &ip6_setting ) == 0 ) );
+		 ( setting_cmp ( setting, &ip6_setting ) == 0 ) ||
+		 ( setting_cmp ( setting, &len6_setting ) == 0 ) );
+}
+
+/**
+ * Fetch prefix len of DHCPv6 leased address
+ *
+ * @v dhcpset		DHCPv6 settings
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int dhcpv6_fetch_len6_len (void *data, size_t len ) {
+	uint8_t len6 = DHCPV6_LEASE_PREFIX_LEN;
+
+	if ( len > sizeof ( len6 ) )
+		len = sizeof ( len6 );
+	memcpy ( data, &len6, len );
+
+	return sizeof ( len6 );
 }
 
 /**
@@ -330,6 +349,10 @@ static int dhcpv6_fetch ( struct settings *settings,
 	/* Handle leased address */
 	if ( setting_cmp ( setting, &ip6_setting ) == 0 )
 		return dhcpv6_fetch_lease ( dhcpv6set, data, len );
+
+	/* Handle leased address prefix len */
+	if ( setting_cmp ( setting, &len6_setting ) == 0 )
+		return dhcpv6_fetch_len6_len ( data, len );
 
 	/* Find option */
 	option = dhcpv6_option ( &dhcpv6set->options, setting->tag );

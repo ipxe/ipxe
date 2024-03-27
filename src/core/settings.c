@@ -1791,6 +1791,9 @@ const struct setting_type setting_type_ipv6 __setting_type = {
 /** IPv6 settings scope */
 const struct settings_scope dhcpv6_scope;
 
+/** NDP settings scope */
+const struct settings_scope ndp_settings_scope;
+
 /**
  * Integer setting type indices
  *

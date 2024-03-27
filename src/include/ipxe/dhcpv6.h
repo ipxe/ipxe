@@ -19,6 +19,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** DHCPv6 client port */
 #define DHCPV6_CLIENT_PORT 546
 
+/** DHCPv6 assigned IPv6 address prefix length */
+#define DHCPV6_LEASE_PREFIX_LEN 128
+
 /**
  * A DHCPv6 option
  *
