@@ -32,8 +32,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/mnpnet.h>
 #include "snpnet.h"
-#include "mnpnet.h"
 
 /**
  * Check to see if driver supports a device

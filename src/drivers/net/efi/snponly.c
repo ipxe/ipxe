@@ -29,10 +29,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/mnpnet.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/Protocol/NetworkInterfaceIdentifier.h>
 #include "snpnet.h"
-#include "mnpnet.h"
 #include "nii.h"
 
 /** @file

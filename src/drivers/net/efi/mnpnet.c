@@ -38,8 +38,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_service.h>
 #include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/mnpnet.h>
 #include <ipxe/efi/Protocol/ManagedNetwork.h>
-#include "mnpnet.h"
 
 /** An MNP transmit or receive token */
 struct mnp_token {
@@ -501,4 +501,59 @@ void mnpnet_stop ( struct efi_device *efidev ) {
 	list_del ( &mnp->dev.siblings );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
+}
+
+/**
+ * Create temporary MNP network device
+ *
+ * @v handle		MNP service binding handle
+ * @v netdev		Network device to fill in
+ * @ret rc		Return status code
+ */
+int mnptemp_create ( EFI_HANDLE handle, struct net_device **netdev ) {
+	struct efi_device *efidev;
+	int rc;
+
+	/* Create temporary EFI device */
+	efidev = efidev_alloc ( handle );
+	if ( ! efidev ) {
+		DBGC ( handle, "MNP %s could not create temporary device\n",
+		       efi_handle_name ( handle ) );
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Start temporary network device */
+	if ( ( rc = mnpnet_start ( efidev ) ) != 0 ) {
+		DBGC ( handle, "MNP %s could not start MNP: %s\n",
+		       efi_handle_name ( handle ), strerror ( rc ) );
+		goto err_start;
+	}
+
+	/* Fill in network device */
+	*netdev = efidev_get_drvdata ( efidev );
+
+	return 0;
+
+	mnpnet_stop ( efidev );
+ err_start:
+	efidev_free ( efidev );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Destroy temporary MNP network device
+ *
+ * @v netdev		Network device
+ */
+void mnptemp_destroy ( struct net_device *netdev ) {
+	struct mnp_nic *mnp = netdev->priv;
+	struct efi_device *efidev = mnp->efidev;
+
+	/* Stop temporary network device */
+	mnpnet_stop ( efidev );
+
+	/* Free temporary EFI device */
+	efidev_free ( efidev );
 }
