@@ -134,10 +134,13 @@ int image_set_uri ( struct image *image, struct uri *uri ) {
 	int rc;
 
 	/* Set name, if image does not already have one */
-	if ( uri->path && ( ! ( image->name && image->name[0] ) ) ) {
-		name = basename ( ( char * ) uri->path );
-		if ( ( rc = image_set_name ( image, name ) ) != 0 )
-			return rc;
+	if ( ! ( image->name && image->name[0] ) ) {
+		name = ( uri->path ? uri->path : uri->opaque );
+		if ( name ) {
+			name = basename ( ( char * ) name );
+			if ( ( rc = image_set_name ( image, name ) ) != 0 )
+				return rc;
+		}
 	}
 
 	/* Update image URI */
