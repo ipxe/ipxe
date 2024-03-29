@@ -86,6 +86,8 @@ static inline void * efidev_get_drvdata ( struct efi_device *efidev ) {
 	return efidev->priv;
 }
 
+extern struct efi_device * efidev_alloc ( EFI_HANDLE device );
+extern void efidev_free ( struct efi_device *efidev );
 extern struct efi_device * efidev_parent ( struct device *dev );
 extern int efi_driver_install ( void );
 extern void efi_driver_uninstall ( void );
