@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uri.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/process.h>
+#include <ipxe/errortab.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_path.h>
@@ -47,6 +48,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * EFI local file access
  *
  */
+
+/* Disambiguate the various error causes */
+#define EINFO_EEFI_OPEN							\
+	__einfo_uniqify ( EINFO_EPLATFORM, 0x01, "Could not open" )
+#define EINFO_EEFI_OPEN_NOT_FOUND					\
+	__einfo_platformify ( EINFO_EEFI_OPEN, EFI_NOT_FOUND,		\
+			      "Not found" )
+#define EEFI_OPEN_NOT_FOUND						\
+	__einfo_error ( EINFO_EEFI_OPEN_NOT_FOUND )
+#define EEFI_OPEN( efirc ) EPLATFORM ( EINFO_EEFI_OPEN, efirc,		\
+				       EEFI_OPEN_NOT_FOUND )
 
 /** Download blocksize */
 #define EFI_LOCAL_BLKSIZE 4096
@@ -73,6 +85,11 @@ struct efi_local {
 	EFI_FILE_PROTOCOL *file;
 	/** Length of file */
 	size_t len;
+};
+
+/** Human-readable error messages */
+struct errortab efi_local_errors[] __errortab = {
+	__einfo_errortab ( EINFO_EEFI_OPEN_NOT_FOUND ),
 };
 
 /**
@@ -339,7 +356,7 @@ static int efi_local_open_resolved ( struct efi_local *local,
 	/* Open file */
 	if ( ( efirc = local->root->Open ( local->root, &file, name,
 					   EFI_FILE_MODE_READ, 0 ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+		rc = -EEFI_OPEN ( efirc );
 		DBGC ( local, "LOCAL %p could not open \"%s\": %s\n",
 		       local, resolved, strerror ( rc ) );
 		return rc;
