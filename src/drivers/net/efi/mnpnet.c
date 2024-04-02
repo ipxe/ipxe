@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/cachedhcp.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_service.h>
@@ -550,6 +551,9 @@ int mnptemp_create ( EFI_HANDLE handle, struct net_device **netdev ) {
 void mnptemp_destroy ( struct net_device *netdev ) {
 	struct mnp_nic *mnp = netdev->priv;
 	struct efi_device *efidev = mnp->efidev;
+
+	/* Recycle any cached DHCP packet */
+	cachedhcp_recycle ( netdev );
 
 	/* Stop temporary network device */
 	mnpnet_stop ( efidev );

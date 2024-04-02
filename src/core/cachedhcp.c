@@ -46,11 +46,20 @@ struct cached_dhcp_packet {
 	struct dhcp_packet *dhcppkt;
 	/** VLAN tag (if applicable) */
 	unsigned int vlan;
+	/** Flags */
+	unsigned int flags;
 };
+
+/** Cached DHCP packet should be retained */
+#define CACHEDHCP_RETAIN 0x0001
+
+/** Cached DHCP packet has been used */
+#define CACHEDHCP_USED 0x0002
 
 /** Cached DHCPACK */
 struct cached_dhcp_packet cached_dhcpack = {
 	.name = DHCP_SETTINGS_NAME,
+	.flags = CACHEDHCP_RETAIN,
 };
 
 /** Cached ProxyDHCPOFFER */
@@ -101,8 +110,8 @@ static int cachedhcp_apply ( struct cached_dhcp_packet *cache,
 	size_t ll_addr_len;
 	int rc;
 
-	/* Do nothing if cache is empty */
-	if ( ! cache->dhcppkt )
+	/* Do nothing if cache is empty or already in use */
+	if ( ( ! cache->dhcppkt ) || ( cache->flags & CACHEDHCP_USED ) )
 		return 0;
 	chaddr = cache->dhcppkt->dhcphdr->chaddr;
 
@@ -169,8 +178,12 @@ static int cachedhcp_apply ( struct cached_dhcp_packet *cache,
 		return rc;
 	}
 
-	/* Free cached DHCP packet */
-	cachedhcp_free ( cache );
+	/* Mark as used */
+	cache->flags |= CACHEDHCP_USED;
+
+	/* Free cached DHCP packet, if applicable */
+	if ( ! ( cache->flags & CACHEDHCP_RETAIN ) )
+		cachedhcp_free ( cache );
 
 	return 0;
 }
@@ -246,10 +259,10 @@ int cachedhcp_record ( struct cached_dhcp_packet *cache, unsigned int vlan,
 }
 
 /**
- * Cached DHCP packet startup function
+ * Cached DHCP packet early startup function
  *
  */
-static void cachedhcp_startup ( void ) {
+static void cachedhcp_startup_early ( void ) {
 
 	/* Apply cached ProxyDHCPOFFER, if any */
 	cachedhcp_apply ( &cached_proxydhcp, NULL );
@@ -258,6 +271,20 @@ static void cachedhcp_startup ( void ) {
 	/* Apply cached PXEBSACK, if any */
 	cachedhcp_apply ( &cached_pxebs, NULL );
 	cachedhcp_free ( &cached_pxebs );
+}
+
+/**
+ * Cache DHCP packet late startup function
+ *
+ */
+static void cachedhcp_startup_late ( void ) {
+
+	/* Clear retention flag */
+	cached_dhcpack.flags &= ~CACHEDHCP_RETAIN;
+
+	/* Free cached DHCPACK, if used by a network device */
+	if ( cached_dhcpack.flags & CACHEDHCP_USED )
+		cachedhcp_free ( &cached_dhcpack );
 
 	/* Report unclaimed DHCPACK, if any.  Do not free yet, since
 	 * it may still be claimed by a dynamically created device
@@ -284,10 +311,16 @@ static void cachedhcp_shutdown ( int booting __unused ) {
 	cachedhcp_free ( &cached_dhcpack );
 }
 
-/** Cached DHCPACK startup function */
-struct startup_fn cachedhcp_startup_fn __startup_fn ( STARTUP_LATE ) = {
-	.name = "cachedhcp",
-	.startup = cachedhcp_startup,
+/** Cached DHCP packet early startup function */
+struct startup_fn cachedhcp_early_fn __startup_fn ( STARTUP_EARLY ) = {
+	.name = "cachedhcp1",
+	.startup = cachedhcp_startup_early,
+};
+
+/** Cached DHCP packet late startup function */
+struct startup_fn cachedhcp_late_fn __startup_fn ( STARTUP_LATE ) = {
+	.name = "cachedhcp2",
+	.startup = cachedhcp_startup_late,
 	.shutdown = cachedhcp_shutdown,
 };
 
@@ -309,3 +342,25 @@ struct net_driver cachedhcp_driver __net_driver = {
 	.name = "cachedhcp",
 	.probe = cachedhcp_probe,
 };
+
+/**
+ * Recycle cached DHCPACK
+ *
+ * @v netdev		Network device
+ * @v priv		Private data
+ */
+void cachedhcp_recycle ( struct net_device *netdev ) {
+	struct cached_dhcp_packet *cache = &cached_dhcpack;
+	struct settings *settings;
+
+	/* Return DHCPACK to cache, if applicable */
+	settings = find_child_settings ( netdev_settings ( netdev ),
+					 cache->name );
+	if ( cache->dhcppkt && ( settings == &cache->dhcppkt->settings ) ) {
+		DBGC ( colour, "CACHEDHCP %s recycled from %s\n",
+		       cache->name, netdev->name );
+		assert ( cache->flags & CACHEDHCP_USED );
+		unregister_settings ( settings );
+		cache->flags &= ~CACHEDHCP_USED;
+	}
+}
