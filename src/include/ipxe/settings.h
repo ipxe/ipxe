@@ -471,6 +471,8 @@ mac_setting __setting ( SETTING_NETDEV, mac );
 extern const struct setting
 busid_setting __setting ( SETTING_NETDEV, busid );
 extern const struct setting
+linktype_setting __setting ( SETTING_NETDEV, linktype );
+extern const struct setting
 user_class_setting __setting ( SETTING_HOST_EXTRA, user-class );
 extern const struct setting
 vendor_class_setting __setting ( SETTING_HOST_EXTRA, vendor-class );
