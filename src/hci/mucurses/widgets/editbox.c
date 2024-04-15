@@ -39,20 +39,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Initialise text box widget
  *
  * @v box		Editable text box widget
- * @v buf		Text buffer
- * @v len		Size of text buffer
+ * @v buf		Dynamically allocated string buffer
  * @v win		Containing window
  * @v row		Row
  * @v col		Starting column
  * @v width		Width
  * @v flags		Flags
  */
-void init_editbox ( struct edit_box *box, char *buf, size_t len,
+void init_editbox ( struct edit_box *box, char **buf,
 		    WINDOW *win, unsigned int row, unsigned int col,
 		    unsigned int width, unsigned int flags ) {
 	memset ( box, 0, sizeof ( *box ) );
-	init_editstring ( &box->string, buf, len );
-	box->string.cursor = strlen ( buf );
+	init_editstring ( &box->string, buf );
+	box->string.cursor = ( *buf ? strlen ( *buf ) : 0 );
 	box->win = ( win ? win : stdscr );
 	box->row = row;
 	box->col = col;
@@ -67,6 +66,7 @@ void init_editbox ( struct edit_box *box, char *buf, size_t len,
  *
  */
 void draw_editbox ( struct edit_box *box ) {
+	const char *content = *(box->string.buf);
 	size_t width = box->width;
 	char buf[ width + 1 ];
 	signed int cursor_offset, underflow, overflow, first;
@@ -90,13 +90,13 @@ void draw_editbox ( struct edit_box *box ) {
 	/* Construct underscore-padded string portion */
 	memset ( buf, '_', width );
 	buf[width] = '\0';
-	len = ( strlen ( box->string.buf ) - first );
+	len = ( content ? ( strlen ( content ) - first ) : 0 );
 	if ( len > width )
 		len = width;
 	if ( box->flags & EDITBOX_STARS ) {
 		memset ( buf, '*', len );
 	} else {
-		memcpy ( buf, ( box->string.buf + first ), len );
+		memcpy ( buf, ( content + first ), len );
 	}
 
 	/* Print box content and move cursor */

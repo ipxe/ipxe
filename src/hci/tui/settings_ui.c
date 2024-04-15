@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <curses.h>
@@ -58,12 +59,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	char start[0];							\
 	char pad1[1];							\
 	union {								\
-		char settings[ cols - 1 - 1 - 1 - 1 ];			\
+		struct {						\
+			char name[ cols - 1 - 1 - 1 - 1 - 1 ];		\
+			char pad2[1];					\
+		} __attribute__ (( packed )) settings;			\
 		struct {						\
 			char name[15];					\
 			char pad2[1];					\
 			char value[ cols - 1 - 15 - 1 - 1 - 1 - 1 ];	\
-		} setting;						\
+		} __attribute__ (( packed )) setting;			\
 	} u;								\
 	char pad3[1];							\
 	char nul;							\
@@ -92,8 +96,8 @@ struct settings_ui_row {
 	struct edit_box editbox;
 	/** Editing in progress flag */
 	int editing;
-	/** Buffer for setting's value */
-	char value[256]; /* enough size for a DHCP string */
+	/** Dynamically allocated buffer for setting's value */
+	char *buf;
 };
 
 /** A settings user interface */
@@ -121,24 +125,22 @@ static unsigned int select_setting_row ( struct settings_ui *ui,
 	struct setting *previous = NULL;
 	unsigned int count = 0;
 
+	/* Free any previous setting value */
+	free ( ui->row.buf );
+	ui->row.buf = NULL;
+
 	/* Initialise structure */
 	memset ( &ui->row, 0, sizeof ( ui->row ) );
 	ui->row.row = ( SETTINGS_LIST_ROW + index - ui->scroll.first );
 
 	/* Include parent settings block, if applicable */
-	if ( ui->settings->parent && ( count++ == index ) ) {
+	if ( ui->settings->parent && ( count++ == index ) )
 		ui->row.settings = ui->settings->parent;
-		snprintf ( ui->row.value, sizeof ( ui->row.value ),
-			   "../" );
-	}
 
 	/* Include any child settings blocks, if applicable */
 	list_for_each_entry ( settings, &ui->settings->children, siblings ) {
-		if ( count++ == index ) {
+		if ( count++ == index )
 			ui->row.settings = settings;
-			snprintf ( ui->row.value, sizeof ( ui->row.value ),
-				   "%s/", settings->name );
-		}
 	}
 
 	/* Include any applicable settings */
@@ -155,15 +157,14 @@ static unsigned int select_setting_row ( struct settings_ui *ui,
 
 		/* Read current setting value and origin */
 		if ( count++ == index ) {
-			fetchf_setting ( ui->settings, setting, &ui->row.origin,
-					 &ui->row.setting, ui->row.value,
-					 sizeof ( ui->row.value ) );
+			fetchf_setting_copy ( ui->settings, setting,
+					      &ui->row.origin,
+					      &ui->row.setting, &ui->row.buf );
 		}
 	}
 
 	/* Initialise edit box */
-	init_editbox ( &ui->row.editbox, ui->row.value,
-		       sizeof ( ui->row.value ), NULL, ui->row.row,
+	init_editbox ( &ui->row.editbox, &ui->row.buf, NULL, ui->row.row,
 		       ( SETTINGS_LIST_COL +
 			 offsetof ( typeof ( *text ), u.setting.value ) ),
 		       sizeof ( text->u.setting.value ), 0 );
@@ -197,7 +198,7 @@ static size_t string_copy ( char *dest, const char *src, size_t len ) {
 static void draw_setting_row ( struct settings_ui *ui ) {
 	SETTING_ROW_TEXT ( COLS ) text;
 	unsigned int curs_offset;
-	char *value;
+	const char *value;
 
 	/* Fill row with spaces */
 	memset ( &text, ' ', sizeof ( text ) );
@@ -207,10 +208,12 @@ static void draw_setting_row ( struct settings_ui *ui ) {
 	if ( ui->row.settings ) {
 
 		/* Construct space-padded name */
-		curs_offset = ( offsetof ( typeof ( text ), u.settings ) +
-				string_copy ( text.u.settings,
-					      ui->row.value,
-					      sizeof ( text.u.settings ) ) );
+		value = ( ( ui->row.settings == ui->settings->parent ) ?
+			  ".." : ui->row.settings->name );
+		curs_offset = string_copy ( text.u.settings.name, value,
+					    sizeof ( text.u.settings.name ) );
+		text.u.settings.name[curs_offset] = '/';
+		curs_offset += offsetof ( typeof ( text ), u.settings );
 
 	} else {
 
@@ -221,12 +224,12 @@ static void draw_setting_row ( struct settings_ui *ui ) {
 			      sizeof ( text.u.setting.name ) );
 
 		/* Construct space-padded value */
-		value = ui->row.value;
-		if ( ! *value )
+		value = ui->row.buf;
+		if ( ! ( value && value[0] ) )
 			value = "<not specified>";
-		curs_offset = ( offsetof ( typeof ( text ), u.setting.value ) +
-				string_copy ( text.u.setting.value, value,
-					      sizeof ( text.u.setting.value )));
+		curs_offset = string_copy ( text.u.setting.value, value,
+					    sizeof ( text.u.setting.value ) );
+		curs_offset += offsetof ( typeof ( text ), u.setting.value );
 	}
 
 	/* Print row */
@@ -257,7 +260,7 @@ static int edit_setting ( struct settings_ui *ui, int key ) {
  */
 static int save_setting ( struct settings_ui *ui ) {
 	assert ( ui->row.setting.name != NULL );
-	return storef_setting ( ui->settings, &ui->row.setting, ui->row.value );
+	return storef_setting ( ui->settings, &ui->row.setting, ui->row.buf );
 }
 
 /**
@@ -527,6 +530,7 @@ static int main_loop ( struct settings *settings ) {
 			redraw = 1;
 			break;
 		case CTRL_X:
+			select_setting_row ( &ui, -1U );
 			return 0;
 		case CR:
 		case LF:

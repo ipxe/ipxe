@@ -36,7 +36,7 @@ enum edit_box_flags {
 	EDITBOX_STARS = 0x0001,
 };
 
-extern void init_editbox ( struct edit_box *box, char *buf, size_t len,
+extern void init_editbox ( struct edit_box *box, char **buf,
 			   WINDOW *win, unsigned int row, unsigned int col,
 			   unsigned int width, unsigned int flags )
 			   __attribute__ (( nonnull (1, 2) ));

@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <curses.h>
 #include <ipxe/console.h>
@@ -49,8 +50,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EDITBOX_WIDTH		20U
 
 int login_ui ( void ) {
-	char username[64];
-	char password[64];
+	char *username;
+	char *password;
 	struct edit_box username_box;
 	struct edit_box password_box;
 	struct edit_box *current_box = &username_box;
@@ -58,19 +59,16 @@ int login_ui ( void ) {
 	int rc = -EINPROGRESS;
 
 	/* Fetch current setting values */
-	fetch_string_setting ( NULL, &username_setting, username,
-			       sizeof ( username ) );
-	fetch_string_setting ( NULL, &password_setting, password,
-			       sizeof ( password ) );
+	fetchf_setting_copy ( NULL, &username_setting, NULL, NULL, &username );
+	fetchf_setting_copy ( NULL, &password_setting, NULL, NULL, &password );
 
 	/* Initialise UI */
 	initscr();
 	start_color();
-	init_editbox ( &username_box, username, sizeof ( username ), NULL,
-		       USERNAME_ROW, EDITBOX_COL, EDITBOX_WIDTH, 0 );
-	init_editbox ( &password_box, password, sizeof ( password ), NULL,
-		       PASSWORD_ROW, EDITBOX_COL, EDITBOX_WIDTH,
-		       EDITBOX_STARS );
+	init_editbox ( &username_box, &username, NULL, USERNAME_ROW,
+		       EDITBOX_COL, EDITBOX_WIDTH, 0 );
+	init_editbox ( &password_box, &password, NULL, PASSWORD_ROW,
+		       EDITBOX_COL, EDITBOX_WIDTH, EDITBOX_STARS );
 
 	/* Draw initial UI */
 	color_set ( CPAIR_NORMAL, NULL );
@@ -122,16 +120,15 @@ int login_ui ( void ) {
 	erase();
 	endwin();
 
-	if ( rc != 0 )
-		return rc;
+	/* Store settings on successful completion */
+	if ( rc == 0 )
+		rc = storef_setting ( NULL, &username_setting, username );
+	if ( rc == 0 )
+		rc = storef_setting ( NULL, &password_setting, password );
 
-	/* Store settings */
-	if ( ( rc = store_setting ( NULL, &username_setting, username,
-				    strlen ( username ) ) ) != 0 )
-		return rc;
-	if ( ( rc = store_setting ( NULL, &password_setting, password,
-				    strlen ( password ) ) ) != 0 )
-		return rc;
+	/* Free setting values */
+	free ( username );
+	free ( password );
 
-	return 0;
+	return rc;
 }
