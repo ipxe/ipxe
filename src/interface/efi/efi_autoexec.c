@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/timer.h>
 #include <ipxe/image.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/uri.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_utils.h>
 #include <ipxe/efi/efi_autoexec.h>
@@ -111,6 +112,14 @@ static int efi_autoexec_network ( EFI_HANDLE handle, struct image **image ) {
 		goto err_create;
 	}
 
+	/* Do nothing unless we have a usable current working URI */
+	if ( ! cwuri ) {
+		DBGC ( device, "EFI %s has no current working URI\n",
+		       efi_handle_name ( device ) );
+		rc = -ENOTTY;
+		goto err_cwuri;
+	}
+
 	/* Open network device */
 	if ( ( rc = netdev_open ( netdev ) ) != 0 ) {
 		DBGC ( device, "EFI %s could not open net device: %s\n",
@@ -130,6 +139,7 @@ static int efi_autoexec_network ( EFI_HANDLE handle, struct image **image ) {
 	sync ( EFI_AUTOEXEC_TIMEOUT );
 
  err_open:
+ err_cwuri:
 	mnptemp_destroy ( netdev );
  err_create:
 	return rc;
