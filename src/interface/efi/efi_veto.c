@@ -520,6 +520,37 @@ static int efi_veto_dhcp6 ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 	return 1;
 }
 
+/**
+ * Veto Insyde Serial Terminal Driver
+ *
+ * @v binding           Driver binding protocol
+ * @v loaded            Loaded image protocol
+ * @v wtf               Component name protocol, if present
+ * @v manufacturer      Manufacturer name, if present
+ * @v name              Driver name, if present
+ * @ret vetoed          Driver is to be vetoed
+ */
+static int
+efi_veto_insyde_serial_terminal ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
+			    EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
+			    EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
+			    const char *manufacturer, const CHAR16 *name ) {
+	static const CHAR16 serial_terminal[] = L"Serial Terminal Driver";
+	static const char *insyde = "Insyde";
+
+	/* Check manufacturer and driver name */
+	if ( ! manufacturer )
+		return 0;
+	if ( ! name )
+		return 0;
+	if ( strcmp ( manufacturer, insyde ) != 0 )
+		return 0;
+	if ( memcmp ( name, serial_terminal, sizeof ( serial_terminal ) ) != 0 )
+		return 0;
+
+	return 1;
+}
+
 /** Driver vetoes */
 static struct efi_veto_candidate efi_vetoes[] = {
 	{
@@ -538,6 +569,10 @@ static struct efi_veto_candidate efi_vetoes[] = {
 		.name = "Dhcp6",
 		.veto = efi_veto_dhcp6,
 	},
+	{
+		.name = "Insyde Serial Terminal Driver",
+		.veto = efi_veto_insyde_serial_terminal,
+	}
 };
 
 /**
