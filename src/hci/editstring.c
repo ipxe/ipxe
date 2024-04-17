@@ -59,9 +59,13 @@ static __nonnull void kill_eol ( struct edit_string *string );
  */
 static int insert_delete ( struct edit_string *string, size_t delete_len,
 			   const char *insert_text ) {
-	size_t old_len, max_delete_len, insert_len, new_len;
+	size_t old_len, max_delete_len, move_len, insert_len, new_len;
 	char *buf;
 	char *tmp;
+
+	/* Prepare edit history */
+	string->mod_start = string->cursor;
+	string->mod_end = string->cursor;
 
 	/* Calculate lengths */
 	buf = *(string->buf);
@@ -70,39 +74,36 @@ static int insert_delete ( struct edit_string *string, size_t delete_len,
 	max_delete_len = ( old_len - string->cursor );
 	if ( delete_len > max_delete_len )
 		delete_len = max_delete_len;
+	move_len = ( max_delete_len - delete_len );
 	insert_len = ( insert_text ? strlen ( insert_text ) : 0 );
 	new_len = ( old_len - delete_len + insert_len );
+
+	/* Delete existing text */
+	memmove ( ( buf + string->cursor ),
+		  ( buf + string->cursor + delete_len ), move_len );
 
 	/* Reallocate string, ignoring failures if shrinking */
 	tmp = realloc ( buf, ( new_len + 1 /* NUL */ ) );
 	if ( tmp ) {
 		buf = tmp;
 		*(string->buf) = buf;
-	} else if ( new_len > old_len ) {
+	} else if ( ( new_len > old_len ) || ( ! buf ) ) {
 		return -ENOMEM;
 	}
 
-	/* Fill in edit history */
-	string->mod_start = string->cursor;
-	string->mod_end = ( ( new_len > old_len ) ? new_len : old_len );
-
-	/* Move data following the cursor */
+	/* Create space for inserted text */
 	memmove ( ( buf + string->cursor + insert_len ),
-		  ( buf + string->cursor + delete_len ),
-		  ( max_delete_len - delete_len ) );
+		  ( buf + string->cursor ), move_len );
 
 	/* Copy inserted text to cursor position */
 	memcpy ( ( buf + string->cursor ), insert_text, insert_len );
 	string->cursor += insert_len;
 
-	/* Terminate string (if not NULL) */
-	if ( buf ) {
-		buf[new_len] = '\0';
-	} else {
-		assert ( old_len == 0 );
-		assert ( insert_len == 0 );
-		assert ( new_len == 0 );
-	}
+	/* Terminate string */
+	buf[new_len] = '\0';
+
+	/* Update edit history */
+	string->mod_end = ( ( new_len > old_len ) ? new_len : old_len );
 
 	return 0;
 }
