@@ -108,6 +108,8 @@ struct settings_ui {
 	struct jump_scroller scroll;
 	/** Current row */
 	struct settings_ui_row row;
+	/** Widget set used for editing setting */
+	struct widgets widgets;
 };
 
 /**
@@ -164,10 +166,11 @@ static unsigned int select_setting_row ( struct settings_ui *ui,
 	}
 
 	/* Initialise edit box */
-	init_editbox ( &ui->row.editbox, &ui->row.buf, NULL, ui->row.row,
+	memset ( &ui->row.editbox, 0, sizeof ( ui->row.editbox ) );
+	init_editbox ( &ui->row.editbox, ui->row.row,
 		       ( SETTINGS_LIST_COL +
 			 offsetof ( typeof ( *text ), u.setting.value ) ),
-		       sizeof ( text->u.setting.value ), 0 );
+		       sizeof ( text->u.setting.value ), 0, &ui->row.buf );
 
 	return count;
 }
@@ -250,7 +253,7 @@ static void draw_setting_row ( struct settings_ui *ui ) {
 static int edit_setting ( struct settings_ui *ui, int key ) {
 	assert ( ui->row.setting.name != NULL );
 	ui->row.editing = 1;
-	return edit_editbox ( &ui->row.editbox, key );
+	return edit_widget ( &ui->widgets, &ui->row.editbox.widget, key );
 }
 
 /**
@@ -454,6 +457,7 @@ static int main_loop ( struct settings *settings ) {
 	/* Print initial screen content */
 	color_set ( CPAIR_NORMAL, NULL );
 	memset ( &ui, 0, sizeof ( ui ) );
+	init_widgets ( &ui.widgets, NULL );
 	select_settings ( &ui, settings );
 
 	while ( 1 ) {
@@ -477,9 +481,7 @@ static int main_loop ( struct settings *settings ) {
 			assert ( ui.row.setting.name != NULL );
 
 			/* Redraw edit box */
-			color_set ( CPAIR_EDIT, NULL );
-			draw_editbox ( &ui.row.editbox );
-			color_set ( CPAIR_NORMAL, NULL );
+			draw_widget ( &ui.widgets, &ui.row.editbox.widget );
 
 			/* Process keypress */
 			key = edit_setting ( &ui, getkey ( 0 ) );

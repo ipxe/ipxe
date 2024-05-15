@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <curses.h>
 #include <ipxe/console.h>
 #include <ipxe/settings.h>
+#include <ipxe/label.h>
 #include <ipxe/editbox.h>
 #include <ipxe/keys.h>
 #include <ipxe/ansicol.h>
@@ -45,90 +46,55 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define USERNAME_ROW		( ( LINES / 2U ) - 2U )
 #define PASSWORD_LABEL_ROW	( ( LINES / 2U ) + 2U )
 #define PASSWORD_ROW		( ( LINES / 2U ) + 4U )
-#define LABEL_COL		( ( COLS / 2U ) - 4U )
-#define EDITBOX_COL		( ( COLS / 2U ) - 10U )
-#define EDITBOX_WIDTH		20U
+#define WIDGET_COL		( ( COLS / 2U ) - 10U )
+#define WIDGET_WIDTH		20U
 
 int login_ui ( void ) {
 	char *username;
 	char *password;
-	struct edit_box username_box;
-	struct edit_box password_box;
-	struct edit_box *current_box = &username_box;
-	int key;
-	int rc = -EINPROGRESS;
+	struct {
+		struct widgets widgets;
+		struct label username_label;
+		struct label password_label;
+		struct edit_box username_box;
+		struct edit_box password_box;
+	} widgets;
+	int rc;
 
 	/* Fetch current setting values */
 	fetchf_setting_copy ( NULL, &username_setting, NULL, NULL, &username );
 	fetchf_setting_copy ( NULL, &password_setting, NULL, NULL, &password );
 
-	/* Initialise UI */
-	initscr();
-	start_color();
-	init_editbox ( &username_box, &username, NULL, USERNAME_ROW,
-		       EDITBOX_COL, EDITBOX_WIDTH, 0 );
-	init_editbox ( &password_box, &password, NULL, PASSWORD_ROW,
-		       EDITBOX_COL, EDITBOX_WIDTH, EDITBOX_STARS );
+	/* Construct user interface */
+	memset ( &widgets, 0, sizeof ( widgets ) );
+	init_widgets ( &widgets.widgets, NULL );
+	init_label ( &widgets.username_label, USERNAME_LABEL_ROW, WIDGET_COL,
+		     WIDGET_WIDTH, "Username" );
+	init_label ( &widgets.password_label, PASSWORD_LABEL_ROW, WIDGET_COL,
+		     WIDGET_WIDTH, "Password" );
+	init_editbox ( &widgets.username_box, USERNAME_ROW, WIDGET_COL,
+		       WIDGET_WIDTH, 0, &username );
+	init_editbox ( &widgets.password_box, PASSWORD_ROW, WIDGET_COL,
+		       WIDGET_WIDTH, WIDGET_SECRET, &password );
+	add_widget ( &widgets.widgets, &widgets.username_label.widget );
+	add_widget ( &widgets.widgets, &widgets.password_label.widget );
+	add_widget ( &widgets.widgets, &widgets.username_box.widget );
+	add_widget ( &widgets.widgets, &widgets.password_box.widget );
 
-	/* Draw initial UI */
-	color_set ( CPAIR_NORMAL, NULL );
-	erase();
-	attron ( A_BOLD );
-	mvprintw ( USERNAME_LABEL_ROW, LABEL_COL, "Username:" );
-	mvprintw ( PASSWORD_LABEL_ROW, LABEL_COL, "Password:" );
-	attroff ( A_BOLD );
-	color_set ( CPAIR_EDIT, NULL );
-	draw_editbox ( &username_box );
-	draw_editbox ( &password_box );
-
-	/* Main loop */
-	while ( rc == -EINPROGRESS ) {
-
-		draw_editbox ( current_box );
-
-		key = getkey ( 0 );
-		switch ( key ) {
-		case KEY_DOWN:
-			current_box = &password_box;
-			break;
-		case KEY_UP:
-			current_box = &username_box;
-			break;
-		case TAB:
-			current_box = ( ( current_box == &username_box ) ?
-					&password_box : &username_box );
-			break;
-		case KEY_ENTER:
-			if ( current_box == &username_box ) {
-				current_box = &password_box;
-			} else {
-				rc = 0;
-			}
-			break;
-		case CTRL_C:
-		case ESC:
-			rc = -ECANCELED;
-			break;
-		default:
-			edit_editbox ( current_box, key );
-			break;
-		}
-	}
-
-	/* Terminate UI */
-	color_set ( CPAIR_NORMAL, NULL );
-	erase();
-	endwin();
+	/* Present user interface */
+	if ( ( rc = widget_ui ( &widgets.widgets ) ) != 0 )
+		goto err_ui;
 
 	/* Store settings on successful completion */
-	if ( rc == 0 )
-		rc = storef_setting ( NULL, &username_setting, username );
-	if ( rc == 0 )
-		rc = storef_setting ( NULL, &password_setting, password );
+	if ( ( rc = storef_setting ( NULL, &username_setting, username ) ) !=0)
+		goto err_store_username;
+	if ( ( rc = storef_setting ( NULL, &password_setting, password ) ) !=0)
+		goto err_store_password;
 
-	/* Free setting values */
+ err_store_username:
+ err_store_password:
+ err_ui:
 	free ( username );
 	free ( password );
-
 	return rc;
 }
