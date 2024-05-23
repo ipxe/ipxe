@@ -321,9 +321,9 @@ char * strstr ( const char *haystack, const char *needle ) {
  *
  * @v dest		Destination string
  * @v src		Source string
- * @ret dest		Destination string
+ * @ret dnul		Terminating NUL of destination string
  */
-char * strcpy ( char *dest, const char *src ) {
+char * stpcpy ( char *dest, const char *src ) {
 	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
 	uint8_t *dest_bytes = ( ( uint8_t * ) dest );
 
@@ -333,6 +333,19 @@ char * strcpy ( char *dest, const char *src ) {
 		if ( ! *dest_bytes )
 			break;
 	}
+	return ( ( char * ) dest_bytes );
+}
+
+/**
+ * Copy string
+ *
+ * @v dest		Destination string
+ * @v src		Source string
+ * @ret dest		Destination string
+ */
+char * strcpy ( char *dest, const char *src ) {
+
+	stpcpy ( dest, src );
 	return dest;
 }
 

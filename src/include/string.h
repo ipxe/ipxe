@@ -43,6 +43,7 @@ extern char * __pure strchr ( const char *src, int character ) __nonnull;
 extern char * __pure strrchr ( const char *src, int character ) __nonnull;
 extern char * __pure strstr ( const char *haystack,
 			      const char *needle ) __nonnull;
+extern char * stpcpy ( char *dest, const char *src ) __nonnull;
 extern char * strcpy ( char *dest, const char *src ) __nonnull;
 extern char * strncpy ( char *dest, const char *src, size_t max ) __nonnull;
 extern char * strcat ( char *dest, const char *src ) __nonnull;

@@ -204,6 +204,24 @@ static void string_test_exec ( void ) {
 		free ( dup );
 	}
 
+	/* Test stpcpy() */
+	{
+		const char longer[12] = "duplicateme";
+		const char shorter[6] = "hello";
+		char dest[12];
+		char *dnul;
+
+		dnul = stpcpy ( dest, longer );
+		ok ( *dnul == '\0' );
+		ok ( dnul == &dest[11] );
+		ok ( memcmp ( dest, longer, 12 ) == 0 );
+		dnul = stpcpy ( dest, shorter );
+		ok ( *dnul == '\0' );
+		ok ( dnul == &dest[5] );
+		ok ( memcmp ( dest, shorter, 6 ) == 0 );
+		ok ( memcmp ( ( dest + 6 ), ( longer + 6 ), 6 ) == 0 );
+	}
+
 	/* Test strcpy() */
 	{
 		const char longer[7] = "copyme";
