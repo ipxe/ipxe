@@ -126,6 +126,8 @@ struct item_options {
 static struct option_descriptor item_opts[] = {
 	OPTION_DESC ( "menu", 'm', required_argument,
 		      struct item_options, dynui, parse_string ),
+	OPTION_DESC ( "form", 'f', required_argument,
+		      struct item_options, dynui, parse_string ),
 	OPTION_DESC ( "key", 'k', required_argument,
 		      struct item_options, key, parse_key ),
 	OPTION_DESC ( "default", 'd', no_argument,
@@ -287,10 +289,70 @@ static int choose_exec ( int argc, char **argv ) {
 	return rc;
 }
 
+/** "present" options */
+struct present_options {
+	/** Dynamic user interface name */
+	char *dynui;
+	/** Keep dynamic user interface */
+	int keep;
+};
+
+/** "present" option list */
+static struct option_descriptor present_opts[] = {
+	OPTION_DESC ( "form", 'f', required_argument,
+		      struct present_options, dynui, parse_string ),
+	OPTION_DESC ( "keep", 'k', no_argument,
+		      struct present_options, keep, parse_flag ),
+};
+
+/** "present" command descriptor */
+static struct command_descriptor present_cmd =
+	COMMAND_DESC ( struct present_options, present_opts, 0, 0, NULL );
+
+/**
+ * The "present" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int present_exec ( int argc, char **argv ) {
+	struct present_options opts;
+	struct dynamic_ui *dynui;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &present_cmd, &opts ) ) != 0 )
+		goto err_parse_options;
+
+	/* Identify dynamic user interface */
+	if ( ( rc = parse_dynui ( opts.dynui, &dynui ) ) != 0 )
+		goto err_parse_dynui;
+
+	/* Show as form */
+	if ( ( rc = show_form ( dynui ) ) != 0 )
+		goto err_show_form;
+
+	/* Success */
+	rc = 0;
+
+ err_show_form:
+	/* Destroy dynamic user interface, if applicable */
+	if ( ! opts.keep )
+		destroy_dynui ( dynui );
+ err_parse_dynui:
+ err_parse_options:
+	return rc;
+}
+
 /** Dynamic user interface commands */
 struct command dynui_commands[] __command = {
 	{
 		.name = "menu",
+		.exec = dynui_exec,
+	},
+	{
+		.name = "form",
 		.exec = dynui_exec,
 	},
 	{
@@ -300,5 +362,9 @@ struct command dynui_commands[] __command = {
 	{
 		.name = "choose",
 		.exec = choose_exec,
+	},
+	{
+		.name = "present",
+		.exec = present_exec,
 	},
 };

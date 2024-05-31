@@ -227,6 +227,9 @@ REQUIRE_OBJECT ( sanboot_cmd );
 #ifdef MENU_CMD
 REQUIRE_OBJECT ( dynui_cmd );
 #endif
+#ifdef FORM_CMD
+REQUIRE_OBJECT ( dynui_cmd );
+#endif
 #ifdef LOGIN_CMD
 REQUIRE_OBJECT ( login_cmd );
 #endif

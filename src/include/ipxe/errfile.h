@@ -418,6 +418,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_des		      ( ERRFILE_OTHER | 0x00600000 )
 #define ERRFILE_editstring	      ( ERRFILE_OTHER | 0x00610000 )
 #define ERRFILE_widget_ui	      ( ERRFILE_OTHER | 0x00620000 )
+#define ERRFILE_form_ui		      ( ERRFILE_OTHER | 0x00630000 )
 
 /** @} */
 
