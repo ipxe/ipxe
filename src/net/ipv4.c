@@ -82,14 +82,15 @@ static struct profiler ipv4_rx_profiler __profiler = { .name = "ipv4.rx" };
  * @ret rc		Return status code
  */
 static int add_ipv4_miniroute ( struct net_device *netdev,
-				struct in_addr address, struct in_addr netmask,
-				struct in_addr gateway ) {
+				struct in_addr address, struct in_addr netaddr,
+				struct in_addr netmask, struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
 
-	DBGC ( netdev, "IPv4 add %s", inet_ntoa ( address ) );
+	DBGC ( netdev, "IPv4 add %s", inet_ntoa ( netaddr ) );
 	DBGC ( netdev, "/%s ", inet_ntoa ( netmask ) );
 	if ( gateway.s_addr )
 		DBGC ( netdev, "gw %s ", inet_ntoa ( gateway ) );
+	DBGC ( netdev, "src %s ", inet_ntoa ( address ) );
 	DBGC ( netdev, "via %s\n", netdev->name );
 
 	/* Allocate and populate miniroute structure */
@@ -102,6 +103,7 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
 	/* Record routing information */
 	miniroute->netdev = netdev_get ( netdev );
 	miniroute->address = address;
+	miniroute->netaddr = netaddr;
 	miniroute->netmask = netmask;
 	miniroute->gateway = gateway;
 		
@@ -125,10 +127,11 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
 static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 	struct net_device *netdev = miniroute->netdev;
 
-	DBGC ( netdev, "IPv4 del %s", inet_ntoa ( miniroute->address ) );
+	DBGC ( netdev, "IPv4 del %s", inet_ntoa ( miniroute->netaddr ) );
 	DBGC ( netdev, "/%s ", inet_ntoa ( miniroute->netmask ) );
 	if ( miniroute->gateway.s_addr )
 		DBGC ( netdev, "gw %s ", inet_ntoa ( miniroute->gateway ) );
+	DBGC ( netdev, "src %s ", inet_ntoa ( miniroute->address ) );
 	DBGC ( netdev, "via %s\n", miniroute->netdev->name );
 
 	netdev_put ( miniroute->netdev );
@@ -168,21 +171,21 @@ static struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
 
 		} else {
 
-			/* If destination is an on-link global
-			 * address, then use this route.
+			/* If the destination is global, and is within the
+			 * route's network (netaddr/netmask), then use this
+			 * route.
 			 */
-			if ( ( ( dest->s_addr ^ miniroute->address.s_addr )
+			if ( ( ( dest->s_addr ^ miniroute->netaddr.s_addr )
 			       & miniroute->netmask.s_addr ) == 0 )
+				/* Is this via a gateway?
+				 *
+				 * If so, then set the next hop.
+				 */
+				if ( miniroute->gateway.s_addr ) {
+					*dest = miniroute->gateway;
+				}
 				return miniroute;
 
-			/* If destination is an off-link global
-			 * address, and we have a default gateway,
-			 * then use this route.
-			 */
-			if ( miniroute->gateway.s_addr ) {
-				*dest = miniroute->gateway;
-				return miniroute;
-			}
 		}
 	}
 
@@ -812,6 +815,14 @@ const struct setting gateway_setting __setting ( SETTING_IP4, gateway ) = {
 	.type = &setting_type_ipv4,
 };
 
+/** RFC 3442 Classless Static Routes option setting */
+const struct setting rfc3442_routes_setting __setting ( SETTING_IP4, rfc3442-routes ) = {
+	.name = "rfc3442-routes",
+	.description = "RFC 3442 Classless Static Routes",
+	.tag = DHCP_CLASSLESS_STATIC_ROUTES,
+	.type = &setting_type_hex,
+};
+
 /**
  * Send gratuitous ARP, if applicable
  *
@@ -823,9 +834,17 @@ const struct setting gateway_setting __setting ( SETTING_IP4, gateway ) = {
  */
 static int ipv4_gratuitous_arp ( struct net_device *netdev,
 				 struct in_addr address,
-				 struct in_addr netmask __unused,
+				 struct in_addr netaddr,
+				 struct in_addr netmask,
 				 struct in_addr gateway __unused ) {
 	int rc;
+	struct in_addr src_addr_truncated = { 0 };
+
+	/* Test if source address is outside destination network
+	   and do nothing if so  */
+	src_addr_truncated.s_addr = ( address.s_addr & netmask.s_addr );
+	if ( src_addr_truncated.s_addr != netaddr.s_addr )
+		return 0;
 
 	/* Do nothing if network device already has this IPv4 address */
 	if ( ipv4_has_addr ( netdev, address ) )
@@ -852,13 +871,18 @@ static int ipv4_gratuitous_arp ( struct net_device *netdev,
  */
 static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 					     struct in_addr address,
+					     struct in_addr netaddr,
 					     struct in_addr netmask,
 					     struct in_addr gateway ) ) {
 	struct net_device *netdev;
 	struct settings *settings;
 	struct in_addr address = { 0 };
+	struct in_addr netaddr = { 0 };
 	struct in_addr netmask = { 0 };
 	struct in_addr gateway = { 0 };
+	struct in_addr zeroes_addr = { 0 }; // 0.0.0.0
+	void *rfc3442_data = NULL;
+	int rfc3442_data_len;
 	int rc;
 
 	/* Process settings for each network device */
@@ -890,12 +914,115 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		/* Get default gateway, if present */
 		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
 
-		/* Apply settings */
-		if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
-			return rc;
-	}
+		/* Get RFC 3442 Classless Static Routes, if present */
+		rfc3442_data_len = fetch_raw_setting_copy (
+				NULL, &rfc3442_routes_setting, &rfc3442_data );
 
+		/* Calculate netaddr */
+		netaddr.s_addr = ( address.s_addr & netmask.s_addr );
+
+		/* Apply settings
+		 *
+		 * Firstly, create route for directly connected network
+		 *
+		 * netdev: netaddr/netmask via 0.0.0.0 (directly connected) src address
+		 */
+		if ( ( rc = apply ( netdev, address, netaddr, netmask, zeroes_addr ) ) != 0 )
+			goto err;
+
+		/* Secondly, create route for default gateway address, *if and
+		 * only if* the interface *has* a default gateway address *and*
+		 * no option 121 (RFC 3442 Classless Static Routes) data was received
+		 *
+		 * netdev: 0.0.0.0/0.0.0.0 via gateway src address
+		 */
+		if ( ( gateway.s_addr ) && ( ! rfc3442_data ) ) {
+			if ( ( rc = apply ( netdev, address, zeroes_addr, zeroes_addr, gateway ) ) != 0 )
+				goto err;
+		}
+
+		/* Thirdly, create Classless Static Routes if present */
+		if ( rfc3442_data_len > 0 ) {
+			DBGC ( netdev, "IPv4 got %d bytes of Option 121 data\n",
+			       rfc3442_data_len );
+			int remaining = rfc3442_data_len;
+			int offset = 0;
+			unsigned int mask_width;
+			unsigned int mask_octets;
+			unsigned int route_len;
+			struct in_addr csr_netaddr = { 0 };
+			struct in_addr csr_netmask = { 0 };
+			struct in_addr csr_gateway = { 0 };
+
+			while ( remaining ) {
+				DBGC ( netdev, "%d bytes of Option 121 data remaining...\n",
+				       remaining );
+				/* Calculate number of significant octets in mask */
+				mask_width = ((unsigned char*)rfc3442_data)[offset];
+				mask_octets = (mask_width + 7) / 8;
+				DBGC ( netdev, "Got mask width %d... mask octets %d... ",
+				       mask_width, mask_octets );
+				/* Calculate length of entire route in octets */
+				route_len = 1 + mask_octets + 4;
+				DBGC ( netdev, "route record length %d... ",
+				       route_len );
+				/* Check bytes remaining */
+				remaining -= route_len;
+				if ( remaining < 0 ) {
+					DBGC ( netdev, "\nError: Insufficient bytes of Option 121 data remaining, expected %d. Exiting loop.\n",
+					       route_len );
+					break;
+				}
+				/* Check subnet mask length and network address
+				 * stored length are sensible
+				 */
+				if ( ( mask_width > 32 ) || ( mask_octets > 4 ) ) {
+					DBGC ( netdev, "\nError: Invalid network address length (%d octets)/subnet mask (/%d). Exiting loop.\n",
+					       mask_octets, mask_width );
+					break;
+				}
+				/* Subnet mask */
+				csr_netmask.s_addr = htonl((mask_width > 0) ?
+							   0xFFFFFFFFU << (32 - mask_width) :
+							   0);
+				DBGC ( netdev, "netmask %s... ",
+				       inet_ntoa ( csr_netmask ) );
+				/* Network address */
+				csr_netaddr.s_addr = 0;
+				if ( mask_octets > 0 )
+					memcpy(&csr_netaddr.s_addr, ((char*)rfc3442_data +
+								     offset + 1),
+					       mask_octets);
+				DBGC ( netdev, "unmasked netaddr %s... ",
+				       inet_ntoa ( csr_netaddr ) );
+				/* Zero bits in host portion of network address */
+				csr_netaddr.s_addr &= csr_netmask.s_addr;
+				DBGC ( netdev, "masked netaddr %s... ",
+				       inet_ntoa ( csr_netaddr ) );
+				/* Router address */
+				memcpy(&csr_gateway.s_addr, ((char*)rfc3442_data +
+							     offset + 1 + mask_octets),
+				       sizeof ( csr_gateway.s_addr ));
+				DBGC ( netdev, "gw %s.\n",
+				       inet_ntoa ( csr_gateway ) );
+				/* Add route to routing table */
+				if ( ( rc = apply ( netdev, address, csr_netaddr,
+						    csr_netmask, csr_gateway ) ) != 0 )
+					goto err;
+				offset += route_len;
+			}
+
+		}
+
+		if ( rfc3442_data ) {
+			free ( rfc3442_data );
+			rfc3442_data = NULL;
+		}
+	}
 	return 0;
+ err:
+	free ( rfc3442_data );
+	return rc;
 }
 
 /**

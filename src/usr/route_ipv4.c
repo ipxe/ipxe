@@ -46,10 +46,11 @@ static void route_ipv4_print ( struct net_device *netdev ) {
 		if ( miniroute->netdev != netdev )
 			continue;
 		printf ( "%s: %s/", netdev->name,
-			 inet_ntoa ( miniroute->address ) );
+			 inet_ntoa ( miniroute->netaddr ) );
 		printf ( "%s", inet_ntoa ( miniroute->netmask ) );
 		if ( miniroute->gateway.s_addr )
 			printf ( " gw %s", inet_ntoa ( miniroute->gateway ) );
+		printf ( " src %s", inet_ntoa ( miniroute->address ) );
 		if ( ! netdev_is_open ( miniroute->netdev ) )
 			printf ( " (inaccessible)" );
 		printf ( "\n" );
