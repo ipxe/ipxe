@@ -16,8 +16,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct widgets {
 	/** List of widgets (in tab order) */
 	struct list_head list;
-	/** Containing window */
-	WINDOW *win;
 };
 
 /** A text widget */
@@ -50,14 +48,12 @@ struct widget_operations {
 	/**
 	 * Draw widget
 	 *
-	 * @v widgets		Text widget set
 	 * @v widget		Text widget
 	 */
-	void ( * draw ) ( struct widgets *widgets, struct widget *widget );
+	void ( * draw ) ( struct widget *widget );
 	/**
 	 * Edit widget
 	 *
-	 * @v widgets		Text widget set
 	 * @v widget		Text widget
 	 * @v key		Key pressed by user
 	 * @ret key		Key returned to application, or zero
@@ -66,21 +62,18 @@ struct widget_operations {
 	 * method to ensure that any changes to an editable widget are
 	 * displayed to the user.
 	 */
-	int ( * edit ) ( struct widgets *widgets, struct widget *widget,
-			 int key );
+	int ( * edit ) ( struct widget *widget, int key );
 };
 
 /**
  * Initialise text widget set
  *
  * @v widgets		Text widget set
- * @v win		Containing window
  */
 static inline __attribute__ (( always_inline )) void
-init_widgets ( struct widgets *widgets, WINDOW *win ) {
+init_widgets ( struct widgets *widgets ) {
 
 	INIT_LIST_HEAD ( &widgets->list );
-	widgets->win = ( win ? win : stdscr );
 }
 
 /**
@@ -119,19 +112,17 @@ add_widget ( struct widgets *widgets, struct widget *widget ) {
 /**
  * Draw text widget
  *
- * @v widgets		Text widget set
  * @v widget		Text widget
  */
 static inline __attribute__ (( always_inline )) void
-draw_widget ( struct widgets *widgets, struct widget *widget ) {
+draw_widget ( struct widget *widget ) {
 
-	widget->op->draw ( widgets, widget );
+	widget->op->draw ( widget );
 }
 
 /**
  * Edit text widget
  *
- * @v widgets		Text widget set
  * @v widget		Text widget
  * @v key		Key pressed by user
  * @ret key		Key returned to application, or zero
@@ -141,9 +132,9 @@ draw_widget ( struct widgets *widgets, struct widget *widget ) {
  * user.
  */
 static inline __attribute__ (( always_inline )) int
-edit_widget ( struct widgets *widgets, struct widget *widget, int key ) {
+edit_widget ( struct widget *widget, int key ) {
 
-	return widget->op->edit ( widgets, widget, key );
+	return widget->op->edit ( widget, key );
 }
 
 extern int widget_ui ( struct widgets *widgets );

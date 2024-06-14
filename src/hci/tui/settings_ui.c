@@ -253,7 +253,7 @@ static void draw_setting_row ( struct settings_ui *ui ) {
 static int edit_setting ( struct settings_ui *ui, int key ) {
 	assert ( ui->row.setting.name != NULL );
 	ui->row.editing = 1;
-	return edit_widget ( &ui->widgets, &ui->row.editbox.widget, key );
+	return edit_widget ( &ui->row.editbox.widget, key );
 }
 
 /**
@@ -457,7 +457,7 @@ static int main_loop ( struct settings *settings ) {
 	/* Print initial screen content */
 	color_set ( CPAIR_NORMAL, NULL );
 	memset ( &ui, 0, sizeof ( ui ) );
-	init_widgets ( &ui.widgets, NULL );
+	init_widgets ( &ui.widgets );
 	select_settings ( &ui, settings );
 
 	while ( 1 ) {
@@ -481,7 +481,7 @@ static int main_loop ( struct settings *settings ) {
 			assert ( ui.row.setting.name != NULL );
 
 			/* Redraw edit box */
-			draw_widget ( &ui.widgets, &ui.row.editbox.widget );
+			draw_widget ( &ui.row.editbox.widget );
 
 			/* Process keypress */
 			key = edit_setting ( &ui, getkey ( 0 ) );

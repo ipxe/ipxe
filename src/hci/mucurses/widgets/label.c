@@ -36,10 +36,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Draw text label widget
  *
- * @v widgets		Text widget set
  * @v widget		Text widget
  */
-static void draw_label ( struct widgets *widgets, struct widget *widget ) {
+static void draw_label ( struct widget *widget ) {
 	struct label *label = container_of ( widget, struct label, widget );
 	unsigned int width = widget->width;
 	unsigned int col = widget->col;
@@ -51,20 +50,18 @@ static void draw_label ( struct widgets *widgets, struct widget *widget ) {
 
 	/* Print label content */
 	attron ( A_BOLD );
-	mvwprintw ( widgets->win, widget->row, col, "%s", text );
+	mvprintw ( widget->row, col, "%s", text );
 	attroff ( A_BOLD );
 }
 
 /**
  * Edit text label widget
  *
- * @v widgets		Text widget set
  * @v widget		Text widget
  * @v key		Key pressed by user
  * @ret key		Key returned to application, or zero
  */
-static int edit_label ( struct widgets *widgets __unused,
-			struct widget *widget __unused, int key ) {
+static int edit_label ( struct widget *widget __unused, int key ) {
 
 	/* Cannot be edited */
 	return key;

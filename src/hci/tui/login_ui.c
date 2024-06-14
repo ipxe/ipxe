@@ -67,7 +67,7 @@ int login_ui ( void ) {
 
 	/* Construct user interface */
 	memset ( &widgets, 0, sizeof ( widgets ) );
-	init_widgets ( &widgets.widgets, NULL );
+	init_widgets ( &widgets.widgets );
 	init_label ( &widgets.username_label, USERNAME_LABEL_ROW, WIDGET_COL,
 		     WIDGET_WIDTH, "Username" );
 	init_label ( &widgets.password_label, PASSWORD_LABEL_ROW, WIDGET_COL,

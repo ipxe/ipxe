@@ -39,10 +39,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Draw text box widget
  *
- * @v widgets		Text widget set
  * @v widget		Text widget
  */
-static void draw_editbox ( struct widgets *widgets, struct widget *widget ) {
+static void draw_editbox ( struct widget *widget ) {
 	struct edit_box *box = container_of ( widget, struct edit_box, widget );
 	const char *content = *(box->string.buf);
 	size_t width = widget->width;
@@ -79,21 +78,19 @@ static void draw_editbox ( struct widgets *widgets, struct widget *widget ) {
 
 	/* Print box content and move cursor */
 	color_set ( CPAIR_EDIT, NULL );
-	mvwprintw ( widgets->win, widget->row, widget->col, "%s", buf );
-	wmove ( widgets->win, widget->row, ( widget->col + cursor_offset ) );
+	mvprintw ( widget->row, widget->col, "%s", buf );
+	move ( widget->row, ( widget->col + cursor_offset ) );
 	color_set ( CPAIR_NORMAL, NULL );
 }
 
 /**
  * Edit text box widget
  *
- * @v widgets		Text widget set
  * @v widget		Text widget
  * @v key		Key pressed by user
  * @ret key		Key returned to application, or zero
  */
-static int edit_editbox ( struct widgets *widgets __unused,
-			  struct widget *widget, int key ) {
+static int edit_editbox ( struct widget *widget, int key ) {
 	struct edit_box *box = container_of ( widget, struct edit_box, widget );
 
 	return edit_string ( &box->string, key );

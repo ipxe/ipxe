@@ -68,7 +68,7 @@ static int widget_ui_loop ( struct widgets *widgets ) {
 
 	/* Draw all widgets */
 	list_for_each_entry ( widget, &widgets->list, list )
-		draw_widget ( widgets, widget );
+		draw_widget ( widget );
 
 	/* Count editable widgets */
 	count = 0;
@@ -85,10 +85,10 @@ static int widget_ui_loop ( struct widgets *widgets ) {
 			return -ENOENT;
 
 		/* Redraw current widget */
-		draw_widget ( widgets, widget );
+		draw_widget ( widget );
 
 		/* Process keypress */
-		key = edit_widget ( widgets, widget, getkey ( 0 ) );
+		key = edit_widget ( widget, getkey ( 0 ) );
 		switch ( key ) {
 		case KEY_UP:
 			if ( current > 0 )
