@@ -35,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/keys.h>
 #include <ipxe/ansicol.h>
 #include <ipxe/jumpscroll.h>
+#include <ipxe/message.h>
 #include <ipxe/settings_ui.h>
 #include <config/branding.h>
 
@@ -267,75 +268,6 @@ static int save_setting ( struct settings_ui *ui ) {
 }
 
 /**
- * Print message centred on specified row
- *
- * @v row		Row
- * @v fmt		printf() format string
- * @v args		printf() argument list
- */
-static void vmsg ( unsigned int row, const char *fmt, va_list args ) {
-	char buf[COLS];
-	size_t len;
-
-	len = vsnprintf ( buf, sizeof ( buf ), fmt, args );
-	mvprintw ( row, ( ( COLS - len ) / 2 ), "%s", buf );
-}
-
-/**
- * Print message centred on specified row
- *
- * @v row		Row
- * @v fmt		printf() format string
- * @v ..		printf() arguments
- */
-static void msg ( unsigned int row, const char *fmt, ... ) {
-	va_list args;
-
-	va_start ( args, fmt );
-	vmsg ( row, fmt, args );
-	va_end ( args );
-}
-
-/**
- * Clear message on specified row
- *
- * @v row		Row
- */
-static void clearmsg ( unsigned int row ) {
-	move ( row, 0 );
-	clrtoeol();
-}
-
-/**
- * Print alert message
- *
- * @v fmt		printf() format string
- * @v args		printf() argument list
- */
-static void valert ( const char *fmt, va_list args ) {
-	clearmsg ( ALERT_ROW );
-	color_set ( CPAIR_ALERT, NULL );
-	vmsg ( ALERT_ROW, fmt, args );
-	sleep ( 2 );
-	color_set ( CPAIR_NORMAL, NULL );
-	clearmsg ( ALERT_ROW );
-}
-
-/**
- * Print alert message
- *
- * @v fmt		printf() format string
- * @v ...		printf() arguments
- */
-static void alert ( const char *fmt, ... ) {
-	va_list args;
-
-	va_start ( args, fmt );
-	valert ( fmt, args );
-	va_end ( args );
-}
-
-/**
  * Draw title row
  *
  * @v ui		Settings UI
@@ -488,8 +420,10 @@ static int main_loop ( struct settings *settings ) {
 			switch ( key ) {
 			case CR:
 			case LF:
-				if ( ( rc = save_setting ( &ui ) ) != 0 )
-					alert ( " %s ", strerror ( rc ) );
+				if ( ( rc = save_setting ( &ui ) ) != 0 ) {
+					alert ( ALERT_ROW, " %s ",
+						strerror ( rc ) );
+				}
 				/* Fall through */
 			case CTRL_C:
 				select_setting_row ( &ui, ui.scroll.current );
@@ -526,7 +460,7 @@ static int main_loop ( struct settings *settings ) {
 				break;
 			if ( ( rc = delete_setting ( ui.settings,
 						     &ui.row.setting ) ) != 0 ){
-				alert ( " %s ", strerror ( rc ) );
+				alert ( ALERT_ROW, " %s ", strerror ( rc ) );
 			}
 			select_setting_row ( &ui, ui.scroll.current );
 			redraw = 1;
