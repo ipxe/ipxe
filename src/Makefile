@@ -4,7 +4,7 @@
 #
 
 CLEANUP		:=
-CFLAGS		:=
+CFLAGS		:= -DHAVE_CONFIG_H
 ASFLAGS		:=
 LDFLAGS		:=
 HOST_CFLAGS	:=
@@ -102,6 +102,7 @@ SRCDIRS		+= hci/mucurses hci/mucurses/widgets
 SRCDIRS		+= hci/keymap
 SRCDIRS		+= usr
 SRCDIRS		+= config
+SRCDIRS		+= libqrencode
 
 # These directories contain code that is not eligible for UEFI Secure
 # Boot signing.
@@ -119,6 +120,7 @@ SRCDIRS_INSEC	+= drivers/net/ath/ath9k
 NON_AUTO_SRCS	:=
 NON_AUTO_SRCS	+= core/version.c
 NON_AUTO_SRCS	+= drivers/net/prism2.c
+NON_AUTO_SRCS	+= libqrencode/qrenc.c
 
 # INCDIRS lists the include path
 #
@@ -130,11 +132,11 @@ INCDIRS		+= include .
 # Default build target: build the most common targets and print out a
 # helpfully suggestive message
 #
-ALL		:= bin/blib.a bin/ipxe.dsk bin/ipxe.lkrn bin/ipxe.iso \
-		   bin/ipxe.usb bin/ipxe.pxe bin/undionly.kpxe bin/rtl8139.rom \
-		   bin/8086100e.mrom bin/80861209.rom bin/10500940.rom \
-		   bin/10222000.rom bin/10ec8139.rom bin/1af41000.rom \
-		   bin/8086100f.mrom bin/808610d3.mrom bin/15ad07b0.rom
+ALL	:= bin/blib.a bin/ipxe.dsk bin/ipxe.lkrn bin/ipxe.iso \
+	   bin/ipxe.usb bin/ipxe.pxe bin/undionly.kpxe bin/rtl8139.rom \
+	   bin/8086100e.mrom bin/80861209.rom bin/10500940.rom \
+	   bin/10222000.rom bin/10ec8139.rom bin/1af41000.rom \
+	   bin/8086100f.mrom bin/808610d3.mrom bin/15ad07b0.rom
 
 all : $(ALL)
 	@$(ECHO) '==========================================================='
