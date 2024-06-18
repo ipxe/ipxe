@@ -94,20 +94,20 @@ struct menu * create_menu ( const char *name, const char *title ) {
  * Add menu item
  *
  * @v menu		Menu
- * @v label		Label, or NULL
+ * @v name		Name, or NULL
  * @v text		Text, or NULL
  * @v shortcut		Shortcut key
  * @v is_default	Item is the default item
  * @ret item		Menu item, or NULL on failure
  */
-struct menu_item * add_menu_item ( struct menu *menu, const char *label,
+struct menu_item * add_menu_item ( struct menu *menu, const char *name,
 				   const char *text, int shortcut,
 				   int is_default ) {
-	size_t label_len;
+	size_t name_len;
 	size_t text_len;
 	size_t len;
 	struct menu_item *item;
-	char *label_copy;
+	char *name_copy;
 	char *text_copy;
 
 	/* Use empty text if none given */
@@ -115,19 +115,19 @@ struct menu_item * add_menu_item ( struct menu *menu, const char *label,
 		text = "";
 
 	/* Allocate item */
-	label_len = ( label ? ( strlen ( label ) + 1 /* NUL */ ) : 0 );
+	name_len = ( name ? ( strlen ( name ) + 1 /* NUL */ ) : 0 );
 	text_len = ( strlen ( text ) + 1 /* NUL */ );
-	len = ( sizeof ( *item ) + label_len + text_len );
+	len = ( sizeof ( *item ) + name_len + text_len );
 	item = zalloc ( len );
 	if ( ! item )
 		return NULL;
-	label_copy = ( ( void * ) ( item + 1 ) );
-	text_copy = ( label_copy + label_len );
+	name_copy = ( ( void * ) ( item + 1 ) );
+	text_copy = ( name_copy + name_len );
 
 	/* Initialise item */
-	if ( label ) {
-		strcpy ( label_copy, label );
-		item->label = label_copy;
+	if ( name ) {
+		strcpy ( name_copy, name );
+		item->name = name_copy;
 	}
 	strcpy ( text_copy, text );
 	item->text = text_copy;

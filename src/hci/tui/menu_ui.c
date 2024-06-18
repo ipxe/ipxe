@@ -99,7 +99,7 @@ static void draw_menu_item ( struct menu_ui *ui, unsigned int index ) {
 	if ( item ) {
 
 		/* Draw separators in a different colour */
-		if ( ! item->label )
+		if ( ! item->name )
 			color_set ( CPAIR_SEPARATOR, NULL );
 
 		/* Highlight if this is the selected item */
@@ -225,7 +225,7 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 						continue;
 					}
 					ui->scroll.current = i;
-					if ( item->label ) {
+					if ( item->name ) {
 						chosen = 1;
 					} else {
 						move = +1;
@@ -239,7 +239,7 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 		while ( move ) {
 			move = jump_scroll_move ( &ui->scroll, move );
 			item = menu_item ( ui->menu, ui->scroll.current );
-			if ( item->label )
+			if ( item->name )
 				break;
 		}
 
@@ -254,7 +254,7 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 		/* Record selection */
 		item = menu_item ( ui->menu, ui->scroll.current );
 		assert ( item != NULL );
-		assert ( item->label != NULL );
+		assert ( item->name != NULL );
 		*selected = item;
 
 	} while ( ( rc == 0 ) && ! chosen );
@@ -275,7 +275,7 @@ int show_menu ( struct menu *menu, unsigned long timeout,
 	struct menu_item *item;
 	struct menu_ui ui;
 	char buf[ MENU_COLS + 1 /* NUL */ ];
-	int labelled_count = 0;
+	int named_count = 0;
 	int rc;
 
 	/* Initialise UI */
@@ -284,12 +284,12 @@ int show_menu ( struct menu *menu, unsigned long timeout,
 	ui.scroll.rows = MENU_ROWS;
 	ui.timeout = timeout;
 	list_for_each_entry ( item, &menu->items, list ) {
-		if ( item->label ) {
-			if ( ! labelled_count )
+		if ( item->name ) {
+			if ( ! named_count )
 				ui.scroll.current = ui.scroll.count;
-			labelled_count++;
+			named_count++;
 			if ( select ) {
-				if ( strcmp ( select, item->label ) == 0 )
+				if ( strcmp ( select, item->name ) == 0 )
 					ui.scroll.current = ui.scroll.count;
 			} else {
 				if ( item->is_default )
@@ -298,10 +298,10 @@ int show_menu ( struct menu *menu, unsigned long timeout,
 		}
 		ui.scroll.count++;
 	}
-	if ( ! labelled_count ) {
-		/* Menus with no labelled items cannot be selected
-		 * from, and will seriously confuse the navigation
-		 * logic.  Refuse to display any such menus.
+	if ( ! named_count ) {
+		/* Menus with no named items cannot be selected from,
+		 * and will seriously confuse the navigation logic.
+		 * Refuse to display any such menus.
 		 */
 		return -ENOENT;
 	}

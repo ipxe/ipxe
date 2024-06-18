@@ -27,8 +27,8 @@ struct menu {
 struct menu_item {
 	/** List of menu items */
 	struct list_head list;
-	/** Label */
-	const char *label;
+	/** Name */
+	const char *name;
 	/** Text */
 	const char *text;
 	/** Shortcut key */
@@ -38,7 +38,7 @@ struct menu_item {
 };
 
 extern struct menu * create_menu ( const char *name, const char *title );
-extern struct menu_item * add_menu_item ( struct menu *menu, const char *label,
+extern struct menu_item * add_menu_item ( struct menu *menu, const char *name,
 					  const char *text, int shortcut,
 					  int is_default );
 extern void destroy_menu ( struct menu *menu );

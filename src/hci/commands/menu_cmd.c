@@ -135,7 +135,7 @@ static struct option_descriptor item_opts[] = {
 /** "item" command descriptor */
 static struct command_descriptor item_cmd =
 	COMMAND_DESC ( struct item_options, item_opts, 0, MAX_ARGUMENTS,
-		       "[<label> [<text>]]" );
+		       "[<name> [<text>]]" );
 
 /**
  * The "item" command
@@ -148,7 +148,7 @@ static int item_exec ( int argc, char **argv ) {
 	struct item_options opts;
 	struct menu *menu;
 	struct menu_item *item;
-	char *label = NULL;
+	char *name = NULL;
 	char *text = NULL;
 	int rc;
 
@@ -156,9 +156,9 @@ static int item_exec ( int argc, char **argv ) {
 	if ( ( rc = parse_options ( argc, argv, &item_cmd, &opts ) ) != 0 )
 		goto err_parse_options;
 
-	/* Parse label, if present */
+	/* Parse name, if present */
 	if ( ! opts.is_gap )
-		label = argv[optind++]; /* May be NULL */
+		name = argv[optind++]; /* May be NULL */
 
 	/* Parse text, if present */
 	if ( optind < argc ) {
@@ -174,7 +174,7 @@ static int item_exec ( int argc, char **argv ) {
 		goto err_parse_menu;
 
 	/* Add menu item */
-	item = add_menu_item ( menu, label, ( text ? text : "" ),
+	item = add_menu_item ( menu, name, ( text ? text : "" ),
 			       opts.key, opts.is_default );
 	if ( ! item ) {
 		rc = -ENOMEM;
@@ -257,7 +257,7 @@ static int choose_exec ( int argc, char **argv ) {
 
 	/* Store setting */
 	if ( ( rc = storef_setting ( setting.settings, &setting.setting,
-				     item->label ) ) != 0 ) {
+				     item->name ) ) != 0 ) {
 		printf ( "Could not store \"%s\": %s\n",
 			 setting.setting.name, strerror ( rc ) );
 		goto err_store;
