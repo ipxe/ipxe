@@ -58,25 +58,6 @@ struct menu_ui {
 };
 
 /**
- * Return a numbered menu item
- *
- * @v dynui		Dynamic user interface
- * @v index		Index
- * @ret item		Menu item, or NULL
- */
-static struct dynamic_item * menu_item ( struct dynamic_ui *dynui,
-					 unsigned int index ) {
-	struct dynamic_item *item;
-
-	list_for_each_entry ( item, &dynui->items, list ) {
-		if ( index-- == 0 )
-			return item;
-	}
-
-	return NULL;
-}
-
-/**
  * Draw a numbered menu item
  *
  * @v ui		Menu user interface
@@ -96,7 +77,7 @@ static void draw_menu_item ( struct menu_ui *ui, unsigned int index ) {
 	move ( ( MENU_ROW + row_offset ), MENU_COL );
 
 	/* Get menu item */
-	item = menu_item ( ui->dynui, index );
+	item = dynui_item ( ui->dynui, index );
 	if ( item ) {
 
 		/* Draw separators in a different colour */
@@ -178,7 +159,6 @@ static int menu_loop ( struct menu_ui *ui, struct dynamic_item **selected ) {
 	unsigned int previous;
 	unsigned int move;
 	int key;
-	int i;
 	int chosen = 0;
 	int rc = 0;
 
@@ -217,15 +197,9 @@ static int menu_loop ( struct menu_ui *ui, struct dynamic_item **selected ) {
 				chosen = 1;
 				break;
 			default:
-				i = 0;
-				list_for_each_entry ( item, &ui->dynui->items,
-						      list ) {
-					if ( ! ( item->shortcut &&
-						 ( item->shortcut == key ) ) ) {
-						i++;
-						continue;
-					}
-					ui->scroll.current = i;
+				item = dynui_shortcut ( ui->dynui, key );
+				if ( item ) {
+					ui->scroll.current = item->index;
 					if ( item->name ) {
 						chosen = 1;
 					} else {
@@ -239,7 +213,7 @@ static int menu_loop ( struct menu_ui *ui, struct dynamic_item **selected ) {
 		/* Move selection, if applicable */
 		while ( move ) {
 			move = jump_scroll_move ( &ui->scroll, move );
-			item = menu_item ( ui->dynui, ui->scroll.current );
+			item = dynui_item ( ui->dynui, ui->scroll.current );
 			if ( item->name )
 				break;
 		}
@@ -253,7 +227,7 @@ static int menu_loop ( struct menu_ui *ui, struct dynamic_item **selected ) {
 		}
 
 		/* Record selection */
-		item = menu_item ( ui->dynui, ui->scroll.current );
+		item = dynui_item ( ui->dynui, ui->scroll.current );
 		assert ( item != NULL );
 		assert ( item->name != NULL );
 		*selected = item;

@@ -21,6 +21,8 @@ struct dynamic_ui {
 	const char *title;
 	/** Dynamic user interface items */
 	struct list_head items;
+	/** Number of user interface items */
+	unsigned int count;
 };
 
 /** A dynamic user interface item */
@@ -31,6 +33,8 @@ struct dynamic_item {
 	const char *name;
 	/** Text */
 	const char *text;
+	/** Index */
+	unsigned int index;
 	/** Shortcut key */
 	int shortcut;
 	/** Is default item */
@@ -44,6 +48,10 @@ extern struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
 					      int is_default );
 extern void destroy_dynui ( struct dynamic_ui *dynui );
 extern struct dynamic_ui * find_dynui ( const char *name );
+extern struct dynamic_item * dynui_item ( struct dynamic_ui *dynui,
+					  unsigned int index );
+extern struct dynamic_item * dynui_shortcut ( struct dynamic_ui *dynui,
+					      int key );
 extern int show_menu ( struct dynamic_ui *dynui, unsigned long timeout,
 		       const char *select, struct dynamic_item **selected );
 

@@ -131,6 +131,7 @@ struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
 	}
 	strcpy ( text_copy, text );
 	item->text = text_copy;
+	item->index = dynui->count++;
 	item->shortcut = shortcut;
 	item->is_default = is_default;
 
@@ -176,6 +177,43 @@ struct dynamic_ui * find_dynui ( const char *name ) {
 		     ( strcmp ( dynui->name, name ) == 0 ) ) {
 			return dynui;
 		}
+	}
+
+	return NULL;
+}
+
+/**
+ * Find dynamic user interface item by index
+ *
+ * @v dynui		Dynamic user interface
+ * @v index		Index
+ * @ret item		User interface item, or NULL if not found
+ */
+struct dynamic_item * dynui_item ( struct dynamic_ui *dynui,
+				   unsigned int index ) {
+	struct dynamic_item *item;
+
+	list_for_each_entry ( item, &dynui->items, list ) {
+		if ( index-- == 0 )
+			return item;
+	}
+
+	return NULL;
+}
+
+/**
+ * Find dynamic user interface item by shortcut key
+ *
+ * @v dynui		Dynamic user interface
+ * @v key		Shortcut key
+ * @ret item		User interface item, or NULL if not found
+ */
+struct dynamic_item * dynui_shortcut ( struct dynamic_ui *dynui, int key ) {
+	struct dynamic_item *item;
+
+	list_for_each_entry ( item, &dynui->items, list ) {
+		if ( key && ( key == item->shortcut ) )
+			return item;
 	}
 
 	return NULL;
