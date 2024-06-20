@@ -29,72 +29,42 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <curses.h>
-#include <ipxe/console.h>
-#include <ipxe/settings.h>
-#include <ipxe/label.h>
-#include <ipxe/editbox.h>
-#include <ipxe/keys.h>
-#include <ipxe/ansicol.h>
+#include <ipxe/dynui.h>
 #include <ipxe/login_ui.h>
 
-/* Screen layout */
-#define USERNAME_LABEL_ROW	( ( LINES / 2U ) - 4U )
-#define USERNAME_ROW		( ( LINES / 2U ) - 2U )
-#define PASSWORD_LABEL_ROW	( ( LINES / 2U ) + 2U )
-#define PASSWORD_ROW		( ( LINES / 2U ) + 4U )
-#define WIDGET_COL		( ( COLS / 2U ) - 10U )
-#define WIDGET_WIDTH		20U
+static struct dynamic_item username;
+static struct dynamic_item password;
+
+static struct dynamic_ui login = {
+	.items = {
+		.prev = &password.list,
+		.next = &username.list,
+	},
+	.count = 2,
+};
+
+static struct dynamic_item username = {
+	.list = {
+		.prev = &login.items,
+		.next = &password.list,
+	},
+	.name = "username",
+	.text = "Username",
+	.index = 0,
+};
+
+static struct dynamic_item password = {
+	.list = {
+		.prev = &username.list,
+		.next = &login.items,
+	},
+	.name = "password",
+	.text = "Password",
+	.index = 1,
+	.flags = DYNUI_SECRET,
+};
 
 int login_ui ( void ) {
-	char *username;
-	char *password;
-	struct {
-		struct widgets widgets;
-		struct label username_label;
-		struct label password_label;
-		struct edit_box username_box;
-		struct edit_box password_box;
-	} widgets;
-	int rc;
 
-	/* Fetch current setting values */
-	fetchf_setting_copy ( NULL, &username_setting, NULL, NULL, &username );
-	fetchf_setting_copy ( NULL, &password_setting, NULL, NULL, &password );
-
-	/* Construct user interface */
-	memset ( &widgets, 0, sizeof ( widgets ) );
-	init_widgets ( &widgets.widgets );
-	init_label ( &widgets.username_label, USERNAME_LABEL_ROW, WIDGET_COL,
-		     WIDGET_WIDTH, "Username" );
-	init_label ( &widgets.password_label, PASSWORD_LABEL_ROW, WIDGET_COL,
-		     WIDGET_WIDTH, "Password" );
-	init_editbox ( &widgets.username_box, USERNAME_ROW, WIDGET_COL,
-		       WIDGET_WIDTH, 0, &username );
-	init_editbox ( &widgets.password_box, PASSWORD_ROW, WIDGET_COL,
-		       WIDGET_WIDTH, WIDGET_SECRET, &password );
-	add_widget ( &widgets.widgets, &widgets.username_label.widget );
-	add_widget ( &widgets.widgets, &widgets.password_label.widget );
-	add_widget ( &widgets.widgets, &widgets.username_box.widget );
-	add_widget ( &widgets.widgets, &widgets.password_box.widget );
-
-	/* Present user interface */
-	if ( ( rc = widget_ui ( &widgets.widgets ) ) != 0 )
-		goto err_ui;
-
-	/* Store settings on successful completion */
-	if ( ( rc = storef_setting ( NULL, &username_setting, username ) ) !=0)
-		goto err_store_username;
-	if ( ( rc = storef_setting ( NULL, &password_setting, password ) ) !=0)
-		goto err_store_password;
-
- err_store_username:
- err_store_password:
- err_ui:
-	free ( username );
-	free ( password );
-	return rc;
+	return show_form ( &login );
 }
