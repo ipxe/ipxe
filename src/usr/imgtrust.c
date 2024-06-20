@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/cms.h>
+#include <ipxe/base16.h>
 #include <ipxe/validator.h>
 #include <ipxe/monojob.h>
 #include <usr/imgtrust.h>
@@ -108,6 +109,112 @@ int imgverify ( struct image *image, struct image *signature,
 	free ( data );
  err_asn1:
 	syslog ( LOG_ERR, "Image \"%s\" signature bad: %s\n",
+		 image->name, strerror ( rc ) );
+	return rc;
+}
+
+
+/**
+ * Calculate digest of user data
+ *
+ * @v digest		Digest alogorithm
+ * @v data		Data to digest
+ * @v len		Length of data
+ * @v out		Digest output
+ */
+static void digest_user_data ( struct digest_algorithm *digest, userptr_t data,
+			       size_t len, void *out ) {
+	uint8_t ctx[ digest->ctxsize ];
+	uint8_t block[ digest->blocksize ];
+	size_t offset = 0;
+	size_t frag_len;
+
+	/* Initialise digest */
+	digest_init ( digest, ctx );
+
+	/* Process data one block at a time */
+	while ( len ) {
+		frag_len = len;
+		if ( frag_len > sizeof ( block ) )
+			frag_len = sizeof ( block );
+		copy_from_user ( block, data, offset, frag_len );
+		digest_update ( digest, ctx, block, frag_len );
+		offset += frag_len;
+		len -= frag_len;
+	}
+
+	/* Finalise digest */
+	digest_final ( digest, ctx, out );
+}
+
+
+/**
+ * Identify a digest algorithm by name
+ *
+ * @v name		Digest name
+
+ * @ret digest		Digest algorithm, or NULL
+ */
+static struct digest_algorithm *
+find_digest_algorithm ( const char *name ) {
+	struct asn1_algorithm *algorithm;
+
+	for_each_table_entry ( algorithm, ASN1_ALGORITHMS ) {
+		if ( strcmp ( algorithm->name, name ) == 0
+		     && algorithm->digest )
+			return algorithm->digest;
+	}
+
+	return NULL;
+}
+
+/**
+ * Verify image using the supplied digest
+ *
+ * @v image		Image to verify
+ * @v digest_name	Name of digest algorithm to use
+ * @v hex		Hex encoded digest
+ * @ret rc		Return status code
+ */
+int imgverifydigest ( struct image *image, const char *digest_name,
+		      const char *hex ) {
+	struct digest_algorithm *digest;
+	uint8_t in[ base16_decoded_max_len ( hex ) ];
+	uint8_t out[ base16_decoded_max_len ( hex ) ];
+	int rc;
+
+	/* Mark image as untrusted */
+	image_untrust ( image );
+
+	/* Parse digest name */
+	if ( ! ( digest = find_digest_algorithm ( digest_name ) ) ) {
+		syslog ( LOG_ERR, "Invalid digest name: %s\n", digest_name );
+		rc = -EINVAL;
+		goto err_verify;
+	}
+
+	/* Parse hex input digest */
+	if ( base16_decode ( hex, in ) != (int) digest->digestsize )  {
+		syslog ( LOG_ERR, "Invalid digest: %s %s\n", digest_name, hex );
+		rc = -EINVAL;
+		goto err_verify;
+	}
+
+	/* Verify digest */
+	digest_user_data ( digest, image->data, image->len, out );
+	if ( memcmp ( in, out, digest->digestsize ) != 0 )  {
+		rc = -EINVAL;
+		goto err_verify;
+	}
+
+	/* Mark image as trusted */
+	image_trust ( image );
+	syslog ( LOG_NOTICE, "Image \"%s\" digest OK\n", image->name );
+
+	return 0;
+
+ err_verify:
+	syslog ( LOG_ERR, "Image \"%s\" digest bad: %s\n",
 		 image->name, strerror ( rc ) );
 	return rc;
 }
