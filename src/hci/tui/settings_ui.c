@@ -381,8 +381,8 @@ static void select_settings ( struct settings_ui *ui,
 static int main_loop ( struct settings *settings ) {
 	struct settings_ui ui;
 	unsigned int previous;
+	unsigned int move;
 	int redraw = 1;
-	int move;
 	int key;
 	int rc;
 

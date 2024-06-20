@@ -175,9 +175,9 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 	struct menu_item *item;
 	unsigned long timeout;
 	unsigned int previous;
+	unsigned int move;
 	int key;
 	int i;
-	int move;
 	int chosen = 0;
 	int rc = 0;
 
@@ -192,7 +192,7 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 		ui->timeout -= timeout;
 
 		/* Get key */
-		move = 0;
+		move = SCROLL_NONE;
 		key = getkey ( timeout );
 		if ( key < 0 ) {
 			/* Choose default if we finally time out */
@@ -228,7 +228,7 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 					if ( item->name ) {
 						chosen = 1;
 					} else {
-						move = +1;
+						move = SCROLL_DOWN;
 					}
 				}
 				break;
