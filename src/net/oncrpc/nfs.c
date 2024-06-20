@@ -183,8 +183,14 @@ int nfs_get_lookup_reply ( struct nfs_lookup_reply *lookup_reply,
 
 	nfs_iob_get_fh ( reply->data, &lookup_reply->fh );
 
-	if ( oncrpc_iob_get_int ( reply->data ) == 1 )
+	if ( oncrpc_iob_get_int ( reply->data ) == 1 ) {
 		lookup_reply->ent_type = oncrpc_iob_get_int ( reply->data );
+		oncrpc_iob_get_int ( reply->data ); // mode
+		oncrpc_iob_get_int ( reply->data ); // nlink
+		oncrpc_iob_get_int ( reply->data ); // uid
+		oncrpc_iob_get_int ( reply->data ); // gid
+		lookup_reply->size = oncrpc_iob_get_int64 ( reply->data );
+	}
 
 	return 0;
 }
