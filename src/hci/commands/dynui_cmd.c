@@ -116,6 +116,8 @@ struct item_options {
 	unsigned int key;
 	/** Use as default */
 	int is_default;
+	/** Value is a secret */
+	int is_secret;
 	/** Use as a separator */
 	int is_gap;
 };
@@ -128,6 +130,8 @@ static struct option_descriptor item_opts[] = {
 		      struct item_options, key, parse_key ),
 	OPTION_DESC ( "default", 'd', no_argument,
 		      struct item_options, is_default, parse_flag ),
+	OPTION_DESC ( "secret", 's', no_argument,
+		      struct item_options, is_secret, parse_flag ),
 	OPTION_DESC ( "gap", 'g', no_argument,
 		      struct item_options, is_gap, parse_flag ),
 };
@@ -177,6 +181,8 @@ static int item_exec ( int argc, char **argv ) {
 	/* Add dynamic user interface item */
 	if ( opts.is_default )
 		flags |= DYNUI_DEFAULT;
+	if ( opts.is_secret )
+		flags |= DYNUI_SECRET;
 	item = add_dynui_item ( dynui, name, ( text ? text : "" ), flags,
 				opts.key );
 	if ( ! item ) {

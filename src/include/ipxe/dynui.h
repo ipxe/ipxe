@@ -44,6 +44,9 @@ struct dynamic_item {
 /** Dynamic user interface item is default selection */
 #define DYNUI_DEFAULT 0x0001
 
+/** Dynamic user interface item represents a secret */
+#define DYNUI_SECRET 0x0002
+
 extern struct dynamic_ui * create_dynui ( const char *name, const char *title );
 extern struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
 					      const char *name,
