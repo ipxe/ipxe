@@ -267,7 +267,7 @@ int show_menu ( struct dynamic_ui *dynui, unsigned long timeout,
 				if ( strcmp ( select, item->name ) == 0 )
 					ui.scroll.current = ui.scroll.count;
 			} else {
-				if ( item->is_default )
+				if ( item->flags & DYNUI_DEFAULT )
 					ui.scroll.current = ui.scroll.count;
 			}
 		}

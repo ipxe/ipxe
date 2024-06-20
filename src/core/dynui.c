@@ -96,13 +96,13 @@ struct dynamic_ui * create_dynui ( const char *name, const char *title ) {
  * @v dynui		Dynamic user interface
  * @v name		Name, or NULL
  * @v text		Text, or NULL
+ * @v flags		Flags
  * @v shortcut		Shortcut key
- * @v is_default	Item is the default item
  * @ret item		User interface item, or NULL on failure
  */
 struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
 				       const char *name, const char *text,
-				       int shortcut, int is_default ) {
+				       unsigned int flags, int shortcut ) {
 	struct dynamic_item *item;
 	size_t name_len;
 	size_t text_len;
@@ -132,8 +132,8 @@ struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
 	strcpy ( text_copy, text );
 	item->text = text_copy;
 	item->index = dynui->count++;
+	item->flags = flags;
 	item->shortcut = shortcut;
-	item->is_default = is_default;
 
 	/* Add to list of items */
 	list_add_tail ( &item->list, &dynui->items );

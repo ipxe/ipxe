@@ -148,6 +148,7 @@ static int item_exec ( int argc, char **argv ) {
 	struct item_options opts;
 	struct dynamic_ui *dynui;
 	struct dynamic_item *item;
+	unsigned int flags = 0;
 	char *name = NULL;
 	char *text = NULL;
 	int rc;
@@ -174,8 +175,10 @@ static int item_exec ( int argc, char **argv ) {
 		goto err_parse_dynui;
 
 	/* Add dynamic user interface item */
-	item = add_dynui_item ( dynui, name, ( text ? text : "" ),
-				opts.key, opts.is_default );
+	if ( opts.is_default )
+		flags |= DYNUI_DEFAULT;
+	item = add_dynui_item ( dynui, name, ( text ? text : "" ), flags,
+				opts.key );
 	if ( ! item ) {
 		rc = -ENOMEM;
 		goto err_add_dynui_item;

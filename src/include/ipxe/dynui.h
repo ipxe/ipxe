@@ -35,17 +35,21 @@ struct dynamic_item {
 	const char *text;
 	/** Index */
 	unsigned int index;
+	/** Flags */
+	unsigned int flags;
 	/** Shortcut key */
 	int shortcut;
-	/** Is default item */
-	int is_default;
 };
+
+/** Dynamic user interface item is default selection */
+#define DYNUI_DEFAULT 0x0001
 
 extern struct dynamic_ui * create_dynui ( const char *name, const char *title );
 extern struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
 					      const char *name,
-					      const char *text, int shortcut,
-					      int is_default );
+					      const char *text,
+					      unsigned int flags,
+					      int shortcut );
 extern void destroy_dynui ( struct dynamic_ui *dynui );
 extern struct dynamic_ui * find_dynui ( const char *name );
 extern struct dynamic_item * dynui_item ( struct dynamic_ui *dynui,
