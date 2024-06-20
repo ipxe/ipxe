@@ -109,8 +109,6 @@ struct settings_ui {
 	struct jump_scroller scroll;
 	/** Current row */
 	struct settings_ui_row row;
-	/** Widget set used for editing setting */
-	struct widgets widgets;
 };
 
 /**
@@ -389,7 +387,6 @@ static int main_loop ( struct settings *settings ) {
 	/* Print initial screen content */
 	color_set ( CPAIR_NORMAL, NULL );
 	memset ( &ui, 0, sizeof ( ui ) );
-	init_widgets ( &ui.widgets );
 	select_settings ( &ui, settings );
 
 	while ( 1 ) {

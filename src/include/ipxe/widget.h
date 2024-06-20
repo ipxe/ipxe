@@ -10,18 +10,9 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <curses.h>
-#include <ipxe/list.h>
-
-/** A text widget set */
-struct widgets {
-	/** List of widgets (in tab order) */
-	struct list_head list;
-};
 
 /** A text widget */
 struct widget {
-	/** List of widgets (in tab order) */
-	struct list_head list;
 	/** Widget operations */
 	struct widget_operations *op;
 
@@ -66,17 +57,6 @@ struct widget_operations {
 };
 
 /**
- * Initialise text widget set
- *
- * @v widgets		Text widget set
- */
-static inline __attribute__ (( always_inline )) void
-init_widgets ( struct widgets *widgets ) {
-
-	INIT_LIST_HEAD ( &widgets->list );
-}
-
-/**
  * Initialise text widget
  *
  * @v widget		Text widget
@@ -95,18 +75,6 @@ init_widget ( struct widget *widget, struct widget_operations *op,
 	widget->col = col;
 	widget->width = width;
 	widget->flags = flags;
-}
-
-/**
- * Append text widget
- *
- * @v widgets		Text widget set
- * @v widget		Text widget
- */
-static inline __attribute__ (( always_inline )) void
-add_widget ( struct widgets *widgets, struct widget *widget ) {
-
-	list_add_tail ( &widget->list, &widgets->list );
 }
 
 /**
@@ -136,7 +104,5 @@ edit_widget ( struct widget *widget, int key ) {
 
 	return widget->op->edit ( widget, key );
 }
-
-extern int widget_ui ( struct widgets *widgets );
 
 #endif /* _IPXE_WIDGET_H */
