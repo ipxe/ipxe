@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * Menu commands
+ * Dynamic user interface commands
  *
  */
 
@@ -34,7 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
-#include <ipxe/menu.h>
+#include <ipxe/dynui.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/settings.h>
@@ -42,42 +42,42 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 FEATURE ( FEATURE_MISC, "Menu", DHCP_EB_FEATURE_MENU, 1 );
 
-/** "menu" options */
-struct menu_options {
+/** "dynui" options */
+struct dynui_options {
 	/** Name */
 	char *name;
 	/** Delete */
 	int delete;
 };
 
-/** "menu" option list */
-static struct option_descriptor menu_opts[] = {
+/** "dynui" option list */
+static struct option_descriptor dynui_opts[] = {
 	OPTION_DESC ( "name", 'n', required_argument,
-		      struct menu_options, name, parse_string ),
+		      struct dynui_options, name, parse_string ),
 	OPTION_DESC ( "delete", 'd', no_argument,
-		      struct menu_options, delete, parse_flag ),
+		      struct dynui_options, delete, parse_flag ),
 };
 
-/** "menu" command descriptor */
-static struct command_descriptor menu_cmd =
-	COMMAND_DESC ( struct menu_options, menu_opts, 0, MAX_ARGUMENTS,
+/** "dynui" command descriptor */
+static struct command_descriptor dynui_cmd =
+	COMMAND_DESC ( struct dynui_options, dynui_opts, 0, MAX_ARGUMENTS,
 		       "[<title>]" );
 
 /**
- * The "menu" command
+ * The "dynui" command
  *
  * @v argc		Argument count
  * @v argv		Argument list
  * @ret rc		Return status code
  */
-static int menu_exec ( int argc, char **argv ) {
-	struct menu_options opts;
-	struct menu *menu;
+static int dynui_exec ( int argc, char **argv ) {
+	struct dynui_options opts;
+	struct dynamic_ui *dynui;
 	char *title;
 	int rc;
 
 	/* Parse options */
-	if ( ( rc = parse_options ( argc, argv, &menu_cmd, &opts ) ) != 0 )
+	if ( ( rc = parse_options ( argc, argv, &dynui_cmd, &opts ) ) != 0 )
 		goto err_parse_options;
 
 	/* Parse title */
@@ -87,21 +87,21 @@ static int menu_exec ( int argc, char **argv ) {
 		goto err_parse_title;
 	}
 
-	/* Create menu */
-	menu = create_menu ( opts.name, title );
-	if ( ! menu ) {
+	/* Create dynamic user interface */
+	dynui = create_dynui ( opts.name, title );
+	if ( ! dynui ) {
 		rc = -ENOMEM;
-		goto err_create_menu;
+		goto err_create_dynui;
 	}
 
-	/* Destroy menu, if applicable */
+	/* Destroy dynamic user interface, if applicable */
 	if ( opts.delete )
-		destroy_menu ( menu );
+		destroy_dynui ( dynui );
 
 	/* Success */
 	rc = 0;
 
- err_create_menu:
+ err_create_dynui:
 	free ( title );
  err_parse_title:
  err_parse_options:
@@ -110,8 +110,8 @@ static int menu_exec ( int argc, char **argv ) {
 
 /** "item" options */
 struct item_options {
-	/** Menu name */
-	char *menu;
+	/** Dynamic user interface name */
+	char *dynui;
 	/** Shortcut key */
 	unsigned int key;
 	/** Use as default */
@@ -123,7 +123,7 @@ struct item_options {
 /** "item" option list */
 static struct option_descriptor item_opts[] = {
 	OPTION_DESC ( "menu", 'm', required_argument,
-		      struct item_options, menu, parse_string ),
+		      struct item_options, dynui, parse_string ),
 	OPTION_DESC ( "key", 'k', required_argument,
 		      struct item_options, key, parse_key ),
 	OPTION_DESC ( "default", 'd', no_argument,
@@ -146,8 +146,8 @@ static struct command_descriptor item_cmd =
  */
 static int item_exec ( int argc, char **argv ) {
 	struct item_options opts;
-	struct menu *menu;
-	struct menu_item *item;
+	struct dynamic_ui *dynui;
+	struct dynamic_item *item;
 	char *name = NULL;
 	char *text = NULL;
 	int rc;
@@ -169,23 +169,23 @@ static int item_exec ( int argc, char **argv ) {
 		}
 	}
 
-	/* Identify menu */
-	if ( ( rc = parse_menu ( opts.menu, &menu ) ) != 0 )
-		goto err_parse_menu;
+	/* Identify dynamic user interface */
+	if ( ( rc = parse_dynui ( opts.dynui, &dynui ) ) != 0 )
+		goto err_parse_dynui;
 
-	/* Add menu item */
-	item = add_menu_item ( menu, name, ( text ? text : "" ),
-			       opts.key, opts.is_default );
+	/* Add dynamic user interface item */
+	item = add_dynui_item ( dynui, name, ( text ? text : "" ),
+				opts.key, opts.is_default );
 	if ( ! item ) {
 		rc = -ENOMEM;
-		goto err_add_menu_item;
+		goto err_add_dynui_item;
 	}
 
 	/* Success */
 	rc = 0;
 
- err_add_menu_item:
- err_parse_menu:
+ err_add_dynui_item:
+ err_parse_dynui:
 	free ( text );
  err_parse_text:
  err_parse_options:
@@ -194,20 +194,20 @@ static int item_exec ( int argc, char **argv ) {
 
 /** "choose" options */
 struct choose_options {
-	/** Menu name */
-	char *menu;
+	/** Dynamic user interface name */
+	char *dynui;
 	/** Timeout */
 	unsigned long timeout;
 	/** Default selection */
 	char *select;
-	/** Keep menu */
+	/** Keep dynamic user interface */
 	int keep;
 };
 
 /** "choose" option list */
 static struct option_descriptor choose_opts[] = {
 	OPTION_DESC ( "menu", 'm', required_argument,
-		      struct choose_options, menu, parse_string ),
+		      struct choose_options, dynui, parse_string ),
 	OPTION_DESC ( "default", 'd', required_argument,
 		      struct choose_options, select, parse_string ),
 	OPTION_DESC ( "timeout", 't', required_argument,
@@ -230,8 +230,8 @@ static struct command_descriptor choose_cmd =
 static int choose_exec ( int argc, char **argv ) {
 	struct choose_options opts;
 	struct named_setting setting;
-	struct menu *menu;
-	struct menu_item *item;
+	struct dynamic_ui *dynui;
+	struct dynamic_item *item;
 	int rc;
 
 	/* Parse options */
@@ -243,12 +243,13 @@ static int choose_exec ( int argc, char **argv ) {
 						 &setting ) ) != 0 )
 		goto err_parse_setting;
 
-	/* Identify menu */
-	if ( ( rc = parse_menu ( opts.menu, &menu ) ) != 0 )
-		goto err_parse_menu;
+	/* Identify dynamic user interface */
+	if ( ( rc = parse_dynui ( opts.dynui, &dynui ) ) != 0 )
+		goto err_parse_dynui;
 
-	/* Show menu */
-	if ( ( rc = show_menu ( menu, opts.timeout, opts.select, &item ) ) != 0)
+	/* Show as menu */
+	if ( ( rc = show_menu ( dynui, opts.timeout, opts.select,
+				&item ) ) != 0 )
 		goto err_show_menu;
 
 	/* Apply default type if necessary */
@@ -268,20 +269,20 @@ static int choose_exec ( int argc, char **argv ) {
 
  err_store:
  err_show_menu:
-	/* Destroy menu, if applicable */
+	/* Destroy dynamic user interface, if applicable */
 	if ( ! opts.keep )
-		destroy_menu ( menu );
- err_parse_menu:
+		destroy_dynui ( dynui );
+ err_parse_dynui:
  err_parse_setting:
  err_parse_options:
 	return rc;
 }
 
-/** Menu commands */
-struct command menu_commands[] __command = {
+/** Dynamic user interface commands */
+struct command dynui_commands[] __command = {
 	{
 		.name = "menu",
-		.exec = menu_exec,
+		.exec = dynui_exec,
 	},
 	{
 		.name = "item",

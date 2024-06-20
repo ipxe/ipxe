@@ -364,7 +364,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_cms		      ( ERRFILE_OTHER | 0x002a0000 )
 #define ERRFILE_imgtrust	      ( ERRFILE_OTHER | 0x002b0000 )
 #define ERRFILE_menu_ui		      ( ERRFILE_OTHER | 0x002c0000 )
-#define ERRFILE_menu_cmd	      ( ERRFILE_OTHER | 0x002d0000 )
+#define ERRFILE_dynui_cmd	      ( ERRFILE_OTHER | 0x002d0000 )
 #define ERRFILE_validator	      ( ERRFILE_OTHER | 0x002e0000 )
 #define ERRFILE_ocsp		      ( ERRFILE_OTHER | 0x002f0000 )
 #define ERRFILE_nslookup	      ( ERRFILE_OTHER | 0x00300000 )

@@ -225,7 +225,7 @@ REQUIRE_OBJECT ( dhcp_cmd );
 REQUIRE_OBJECT ( sanboot_cmd );
 #endif
 #ifdef MENU_CMD
-REQUIRE_OBJECT ( menu_cmd );
+REQUIRE_OBJECT ( dynui_cmd );
 #endif
 #ifdef LOGIN_CMD
 REQUIRE_OBJECT ( login_cmd );

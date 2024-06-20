@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * Menu selection
+ * Dynamic user interfaces
  *
  */
 
@@ -33,80 +33,80 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <assert.h>
 #include <ipxe/list.h>
-#include <ipxe/menu.h>
+#include <ipxe/dynui.h>
 
-/** List of all menus */
-static LIST_HEAD ( menus );
+/** List of all dynamic user interfaces */
+static LIST_HEAD ( dynamic_uis );
 
 /**
- * Create menu
+ * Create dynamic user interface
  *
- * @v name		Menu name, or NULL
- * @v title		Menu title, or NULL
- * @ret menu		Menu, or NULL on failure
+ * @v name		User interface name, or NULL
+ * @v title		User interface title, or NULL
+ * @ret dynui		Dynamic user interface, or NULL on failure
  */
-struct menu * create_menu ( const char *name, const char *title ) {
+struct dynamic_ui * create_dynui ( const char *name, const char *title ) {
+	struct dynamic_ui *dynui;
 	size_t name_len;
 	size_t title_len;
 	size_t len;
-	struct menu *menu;
 	char *name_copy;
 	char *title_copy;
 
-	/* Destroy any existing menu of this name */
-	menu = find_menu ( name );
-	if ( menu )
-		destroy_menu ( menu );
+	/* Destroy any existing user interface of this name */
+	dynui = find_dynui ( name );
+	if ( dynui )
+		destroy_dynui ( dynui );
 
 	/* Use empty title if none given */
 	if ( ! title )
 		title = "";
 
-	/* Allocate menu */
+	/* Allocate user interface */
 	name_len = ( name ? ( strlen ( name ) + 1 /* NUL */ ) : 0 );
 	title_len = ( strlen ( title ) + 1 /* NUL */ );
-	len = ( sizeof ( *menu ) + name_len + title_len );
-	menu = zalloc ( len );
-	if ( ! menu )
+	len = ( sizeof ( *dynui ) + name_len + title_len );
+	dynui = zalloc ( len );
+	if ( ! dynui )
 		return NULL;
-	name_copy = ( ( void * ) ( menu + 1 ) );
+	name_copy = ( ( void * ) ( dynui + 1 ) );
 	title_copy = ( name_copy + name_len );
 
-	/* Initialise menu */
+	/* Initialise user interface */
 	if ( name ) {
 		strcpy ( name_copy, name );
-		menu->name = name_copy;
+		dynui->name = name_copy;
 	}
 	strcpy ( title_copy, title );
-	menu->title = title_copy;
-	INIT_LIST_HEAD ( &menu->items );
+	dynui->title = title_copy;
+	INIT_LIST_HEAD ( &dynui->items );
 
-	/* Add to list of menus */
-	list_add_tail ( &menu->list, &menus );
+	/* Add to list of user interfaces */
+	list_add_tail ( &dynui->list, &dynamic_uis );
 
-	DBGC ( menu, "MENU %s created with title \"%s\"\n",
-	       menu->name, menu->title );
+	DBGC ( dynui, "DYNUI %s created with title \"%s\"\n",
+	       dynui->name, dynui->title );
 
-	return menu;
+	return dynui;
 }
 
 /**
- * Add menu item
+ * Add dynamic user interface item
  *
- * @v menu		Menu
+ * @v dynui		Dynamic user interface
  * @v name		Name, or NULL
  * @v text		Text, or NULL
  * @v shortcut		Shortcut key
  * @v is_default	Item is the default item
- * @ret item		Menu item, or NULL on failure
+ * @ret item		User interface item, or NULL on failure
  */
-struct menu_item * add_menu_item ( struct menu *menu, const char *name,
-				   const char *text, int shortcut,
-				   int is_default ) {
+struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
+				       const char *name, const char *text,
+				       int shortcut, int is_default ) {
+	struct dynamic_item *item;
 	size_t name_len;
 	size_t text_len;
 	size_t len;
-	struct menu_item *item;
 	char *name_copy;
 	char *text_copy;
 
@@ -135,46 +135,46 @@ struct menu_item * add_menu_item ( struct menu *menu, const char *name,
 	item->is_default = is_default;
 
 	/* Add to list of items */
-	list_add_tail ( &item->list, &menu->items );
+	list_add_tail ( &item->list, &dynui->items );
 
 	return item;
 }
 
 /**
- * Destroy menu
+ * Destroy dynamic user interface
  *
- * @v menu		Menu
+ * @v dynui		Dynamic user interface
  */
-void destroy_menu ( struct menu *menu ) {
-	struct menu_item *item;
-	struct menu_item *tmp;
+void destroy_dynui ( struct dynamic_ui *dynui ) {
+	struct dynamic_item *item;
+	struct dynamic_item *tmp;
 
-	/* Remove from list of menus */
-	list_del ( &menu->list );
+	/* Remove from list of user interfaces */
+	list_del ( &dynui->list );
 
 	/* Free items */
-	list_for_each_entry_safe ( item, tmp, &menu->items, list ) {
+	list_for_each_entry_safe ( item, tmp, &dynui->items, list ) {
 		list_del ( &item->list );
 		free ( item );
 	}
 
-	/* Free menu */
-	free ( menu );
+	/* Free user interface */
+	free ( dynui );
 }
 
 /**
- * Find menu
+ * Find dynamic user interface
  *
- * @v name		Menu name, or NULL
- * @ret menu		Menu, or NULL if not found
+ * @v name		User interface name, or NULL
+ * @ret dynui		Dynamic user interface, or NULL if not found
  */
-struct menu * find_menu ( const char *name ) {
-	struct menu *menu;
+struct dynamic_ui * find_dynui ( const char *name ) {
+	struct dynamic_ui *dynui;
 
-	list_for_each_entry ( menu, &menus, list ) {
-		if ( ( menu->name == name ) ||
-		     ( strcmp ( menu->name, name ) == 0 ) ) {
-			return menu;
+	list_for_each_entry ( dynui, &dynamic_uis, list ) {
+		if ( ( dynui->name == name ) ||
+		     ( strcmp ( dynui->name, name ) == 0 ) ) {
+			return dynui;
 		}
 	}
 

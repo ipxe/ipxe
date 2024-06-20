@@ -33,7 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <getopt.h>
 #include <ipxe/uuid.h>
 #include <ipxe/netdevice.h>
-#include <ipxe/menu.h>
+#include <ipxe/dynui.h>
 #include <ipxe/settings.h>
 #include <ipxe/params.h>
 #include <ipxe/timer.h>
@@ -194,21 +194,21 @@ int parse_netdev_configurator ( char *text,
 }
 
 /**
- * Parse menu name
+ * Parse dynamic user interface name
  *
  * @v text		Text
- * @ret menu		Menu
+ * @ret dynui		Dynamic user interface
  * @ret rc		Return status code
  */
-int parse_menu ( char *text, struct menu **menu ) {
+int parse_dynui ( char *text, struct dynamic_ui **dynui ) {
 
-	/* Find menu */
-	*menu = find_menu ( text );
-	if ( ! *menu ) {
+	/* Find user interface */
+	*dynui = find_dynui ( text );
+	if ( ! *dynui ) {
 		if ( text ) {
-			printf ( "\"%s\": no such menu\n", text );
+			printf ( "\"%s\": no such user interface\n", text );
 		} else {
-			printf ( "No default menu\n" );
+			printf ( "No default user interface\n" );
 		}
 		return -ENOENT;
 	}

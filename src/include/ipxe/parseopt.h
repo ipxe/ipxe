@@ -16,7 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 struct net_device;
 struct net_device_configurator;
-struct menu;
+struct dynamic_ui;
 struct parameters;
 
 /** A command-line option descriptor */
@@ -142,7 +142,7 @@ extern int parse_netdev ( char *text, struct net_device **netdev );
 extern int
 parse_netdev_configurator ( char *text,
 			    struct net_device_configurator **configurator );
-extern int parse_menu ( char *text, struct menu **menu );
+extern int parse_dynui ( char *text, struct dynamic_ui **dynui );
 extern int parse_flag ( char *text __unused, int *flag );
 extern int parse_key ( char *text, unsigned int *key );
 extern int parse_settings ( char *text, struct settings **settings );
