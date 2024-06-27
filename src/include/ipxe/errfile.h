@@ -106,6 +106,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_spi_bit		     ( ERRFILE_DRIVER | 0x00130000 )
 #define ERRFILE_nvsvpd		     ( ERRFILE_DRIVER | 0x00140000 )
 #define ERRFILE_uart		     ( ERRFILE_DRIVER | 0x00150000 )
+#define ERRFILE_serial		     ( ERRFILE_DRIVER | 0x00160000 )
 
 #define ERRFILE_3c509		     ( ERRFILE_DRIVER | 0x00200000 )
 #define ERRFILE_bnx2		     ( ERRFILE_DRIVER | 0x00210000 )
