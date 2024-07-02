@@ -2466,35 +2466,33 @@ static int tls_new_certificate_request ( struct tls_connection *tls,
 	x509_chain_put ( tls->certs );
 	tls->certs = NULL;
 
-	/* Determine client certificate to be sent */
-	cert = certstore_find_key ( tls->key );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p could not find certificate corresponding "
-		       "to private key\n", tls );
-		rc = -EPERM_CLIENT_CERT;
-		goto err_find;
-	}
-	x509_get ( cert );
-	DBGC ( tls, "TLS %p selected client certificate %s\n",
-	       tls, x509_name ( cert ) );
-
 	/* Create client certificate chain */
 	tls->certs = x509_alloc_chain();
 	if ( ! tls->certs ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
+	/* Determine client certificate to be sent */
+	cert = certstore_find_key ( tls->key );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p could not find certificate corresponding "
+		       "to private key\n", tls );
+	} else {
+		x509_get ( cert );
+		DBGC ( tls, "TLS %p selected client certificate %s\n",
+		       tls, x509_name ( cert ) );
 
-	/* Append client certificate to chain */
-	if ( ( rc = x509_append ( tls->certs, cert ) ) != 0 )
-		goto err_append;
+		/* Append client certificate to chain */
+		if ( ( rc = x509_append ( tls->certs, cert ) ) != 0 )
+			goto err_append;
 
-	/* Append any relevant issuer certificates */
-	if ( ( rc = x509_auto_append ( tls->certs, &certstore ) ) != 0 )
-		goto err_auto_append;
+		/* Append any relevant issuer certificates */
+		if ( ( rc = x509_auto_append ( tls->certs, &certstore ) ) != 0 )
+			goto err_auto_append;
 
-	/* Drop local reference to client certificate */
-	x509_put ( cert );
+		/* Drop local reference to client certificate */
+		x509_put ( cert );
+	}
 
 	return 0;
 
@@ -2502,9 +2500,8 @@ static int tls_new_certificate_request ( struct tls_connection *tls,
  err_append:
 	x509_chain_put ( tls->certs );
 	tls->certs = NULL;
- err_alloc:
 	x509_put ( cert );
- err_find:
+ err_alloc:
 	return rc;
 }
 
@@ -3593,8 +3590,10 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 			     TLS_TX_CHANGE_CIPHER |
 			     TLS_TX_FINISHED );
 	if ( tls->certs ) {
-		tls->tx_pending |= ( TLS_TX_CERTIFICATE |
-				     TLS_TX_CERTIFICATE_VERIFY );
+		tls->tx_pending |= TLS_TX_CERTIFICATE;
+		if ( x509_first ( tls->certs ) ) {
+			tls->tx_pending |= TLS_TX_CERTIFICATE_VERIFY;
+		}
 	}
 	tls_tx_resume ( tls );
 
