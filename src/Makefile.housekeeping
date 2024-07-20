@@ -1469,7 +1469,7 @@ CONFIG_HEADERS := $(patsubst config/%,%,$(wildcard config/*.h))
 CONFIG_LOCAL_HEADERS := $(foreach HEADER,$(CONFIG_HEADERS),\
 				  config/local/$(HEADER))
 
-$(CONFIG_LOCAL_HEADERS) :
+$(CONFIG_LOCAL_HEADERS):
 	$(Q)$(TOUCH) $@
 
 .PRECIOUS : $(CONFIG_LOCAL_HEADERS)
