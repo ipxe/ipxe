@@ -59,9 +59,6 @@ struct google_mac {
  */
 #define GVE_LEN_ALIGN 64
 
-/** Maximum number of pages per queue (must be a power of two) */
-#define GVE_QPL_MAX 16
-
 /** Configuration BAR */
 #define GVE_CFG_BAR PCI_BASE_ADDRESS_0
 
@@ -207,6 +204,14 @@ struct gve_admin_register {
 	/** Page size */
 	uint64_t size;
 } __attribute__ (( packed ));
+
+/**
+ * Maximum number of pages per queue
+ *
+ * This is a policy decision.  Must be sufficient to allow for both
+ * the transmit and receive queue fill levels.
+ */
+#define GVE_QPL_MAX 32
 
 /** Page list */
 struct gve_pages {
@@ -538,9 +543,11 @@ struct gve_tx_descriptor {
 /**
  * Maximum number of receive buffers
  *
- * This is a policy decision.
+ * This is a policy decision.  Experiments suggest that using fewer
+ * than 64 receive buffers leads to excessive packet drop rates on
+ * some instance types.
  */
-#define GVE_RX_FILL 16
+#define GVE_RX_FILL 64
 
 /** Receive queue page list ID */
 #define GVE_RX_QPL 0x18ae5258

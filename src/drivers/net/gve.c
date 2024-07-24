@@ -722,6 +722,7 @@ static int gve_alloc_qpl ( struct gve_nic *gve, struct gve_qpl *qpl,
 	/* Calculate number of pages required */
 	build_assert ( GVE_BUF_SIZE <= GVE_PAGE_SIZE );
 	qpl->count = ( ( buffers + GVE_BUF_PER_PAGE - 1 ) / GVE_BUF_PER_PAGE );
+	assert ( qpl->count <= GVE_QPL_MAX );
 
 	/* Allocate pages (as a single block) */
 	len = ( qpl->count * GVE_PAGE_SIZE );
