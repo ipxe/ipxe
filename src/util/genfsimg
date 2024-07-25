@@ -229,17 +229,27 @@ done
 
 # Configure ISO image, if applicable
 #
-# Note that the BIOS boot files are required even for an EFI-only ISO,
-# since isohybrid will refuse to work without them.
+# Note that the BIOS boot files are required even for an EFI-only
+# hybrid ISO, since isohybrid will refuse to work without them.
 #
 if [ -n "${ISOIMG}" ] ; then
     ISOARGS="-J -R -l"
-    copy_syslinux_file "isolinux.bin" "${ISODIR}"
-    copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
-    ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
-    ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
+    if isohybrid --version >/dev/null 2>&1 ; then
+	ISOHYBRID=isohybrid
+    else
+	ISOHYBRID=
+    fi
+    if [ -n "${LKRN}" -o -n "${ISOHYBRID}" ] ; then
+	copy_syslinux_file "isolinux.bin" "${ISODIR}"
+	copy_syslinux_file "ldlinux.c32" "${ISODIR}" 2>/dev/null || true
+	ISOARGS="${ISOARGS} -no-emul-boot -eltorito-boot isolinux.bin"
+	ISOARGS="${ISOARGS} -boot-load-size 4 -boot-info-table"
+	if [ -n "${EFI}" ] ; then
+	    ISOARGS="${ISOARGS} -eltorito-alt-boot"
+	fi
+    fi
     if [ -n "${EFI}" ] ; then
-	ISOARGS="${ISOARGS} -eltorito-alt-boot -no-emul-boot -e esp.img"
+	ISOARGS="${ISOARGS} -no-emul-boot -e esp.img"
     else
 	FATIMG=
     fi
@@ -313,7 +323,7 @@ if [ -n "${ISOIMG}" ] ; then
 	    -appid "iPXE - Open Source Network Boot Firmware" \
 	    -publisher "ipxe.org" -sysid "iPXE" -o "${ISOIMG}" \
 	    ${ISOARGS} "${ISODIR}"
-    if isohybrid --version >/dev/null 2>&1 ; then
+    if [ -n "${ISOHYBRID}" ] ; then
 	ISOHYBRIDARGS=
 	if [ -n "${EFI}" ] ; then
 	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --uefi"
@@ -321,7 +331,7 @@ if [ -n "${ISOIMG}" ] ; then
 	if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
 	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --id ${SOURCE_DATE_EPOCH}"
 	fi
-	isohybrid ${ISOHYBRIDARGS} "${ISOIMG}"
+	"${ISOHYBRID}" ${ISOHYBRIDARGS} "${ISOIMG}"
     fi
 fi
 
