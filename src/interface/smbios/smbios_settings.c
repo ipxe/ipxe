@@ -130,6 +130,13 @@ static int smbios_fetch ( struct settings *settings __unused,
 			return rc;
 		}
 
+		/* Limit length */
+		if ( tag_offset > sizeof ( buf ) ) {
+			tag_len = 0;
+		} else if ( ( tag_offset + tag_len ) > sizeof ( buf ) ) {
+			tag_len = ( sizeof ( buf ) - tag_offset );
+		}
+
 		/* Mangle UUIDs if necessary.  iPXE treats UUIDs as
 		 * being in network byte order (big-endian).  SMBIOS
 		 * specification version 2.6 states that UUIDs are
