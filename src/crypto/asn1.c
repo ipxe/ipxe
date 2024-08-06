@@ -196,11 +196,6 @@ int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
 	DBGC ( cursor, "ASN1 %p skipped object type %02x (len %x)\n",
 	       cursor, type, len );
 
-	if ( ! cursor->len ) {
-		DBGC ( cursor, "ASN1 %p reached end of object\n", cursor );
-		return -ENOENT;
-	}
-
 	return 0;
 }
 
