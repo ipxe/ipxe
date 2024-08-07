@@ -76,8 +76,6 @@ static int der_probe ( struct image *image ) {
 	struct asn1_cursor cursor;
 	uint8_t buf[8];
 	size_t extra;
-	size_t total;
-	int len;
 	int rc;
 
 	/* Sanity check: no realistic DER image can be smaller than this */
@@ -90,21 +88,16 @@ static int der_probe ( struct image *image ) {
 	copy_from_user ( buf, image->data, 0, sizeof ( buf ) );
 	extra = ( image->len - sizeof ( buf ) );
 
-	/* Get length of ASN.1 sequence */
-	len = asn1_start ( &cursor, ASN1_SEQUENCE, extra );
-	if ( len < 0 ) {
-		rc = len;
+	/* Check that image begins with an ASN.1 sequence object */
+	if ( ( rc = asn1_enter_partial ( &cursor, ASN1_SEQUENCE,
+					 &extra ) ) != 0 ) {
 		DBGC ( image, "DER %s is not valid ASN.1: %s\n",
 		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
-	/* Add length of tag and length bytes consumed by asn1_start() */
-	total = ( len + ( cursor.data - ( ( void * ) buf ) ) );
-	assert ( total <= image->len );
-
 	/* Check that image comprises a single well-formed ASN.1 object */
-	if ( total != image->len ) {
+	if ( extra != ( image->len - sizeof ( buf ) ) ) {
 		DBGC ( image, "DER %s is not single ASN.1\n", image->name );
 		return -ENOEXEC;
 	}

@@ -99,7 +99,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * modified.  If any other error occurs, the object cursor will be
  * invalidated.
  */
-int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
+static int asn1_start ( struct asn1_cursor *cursor, unsigned int type,
+			size_t extra ) {
 	unsigned int len_len;
 	unsigned int len;
 
@@ -154,6 +155,41 @@ int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
 }
 
 /**
+ * Enter ASN.1 partial object
+ *
+ * @v cursor		ASN.1 object cursor
+ * @v type		Expected type, or ASN1_ANY
+ * @v extra		Additional length beyond partial object
+ * @ret rc		Return status code
+ *
+ * The object cursor and additional length will be updated to point to
+ * the body of the current ASN.1 object.
+ *
+ * If any error occurs, the object cursor will be invalidated.
+ */
+int asn1_enter_partial ( struct asn1_cursor *cursor, unsigned int type,
+			 size_t *extra ) {
+	int len;
+
+	/* Parse current object */
+	len = asn1_start ( cursor, type, *extra );
+	if ( len < 0 ) {
+		asn1_invalidate_cursor ( cursor );
+		return len;
+	}
+
+	/* Update cursor and additional length */
+	if ( ( ( size_t ) len ) <= cursor->len )
+		cursor->len = len;
+	assert ( ( len - cursor->len ) <= *extra );
+	*extra = ( len - cursor->len );
+
+	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
+	       cursor, type, len );
+	return 0;
+}
+
+/**
  * Enter ASN.1 object
  *
  * @v cursor		ASN.1 object cursor
@@ -166,19 +202,9 @@ int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
  * If any error occurs, the object cursor will be invalidated.
  */
 int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
-	int len;
+	static size_t no_extra = 0;
 
-	len = asn1_start ( cursor, type, 0 );
-	if ( len < 0 ) {
-		asn1_invalidate_cursor ( cursor );
-		return len;
-	}
-
-	cursor->len = len;
-	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
-	       cursor, type, len );
-
-	return 0;
+	return asn1_enter_partial ( cursor, type, &no_extra );
 }
 
 /**
@@ -198,15 +224,17 @@ int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
 int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
+	/* Parse current object */
 	len = asn1_start ( cursor, type, 0 );
 	if ( len < 0 )
 		return len;
 
+	/* Update cursor */
 	cursor->data += len;
 	cursor->len -= len;
+
 	DBGC ( cursor, "ASN1 %p skipped object type %02x (len %x)\n",
 	       cursor, type, len );
-
 	return 0;
 }
 
