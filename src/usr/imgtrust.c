@@ -50,30 +50,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 int imgverify ( struct image *image, struct image *signature,
 		const char *name ) {
-	struct asn1_cursor *data;
 	struct cms_signature *sig;
 	struct cms_signer_info *info;
 	time_t now;
-	int next;
 	int rc;
 
-	/* Mark image as untrusted */
-	image_untrust ( image );
-
-	/* Get raw signature data */
-	next = image_asn1 ( signature, 0, &data );
-	if ( next < 0 ) {
-		rc = next;
-		goto err_asn1;
-	}
-
 	/* Parse signature */
-	if ( ( rc = cms_signature ( data->data, data->len, &sig ) ) != 0 )
+	if ( ( rc = cms_signature ( signature, &sig ) ) != 0 )
 		goto err_parse;
-
-	/* Free raw signature data */
-	free ( data );
-	data = NULL;
 
 	/* Complete all certificate chains */
 	list_for_each_entry ( info, &sig->info, list ) {
@@ -86,16 +70,14 @@ int imgverify ( struct image *image, struct image *signature,
 
 	/* Use signature to verify image */
 	now = time ( NULL );
-	if ( ( rc = cms_verify ( sig, image->data, image->len,
-				 name, now, NULL, NULL ) ) != 0 )
+	if ( ( rc = cms_verify ( sig, image, name, now, NULL, NULL ) ) != 0 )
 		goto err_verify;
 
 	/* Drop reference to signature */
 	cms_put ( sig );
 	sig = NULL;
 
-	/* Mark image as trusted */
-	image_trust ( image );
+	/* Record signature verification */
 	syslog ( LOG_NOTICE, "Image \"%s\" signature OK\n", image->name );
 
 	return 0;
@@ -105,8 +87,6 @@ int imgverify ( struct image *image, struct image *signature,
  err_create_validator:
 	cms_put ( sig );
  err_parse:
-	free ( data );
- err_asn1:
 	syslog ( LOG_ERR, "Image \"%s\" signature bad: %s\n",
 		 image->name, strerror ( rc ) );
 	return rc;

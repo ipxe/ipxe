@@ -36,7 +36,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <ipxe/sha256.h>
 #include <ipxe/x509.h>
+#include <ipxe/image.h>
 #include <ipxe/uaccess.h>
+#include <ipxe/der.h>
 #include <ipxe/cms.h>
 #include <ipxe/test.h>
 
@@ -45,19 +47,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** CMS test code blob */
 struct cms_test_code {
-	/** Data */
-	const void *data;
-	/** Length of data */
-	size_t len;
+	/** Code image */
+	struct image image;
 };
 
 /** CMS test signature */
 struct cms_test_signature {
-	/** Data */
-	const void *data;
-	/** Length of data */
-	size_t len;
-
+	/** Signature image */
+	struct image image;
 	/** Parsed signature */
 	struct cms_signature *sig;
 };
@@ -69,19 +66,29 @@ struct cms_test_signature {
 #define FINGERPRINT(...) { __VA_ARGS__ }
 
 /** Define a test code blob */
-#define SIGNED_CODE( name, DATA )					\
-	static const uint8_t name ## _data[] = DATA;			\
-	static struct cms_test_code name = {				\
-		.data = name ## _data,					\
-		.len = sizeof ( name ## _data ),			\
+#define SIGNED_CODE( NAME, DATA )					\
+	static const uint8_t NAME ## _data[] = DATA;			\
+	static struct cms_test_code NAME = {				\
+		.image = {						\
+			.refcnt = REF_INIT ( ref_no_free ),		\
+			.name = #NAME,					\
+			.type = &der_image_type,			\
+			.data = ( userptr_t ) ( NAME ## _data ),	\
+			.len = sizeof ( NAME ## _data ),		\
+		},							\
 	}
 
 /** Define a test signature */
-#define SIGNATURE( name, DATA )						\
-	static const uint8_t name ## _data[] = DATA;			\
-	static struct cms_test_signature name = {			\
-		.data = name ## _data,					\
-		.len = sizeof ( name ## _data ),			\
+#define SIGNATURE( NAME, DATA )						\
+	static const uint8_t NAME ## _data[] = DATA;			\
+	static struct cms_test_signature NAME = {			\
+		.image = {						\
+			.refcnt = REF_INIT ( ref_no_free ),		\
+			.name = #NAME,					\
+			.type = &der_image_type,			\
+			.data = ( userptr_t ) ( NAME ## _data ),	\
+			.len = sizeof ( NAME ## _data ),		\
+		},							\
 	}
 
 /** Code that has been signed */
@@ -1353,9 +1360,16 @@ static time_t test_expired = 1375573111ULL; /* Sat Aug  3 23:38:31 2013 */
  */
 static void cms_signature_okx ( struct cms_test_signature *sgn,
 				const char *file, unsigned int line ) {
+	const void *data = ( ( void * ) sgn->image.data );
 
-	okx ( cms_signature ( sgn->data, sgn->len, &sgn->sig ) == 0,
-	      file, line );
+	/* Fix up image data pointer */
+	sgn->image.data = virt_to_user ( data );
+
+	/* Check ability to parse signature */
+	okx ( cms_signature ( &sgn->image, &sgn->sig ) == 0, file, line );
+
+	/* Reset image data pointer */
+	sgn->image.data = ( ( userptr_t ) data );
 }
 #define cms_signature_ok( sgn ) \
 	cms_signature_okx ( sgn, __FILE__, __LINE__ )
@@ -1377,10 +1391,21 @@ static void cms_verify_okx ( struct cms_test_signature *sgn,
 			     time_t time, struct x509_chain *store,
 			     struct x509_root *root, const char *file,
 			     unsigned int line ) {
+	const void *data = ( ( void * ) code->image.data );
 
+	/* Fix up image data pointer */
+	code->image.data = virt_to_user ( data );
+
+	/* Invalidate any certificates from previous tests */
 	x509_invalidate_chain ( sgn->sig->certificates );
-	okx ( cms_verify ( sgn->sig, virt_to_user ( code->data ), code->len,
-			   name, time, store, root ) == 0, file, line );
+
+	/* Check ability to verify signature */
+	okx ( cms_verify ( sgn->sig, &code->image, name, time, store,
+			   root ) == 0, file, line );
+	okx ( code->image.flags & IMAGE_TRUSTED, file, line );
+
+	/* Reset image data pointer */
+	code->image.data = ( ( userptr_t ) data );
 }
 #define cms_verify_ok( sgn, code, name, time, store, root )		\
 	cms_verify_okx ( sgn, code, name, time, store, root,		\
@@ -1403,10 +1428,21 @@ static void cms_verify_fail_okx ( struct cms_test_signature *sgn,
 				  time_t time, struct x509_chain *store,
 				  struct x509_root *root, const char *file,
 				  unsigned int line ) {
+	const void *data = ( ( void * ) code->image.data );
 
+	/* Fix up image data pointer */
+	code->image.data = virt_to_user ( data );
+
+	/* Invalidate any certificates from previous tests */
 	x509_invalidate_chain ( sgn->sig->certificates );
-	okx ( cms_verify ( sgn->sig, virt_to_user ( code->data ), code->len,
-			   name, time, store, root ) != 0, file, line );
+
+	/* Check inability to verify signature */
+	okx ( cms_verify ( sgn->sig, &code->image, name, time, store,
+			   root ) != 0, file, line );
+	okx ( ! ( code->image.flags & IMAGE_TRUSTED ), file, line );
+
+	/* Reset image data pointer */
+	code->image.data = ( ( userptr_t ) data );
 }
 #define cms_verify_fail_ok( sgn, code, name, time, store, root )	\
 	cms_verify_fail_okx ( sgn, code, name, time, store, root,	\

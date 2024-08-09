@@ -16,6 +16,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/refcnt.h>
 #include <ipxe/uaccess.h>
 
+struct image;
+
 /** CMS signer information */
 struct cms_signer_info {
 	/** List of signer information blocks */
@@ -67,9 +69,9 @@ cms_put ( struct cms_signature *sig ) {
 	ref_put ( &sig->refcnt );
 }
 
-extern int cms_signature ( const void *data, size_t len,
+extern int cms_signature ( struct image *image,
 			   struct cms_signature **sig );
-extern int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
+extern int cms_verify ( struct cms_signature *sig, struct image *image,
 			const char *name, time_t time, struct x509_chain *store,
 			struct x509_root *root );
 

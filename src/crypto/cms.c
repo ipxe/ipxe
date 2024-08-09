@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/asn1.h>
 #include <ipxe/x509.h>
+#include <ipxe/image.h>
 #include <ipxe/malloc.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/cms.h>
@@ -372,7 +373,6 @@ static int cms_parse ( struct cms_signature *sig,
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse contentType */
-
 	if ( ( rc = cms_parse_content_type ( sig, &cursor ) ) != 0 )
 		return rc;
 	asn1_skip_any ( &cursor );
@@ -453,16 +453,16 @@ static void cms_free ( struct refcnt *refcnt ) {
 /**
  * Create CMS signature
  *
- * @v data		Raw signature data
- * @v len		Length of raw data
+ * @v image		Image
  * @ret sig		CMS signature
  * @ret rc		Return status code
  *
  * On success, the caller holds a reference to the CMS signature, and
  * is responsible for ultimately calling cms_put().
  */
-int cms_signature ( const void *data, size_t len, struct cms_signature **sig ) {
-	struct asn1_cursor cursor;
+int cms_signature ( struct image *image, struct cms_signature **sig ) {
+	struct asn1_cursor *raw;
+	int next;
 	int rc;
 
 	/* Allocate and initialise signature */
@@ -481,18 +481,30 @@ int cms_signature ( const void *data, size_t len, struct cms_signature **sig ) {
 		goto err_alloc_chain;
 	}
 
-	/* Initialise cursor */
-	cursor.data = data;
-	cursor.len = len;
-	asn1_shrink_any ( &cursor );
+	/* Get raw signature data */
+	next = image_asn1 ( image, 0, &raw );
+	if ( next < 0 ) {
+		rc = next;
+		DBGC ( *sig, "CMS %p could not get raw ASN.1 data: %s\n",
+		       *sig, strerror ( rc ) );
+		goto err_asn1;
+	}
+
+	/* Use only first signature in image */
+	asn1_shrink_any ( raw );
 
 	/* Parse signature */
-	if ( ( rc = cms_parse ( *sig, &cursor ) ) != 0 )
+	if ( ( rc = cms_parse ( *sig, raw ) ) != 0 )
 		goto err_parse;
+
+	/* Free raw signature data */
+	free ( raw );
 
 	return 0;
 
  err_parse:
+	free ( raw );
+ err_asn1:
  err_alloc_chain:
 	cms_put ( *sig );
  err_alloc:
@@ -642,15 +654,14 @@ static int cms_verify_signer_info ( struct cms_signature *sig,
  * Verify CMS signature
  *
  * @v sig		CMS signature
- * @v data		Signed data
- * @v len		Length of signed data
+ * @v image		Signed image
  * @v name		Required common name, or NULL to check all signatures
  * @v time		Time at which to validate certificates
  * @v store		Certificate store, or NULL to use default
  * @v root		Root certificate list, or NULL to use default
  * @ret rc		Return status code
  */
-int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
+int cms_verify ( struct cms_signature *sig, struct image *image,
 		 const char *name, time_t time, struct x509_chain *store,
 		 struct x509_root *root ) {
 	struct cms_signer_info *info;
@@ -658,13 +669,17 @@ int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
 	int count = 0;
 	int rc;
 
+	/* Mark image as untrusted */
+	image_untrust ( image );
+
 	/* Verify using all signerInfos */
 	list_for_each_entry ( info, &sig->info, list ) {
 		cert = x509_first ( info->chain );
 		if ( name && ( x509_check_name ( cert, name ) != 0 ) )
 			continue;
-		if ( ( rc = cms_verify_signer_info ( sig, info, data, len, time,
-						     store, root ) ) != 0 )
+		if ( ( rc = cms_verify_signer_info ( sig, info, image->data,
+						     image->len, time, store,
+						     root ) ) != 0 )
 			return rc;
 		count++;
 	}
@@ -680,6 +695,9 @@ int cms_verify ( struct cms_signature *sig, userptr_t data, size_t len,
 			return -EACCES_NO_SIGNATURES;
 		}
 	}
+
+	/* Mark image as trusted */
+	image_trust ( image );
 
 	return 0;
 }
