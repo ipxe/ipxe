@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/rsa.h>
 #include <ipxe/rootcert.h>
 #include <ipxe/certstore.h>
+#include <ipxe/privkey.h>
 #include <ipxe/socket.h>
 #include <ipxe/in.h>
 #include <ipxe/image.h>
@@ -1078,7 +1079,7 @@ int x509_certificate ( const void *data, size_t len,
 	asn1_shrink_any ( &cursor );
 
 	/* Return stored certificate, if present */
-	if ( ( *cert = certstore_find ( &cursor ) ) != NULL ) {
+	if ( ( *cert = x509_find ( &certstore, &cursor ) ) != NULL ) {
 
 		/* Add caller's reference */
 		x509_get ( *cert );
@@ -1711,13 +1712,54 @@ void x509_truncate ( struct x509_chain *chain, struct x509_link *link ) {
 }
 
 /**
+ * Mark X.509 certificate as found
+ *
+ * @v certs		X.509 certificate list
+ * @v cert		X.509 certificate
+ * @ret cert		X.509 certificate
+ */
+static struct x509_certificate * x509_found ( struct x509_chain *certs,
+					      struct x509_certificate *cert ) {
+
+	/* Mark as found, if applicable */
+	if ( certs->found )
+		certs->found ( certs, cert );
+
+	return cert;
+}
+
+/**
+ * Identify X.509 certificate by raw certificate data
+ *
+ * @v certs		X.509 certificate list
+ * @v raw		Raw certificate data
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+struct x509_certificate * x509_find ( struct x509_chain *certs,
+				      const struct asn1_cursor *raw ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Search for certificate within store */
+	list_for_each_entry ( link, &certs->links, list ) {
+
+		/* Check raw certificate data */
+		cert = link->cert;
+		if ( asn1_compare ( raw, &cert->raw ) == 0 )
+			return x509_found ( certs, cert );
+	}
+
+	return NULL;
+}
+
+/**
  * Identify X.509 certificate by subject
  *
  * @v certs		X.509 certificate list
  * @v subject		Subject
  * @ret cert		X.509 certificate, or NULL if not found
  */
-static struct x509_certificate *
+struct x509_certificate *
 x509_find_subject ( struct x509_chain *certs,
 		    const struct asn1_cursor *subject ) {
 	struct x509_link *link;
@@ -1729,7 +1771,62 @@ x509_find_subject ( struct x509_chain *certs,
 		/* Check subject */
 		cert = link->cert;
 		if ( asn1_compare ( subject, &cert->subject.raw ) == 0 )
-			return cert;
+			return x509_found ( certs, cert );
+	}
+
+	return NULL;
+}
+
+/**
+ * Identify X.509 certificate by issuer and serial number
+ *
+ * @v certs		X.509 certificate list
+ * @v issuer		Issuer
+ * @v serial		Serial number
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+struct x509_certificate *
+x509_find_issuer_serial ( struct x509_chain *certs,
+			  const struct asn1_cursor *issuer,
+			  const struct asn1_cursor *serial ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Scan through certificate list */
+	list_for_each_entry ( link, &certs->links, list ) {
+
+		/* Check issuer and serial number */
+		cert = link->cert;
+		if ( ( asn1_compare ( issuer, &cert->issuer.raw ) == 0 ) &&
+		     ( asn1_compare ( serial, &cert->serial.raw ) == 0 ) )
+			return x509_found ( certs, cert );
+	}
+
+	return NULL;
+}
+
+/**
+ * Identify X.509 certificate by corresponding public key
+ *
+ * @v certs		X.509 certificate list
+ * @v key		Private key
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+struct x509_certificate * x509_find_key ( struct x509_chain *certs,
+					  struct private_key *key ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Scan through certificate list */
+	list_for_each_entry ( link, &certs->links, list ) {
+
+		/* Check public key */
+		cert = link->cert;
+		if ( pubkey_match ( cert->signature_algorithm->pubkey,
+				    key->builder.data, key->builder.len,
+				    cert->subject.public_key.raw.data,
+				    cert->subject.public_key.raw.len ) == 0 )
+			return x509_found ( certs, cert );
 	}
 
 	return NULL;

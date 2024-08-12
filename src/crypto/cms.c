@@ -144,34 +144,6 @@ static int cms_parse_certificates ( struct cms_signature *sig,
 }
 
 /**
- * Identify CMS signature certificate by issuer and serial number
- *
- * @v sig		CMS signature
- * @v issuer		Issuer
- * @v serial		Serial number
- * @ret cert		X.509 certificate, or NULL if not found
- */
-static struct x509_certificate *
-cms_find_issuer_serial ( struct cms_signature *sig,
-			 const struct asn1_cursor *issuer,
-			 const struct asn1_cursor *serial ) {
-	struct x509_link *link;
-	struct x509_certificate *cert;
-
-	/* Scan through certificate list */
-	list_for_each_entry ( link, &sig->certificates->links, list ) {
-
-		/* Check issuer and serial number */
-		cert = link->cert;
-		if ( ( asn1_compare ( issuer, &cert->issuer.raw ) == 0 ) &&
-		     ( asn1_compare ( serial, &cert->serial.raw ) == 0 ) )
-			return cert;
-	}
-
-	return NULL;
-}
-
-/**
  * Parse CMS signature signer identifier
  *
  * @v sig		CMS signature
@@ -216,7 +188,7 @@ static int cms_parse_signer_identifier ( struct cms_signature *sig,
 	DBGC_HDA ( sig, 0, serial.data, serial.len );
 
 	/* Identify certificate */
-	cert = cms_find_issuer_serial ( sig, &issuer, &serial );
+	cert = x509_find_issuer_serial ( sig->certificates, &issuer, &serial );
 	if ( ! cert ) {
 		DBGC ( sig, "CMS %p/%p could not identify signer's "
 		       "certificate\n", sig, info );

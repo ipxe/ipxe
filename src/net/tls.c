@@ -2467,7 +2467,7 @@ static int tls_new_certificate_request ( struct tls_connection *tls,
 	tls->certs = NULL;
 
 	/* Determine client certificate to be sent */
-	cert = certstore_find_key ( tls->key );
+	cert = x509_find_key ( &certstore, tls->key );
 	if ( ! cert ) {
 		DBGC ( tls, "TLS %p could not find certificate corresponding "
 		       "to private key\n", tls );
