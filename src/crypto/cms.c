@@ -59,60 +59,68 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_error ( EINFO_EACCES_NO_SIGNATURES )
 #define EINFO_EACCES_NO_SIGNATURES \
 	__einfo_uniqify ( EINFO_EACCES, 0x05, "No signatures present" )
-#define EINVAL_DIGEST \
-	__einfo_error ( EINFO_EINVAL_DIGEST )
-#define EINFO_EINVAL_DIGEST \
-	__einfo_uniqify ( EINFO_EINVAL, 0x01, "Not a digest algorithm" )
-#define EINVAL_PUBKEY \
-	__einfo_error ( EINFO_EINVAL_PUBKEY )
-#define EINFO_EINVAL_PUBKEY \
-	__einfo_uniqify ( EINFO_EINVAL, 0x02, "Not a public-key algorithm" )
-#define ENOTSUP_SIGNEDDATA \
-	__einfo_error ( EINFO_ENOTSUP_SIGNEDDATA )
-#define EINFO_ENOTSUP_SIGNEDDATA \
-	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Not a digital signature" )
+#define ENOTSUP_TYPE \
+	__einfo_error ( EINFO_ENOTSUP_TYPE )
+#define EINFO_ENOTSUP_TYPE \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Unrecognised message type" )
 
-/** "pkcs7-signedData" object identifier */
+static int cms_parse_signed ( struct cms_message *cms,
+			      const struct asn1_cursor *raw );
+
+/** "id-signedData" object identifier */
 static uint8_t oid_signeddata[] = { ASN1_OID_SIGNEDDATA };
 
-/** "pkcs7-signedData" object identifier cursor */
-static struct asn1_cursor oid_signeddata_cursor =
-	ASN1_CURSOR ( oid_signeddata );
+/** CMS message types */
+static struct cms_type cms_types[] = {
+	{
+		.name = "signed",
+		.oid = ASN1_CURSOR ( oid_signeddata ),
+		.parse = cms_parse_signed,
+	},
+};
 
 /**
- * Parse CMS signature content type
+ * Parse CMS message content type
  *
- * @v sig		CMS signature
+ * @v cms		CMS message
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse_content_type ( struct cms_signature *sig,
+static int cms_parse_content_type ( struct cms_message *cms,
 				    const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
+	struct cms_type *type;
+	unsigned int i;
 
 	/* Enter contentType */
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_OID );
 
-	/* Check OID is pkcs7-signedData */
-	if ( asn1_compare ( &cursor, &oid_signeddata_cursor ) != 0 ) {
-		DBGC ( sig, "CMS %p does not contain signedData:\n", sig );
-		DBGC_HDA ( sig, 0, raw->data, raw->len );
-		return -ENOTSUP_SIGNEDDATA;
+	/* Check for a recognised OID */
+	for ( i = 0 ; i < ( sizeof ( cms_types ) /
+			    sizeof ( cms_types[0] ) ) ; i++ ) {
+		type = &cms_types[i];
+		if ( asn1_compare ( &cursor, &type->oid ) == 0 ) {
+			cms->type = type;
+			DBGC ( cms, "CMS %p contains %sData\n",
+			       cms, type->name );
+			return 0;
+		}
 	}
 
-	DBGC ( sig, "CMS %p contains signedData\n", sig );
-	return 0;
+	DBGC ( cms, "CMS %p is not a recognised message type:\n", cms );
+	DBGC_HDA ( cms, 0, raw->data, raw->len );
+	return -ENOTSUP_TYPE;
 }
 
 /**
- * Parse CMS signature certificate list
+ * Parse CMS message certificate list
  *
- * @v sig		CMS signature
+ * @v cms		CMS message
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse_certificates ( struct cms_signature *sig,
+static int cms_parse_certificates ( struct cms_message *cms,
 				    const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
 	struct x509_certificate *cert;
@@ -126,16 +134,16 @@ static int cms_parse_certificates ( struct cms_signature *sig,
 	while ( cursor.len ) {
 
 		/* Add certificate to chain */
-		if ( ( rc = x509_append_raw ( sig->certificates, cursor.data,
+		if ( ( rc = x509_append_raw ( cms->certificates, cursor.data,
 					      cursor.len ) ) != 0 ) {
-			DBGC ( sig, "CMS %p could not append certificate: %s\n",
-			       sig, strerror ( rc) );
-			DBGC_HDA ( sig, 0, cursor.data, cursor.len );
+			DBGC ( cms, "CMS %p could not append certificate: %s\n",
+			       cms, strerror ( rc) );
+			DBGC_HDA ( cms, 0, cursor.data, cursor.len );
 			return rc;
 		}
-		cert = x509_last ( sig->certificates );
-		DBGC ( sig, "CMS %p found certificate %s\n",
-		       sig, x509_name ( cert ) );
+		cert = x509_last ( cms->certificates );
+		DBGC ( cms, "CMS %p found certificate %s\n",
+		       cms, x509_name ( cert ) );
 
 		/* Move to next certificate */
 		asn1_skip_any ( &cursor );
@@ -145,16 +153,16 @@ static int cms_parse_certificates ( struct cms_signature *sig,
 }
 
 /**
- * Parse CMS signature signer identifier
+ * Parse CMS message participant identifier
  *
- * @v sig		CMS signature
- * @v info		Signer information to fill in
+ * @v cms		CMS message
+ * @v part		Participant information to fill in
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse_signer_identifier ( struct cms_signature *sig,
-					 struct cms_signer_info *info,
-					 const struct asn1_cursor *raw ) {
+static int cms_parse_identifier ( struct cms_message *cms,
+				  struct cms_participant *part,
+				  const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
 	struct asn1_cursor serial;
 	struct asn1_cursor issuer;
@@ -168,46 +176,46 @@ static int cms_parse_signer_identifier ( struct cms_signature *sig,
 	/* Identify issuer */
 	memcpy ( &issuer, &cursor, sizeof ( issuer ) );
 	if ( ( rc = asn1_shrink ( &issuer, ASN1_SEQUENCE ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not locate issuer: %s\n",
-		       sig, info, strerror ( rc ) );
-		DBGC_HDA ( sig, 0, raw->data, raw->len );
+		DBGC ( cms, "CMS %p/%p could not locate issuer: %s\n",
+		       cms, part, strerror ( rc ) );
+		DBGC_HDA ( cms, 0, raw->data, raw->len );
 		return rc;
 	}
-	DBGC ( sig, "CMS %p/%p issuer is:\n", sig, info );
-	DBGC_HDA ( sig, 0, issuer.data, issuer.len );
+	DBGC ( cms, "CMS %p/%p issuer is:\n", cms, part );
+	DBGC_HDA ( cms, 0, issuer.data, issuer.len );
 	asn1_skip_any ( &cursor );
 
 	/* Identify serialNumber */
 	memcpy ( &serial, &cursor, sizeof ( serial ) );
 	if ( ( rc = asn1_shrink ( &serial, ASN1_INTEGER ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not locate serialNumber: %s\n",
-		       sig, info, strerror ( rc ) );
-		DBGC_HDA ( sig, 0, raw->data, raw->len );
+		DBGC ( cms, "CMS %p/%p could not locate serialNumber: %s\n",
+		       cms, part, strerror ( rc ) );
+		DBGC_HDA ( cms, 0, raw->data, raw->len );
 		return rc;
 	}
-	DBGC ( sig, "CMS %p/%p serial number is:\n", sig, info );
-	DBGC_HDA ( sig, 0, serial.data, serial.len );
+	DBGC ( cms, "CMS %p/%p serial number is:\n", cms, part );
+	DBGC_HDA ( cms, 0, serial.data, serial.len );
 
 	/* Identify certificate */
-	cert = x509_find_issuer_serial ( sig->certificates, &issuer, &serial );
+	cert = x509_find_issuer_serial ( cms->certificates, &issuer, &serial );
 	if ( ! cert ) {
-		DBGC ( sig, "CMS %p/%p could not identify signer's "
-		       "certificate\n", sig, info );
+		DBGC ( cms, "CMS %p/%p could not identify certificate\n",
+		       cms, part );
 		return -ENOENT;
 	}
 
 	/* Append certificate to chain */
-	if ( ( rc = x509_append ( info->chain, cert ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not append certificate: %s\n",
-		       sig, info, strerror ( rc ) );
+	if ( ( rc = x509_append ( part->chain, cert ) ) != 0 ) {
+		DBGC ( cms, "CMS %p/%p could not append certificate: %s\n",
+		       cms, part, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Append remaining certificates to chain */
-	if ( ( rc = x509_auto_append ( info->chain,
-				       sig->certificates ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not append certificates: %s\n",
-		       sig, info, strerror ( rc ) );
+	if ( ( rc = x509_auto_append ( part->chain,
+				       cms->certificates ) ) != 0 ) {
+		DBGC ( cms, "CMS %p/%p could not append certificates: %s\n",
+		       cms, part, strerror ( rc ) );
 		return rc;
 	}
 
@@ -215,110 +223,110 @@ static int cms_parse_signer_identifier ( struct cms_signature *sig,
 }
 
 /**
- * Parse CMS signature digest algorithm
+ * Parse CMS message digest algorithm
  *
- * @v sig		CMS signature
- * @v info		Signer information to fill in
+ * @v cms		CMS message
+ * @v part		Participant information to fill in
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse_digest_algorithm ( struct cms_signature *sig,
-					struct cms_signer_info *info,
+static int cms_parse_digest_algorithm ( struct cms_message *cms,
+					struct cms_participant *part,
 					const struct asn1_cursor *raw ) {
 	struct asn1_algorithm *algorithm;
 	int rc;
 
 	/* Identify algorithm */
 	if ( ( rc = asn1_digest_algorithm ( raw, &algorithm ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not identify digest algorithm: "
-		       "%s\n", sig, info, strerror ( rc ) );
-		DBGC_HDA ( sig, 0, raw->data, raw->len );
+		DBGC ( cms, "CMS %p/%p could not identify digest algorithm: "
+		       "%s\n", cms, part, strerror ( rc ) );
+		DBGC_HDA ( cms, 0, raw->data, raw->len );
 		return rc;
 	}
 
 	/* Record digest algorithm */
-	info->digest = algorithm->digest;
-	DBGC ( sig, "CMS %p/%p digest algorithm is %s\n",
-	       sig, info, algorithm->name );
+	part->digest = algorithm->digest;
+	DBGC ( cms, "CMS %p/%p digest algorithm is %s\n",
+	       cms, part, algorithm->name );
 
 	return 0;
 }
 
 /**
- * Parse CMS signature algorithm
+ * Parse CMS message public-key algorithm
  *
- * @v sig		CMS signature
- * @v info		Signer information to fill in
+ * @v cms		CMS message
+ * @v part		Participant information to fill in
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse_signature_algorithm ( struct cms_signature *sig,
-					   struct cms_signer_info *info,
-					   const struct asn1_cursor *raw ) {
+static int cms_parse_pubkey_algorithm ( struct cms_message *cms,
+					struct cms_participant *part,
+					const struct asn1_cursor *raw ) {
 	struct asn1_algorithm *algorithm;
 	int rc;
 
 	/* Identify algorithm */
 	if ( ( rc = asn1_pubkey_algorithm ( raw, &algorithm ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not identify public-key "
-		       "algorithm: %s\n", sig, info, strerror ( rc ) );
-		DBGC_HDA ( sig, 0, raw->data, raw->len );
+		DBGC ( cms, "CMS %p/%p could not identify public-key "
+		       "algorithm: %s\n", cms, part, strerror ( rc ) );
+		DBGC_HDA ( cms, 0, raw->data, raw->len );
 		return rc;
 	}
 
-	/* Record signature algorithm */
-	info->pubkey = algorithm->pubkey;
-	DBGC ( sig, "CMS %p/%p public-key algorithm is %s\n",
-	       sig, info, algorithm->name );
+	/* Record public-key algorithm */
+	part->pubkey = algorithm->pubkey;
+	DBGC ( cms, "CMS %p/%p public-key algorithm is %s\n",
+	       cms, part, algorithm->name );
 
 	return 0;
 }
 
 /**
- * Parse CMS signature value
+ * Parse CMS message signature or key value
  *
- * @v sig		CMS signature
- * @v info		Signer information to fill in
+ * @v cms		CMS message
+ * @v part		Participant information to fill in
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse_signature_value ( struct cms_signature *sig,
-				       struct cms_signer_info *info,
-				       const struct asn1_cursor *raw ) {
+static int cms_parse_value ( struct cms_message *cms,
+			     struct cms_participant *part,
+			     const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
 	int rc;
 
 	/* Enter signature */
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	if ( ( rc = asn1_enter ( &cursor, ASN1_OCTET_STRING ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not locate signature:\n",
-		       sig, info );
-		DBGC_HDA ( sig, 0, raw->data, raw->len );
+		DBGC ( cms, "CMS %p/%p could not locate value:\n",
+		       cms, part );
+		DBGC_HDA ( cms, 0, raw->data, raw->len );
 		return rc;
 	}
 
 	/* Record signature */
-	info->signature_len = cursor.len;
-	info->signature = malloc ( info->signature_len );
-	if ( ! info->signature )
+	part->len = cursor.len;
+	part->value = malloc ( part->len );
+	if ( ! part->value )
 		return -ENOMEM;
-	memcpy ( info->signature, cursor.data, info->signature_len );
-	DBGC ( sig, "CMS %p/%p signature value is:\n", sig, info );
-	DBGC_HDA ( sig, 0, info->signature, info->signature_len );
+	memcpy ( part->value, cursor.data, part->len );
+	DBGC ( cms, "CMS %p/%p value is:\n", cms, part );
+	DBGC_HDA ( cms, 0, part->value, part->len );
 
 	return 0;
 }
 
 /**
- * Parse CMS signature signer information
+ * Parse CMS message participant information
  *
- * @v sig		CMS signature
- * @v info		Signer information to fill in
+ * @v cms		CMS message
+ * @v part		Participant information to fill in
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse_signer_info ( struct cms_signature *sig,
-				   struct cms_signer_info *info,
+static int cms_parse_participant ( struct cms_message *cms,
+				   struct cms_participant *part,
 				   const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
 	int rc;
@@ -331,12 +339,13 @@ static int cms_parse_signer_info ( struct cms_signature *sig,
 	asn1_skip ( &cursor, ASN1_INTEGER );
 
 	/* Parse sid */
-	if ( ( rc = cms_parse_signer_identifier ( sig, info, &cursor ) ) != 0 )
+	if ( ( rc = cms_parse_identifier ( cms, part, &cursor ) ) != 0 )
 		return rc;
 	asn1_skip_any ( &cursor );
 
 	/* Parse digestAlgorithm */
-	if ( ( rc = cms_parse_digest_algorithm ( sig, info, &cursor ) ) != 0 )
+	if ( ( rc = cms_parse_digest_algorithm ( cms, part,
+						 &cursor ) ) != 0 )
 		return rc;
 	asn1_skip_any ( &cursor );
 
@@ -344,43 +353,79 @@ static int cms_parse_signer_info ( struct cms_signature *sig,
 	asn1_skip_if_exists ( &cursor, ASN1_EXPLICIT_TAG ( 0 ) );
 
 	/* Parse signatureAlgorithm */
-	if ( ( rc = cms_parse_signature_algorithm ( sig, info, &cursor ) ) != 0)
+	if ( ( rc = cms_parse_pubkey_algorithm ( cms, part, &cursor ) ) != 0 )
 		return rc;
 	asn1_skip_any ( &cursor );
 
 	/* Parse signature */
-	if ( ( rc = cms_parse_signature_value ( sig, info, &cursor ) ) != 0 )
+	if ( ( rc = cms_parse_value ( cms, part, &cursor ) ) != 0 )
 		return rc;
 
 	return 0;
 }
 
 /**
- * Parse CMS signature from ASN.1 data
+ * Parse CMS message participants information
  *
- * @v sig		CMS signature
+ * @v cms		CMS message
  * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse ( struct cms_signature *sig,
-		       const struct asn1_cursor *raw ) {
+static int cms_parse_participants ( struct cms_message *cms,
+				    const struct asn1_cursor *raw ) {
 	struct asn1_cursor cursor;
-	struct cms_signer_info *info;
+	struct cms_participant *part;
 	int rc;
 
-	/* Enter contentInfo */
+	/* Enter signerInfos */
 	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	asn1_enter ( &cursor, ASN1_SEQUENCE );
+	asn1_enter ( &cursor, ASN1_SET );
 
-	/* Parse contentType */
-	if ( ( rc = cms_parse_content_type ( sig, &cursor ) ) != 0 )
-		return rc;
-	asn1_skip_any ( &cursor );
+	/* Add each signerInfo.  Errors are handled by ensuring that
+	 * cms_put() will always be able to free any allocated memory.
+	 */
+	while ( cursor.len ) {
 
-	/* Enter content */
-	asn1_enter ( &cursor, ASN1_EXPLICIT_TAG ( 0 ) );
+		/* Allocate participant information block */
+		part = zalloc ( sizeof ( *part ) );
+		if ( ! part )
+			return -ENOMEM;
+		list_add ( &part->list, &cms->participants );
+
+		/* Allocate certificate chain */
+		part->chain = x509_alloc_chain();
+		if ( ! part->chain )
+			return -ENOMEM;
+
+		/* Parse signerInfo */
+		if ( ( rc = cms_parse_participant ( cms, part,
+						    &cursor ) ) != 0 )
+			return rc;
+		asn1_skip_any ( &cursor );
+	}
+
+	return 0;
+}
+
+/**
+ * Parse CMS signed data
+ *
+ * @v cms		CMS message
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int cms_parse_signed ( struct cms_message *cms,
+			      const struct asn1_cursor *raw ) {
+	struct asn1_cursor cursor;
+	int rc;
+
+	/* Allocate certificate list */
+	cms->certificates = x509_alloc_chain();
+	if ( ! cms->certificates )
+		return -ENOMEM;
 
 	/* Enter signedData */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Skip version */
@@ -393,111 +438,113 @@ static int cms_parse ( struct cms_signature *sig,
 	asn1_skip ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse certificates */
-	if ( ( rc = cms_parse_certificates ( sig, &cursor ) ) != 0 )
+	if ( ( rc = cms_parse_certificates ( cms, &cursor ) ) != 0 )
 		return rc;
 	asn1_skip_any ( &cursor );
 
 	/* Skip crls, if present */
 	asn1_skip_if_exists ( &cursor, ASN1_EXPLICIT_TAG ( 1 ) );
 
-	/* Enter signerInfos */
-	asn1_enter ( &cursor, ASN1_SET );
-
-	/* Add each signerInfo.  Errors are handled by ensuring that
-	 * cms_put() will always be able to free any allocated memory.
-	 */
-	while ( cursor.len ) {
-
-		/* Allocate signer information block */
-		info = zalloc ( sizeof ( *info ) );
-		if ( ! info )
-			return -ENOMEM;
-		list_add ( &info->list, &sig->info );
-
-		/* Allocate certificate chain */
-		info->chain = x509_alloc_chain();
-		if ( ! info->chain )
-			return -ENOMEM;
-
-		/* Parse signerInfo */
-		if ( ( rc = cms_parse_signer_info ( sig, info,
-						    &cursor ) ) != 0 )
-			return rc;
-		asn1_skip_any ( &cursor );
-	}
+	/* Parse signerInfos */
+	if ( ( rc = cms_parse_participants ( cms, &cursor ) ) != 0 )
+		return rc;
 
 	return 0;
 }
 
 /**
- * Free CMS signature
+ * Parse CMS message from ASN.1 data
+ *
+ * @v cms		CMS message
+ * @v raw		ASN.1 cursor
+ * @ret rc		Return status code
+ */
+static int cms_parse ( struct cms_message *cms,
+		       const struct asn1_cursor *raw ) {
+	struct asn1_cursor cursor;
+	int rc;
+
+	/* Enter contentInfo */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	asn1_enter ( &cursor, ASN1_SEQUENCE );
+
+	/* Parse contentType */
+	if ( ( rc = cms_parse_content_type ( cms, &cursor ) ) != 0 )
+		return rc;
+	asn1_skip_any ( &cursor );
+
+	/* Enter content */
+	asn1_enter ( &cursor, ASN1_EXPLICIT_TAG ( 0 ) );
+
+	/* Parse type-specific content */
+	if ( ( rc = cms->type->parse ( cms, &cursor ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Free CMS message
  *
  * @v refcnt		Reference count
  */
 static void cms_free ( struct refcnt *refcnt ) {
-	struct cms_signature *sig =
-		container_of ( refcnt, struct cms_signature, refcnt );
-	struct cms_signer_info *info;
-	struct cms_signer_info *tmp;
+	struct cms_message *cms =
+		container_of ( refcnt, struct cms_message, refcnt );
+	struct cms_participant *part;
+	struct cms_participant *tmp;
 
-	list_for_each_entry_safe ( info, tmp, &sig->info, list ) {
-		list_del ( &info->list );
-		x509_chain_put ( info->chain );
-		free ( info->signature );
-		free ( info );
+	list_for_each_entry_safe ( part, tmp, &cms->participants, list ) {
+		list_del ( &part->list );
+		x509_chain_put ( part->chain );
+		free ( part->value );
+		free ( part );
 	}
-	x509_chain_put ( sig->certificates );
-	free ( sig );
+	x509_chain_put ( cms->certificates );
+	free ( cms );
 }
 
 /**
- * Create CMS signature
+ * Create CMS message
  *
  * @v image		Image
- * @ret sig		CMS signature
+ * @ret sig		CMS message
  * @ret rc		Return status code
  *
- * On success, the caller holds a reference to the CMS signature, and
+ * On success, the caller holds a reference to the CMS message, and
  * is responsible for ultimately calling cms_put().
  */
-int cms_signature ( struct image *image, struct cms_signature **sig ) {
+int cms_message ( struct image *image, struct cms_message **cms ) {
 	struct asn1_cursor *raw;
 	int next;
 	int rc;
 
-	/* Allocate and initialise signature */
-	*sig = zalloc ( sizeof ( **sig ) );
-	if ( ! *sig ) {
+	/* Allocate and initialise message */
+	*cms = zalloc ( sizeof ( **cms ) );
+	if ( ! *cms ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	ref_init ( &(*sig)->refcnt, cms_free );
-	INIT_LIST_HEAD ( &(*sig)->info );
+	ref_init ( &(*cms)->refcnt, cms_free );
+	INIT_LIST_HEAD ( &(*cms)->participants );
 
-	/* Allocate certificate list */
-	(*sig)->certificates = x509_alloc_chain();
-	if ( ! (*sig)->certificates ) {
-		rc = -ENOMEM;
-		goto err_alloc_chain;
-	}
-
-	/* Get raw signature data */
+	/* Get raw message data */
 	next = image_asn1 ( image, 0, &raw );
 	if ( next < 0 ) {
 		rc = next;
-		DBGC ( *sig, "CMS %p could not get raw ASN.1 data: %s\n",
-		       *sig, strerror ( rc ) );
+		DBGC ( *cms, "CMS %p could not get raw ASN.1 data: %s\n",
+		       *cms, strerror ( rc ) );
 		goto err_asn1;
 	}
 
-	/* Use only first signature in image */
+	/* Use only first message in image */
 	asn1_shrink_any ( raw );
 
-	/* Parse signature */
-	if ( ( rc = cms_parse ( *sig, raw ) ) != 0 )
+	/* Parse message */
+	if ( ( rc = cms_parse ( *cms, raw ) ) != 0 )
 		goto err_parse;
 
-	/* Free raw signature data */
+	/* Free raw message data */
 	free ( raw );
 
 	return 0;
@@ -505,8 +552,7 @@ int cms_signature ( struct image *image, struct cms_signature **sig ) {
  err_parse:
 	free ( raw );
  err_asn1:
- err_alloc_chain:
-	cms_put ( *sig );
+	cms_put ( *cms );
  err_alloc:
 	return rc;
 }
@@ -514,16 +560,16 @@ int cms_signature ( struct image *image, struct cms_signature **sig ) {
 /**
  * Calculate digest of CMS-signed data
  *
- * @v sig		CMS signature
- * @v info		Signer information
+ * @v cms		CMS message
+ * @v part		Participant information
  * @v data		Signed data
  * @v len		Length of signed data
  * @v out		Digest output
  */
-static void cms_digest ( struct cms_signature *sig,
-			 struct cms_signer_info *info,
+static void cms_digest ( struct cms_message *cms,
+			 struct cms_participant *part,
 			 userptr_t data, size_t len, void *out ) {
-	struct digest_algorithm *digest = info->digest;
+	struct digest_algorithm *digest = part->digest;
 	uint8_t ctx[ digest->ctxsize ];
 	uint8_t block[ digest->blocksize ];
 	size_t offset = 0;
@@ -546,48 +592,47 @@ static void cms_digest ( struct cms_signature *sig,
 	/* Finalise digest */
 	digest_final ( digest, ctx, out );
 
-	DBGC ( sig, "CMS %p/%p digest value:\n", sig, info );
-	DBGC_HDA ( sig, 0, out, digest->digestsize );
+	DBGC ( cms, "CMS %p/%p digest value:\n", cms, part );
+	DBGC_HDA ( cms, 0, out, digest->digestsize );
 }
 
 /**
  * Verify digest of CMS-signed data
  *
- * @v sig		CMS signature
- * @v info		Signer information
+ * @v cms		CMS message
+ * @v part		Participant information
  * @v cert		Corresponding certificate
  * @v data		Signed data
  * @v len		Length of signed data
  * @ret rc		Return status code
  */
-static int cms_verify_digest ( struct cms_signature *sig,
-			       struct cms_signer_info *info,
+static int cms_verify_digest ( struct cms_message *cms,
+			       struct cms_participant *part,
 			       struct x509_certificate *cert,
 			       userptr_t data, size_t len ) {
-	struct digest_algorithm *digest = info->digest;
-	struct pubkey_algorithm *pubkey = info->pubkey;
+	struct digest_algorithm *digest = part->digest;
+	struct pubkey_algorithm *pubkey = part->pubkey;
 	struct x509_public_key *public_key = &cert->subject.public_key;
 	uint8_t digest_out[ digest->digestsize ];
 	uint8_t ctx[ pubkey->ctxsize ];
 	int rc;
 
 	/* Generate digest */
-	cms_digest ( sig, info, data, len, digest_out );
+	cms_digest ( cms, part, data, len, digest_out );
 
 	/* Initialise public-key algorithm */
 	if ( ( rc = pubkey_init ( pubkey, ctx, public_key->raw.data,
 				  public_key->raw.len ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not initialise public key: %s\n",
-		       sig, info, strerror ( rc ) );
+		DBGC ( cms, "CMS %p/%p could not initialise public key: %s\n",
+		       cms, part, strerror ( rc ) );
 		goto err_init;
 	}
 
 	/* Verify digest */
 	if ( ( rc = pubkey_verify ( pubkey, ctx, digest, digest_out,
-				    info->signature,
-				    info->signature_len ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p signature verification failed: %s\n",
-		       sig, info, strerror ( rc ) );
+				    part->value, part->len ) ) != 0 ) {
+		DBGC ( cms, "CMS %p/%p signature verification failed: %s\n",
+		       cms, part, strerror ( rc ) );
 		goto err_verify;
 	}
 
@@ -598,10 +643,10 @@ static int cms_verify_digest ( struct cms_signature *sig,
 }
 
 /**
- * Verify CMS signature signer information
+ * Verify CMS message signer
  *
- * @v sig		CMS signature
- * @v info		Signer information
+ * @v cms		CMS message
+ * @v part		Participant information
  * @v data		Signed data
  * @v len		Length of signed data
  * @v time		Time at which to validate certificates
@@ -609,42 +654,42 @@ static int cms_verify_digest ( struct cms_signature *sig,
  * @v root		Root certificate list, or NULL to use default
  * @ret rc		Return status code
  */
-static int cms_verify_signer_info ( struct cms_signature *sig,
-				    struct cms_signer_info *info,
-				    userptr_t data, size_t len,
-				    time_t time, struct x509_chain *store,
-				    struct x509_root *root ) {
+static int cms_verify_signer ( struct cms_message *cms,
+			       struct cms_participant *part,
+			       userptr_t data, size_t len,
+			       time_t time, struct x509_chain *store,
+			       struct x509_root *root ) {
 	struct x509_certificate *cert;
 	int rc;
 
 	/* Validate certificate chain */
-	if ( ( rc = x509_validate_chain ( info->chain, time, store,
+	if ( ( rc = x509_validate_chain ( part->chain, time, store,
 					  root ) ) != 0 ) {
-		DBGC ( sig, "CMS %p/%p could not validate chain: %s\n",
-		       sig, info, strerror ( rc ) );
+		DBGC ( cms, "CMS %p/%p could not validate chain: %s\n",
+		       cms, part, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Extract code-signing certificate */
-	cert = x509_first ( info->chain );
+	cert = x509_first ( part->chain );
 	assert ( cert != NULL );
 
 	/* Check that certificate can create digital signatures */
 	if ( ! ( cert->extensions.usage.bits & X509_DIGITAL_SIGNATURE ) ) {
-		DBGC ( sig, "CMS %p/%p certificate cannot create signatures\n",
-		       sig, info );
+		DBGC ( cms, "CMS %p/%p certificate cannot create signatures\n",
+		       cms, part );
 		return -EACCES_NON_SIGNING;
 	}
 
 	/* Check that certificate can sign code */
 	if ( ! ( cert->extensions.ext_usage.bits & X509_CODE_SIGNING ) ) {
-		DBGC ( sig, "CMS %p/%p certificate is not code-signing\n",
-		       sig, info );
+		DBGC ( cms, "CMS %p/%p certificate is not code-signing\n",
+		       cms, part );
 		return -EACCES_NON_CODE_SIGNING;
 	}
 
 	/* Verify digest */
-	if ( ( rc = cms_verify_digest ( sig, info, cert, data, len ) ) != 0 )
+	if ( ( rc = cms_verify_digest ( cms, part, cert, data, len ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -653,7 +698,7 @@ static int cms_verify_signer_info ( struct cms_signature *sig,
 /**
  * Verify CMS signature
  *
- * @v sig		CMS signature
+ * @v cms		CMS message
  * @v image		Signed image
  * @v name		Required common name, or NULL to check all signatures
  * @v time		Time at which to validate certificates
@@ -661,10 +706,10 @@ static int cms_verify_signer_info ( struct cms_signature *sig,
  * @v root		Root certificate list, or NULL to use default
  * @ret rc		Return status code
  */
-int cms_verify ( struct cms_signature *sig, struct image *image,
+int cms_verify ( struct cms_message *cms, struct image *image,
 		 const char *name, time_t time, struct x509_chain *store,
 		 struct x509_root *root ) {
-	struct cms_signer_info *info;
+	struct cms_participant *part;
 	struct x509_certificate *cert;
 	int count = 0;
 	int rc;
@@ -672,14 +717,18 @@ int cms_verify ( struct cms_signature *sig, struct image *image,
 	/* Mark image as untrusted */
 	image_untrust ( image );
 
-	/* Verify using all signerInfos */
-	list_for_each_entry ( info, &sig->info, list ) {
-		cert = x509_first ( info->chain );
+	/* Sanity check */
+	if ( ! cms_is_signature ( cms ) )
+		return -ENOTTY;
+
+	/* Verify using all signers */
+	list_for_each_entry ( part, &cms->participants, list ) {
+		cert = x509_first ( part->chain );
 		if ( name && ( x509_check_name ( cert, name ) != 0 ) )
 			continue;
-		if ( ( rc = cms_verify_signer_info ( sig, info, image->data,
-						     image->len, time, store,
-						     root ) ) != 0 )
+		if ( ( rc = cms_verify_signer ( cms, part, image->data,
+						image->len, time, store,
+						root ) ) != 0 )
 			return rc;
 		count++;
 	}
@@ -687,11 +736,11 @@ int cms_verify ( struct cms_signature *sig, struct image *image,
 	/* Check that we have verified at least one signature */
 	if ( count == 0 ) {
 		if ( name ) {
-			DBGC ( sig, "CMS %p had no signatures matching name "
-			       "%s\n", sig, name );
+			DBGC ( cms, "CMS %p had no signatures matching name "
+			       "%s\n", cms, name );
 			return -EACCES_WRONG_NAME;
 		} else {
-			DBGC ( sig, "CMS %p had no signatures\n", sig );
+			DBGC ( cms, "CMS %p had no signatures\n", cms );
 			return -EACCES_NO_SIGNATURES;
 		}
 	}

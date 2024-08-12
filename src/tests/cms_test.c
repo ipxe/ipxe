@@ -55,8 +55,8 @@ struct cms_test_code {
 struct cms_test_signature {
 	/** Signature image */
 	struct image image;
-	/** Parsed signature */
-	struct cms_signature *sig;
+	/** Parsed message */
+	struct cms_message *cms;
 };
 
 /** Define inline data */
@@ -1366,7 +1366,7 @@ static void cms_signature_okx ( struct cms_test_signature *sgn,
 	sgn->image.data = virt_to_user ( data );
 
 	/* Check ability to parse signature */
-	okx ( cms_signature ( &sgn->image, &sgn->sig ) == 0, file, line );
+	okx ( cms_message ( &sgn->image, &sgn->cms ) == 0, file, line );
 
 	/* Reset image data pointer */
 	sgn->image.data = ( ( userptr_t ) data );
@@ -1397,10 +1397,10 @@ static void cms_verify_okx ( struct cms_test_signature *sgn,
 	code->image.data = virt_to_user ( data );
 
 	/* Invalidate any certificates from previous tests */
-	x509_invalidate_chain ( sgn->sig->certificates );
+	x509_invalidate_chain ( sgn->cms->certificates );
 
 	/* Check ability to verify signature */
-	okx ( cms_verify ( sgn->sig, &code->image, name, time, store,
+	okx ( cms_verify ( sgn->cms, &code->image, name, time, store,
 			   root ) == 0, file, line );
 	okx ( code->image.flags & IMAGE_TRUSTED, file, line );
 
@@ -1434,10 +1434,10 @@ static void cms_verify_fail_okx ( struct cms_test_signature *sgn,
 	code->image.data = virt_to_user ( data );
 
 	/* Invalidate any certificates from previous tests */
-	x509_invalidate_chain ( sgn->sig->certificates );
+	x509_invalidate_chain ( sgn->cms->certificates );
 
 	/* Check inability to verify signature */
-	okx ( cms_verify ( sgn->sig, &code->image, name, time, store,
+	okx ( cms_verify ( sgn->cms, &code->image, name, time, store,
 			   root ) != 0, file, line );
 	okx ( ! ( code->image.flags & IMAGE_TRUSTED ), file, line );
 
@@ -1498,11 +1498,11 @@ static void cms_test_exec ( void ) {
 	/* Sanity check */
 	assert ( list_empty ( &empty_store.links ) );
 
-	/* Drop signature references */
-	cms_put ( nonsigned_sig.sig );
-	cms_put ( genericsigned_sig.sig );
-	cms_put ( brokenchain_sig.sig );
-	cms_put ( codesigned_sig.sig );
+	/* Drop message references */
+	cms_put ( nonsigned_sig.cms );
+	cms_put ( genericsigned_sig.cms );
+	cms_put ( brokenchain_sig.cms );
+	cms_put ( codesigned_sig.cms );
 }
 
 /** CMS self-test */
