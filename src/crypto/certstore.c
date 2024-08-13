@@ -72,16 +72,16 @@ static struct x509_certificate certstore_certs[ sizeof ( certstore_raw ) /
 /**
  * Mark stored certificate as most recently used
  *
- * @v certs		X.509 certificate list
+ * @v store		Certificate store
  * @v cert		X.509 certificate
  */
-static void certstore_found ( struct x509_chain *certs,
+static void certstore_found ( struct x509_chain *store,
 			      struct x509_certificate *cert ) {
 
 	/* Mark as most recently used */
 	list_del ( &cert->store.list );
-	list_add ( &cert->store.list, &certs->links );
-	DBGC2 ( certs, "CERTSTORE found certificate %s\n",
+	list_add ( &cert->store.list, &store->links );
+	DBGC2 ( store, "CERTSTORE found certificate %s\n",
 		x509_name ( cert ) );
 }
 

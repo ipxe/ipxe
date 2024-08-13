@@ -1079,7 +1079,7 @@ int x509_certificate ( const void *data, size_t len,
 	asn1_shrink_any ( &cursor );
 
 	/* Return stored certificate, if present */
-	if ( ( *cert = x509_find ( &certstore, &cursor ) ) != NULL ) {
+	if ( ( *cert = x509_find ( NULL, &cursor ) ) != NULL ) {
 
 		/* Add caller's reference */
 		x509_get ( *cert );
@@ -1714,16 +1714,19 @@ void x509_truncate ( struct x509_chain *chain, struct x509_link *link ) {
 /**
  * Mark X.509 certificate as found
  *
- * @v certs		X.509 certificate list
+ * @v store		Certificate store
  * @v cert		X.509 certificate
  * @ret cert		X.509 certificate
  */
-static struct x509_certificate * x509_found ( struct x509_chain *certs,
+static struct x509_certificate * x509_found ( struct x509_chain *store,
 					      struct x509_certificate *cert ) {
 
+	/* Sanity check */
+	assert ( store != NULL );
+
 	/* Mark as found, if applicable */
-	if ( certs->found )
-		certs->found ( certs, cert );
+	if ( store->found )
+		store->found ( store, cert );
 
 	return cert;
 }
@@ -1731,22 +1734,26 @@ static struct x509_certificate * x509_found ( struct x509_chain *certs,
 /**
  * Identify X.509 certificate by raw certificate data
  *
- * @v certs		X.509 certificate list
+ * @v store		Certificate store, or NULL to use default
  * @v raw		Raw certificate data
  * @ret cert		X.509 certificate, or NULL if not found
  */
-struct x509_certificate * x509_find ( struct x509_chain *certs,
+struct x509_certificate * x509_find ( struct x509_chain *store,
 				      const struct asn1_cursor *raw ) {
 	struct x509_link *link;
 	struct x509_certificate *cert;
 
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
 	/* Search for certificate within store */
-	list_for_each_entry ( link, &certs->links, list ) {
+	list_for_each_entry ( link, &store->links, list ) {
 
 		/* Check raw certificate data */
 		cert = link->cert;
 		if ( asn1_compare ( raw, &cert->raw ) == 0 )
-			return x509_found ( certs, cert );
+			return x509_found ( store, cert );
 	}
 
 	return NULL;
@@ -1755,23 +1762,27 @@ struct x509_certificate * x509_find ( struct x509_chain *certs,
 /**
  * Identify X.509 certificate by subject
  *
- * @v certs		X.509 certificate list
+ * @v store		Certificate store, or NULL to use default
  * @v subject		Subject
  * @ret cert		X.509 certificate, or NULL if not found
  */
 struct x509_certificate *
-x509_find_subject ( struct x509_chain *certs,
+x509_find_subject ( struct x509_chain *store,
 		    const struct asn1_cursor *subject ) {
 	struct x509_link *link;
 	struct x509_certificate *cert;
 
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
 	/* Scan through certificate list */
-	list_for_each_entry ( link, &certs->links, list ) {
+	list_for_each_entry ( link, &store->links, list ) {
 
 		/* Check subject */
 		cert = link->cert;
 		if ( asn1_compare ( subject, &cert->subject.raw ) == 0 )
-			return x509_found ( certs, cert );
+			return x509_found ( store, cert );
 	}
 
 	return NULL;
@@ -1780,26 +1791,30 @@ x509_find_subject ( struct x509_chain *certs,
 /**
  * Identify X.509 certificate by issuer and serial number
  *
- * @v certs		X.509 certificate list
+ * @v store		Certificate store, or NULL to use default
  * @v issuer		Issuer
  * @v serial		Serial number
  * @ret cert		X.509 certificate, or NULL if not found
  */
 struct x509_certificate *
-x509_find_issuer_serial ( struct x509_chain *certs,
+x509_find_issuer_serial ( struct x509_chain *store,
 			  const struct asn1_cursor *issuer,
 			  const struct asn1_cursor *serial ) {
 	struct x509_link *link;
 	struct x509_certificate *cert;
 
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
 	/* Scan through certificate list */
-	list_for_each_entry ( link, &certs->links, list ) {
+	list_for_each_entry ( link, &store->links, list ) {
 
 		/* Check issuer and serial number */
 		cert = link->cert;
 		if ( ( asn1_compare ( issuer, &cert->issuer.raw ) == 0 ) &&
 		     ( asn1_compare ( serial, &cert->serial.raw ) == 0 ) )
-			return x509_found ( certs, cert );
+			return x509_found ( store, cert );
 	}
 
 	return NULL;
@@ -1808,17 +1823,21 @@ x509_find_issuer_serial ( struct x509_chain *certs,
 /**
  * Identify X.509 certificate by corresponding public key
  *
- * @v certs		X.509 certificate list
+ * @v store		Certificate store, or NULL to use default
  * @v key		Private key
  * @ret cert		X.509 certificate, or NULL if not found
  */
-struct x509_certificate * x509_find_key ( struct x509_chain *certs,
+struct x509_certificate * x509_find_key ( struct x509_chain *store,
 					  struct private_key *key ) {
 	struct x509_link *link;
 	struct x509_certificate *cert;
 
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
 	/* Scan through certificate list */
-	list_for_each_entry ( link, &certs->links, list ) {
+	list_for_each_entry ( link, &store->links, list ) {
 
 		/* Check public key */
 		cert = link->cert;
@@ -1826,7 +1845,7 @@ struct x509_certificate * x509_find_key ( struct x509_chain *certs,
 				    key->builder.data, key->builder.len,
 				    cert->subject.public_key.raw.data,
 				    cert->subject.public_key.raw.len ) == 0 )
-			return x509_found ( certs, cert );
+			return x509_found ( store, cert );
 	}
 
 	return NULL;
@@ -1836,13 +1855,13 @@ struct x509_certificate * x509_find_key ( struct x509_chain *certs,
  * Append X.509 certificates to X.509 certificate chain
  *
  * @v chain		X.509 certificate chain
- * @v certs		X.509 certificate list
+ * @v store		Certificate store, or NULL to use default
  * @ret rc		Return status code
  *
  * Certificates will be automatically appended to the chain based upon
  * the subject and issuer names.
  */
-int x509_auto_append ( struct x509_chain *chain, struct x509_chain *certs ) {
+int x509_auto_append ( struct x509_chain *chain, struct x509_chain *store ) {
 	struct x509_certificate *cert;
 	struct x509_certificate *previous;
 	int rc;
@@ -1859,7 +1878,7 @@ int x509_auto_append ( struct x509_chain *chain, struct x509_chain *certs ) {
 
 		/* Find issuing certificate */
 		previous = cert;
-		cert = x509_find_subject ( certs, &cert->issuer.raw );
+		cert = x509_find_subject ( store, &cert->issuer.raw );
 		if ( ! cert )
 			break;
 		if ( cert == previous )
@@ -1887,10 +1906,6 @@ int x509_validate_chain ( struct x509_chain *chain, time_t time,
 	struct x509_certificate *issuer = NULL;
 	struct x509_link *link;
 	int rc;
-
-	/* Use default certificate store if none specified */
-	if ( ! store )
-		store = &certstore;
 
 	/* Append any applicable certificates from the certificate store */
 	if ( ( rc = x509_auto_append ( chain, store ) ) != 0 )
