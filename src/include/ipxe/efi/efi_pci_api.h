@@ -43,20 +43,6 @@ PCIAPI_INLINE ( efi, pci_can_probe ) ( void ) {
 }
 
 /**
- * Find next PCI bus:dev.fn address range in system
- *
- * @v busdevfn		Starting PCI bus:dev.fn address
- * @v range		PCI bus:dev.fn address range to fill in
- */
-static inline __always_inline void
-PCIAPI_INLINE ( efi, pci_discover ) ( uint32_t busdevfn __unused,
-				      struct pci_range *range ) {
-
-	/* EFI does not want us to scan the PCI bus ourselves */
-	range->count = 0;
-}
-
-/**
  * Read byte from PCI configuration space via EFI
  *
  * @v pci	PCI device
