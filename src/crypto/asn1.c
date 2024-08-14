@@ -592,6 +592,32 @@ int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
 }
 
 /**
+ * Parse ASN.1 OID-identified cipher algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret algorithm	Algorithm
+ * @ret rc		Return status code
+ */
+int asn1_cipher_algorithm ( const struct asn1_cursor *cursor,
+			    struct asn1_algorithm **algorithm ) {
+	int rc;
+
+	/* Parse algorithm */
+	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+		return rc;
+
+	/* Check algorithm has a cipher */
+	if ( ! (*algorithm)->cipher ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not a cipher "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
+}
+
+/**
  * Parse ASN.1 OID-identified signature algorithm
  *
  * @v cursor		ASN.1 object cursor

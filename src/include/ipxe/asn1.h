@@ -192,6 +192,48 @@ struct asn1_builder_header {
 	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 101 ),	\
 	ASN1_OID_SINGLE ( 110 )
 
+/** ASN.1 OID for id-aes128-cbc (2.16.840.1.101.3.4.1.2) */
+#define ASN1_OID_AES128_CBC					\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 2 )
+
+/** ASN.1 OID for id-aes128-gcm (2.16.840.1.101.3.4.1.6) */
+#define ASN1_OID_AES128_GCM					\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 6 )
+
+/** ASN.1 OID for id-aes192-cbc (2.16.840.1.101.3.4.1.22) */
+#define ASN1_OID_AES192_CBC					\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 22 )
+
+/** ASN.1 OID for id-aes192-gcm (2.16.840.1.101.3.4.1.26) */
+#define ASN1_OID_AES192_GCM					\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 26 )
+
+/** ASN.1 OID for id-aes256-cbc (2.16.840.1.101.3.4.1.42) */
+#define ASN1_OID_AES256_CBC					\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 42 )
+
+/** ASN.1 OID for id-aes256-gcm (2.16.840.1.101.3.4.1.46) */
+#define ASN1_OID_AES256_GCM					\
+	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 101 ),		\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 ),		\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 46 )
+
 /** ASN.1 OID for id-sha256 (2.16.840.1.101.3.4.2.1) */
 #define ASN1_OID_SHA256						\
 	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\
@@ -317,6 +359,8 @@ struct asn1_algorithm {
 	struct pubkey_algorithm *pubkey;
 	/** Digest algorithm (if applicable) */
 	struct digest_algorithm *digest;
+	/** Cipher algorithm (if applicable) */
+	struct cipher_algorithm *cipher;
 	/** Elliptic curve (if applicable) */
 	struct elliptic_curve *curve;
 };
@@ -427,6 +471,8 @@ extern int asn1_algorithm ( const struct asn1_cursor *cursor,
 extern int asn1_pubkey_algorithm ( const struct asn1_cursor *cursor,
 				   struct asn1_algorithm **algorithm );
 extern int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
+				   struct asn1_algorithm **algorithm );
+extern int asn1_cipher_algorithm ( const struct asn1_cursor *cursor,
 				   struct asn1_algorithm **algorithm );
 extern int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 				      struct asn1_algorithm **algorithm );

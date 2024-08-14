@@ -88,6 +88,16 @@ REQUIRE_OBJECT ( oid_sha512_256 );
 REQUIRE_OBJECT ( oid_x25519 );
 #endif
 
+/* AES-CBC */
+#if defined ( CRYPTO_CIPHER_AES_CBC )
+REQUIRE_OBJECT ( oid_aes_cbc );
+#endif
+
+/* AES-GCM */
+#if defined ( CRYPTO_CIPHER_AES_GCM )
+REQUIRE_OBJECT ( oid_aes_gcm );
+#endif
+
 /* RSA and MD5 */
 #if defined ( CRYPTO_PUBKEY_RSA ) && defined ( CRYPTO_DIGEST_MD5 )
 REQUIRE_OBJECT ( rsa_md5 );
