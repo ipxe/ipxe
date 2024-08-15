@@ -67,6 +67,13 @@ struct pci_range {
 #include <bits/pci_io.h>
 
 /**
+ * Check if PCI bus probing is allowed
+ *
+ * @ret ok		Bus probing is allowed
+ */
+int pci_can_probe ( void );
+
+/**
  * Find next PCI bus:dev.fn address range in system
  *
  * @v busdevfn		Starting PCI bus:dev.fn address

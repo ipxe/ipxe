@@ -276,6 +276,7 @@ int ecam_write ( struct pci_device *pci, unsigned int location,
 	return 0;
 }
 
+PROVIDE_PCIAPI_INLINE ( ecam, pci_can_probe );
 PROVIDE_PCIAPI ( ecam, pci_discover, ecam_discover );
 PROVIDE_PCIAPI_INLINE ( ecam, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( ecam, pci_read_config_word );

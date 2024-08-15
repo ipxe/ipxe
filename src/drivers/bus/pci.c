@@ -361,6 +361,10 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 	uint32_t busdevfn = 0;
 	int rc;
 
+	/* Skip automatic probing if prohibited */
+	if ( ! pci_can_probe() )
+		return 0;
+
 	do {
 		/* Allocate struct pci_device */
 		if ( ! pci )

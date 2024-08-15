@@ -188,6 +188,7 @@ int linux_pci_write ( struct pci_device *pci, unsigned long where,
 	return rc;
 }
 
+PROVIDE_PCIAPI_INLINE ( linux, pci_can_probe );
 PROVIDE_PCIAPI_INLINE ( linux, pci_discover );
 PROVIDE_PCIAPI_INLINE ( linux, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( linux, pci_read_config_word );

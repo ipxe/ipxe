@@ -33,6 +33,16 @@ extern int efipci_write ( struct pci_device *pci, unsigned long location,
 			  unsigned long value );
 
 /**
+ * Check if PCI bus probing is allowed
+ *
+ * @ret ok		Bus probing is allowed
+ */
+static inline __always_inline int
+PCIAPI_INLINE ( efi, pci_can_probe ) ( void ) {
+	return 0;
+}
+
+/**
  * Find next PCI bus:dev.fn address range in system
  *
  * @v busdevfn		Starting PCI bus:dev.fn address
