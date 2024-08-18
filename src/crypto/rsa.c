@@ -233,27 +233,21 @@ static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
  *
  * @v ctx		RSA context
  * @v key		Key
- * @v key_len		Length of key
  * @ret rc		Return status code
  */
-static int rsa_init ( void *ctx, const void *key, size_t key_len ) {
+static int rsa_init ( void *ctx, const struct asn1_cursor *key ) {
 	struct rsa_context *context = ctx;
 	struct asn1_cursor modulus;
 	struct asn1_cursor exponent;
-	struct asn1_cursor cursor;
 	int rc;
 
 	/* Initialise context */
 	memset ( context, 0, sizeof ( *context ) );
 
-	/* Initialise cursor */
-	cursor.data = key;
-	cursor.len = key_len;
-
 	/* Parse modulus and exponent */
-	if ( ( rc = rsa_parse_mod_exp ( &modulus, &exponent, &cursor ) ) != 0 ){
+	if ( ( rc = rsa_parse_mod_exp ( &modulus, &exponent, key ) ) != 0 ){
 		DBGC ( context, "RSA %p invalid modulus/exponent:\n", context );
-		DBGC_HDA ( context, 0, cursor.data, cursor.len );
+		DBGC_HDA ( context, 0, key->data, key->len );
 		goto err_parse;
 	}
 
@@ -592,33 +586,23 @@ static void rsa_final ( void *ctx ) {
  * Check for matching RSA public/private key pair
  *
  * @v private_key	Private key
- * @v private_key_len	Private key length
  * @v public_key	Public key
- * @v public_key_len	Public key length
  * @ret rc		Return status code
  */
-static int rsa_match ( const void *private_key, size_t private_key_len,
-		       const void *public_key, size_t public_key_len ) {
+static int rsa_match ( const struct asn1_cursor *private_key,
+		       const struct asn1_cursor *public_key ) {
 	struct asn1_cursor private_modulus;
 	struct asn1_cursor private_exponent;
-	struct asn1_cursor private_cursor;
 	struct asn1_cursor public_modulus;
 	struct asn1_cursor public_exponent;
-	struct asn1_cursor public_cursor;
 	int rc;
-
-	/* Initialise cursors */
-	private_cursor.data = private_key;
-	private_cursor.len = private_key_len;
-	public_cursor.data = public_key;
-	public_cursor.len = public_key_len;
 
 	/* Parse moduli and exponents */
 	if ( ( rc = rsa_parse_mod_exp ( &private_modulus, &private_exponent,
-					&private_cursor ) ) != 0 )
+					private_key ) ) != 0 )
 		return rc;
 	if ( ( rc = rsa_parse_mod_exp ( &public_modulus, &public_exponent,
-					&public_cursor ) ) != 0 )
+					public_key ) ) != 0 )
 		return rc;
 
 	/* Compare moduli */

@@ -93,8 +93,8 @@ struct cipher_algorithm cipher_null = {
 	.auth = cipher_null_auth,
 };
 
-int pubkey_null_init ( void *ctx __unused, const void *key __unused,
-		       size_t key_len __unused ) {
+int pubkey_null_init ( void *ctx __unused,
+		       const struct asn1_cursor *key __unused ) {
 	return 0;
 }
 

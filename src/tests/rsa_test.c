@@ -61,13 +61,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** An RSA encryption and decryption self-test */
 struct rsa_encrypt_decrypt_test {
 	/** Private key */
-	const void *private;
-	/** Private key length */
-	size_t private_len;
+	const struct asn1_cursor private;
 	/** Public key */
-	const void *public;
-	/** Public key length */
-	size_t public_len;
+	const struct asn1_cursor public;
 	/** Plaintext */
 	const void *plaintext;
 	/** Plaintext length */
@@ -100,10 +96,14 @@ struct rsa_encrypt_decrypt_test {
 	static const uint8_t name ## _plaintext[] = PLAINTEXT;		\
 	static const uint8_t name ## _ciphertext[] = CIPHERTEXT;	\
 	static struct rsa_encrypt_decrypt_test name = {			\
-		.private = name ## _private,				\
-		.private_len = sizeof ( name ## _private ),		\
-		.public = name ## _public,				\
-		.public_len = sizeof ( name ## _public ),		\
+		.private = {						\
+			.data = name ## _private,			\
+			.len = sizeof ( name ## _private ),		\
+		},							\
+		.public = {						\
+			.data = name ## _public,			\
+			.len = sizeof ( name ## _public ),		\
+		},							\
 		.plaintext = name ## _plaintext,			\
 		.plaintext_len = sizeof ( name ## _plaintext ),		\
 		.ciphertext = name ## _ciphertext,			\
@@ -113,13 +113,9 @@ struct rsa_encrypt_decrypt_test {
 /** An RSA signature self-test */
 struct rsa_signature_test {
 	/** Private key */
-	const void *private;
-	/** Private key length */
-	size_t private_len;
+	const struct asn1_cursor private;
 	/** Public key */
-	const void *public;
-	/** Public key length */
-	size_t public_len;
+	const struct asn1_cursor public;
 	/** Plaintext */
 	const void *plaintext;
 	/** Plaintext length */
@@ -150,10 +146,14 @@ struct rsa_signature_test {
 	static const uint8_t name ## _plaintext[] = PLAINTEXT;		\
 	static const uint8_t name ## _signature[] = SIGNATURE;		\
 	static struct rsa_signature_test name = {			\
-		.private = name ## _private,				\
-		.private_len = sizeof ( name ## _private ),		\
-		.public = name ## _public,				\
-		.public_len = sizeof ( name ## _public ),		\
+		.private = {						\
+			.data = name ## _private,			\
+			.len = sizeof ( name ## _private ),		\
+		},							\
+		.public = {						\
+			.data = name ## _public,			\
+			.len = sizeof ( name ## _public ),		\
+		},							\
 		.plaintext = name ## _plaintext,			\
 		.plaintext_len = sizeof ( name ## _plaintext ),		\
 		.algorithm = ALGORITHM,					\
@@ -167,17 +167,14 @@ struct rsa_signature_test {
  * @v test		RSA encryption and decryption test
  */
 #define rsa_encrypt_decrypt_ok( test ) do {				\
-	pubkey_decrypt_ok ( &rsa_algorithm, (test)->private,		\
-			    (test)->private_len, (test)->ciphertext,	\
-			    (test)->ciphertext_len, (test)->plaintext,	\
+	pubkey_decrypt_ok ( &rsa_algorithm, &(test)->private,		\
+			    (test)->ciphertext,	(test)->ciphertext_len,	\
+			    (test)->plaintext,  (test)->plaintext_len );\
+	pubkey_encrypt_ok ( &rsa_algorithm, &(test)->private,		\
+			    &(test)->public, (test)->plaintext,		\
 			    (test)->plaintext_len );			\
-	pubkey_encrypt_ok ( &rsa_algorithm, (test)->private,		\
-			    (test)->private_len, (test)->public,	\
-			    (test)->public_len, (test)->plaintext,	\
-			    (test)->plaintext_len );			\
-	pubkey_encrypt_ok ( &rsa_algorithm, (test)->public,		\
-			    (test)->public_len, (test)->private,	\
-			    (test)->private_len, (test)->plaintext,	\
+	pubkey_encrypt_ok ( &rsa_algorithm, &(test)->public,		\
+			    &(test)->private, (test)->plaintext,	\
 			    (test)->plaintext_len );			\
 	} while ( 0 )
 
@@ -190,18 +187,15 @@ struct rsa_signature_test {
 #define rsa_signature_ok( test ) do {					\
 	struct digest_algorithm *digest = (test)->algorithm->digest;	\
 	uint8_t bad_signature[ (test)->signature_len ];			\
-	pubkey_sign_ok ( &rsa_algorithm, (test)->private,		\
-			 (test)->private_len, digest,			\
+	pubkey_sign_ok ( &rsa_algorithm, &(test)->private, digest,	\
 			 (test)->plaintext, (test)->plaintext_len,	\
 			 (test)->signature, (test)->signature_len );	\
-	pubkey_verify_ok ( &rsa_algorithm, (test)->public,		\
-			   (test)->public_len, digest,			\
+	pubkey_verify_ok ( &rsa_algorithm, &(test)->public, digest,	\
 			   (test)->plaintext, (test)->plaintext_len,	\
 			   (test)->signature, (test)->signature_len );	\
 	memset ( bad_signature, 0, sizeof ( bad_signature ) );		\
-	pubkey_verify_fail_ok ( &rsa_algorithm, (test)->public,		\
-				(test)->public_len, digest,		\
-				(test)->plaintext,			\
+	pubkey_verify_fail_ok ( &rsa_algorithm, &(test)->public,	\
+				digest, (test)->plaintext,		\
 				(test)->plaintext_len, bad_signature,	\
 				sizeof ( bad_signature ) );		\
 	} while ( 0 )

@@ -621,8 +621,7 @@ static int cms_verify_digest ( struct cms_message *cms,
 	cms_digest ( cms, part, data, len, digest_out );
 
 	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, ctx, public_key->raw.data,
-				  public_key->raw.len ) ) != 0 ) {
+	if ( ( rc = pubkey_init ( pubkey, ctx, &public_key->raw ) ) != 0 ) {
 		DBGC ( cms, "CMS %p/%p could not initialise public key: %s\n",
 		       cms, part, strerror ( rc ) );
 		goto err_init;

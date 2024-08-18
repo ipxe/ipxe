@@ -857,8 +857,8 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
 	digest_final ( digest, digest_ctx, digest_out );
 
 	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx, public_key->raw.data,
-				  public_key->raw.len ) ) != 0 ) {
+	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx,
+				  &public_key->raw ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" could not initialise public key: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
 		goto err_init;

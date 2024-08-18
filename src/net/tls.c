@@ -1824,7 +1824,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	tls_verify_handshake ( tls, digest_out );
 
 	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, ctx, key->data, key->len ) ) != 0 ) {
+	if ( ( rc = pubkey_init ( pubkey, ctx, key ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not initialise %s client private "
 		       "key: %s\n", tls, pubkey->name, strerror ( rc ) );
 		goto err_pubkey_init;
@@ -3581,8 +3581,7 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 
 	/* Initialise public key algorithm */
 	if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
-				  cert->subject.public_key.raw.data,
-				  cert->subject.public_key.raw.len ) ) != 0 ) {
+				  &cert->subject.public_key.raw ) ) != 0 ) {
 		DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
 		       tls, strerror ( rc ) );
 		goto err;

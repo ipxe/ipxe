@@ -367,8 +367,7 @@ static int icert_cert ( struct icert *icert, struct asn1_cursor *subject,
 	int rc;
 
 	/* Initialise "private" key */
-	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx, private->data,
-				  private->len ) ) != 0 ) {
+	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx, private ) ) != 0 ) {
 		DBGC ( icert, "ICERT %p could not initialise private key: "
 		       "%s\n", icert, strerror ( rc ) );
 		goto err_pubkey_init;

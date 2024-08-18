@@ -12,6 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stddef.h>
 #include <assert.h>
+#include <ipxe/asn1.h>
 
 /** A message digest algorithm */
 struct digest_algorithm {
@@ -126,10 +127,9 @@ struct pubkey_algorithm {
 	 *
 	 * @v ctx		Context
 	 * @v key		Key
-	 * @v key_len		Length of key
 	 * @ret rc		Return status code
 	 */
-	int ( * init ) ( void *ctx, const void *key, size_t key_len );
+	int ( * init ) ( void *ctx, const struct asn1_cursor *key );
 	/** Calculate maximum output length
 	 *
 	 * @v ctx		Context
@@ -186,13 +186,11 @@ struct pubkey_algorithm {
 	/** Check that public key matches private key
 	 *
 	 * @v private_key	Private key
-	 * @v private_key_len	Private key length
 	 * @v public_key	Public key
-	 * @v public_key_len	Public key length
 	 * @ret rc		Return status code
 	 */
-	int ( * match ) ( const void *private_key, size_t private_key_len,
-			  const void *public_key, size_t public_key_len );
+	int ( * match ) ( const struct asn1_cursor *private_key,
+			  const struct asn1_cursor *public_key );
 };
 
 /** An elliptic curve */
@@ -282,8 +280,8 @@ is_auth_cipher ( struct cipher_algorithm *cipher ) {
 
 static inline __attribute__ (( always_inline )) int
 pubkey_init ( struct pubkey_algorithm *pubkey, void *ctx,
-	      const void *key, size_t key_len ) {
-	return pubkey->init ( ctx, key, key_len );
+	      const struct asn1_cursor *key ) {
+	return pubkey->init ( ctx, key );
 }
 
 static inline __attribute__ (( always_inline )) size_t
@@ -324,10 +322,9 @@ pubkey_final ( struct pubkey_algorithm *pubkey, void *ctx ) {
 
 static inline __attribute__ (( always_inline )) int
 pubkey_match ( struct pubkey_algorithm *pubkey,
-	       const void *private_key, size_t private_key_len,
-	       const void *public_key, size_t public_key_len ) {
-	return pubkey->match ( private_key, private_key_len, public_key,
-			       public_key_len );
+	       const struct asn1_cursor *private_key,
+	       const struct asn1_cursor *public_key ) {
+	return pubkey->match ( private_key, public_key );
 }
 
 static inline __attribute__ (( always_inline )) int
@@ -348,7 +345,7 @@ extern void cipher_null_decrypt ( void *ctx, const void *src, void *dst,
 				  size_t len );
 extern void cipher_null_auth ( void *ctx, void *auth );
 
-extern int pubkey_null_init ( void *ctx, const void *key, size_t key_len );
+extern int pubkey_null_init ( void *ctx, const struct asn1_cursor *key );
 extern size_t pubkey_null_max_len ( void *ctx );
 extern int pubkey_null_encrypt ( void *ctx, const void *plaintext,
 				 size_t plaintext_len, void *ciphertext );

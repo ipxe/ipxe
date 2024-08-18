@@ -12,17 +12,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v pubkey		Public key algorithm
  * @v key		Key
- * @v key_len		Key length
  * @v ciphertext	Ciphertext
  * @v ciphertext_len	Ciphertext length
  * @v expected		Expected plaintext
  * @v expected_len	Expected plaintext length
  */
-#define pubkey_decrypt_ok( pubkey, key, key_len, ciphertext,		\
-			   ciphertext_len, expected, expected_len ) do {\
+#define pubkey_decrypt_ok( pubkey, key, ciphertext, ciphertext_len,	\
+			   expected, expected_len ) do {		\
 	uint8_t ctx[ (pubkey)->ctxsize ];				\
 									\
-	ok ( pubkey_init ( (pubkey), ctx, (key), (key_len) ) == 0 );	\
+	ok ( pubkey_init ( (pubkey), ctx, (key) ) == 0 );		\
 	{								\
 		size_t max_len = pubkey_max_len ( (pubkey), ctx );	\
 		uint8_t decrypted[ max_len ];				\
@@ -44,19 +43,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v pubkey		Public key algorithm
  * @v encrypt_key	Encryption key
- * @v encrypt_key_len	Encryption key length
  * @v decrypt_key	Decryption key
- * @v decrypt_key_len	Decryption key length
  * @v plaintext		Plaintext
  * @v plaintext_len	Plaintext length
  */
-#define pubkey_encrypt_ok( pubkey, encrypt_key, encrypt_key_len,	\
-			   decrypt_key, decrypt_key_len, plaintext,	\
+#define pubkey_encrypt_ok( pubkey, encrypt_key, decrypt_key, plaintext,	\
 			   plaintext_len ) do {				\
 	uint8_t ctx[ (pubkey)->ctxsize ];				\
 									\
-	ok ( pubkey_init ( (pubkey), ctx, (encrypt_key),		\
-			   (encrypt_key_len) ) == 0 );			\
+	ok ( pubkey_init ( (pubkey), ctx, (encrypt_key) ) == 0 );	\
 	{								\
 		size_t max_len = pubkey_max_len ( (pubkey), ctx );	\
 		uint8_t encrypted[ max_len ];				\
@@ -68,9 +63,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 						 encrypted );		\
 		ok ( encrypted_len >= 0 );				\
 		pubkey_decrypt_ok ( (pubkey), (decrypt_key),		\
-				    (decrypt_key_len), encrypted,	\
-				    encrypted_len, (plaintext),		\
-				    (plaintext_len) );			\
+				    encrypted, encrypted_len,		\
+				    (plaintext), (plaintext_len) );	\
 	}								\
 	pubkey_final ( (pubkey), ctx );					\
 	} while ( 0 )
@@ -80,15 +74,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v pubkey		Public key algorithm
  * @v key		Key
- * @v key_len		Key length
  * @v digest		Digest algorithm
  * @v plaintext		Plaintext
  * @v plaintext_len	Plaintext length
  * @v expected		Expected signature
  * @v expected_len	Expected signature length
  */
-#define pubkey_sign_ok( pubkey, key, key_len, digest, plaintext,	\
-			plaintext_len, expected, expected_len ) do {	\
+#define pubkey_sign_ok( pubkey, key, digest, plaintext,	plaintext_len,	\
+			expected, expected_len ) do {			\
 	uint8_t ctx[ (pubkey)->ctxsize ];				\
 	uint8_t digestctx[ (digest)->ctxsize ];				\
 	uint8_t digestout[ (digest)->digestsize ];			\
@@ -98,7 +91,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 			(plaintext_len) );				\
 	digest_final ( (digest), digestctx, digestout );		\
 									\
-	ok ( pubkey_init ( (pubkey), ctx, (key), (key_len) ) == 0 );	\
+	ok ( pubkey_init ( (pubkey), ctx, (key) ) == 0 );		\
 	{								\
 		size_t max_len = pubkey_max_len ( (pubkey), ctx );	\
 		uint8_t signature[ max_len ];				\
@@ -118,14 +111,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v pubkey		Public key algorithm
  * @v key		Key
- * @v key_len		Key length
  * @v digest		Digest algorithm
  * @v plaintext		Plaintext
  * @v plaintext_len	Plaintext length
  * @v signature		Signature
  * @v signature_len	Signature length
  */
-#define pubkey_verify_ok( pubkey, key, key_len, digest, plaintext,	\
+#define pubkey_verify_ok( pubkey, key, digest, plaintext,		\
 			  plaintext_len, signature, signature_len ) do {\
 	uint8_t ctx[ (pubkey)->ctxsize ];				\
 	uint8_t digestctx[ (digest)->ctxsize ];				\
@@ -136,7 +128,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 			(plaintext_len) );				\
 	digest_final ( (digest), digestctx, digestout );		\
 									\
-	ok ( pubkey_init ( (pubkey), ctx, (key), (key_len) ) == 0 );	\
+	ok ( pubkey_init ( (pubkey), ctx, (key) ) == 0 );		\
 	ok ( pubkey_verify ( (pubkey), ctx, (digest), digestout,	\
 			     (signature), (signature_len) ) == 0 );	\
 	pubkey_final ( (pubkey), ctx );					\
@@ -147,14 +139,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v pubkey		Public key algorithm
  * @v key		Key
- * @v key_len		Key length
  * @v digest		Digest algorithm
  * @v plaintext		Plaintext
  * @v plaintext_len	Plaintext length
  * @v signature		Signature
  * @v signature_len	Signature length
  */
-#define pubkey_verify_fail_ok( pubkey, key, key_len, digest, plaintext,	\
+#define pubkey_verify_fail_ok( pubkey, key, digest, plaintext,		\
 			       plaintext_len, signature,		\
 			       signature_len ) do {			\
 	uint8_t ctx[ (pubkey)->ctxsize ];				\
@@ -166,7 +157,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 			(plaintext_len) );				\
 	digest_final ( (digest), digestctx, digestout );		\
 									\
-	ok ( pubkey_init ( (pubkey), ctx, (key), (key_len) ) == 0 );	\
+	ok ( pubkey_init ( (pubkey), ctx, (key) ) == 0 );		\
 	ok ( pubkey_verify ( (pubkey), ctx, (digest), digestout,	\
 			     (signature), (signature_len) ) != 0 );	\
 	pubkey_final ( (pubkey), ctx );					\

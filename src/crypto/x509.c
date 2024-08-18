@@ -1149,8 +1149,8 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	}
 
 	/* Verify signature using signer's public key */
-	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx, public_key->raw.data,
-				  public_key->raw.len ) ) != 0 ) {
+	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx,
+				  &public_key->raw ) ) != 0 ) {
 		DBGC ( cert, "X509 %p \"%s\" cannot initialise public key: "
 		       "%s\n", cert, x509_name ( cert ), strerror ( rc ) );
 		goto err_pubkey_init;
@@ -1842,9 +1842,8 @@ struct x509_certificate * x509_find_key ( struct x509_chain *store,
 		/* Check public key */
 		cert = link->cert;
 		if ( pubkey_match ( cert->signature_algorithm->pubkey,
-				    key->builder.data, key->builder.len,
-				    cert->subject.public_key.raw.data,
-				    cert->subject.public_key.raw.len ) == 0 )
+				    privkey_cursor ( key ),
+				    &cert->subject.public_key.raw ) == 0 )
 			return x509_found ( store, cert );
 	}
 
