@@ -240,8 +240,6 @@ struct tls_cipherspec {
 	struct tls_cipher_suite *suite;
 	/** Dynamically-allocated storage */
 	void *dynamic;
-	/** Public key encryption context */
-	void *pubkey_ctx;
 	/** Bulk encryption cipher context */
 	void *cipher_ctx;
 	/** MAC secret */
@@ -402,6 +400,8 @@ struct tls_server {
 	struct x509_root *root;
 	/** Certificate chain */
 	struct x509_chain *chain;
+	/** Public key (within server certificate) */
+	struct asn1_cursor key;
 	/** Certificate validator */
 	struct interface validator;
 	/** Certificate validation pending operation */

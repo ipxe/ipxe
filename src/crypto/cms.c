@@ -612,33 +612,22 @@ static int cms_verify_digest ( struct cms_message *cms,
 			       userptr_t data, size_t len ) {
 	struct digest_algorithm *digest = part->digest;
 	struct pubkey_algorithm *pubkey = part->pubkey;
-	struct x509_public_key *public_key = &cert->subject.public_key;
+	struct asn1_cursor *key = &cert->subject.public_key.raw;
 	uint8_t digest_out[ digest->digestsize ];
-	uint8_t ctx[ pubkey->ctxsize ];
 	int rc;
 
 	/* Generate digest */
 	cms_digest ( cms, part, data, len, digest_out );
 
-	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, ctx, &public_key->raw ) ) != 0 ) {
-		DBGC ( cms, "CMS %p/%p could not initialise public key: %s\n",
-		       cms, part, strerror ( rc ) );
-		goto err_init;
-	}
-
 	/* Verify digest */
-	if ( ( rc = pubkey_verify ( pubkey, ctx, digest, digest_out,
+	if ( ( rc = pubkey_verify ( pubkey, key, digest, digest_out,
 				    part->value, part->len ) ) != 0 ) {
 		DBGC ( cms, "CMS %p/%p signature verification failed: %s\n",
 		       cms, part, strerror ( rc ) );
-		goto err_verify;
+		return rc;
 	}
 
- err_verify:
-	pubkey_final ( pubkey, ctx );
- err_init:
-	return rc;
+	return 0;
 }
 
 /**

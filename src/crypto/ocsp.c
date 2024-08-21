@@ -844,10 +844,9 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
 	struct ocsp_response *response = &ocsp->response;
 	struct digest_algorithm *digest = response->algorithm->digest;
 	struct pubkey_algorithm *pubkey = response->algorithm->pubkey;
-	struct x509_public_key *public_key = &signer->subject.public_key;
+	struct asn1_cursor *key = &signer->subject.public_key.raw;
 	uint8_t digest_ctx[ digest->ctxsize ];
 	uint8_t digest_out[ digest->digestsize ];
-	uint8_t pubkey_ctx[ pubkey->ctxsize ];
 	int rc;
 
 	/* Generate digest */
@@ -856,30 +855,18 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
 			response->tbs.len );
 	digest_final ( digest, digest_ctx, digest_out );
 
-	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx,
-				  &public_key->raw ) ) != 0 ) {
-		DBGC ( ocsp, "OCSP %p \"%s\" could not initialise public key: "
-		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
-		goto err_init;
-	}
-
 	/* Verify digest */
-	if ( ( rc = pubkey_verify ( pubkey, pubkey_ctx, digest, digest_out,
+	if ( ( rc = pubkey_verify ( pubkey, key, digest, digest_out,
 				    response->signature.data,
 				    response->signature.len ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" signature verification failed: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
-		goto err_verify;
+		return rc;
 	}
 
 	DBGC2 ( ocsp, "OCSP %p \"%s\" signature is correct\n",
 		ocsp, x509_name ( ocsp->cert ) );
-
- err_verify:
-	pubkey_final ( pubkey, pubkey_ctx );
- err_init:
-	return rc;
+	return 0;
 }
 
 /**

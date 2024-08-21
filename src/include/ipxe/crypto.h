@@ -121,68 +121,55 @@ struct cipher_algorithm {
 struct pubkey_algorithm {
 	/** Algorithm name */
 	const char *name;
-	/** Context size */
-	size_t ctxsize;
-	/** Initialise algorithm
-	 *
-	 * @v ctx		Context
-	 * @v key		Key
-	 * @ret rc		Return status code
-	 */
-	int ( * init ) ( void *ctx, const struct asn1_cursor *key );
 	/** Calculate maximum output length
 	 *
-	 * @v ctx		Context
+	 * @v key		Key
 	 * @ret max_len		Maximum output length
 	 */
-	size_t ( * max_len ) ( void *ctx );
+	size_t ( * max_len ) ( const struct asn1_cursor *key );
 	/** Encrypt
 	 *
-	 * @v ctx		Context
+	 * @v key		Key
 	 * @v plaintext		Plaintext
 	 * @v plaintext_len	Length of plaintext
 	 * @v ciphertext	Ciphertext
 	 * @ret ciphertext_len	Length of ciphertext, or negative error
 	 */
-	int ( * encrypt ) ( void *ctx, const void *data, size_t len,
-			    void *out );
+	int ( * encrypt ) ( const struct asn1_cursor *key, const void *data,
+			    size_t len, void *out );
 	/** Decrypt
 	 *
-	 * @v ctx		Context
+	 * @v key		Key
 	 * @v ciphertext	Ciphertext
 	 * @v ciphertext_len	Ciphertext length
 	 * @v plaintext		Plaintext
 	 * @ret plaintext_len	Plaintext length, or negative error
 	 */
-	int ( * decrypt ) ( void *ctx, const void *data, size_t len,
-			    void *out );
+	int ( * decrypt ) ( const struct asn1_cursor *key, const void *data,
+			    size_t len, void *out );
 	/** Sign digest value
 	 *
-	 * @v ctx		Context
+	 * @v key		Key
 	 * @v digest		Digest algorithm
 	 * @v value		Digest value
 	 * @v signature		Signature
 	 * @ret signature_len	Signature length, or negative error
 	 */
-	int ( * sign ) ( void *ctx, struct digest_algorithm *digest,
-			 const void *value, void *signature );
+	int ( * sign ) ( const struct asn1_cursor *key,
+			 struct digest_algorithm *digest, const void *value,
+			 void *signature );
 	/** Verify signed digest value
 	 *
-	 * @v ctx		Context
+	 * @v key		Key
 	 * @v digest		Digest algorithm
 	 * @v value		Digest value
 	 * @v signature		Signature
 	 * @v signature_len	Signature length
 	 * @ret rc		Return status code
 	 */
-	int ( * verify ) ( void *ctx, struct digest_algorithm *digest,
-			   const void *value, const void *signature,
-			   size_t signature_len );
-	/** Finalise algorithm
-	 *
-	 * @v ctx		Context
-	 */
-	void ( * final ) ( void *ctx );
+	int ( * verify ) ( const struct asn1_cursor *key,
+			   struct digest_algorithm *digest, const void *value,
+			   const void *signature, size_t signature_len );
 	/** Check that public key matches private key
 	 *
 	 * @v private_key	Private key
@@ -278,46 +265,36 @@ is_auth_cipher ( struct cipher_algorithm *cipher ) {
 	return cipher->authsize;
 }
 
-static inline __attribute__ (( always_inline )) int
-pubkey_init ( struct pubkey_algorithm *pubkey, void *ctx,
-	      const struct asn1_cursor *key ) {
-	return pubkey->init ( ctx, key );
-}
-
 static inline __attribute__ (( always_inline )) size_t
-pubkey_max_len ( struct pubkey_algorithm *pubkey, void *ctx ) {
-	return pubkey->max_len ( ctx );
+pubkey_max_len ( struct pubkey_algorithm *pubkey,
+		 const struct asn1_cursor *key ) {
+	return pubkey->max_len ( key );
 }
 
 static inline __attribute__ (( always_inline )) int
-pubkey_encrypt ( struct pubkey_algorithm *pubkey, void *ctx,
+pubkey_encrypt ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 		 const void *data, size_t len, void *out ) {
-	return pubkey->encrypt ( ctx, data, len, out );
+	return pubkey->encrypt ( key, data, len, out );
 }
 
 static inline __attribute__ (( always_inline )) int
-pubkey_decrypt ( struct pubkey_algorithm *pubkey, void *ctx,
+pubkey_decrypt ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 		 const void *data, size_t len, void *out ) {
-	return pubkey->decrypt ( ctx, data, len, out );
+	return pubkey->decrypt ( key, data, len, out );
 }
 
 static inline __attribute__ (( always_inline )) int
-pubkey_sign ( struct pubkey_algorithm *pubkey, void *ctx,
+pubkey_sign ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 	      struct digest_algorithm *digest, const void *value,
 	      void *signature ) {
-	return pubkey->sign ( ctx, digest, value, signature );
+	return pubkey->sign ( key, digest, value, signature );
 }
 
 static inline __attribute__ (( always_inline )) int
-pubkey_verify ( struct pubkey_algorithm *pubkey, void *ctx,
+pubkey_verify ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 		struct digest_algorithm *digest, const void *value,
 		const void *signature, size_t signature_len ) {
-	return pubkey->verify ( ctx, digest, value, signature, signature_len );
-}
-
-static inline __attribute__ (( always_inline )) void
-pubkey_final ( struct pubkey_algorithm *pubkey, void *ctx ) {
-	pubkey->final ( ctx );
+	return pubkey->verify ( key, digest, value, signature, signature_len );
 }
 
 static inline __attribute__ (( always_inline )) int
@@ -345,15 +322,18 @@ extern void cipher_null_decrypt ( void *ctx, const void *src, void *dst,
 				  size_t len );
 extern void cipher_null_auth ( void *ctx, void *auth );
 
-extern int pubkey_null_init ( void *ctx, const struct asn1_cursor *key );
-extern size_t pubkey_null_max_len ( void *ctx );
-extern int pubkey_null_encrypt ( void *ctx, const void *plaintext,
-				 size_t plaintext_len, void *ciphertext );
-extern int pubkey_null_decrypt ( void *ctx, const void *ciphertext,
-				 size_t ciphertext_len, void *plaintext );
-extern int pubkey_null_sign ( void *ctx, struct digest_algorithm *digest,
+extern size_t pubkey_null_max_len ( const struct asn1_cursor *key );
+extern int pubkey_null_encrypt ( const struct asn1_cursor *key,
+				 const void *plaintext, size_t plaintext_len,
+				 void *ciphertext );
+extern int pubkey_null_decrypt ( const struct asn1_cursor *key,
+				 const void *ciphertext, size_t ciphertext_len,
+				 void *plaintext );
+extern int pubkey_null_sign ( const struct asn1_cursor *key,
+			      struct digest_algorithm *digest,
 			      const void *value, void *signature );
-extern int pubkey_null_verify ( void *ctx, struct digest_algorithm *digest,
+extern int pubkey_null_verify ( const struct asn1_cursor *key,
+				struct digest_algorithm *digest,
 				const void *value, const void *signature ,
 				size_t signature_len );
 

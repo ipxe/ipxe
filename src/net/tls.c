@@ -856,10 +856,6 @@ tls_find_cipher_suite ( unsigned int cipher_suite ) {
 static void tls_clear_cipher ( struct tls_connection *tls __unused,
 			       struct tls_cipherspec *cipherspec ) {
 
-	if ( cipherspec->suite ) {
-		pubkey_final ( cipherspec->suite->pubkey,
-			       cipherspec->pubkey_ctx );
-	}
 	free ( cipherspec->dynamic );
 	memset ( cipherspec, 0, sizeof ( *cipherspec ) );
 	cipherspec->suite = &tls_cipher_suite_null;
@@ -876,7 +872,6 @@ static void tls_clear_cipher ( struct tls_connection *tls __unused,
 static int tls_set_cipher ( struct tls_connection *tls,
 			    struct tls_cipherspec *cipherspec,
 			    struct tls_cipher_suite *suite ) {
-	struct pubkey_algorithm *pubkey = suite->pubkey;
 	struct cipher_algorithm *cipher = suite->cipher;
 	size_t total;
 	void *dynamic;
@@ -885,8 +880,7 @@ static int tls_set_cipher ( struct tls_connection *tls,
 	tls_clear_cipher ( tls, cipherspec );
 
 	/* Allocate dynamic storage */
-	total = ( pubkey->ctxsize + cipher->ctxsize + suite->mac_len +
-		  suite->fixed_iv_len );
+	total = ( cipher->ctxsize + suite->mac_len + suite->fixed_iv_len );
 	dynamic = zalloc ( total );
 	if ( ! dynamic ) {
 		DBGC ( tls, "TLS %p could not allocate %zd bytes for crypto "
@@ -896,7 +890,6 @@ static int tls_set_cipher ( struct tls_connection *tls,
 
 	/* Assign storage */
 	cipherspec->dynamic = dynamic;
-	cipherspec->pubkey_ctx = dynamic;	dynamic += pubkey->ctxsize;
 	cipherspec->cipher_ctx = dynamic;	dynamic += cipher->ctxsize;
 	cipherspec->mac_secret = dynamic;	dynamic += suite->mac_len;
 	cipherspec->fixed_iv = dynamic;		dynamic += suite->fixed_iv_len;
@@ -1392,7 +1385,7 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
-	size_t max_len = pubkey_max_len ( pubkey, cipherspec->pubkey_ctx );
+	size_t max_len = pubkey_max_len ( pubkey, &tls->server.key );
 	struct {
 		uint16_t version;
 		uint8_t random[46];
@@ -1419,8 +1412,8 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 
 	/* Encrypt pre-master secret using server's public key */
 	memset ( &key_xchg, 0, sizeof ( key_xchg ) );
-	len = pubkey_encrypt ( pubkey, cipherspec->pubkey_ctx,
-			       &pre_master_secret, sizeof ( pre_master_secret ),
+	len = pubkey_encrypt ( pubkey, &tls->server.key, &pre_master_secret,
+			       sizeof ( pre_master_secret ),
 			       key_xchg.encrypted_pre_master_secret );
 	if ( len < 0 ) {
 		rc = len;
@@ -1523,7 +1516,7 @@ static int tls_verify_dh_params ( struct tls_connection *tls,
 		digest_final ( digest, ctx, hash );
 
 		/* Verify signature */
-		if ( ( rc = pubkey_verify ( pubkey, cipherspec->pubkey_ctx,
+		if ( ( rc = pubkey_verify ( pubkey, &tls->server.key,
 					    digest, hash, signature,
 					    signature_len ) ) != 0 ) {
 			DBGC ( tls, "TLS %p ServerKeyExchange failed "
@@ -1820,19 +1813,11 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	struct pubkey_algorithm *pubkey = cert->signature_algorithm->pubkey;
 	struct asn1_cursor *key = privkey_cursor ( tls->client.key );
 	uint8_t digest_out[ digest->digestsize ];
-	uint8_t ctx[ pubkey->ctxsize ];
 	struct tls_signature_hash_algorithm *sig_hash = NULL;
 	int rc;
 
 	/* Generate digest to be signed */
 	tls_verify_handshake ( tls, digest_out );
-
-	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, ctx, key ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not initialise %s client private "
-		       "key: %s\n", tls, pubkey->name, strerror ( rc ) );
-		goto err_pubkey_init;
-	}
 
 	/* TLSv1.2 and later use explicit algorithm identifiers */
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
@@ -1848,7 +1833,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 
 	/* Generate and transmit record */
 	{
-		size_t max_len = pubkey_max_len ( pubkey, ctx );
+		size_t max_len = pubkey_max_len ( pubkey, key );
 		int use_sig_hash = ( ( sig_hash == NULL ) ? 0 : 1 );
 		struct {
 			uint32_t type_length;
@@ -1860,7 +1845,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 		int len;
 
 		/* Sign digest */
-		len = pubkey_sign ( pubkey, ctx, digest, digest_out,
+		len = pubkey_sign ( pubkey, key, digest, digest_out,
 				    certificate_verify.signature );
 		if ( len < 0 ) {
 			rc = len;
@@ -1893,8 +1878,6 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 
  err_pubkey_sign:
  err_sig_hash:
-	pubkey_final ( pubkey, ctx );
- err_pubkey_init:
 	return rc;
 }
 
@@ -2312,6 +2295,7 @@ static int tls_parse_chain ( struct tls_connection *tls,
 	int rc;
 
 	/* Free any existing certificate chain */
+	memset ( &tls->server.key, 0, sizeof ( tls->server.key ) );
 	x509_chain_put ( tls->server.chain );
 	tls->server.chain = NULL;
 
@@ -2371,6 +2355,7 @@ static int tls_parse_chain ( struct tls_connection *tls,
  err_parse:
  err_overlength:
  err_underlength:
+	memset ( &tls->server.key, 0, sizeof ( tls->server.key ) );
 	x509_chain_put ( tls->server.chain );
 	tls->server.chain = NULL;
  err_alloc_chain:
@@ -3555,8 +3540,6 @@ static struct interface_descriptor tls_cipherstream_desc =
  */
 static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	struct tls_session *session = tls->session;
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
-	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct x509_certificate *cert;
 
 	/* Mark validation as complete */
@@ -3584,13 +3567,9 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 		goto err;
 	}
 
-	/* Initialise public key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, cipherspec->pubkey_ctx,
-				  &cert->subject.public_key.raw ) ) != 0 ) {
-		DBGC ( tls, "TLS %p cannot initialise public key: %s\n",
-		       tls, strerror ( rc ) );
-		goto err;
-	}
+	/* Extract the now trusted server public key */
+	memcpy ( &tls->server.key, &cert->subject.public_key.raw,
+		 sizeof ( tls->server.key ) );
 
 	/* Schedule Client Key Exchange, Change Cipher, and Finished */
 	tls->tx.pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |

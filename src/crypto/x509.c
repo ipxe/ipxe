@@ -1125,7 +1125,6 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	struct pubkey_algorithm *pubkey = algorithm->pubkey;
 	uint8_t digest_ctx[ digest->ctxsize ];
 	uint8_t digest_out[ digest->digestsize ];
-	uint8_t pubkey_ctx[ pubkey->ctxsize ];
 	int rc;
 
 	/* Sanity check */
@@ -1149,14 +1148,8 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	}
 
 	/* Verify signature using signer's public key */
-	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx,
-				  &public_key->raw ) ) != 0 ) {
-		DBGC ( cert, "X509 %p \"%s\" cannot initialise public key: "
-		       "%s\n", cert, x509_name ( cert ), strerror ( rc ) );
-		goto err_pubkey_init;
-	}
-	if ( ( rc = pubkey_verify ( pubkey, pubkey_ctx, digest, digest_out,
-				    signature->value.data,
+	if ( ( rc = pubkey_verify ( pubkey, &public_key->raw, digest,
+				    digest_out, signature->value.data,
 				    signature->value.len ) ) != 0 ) {
 		DBGC ( cert, "X509 %p \"%s\" signature verification failed: "
 		       "%s\n", cert, x509_name ( cert ), strerror ( rc ) );
@@ -1167,8 +1160,6 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	rc = 0;
 
  err_pubkey_verify:
-	pubkey_final ( pubkey, pubkey_ctx );
- err_pubkey_init:
  err_mismatch:
 	return rc;
 }

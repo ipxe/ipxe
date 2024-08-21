@@ -50,77 +50,41 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 void pubkey_okx ( struct pubkey_test *test, const char *file,
 		  unsigned int line ) {
 	struct pubkey_algorithm *pubkey = test->pubkey;
-	uint8_t private_ctx[pubkey->ctxsize];
-	uint8_t public_ctx[pubkey->ctxsize];
-	size_t max_len;
-
-	/* Initialize contexts */
-	okx ( pubkey_init ( pubkey, private_ctx, &test->private ) == 0,
-	      file, line );
-	okx ( pubkey_init ( pubkey, public_ctx, &test->public ) == 0,
-	      file, line );
-	max_len = pubkey_max_len ( pubkey, private_ctx );
+	size_t max_len = pubkey_max_len ( pubkey, &test->private );
+	uint8_t encrypted[max_len];
+	uint8_t decrypted[max_len];
+	int encrypted_len;
+	int decrypted_len;
 
 	/* Test decrypting with private key to obtain known plaintext */
-	{
-		uint8_t decrypted[max_len];
-		int decrypted_len;
-
-		decrypted_len = pubkey_decrypt ( pubkey, private_ctx,
-						 test->ciphertext,
-						 test->ciphertext_len,
-						 decrypted );
-		okx ( decrypted_len == ( ( int ) test->plaintext_len ),
-		      file, line );
-		okx ( memcmp ( decrypted, test->plaintext,
-			       test->plaintext_len ) == 0, file, line );
-	}
+	decrypted_len = pubkey_decrypt ( pubkey, &test->private,
+					 test->ciphertext, test->ciphertext_len,
+					 decrypted );
+	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
+	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
+	      file, line );
 
 	/* Test encrypting with private key and decrypting with public key */
-	{
-		uint8_t encrypted[max_len];
-		uint8_t decrypted[max_len];
-		int encrypted_len;
-		int decrypted_len;
-
-		encrypted_len = pubkey_encrypt ( pubkey, private_ctx,
-						 test->plaintext,
-						 test->plaintext_len,
-						 encrypted );
-		okx ( encrypted_len >= 0, file, line );
-		decrypted_len = pubkey_decrypt ( pubkey, public_ctx,
-						 encrypted, encrypted_len,
-						 decrypted );
-		okx ( decrypted_len == ( ( int ) test->plaintext_len ),
-		      file, line );
-		okx ( memcmp ( decrypted, test->plaintext,
-			       test->plaintext_len ) == 0, file, line );
-	}
+	encrypted_len = pubkey_encrypt ( pubkey, &test->private,
+					 test->plaintext, test->plaintext_len,
+					 encrypted );
+	okx ( encrypted_len >= 0, file, line );
+	decrypted_len = pubkey_decrypt ( pubkey, &test->public, encrypted,
+					 encrypted_len, decrypted );
+	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
+	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
+	      file, line );
 
 	/* Test encrypting with public key and decrypting with private key */
-	{
-		uint8_t encrypted[max_len];
-		uint8_t decrypted[max_len];
-		int encrypted_len;
-		int decrypted_len;
-
-		encrypted_len = pubkey_encrypt ( pubkey, public_ctx,
-						 test->plaintext,
-						 test->plaintext_len,
-						 encrypted );
-		okx ( encrypted_len >= 0, file, line );
-		decrypted_len = pubkey_decrypt ( pubkey, private_ctx,
-						 encrypted, encrypted_len,
-						 decrypted );
-		okx ( decrypted_len == ( ( int ) test->plaintext_len ),
-		      file, line );
-		okx ( memcmp ( decrypted, test->plaintext,
-			       test->plaintext_len ) == 0, file, line );
-	}
-
-	/* Free contexts */
-	pubkey_final ( pubkey, public_ctx );
-	pubkey_final ( pubkey, private_ctx );
+	encrypted_len = pubkey_encrypt ( pubkey, &test->public,
+					 test->plaintext, test->plaintext_len,
+					 encrypted );
+	okx ( encrypted_len >= 0, file, line );
+	decrypted_len = pubkey_decrypt ( pubkey, &test->private, encrypted,
+					 encrypted_len, decrypted );
+	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
+	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
+	      file, line );
 }
 
 /**
@@ -134,18 +98,12 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 		       unsigned int line ) {
 	struct pubkey_algorithm *pubkey = test->pubkey;
 	struct digest_algorithm *digest = test->digest;
-	uint8_t private_ctx[pubkey->ctxsize];
-	uint8_t public_ctx[pubkey->ctxsize];
+	size_t max_len = pubkey_max_len ( pubkey, &test->private );
+	uint8_t bad[test->signature_len];
 	uint8_t digestctx[digest->ctxsize ];
 	uint8_t digestout[digest->digestsize];
-	size_t max_len;
-
-	/* Initialize contexts */
-	okx ( pubkey_init ( pubkey, private_ctx, &test->private ) == 0,
-	      file, line );
-	okx ( pubkey_init ( pubkey, public_ctx, &test->public ) == 0,
-	      file, line );
-	max_len = pubkey_max_len ( pubkey, private_ctx );
+	uint8_t signature[max_len];
+	int signature_len;
 
 	/* Construct digest over plaintext */
 	digest_init ( digest, digestctx );
@@ -154,34 +112,20 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 	digest_final ( digest, digestctx, digestout );
 
 	/* Test signing using private key */
-	{
-		uint8_t signature[max_len];
-		int signature_len;
-
-		signature_len = pubkey_sign ( pubkey, private_ctx, digest,
-					      digestout, signature );
-		okx ( signature_len == ( ( int ) test->signature_len ),
-		      file, line );
-		okx ( memcmp ( signature, test->signature,
-			       test->signature_len ) == 0, file, line );
-	}
+	signature_len = pubkey_sign ( pubkey, &test->private, digest,
+				      digestout, signature );
+	okx ( signature_len == ( ( int ) test->signature_len ), file, line );
+	okx ( memcmp ( signature, test->signature, test->signature_len ) == 0,
+	      file, line );
 
 	/* Test verification using public key */
-	okx ( pubkey_verify ( pubkey, public_ctx, digest, digestout,
+	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
 			      test->signature, test->signature_len ) == 0,
 	      file, line );
 
 	/* Test verification failure of modified signature */
-	{
-		uint8_t bad[test->signature_len];
-
-		memcpy ( bad, test->signature, test->signature_len );
-		bad[ test->signature_len / 2 ] ^= 0x40;
-		okx ( pubkey_verify ( pubkey, public_ctx, digest, digestout,
-				      bad, sizeof ( bad ) ) != 0, file, line );
-	}
-
-	/* Free contexts */
-	pubkey_final ( pubkey, public_ctx );
-	pubkey_final ( pubkey, private_ctx );
+	memcpy ( bad, test->signature, test->signature_len );
+	bad[ test->signature_len / 2 ] ^= 0x40;
+	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
+			      bad, sizeof ( bad ) ) != 0, file, line );
 }
