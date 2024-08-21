@@ -250,6 +250,14 @@ struct tls_cipherspec {
 	void *fixed_iv;
 };
 
+/** A TLS cipher specification pair */
+struct tls_cipherspec_pair {
+	/** Current cipher specification */
+	struct tls_cipherspec active;
+	/** Next cipher specification */
+	struct tls_cipherspec pending;
+};
+
 /** A TLS signature and hash algorithm identifier */
 struct tls_signature_hash_id {
 	/** Hash algorithm */
@@ -340,6 +348,36 @@ struct tls_session {
 	struct list_head conn;
 };
 
+/** TLS transmit state */
+struct tls_tx {
+	/** Cipher specifications */
+	struct tls_cipherspec_pair cipherspec;
+	/** Sequence number */
+	uint64_t seq;
+	/** Pending transmissions */
+	unsigned int pending;
+	/** Transmit process */
+	struct process process;
+};
+
+/** TLS receive state */
+struct tls_rx {
+	/** Cipher specifications */
+	struct tls_cipherspec_pair cipherspec;
+	/** Sequence number */
+	uint64_t seq;
+	/** State machine current state */
+	enum tls_rx_state state;
+	/** Current received record header */
+	struct tls_header header;
+	/** Current received record header (static I/O buffer) */
+	struct io_buffer iobuf;
+	/** List of received data buffers */
+	struct list_head data;
+	/** Received handshake fragment */
+	struct io_buffer *handshake;
+};
+
 /** A TLS connection */
 struct tls_connection {
 	/** Reference counter */
@@ -365,14 +403,6 @@ struct tls_connection {
 
 	/** Protocol version */
 	uint16_t version;
-	/** Current TX cipher specification */
-	struct tls_cipherspec tx_cipherspec;
-	/** Next TX cipher specification */
-	struct tls_cipherspec tx_cipherspec_pending;
-	/** Current RX cipher specification */
-	struct tls_cipherspec rx_cipherspec;
-	/** Next RX cipher specification */
-	struct tls_cipherspec rx_cipherspec_pending;
 	/** Master secret */
 	uint8_t master_secret[48];
 	/** Server random bytes */
@@ -410,25 +440,10 @@ struct tls_connection {
 	/** Certificate validation pending operation */
 	struct pending_operation validation;
 
-	/** TX sequence number */
-	uint64_t tx_seq;
-	/** TX pending transmissions */
-	unsigned int tx_pending;
-	/** TX process */
-	struct process process;
-
-	/** RX sequence number */
-	uint64_t rx_seq;
-	/** RX state */
-	enum tls_rx_state rx_state;
-	/** Current received record header */
-	struct tls_header rx_header;
-	/** Current received record header (static I/O buffer) */
-	struct io_buffer rx_header_iobuf;
-	/** List of received data buffers */
-	struct list_head rx_data;
-	/** Received handshake fragment */
-	struct io_buffer *rx_handshake;
+	/** Transmit state */
+	struct tls_tx tx;
+	/** Receive state */
+	struct tls_rx rx;
 };
 
 /** RX I/O buffer size

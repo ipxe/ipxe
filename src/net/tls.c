@@ -382,17 +382,17 @@ static void free_tls ( struct refcnt *refcnt ) {
 
 	/* Free dynamically-allocated resources */
 	free ( tls->new_session_ticket );
-	tls_clear_cipher ( tls, &tls->tx_cipherspec );
-	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
-	tls_clear_cipher ( tls, &tls->rx_cipherspec );
-	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
+	tls_clear_cipher ( tls, &tls->tx.cipherspec.active );
+	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
+	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
+	tls_clear_cipher ( tls, &tls->rx.cipherspec.pending );
 	free ( tls->server_key );
 	free ( tls->handshake_ctx );
-	list_for_each_entry_safe ( iobuf, tmp, &tls->rx_data, list ) {
+	list_for_each_entry_safe ( iobuf, tmp, &tls->rx.data, list ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
-	free_iob ( tls->rx_handshake );
+	free_iob ( tls->rx.handshake );
 	x509_chain_put ( tls->certs );
 	x509_chain_put ( tls->chain );
 	x509_root_put ( tls->root );
@@ -420,7 +420,7 @@ static void tls_close ( struct tls_connection *tls, int rc ) {
 	pending_put ( &tls->validation );
 
 	/* Remove process */
-	process_del ( &tls->process );
+	process_del ( &tls->tx.process );
 
 	/* Close all interfaces */
 	intf_shutdown ( &tls->cipherstream, rc );
@@ -662,8 +662,8 @@ static void tls_generate_master_secret ( struct tls_connection *tls,
  * The master secret must already be known.
  */
 static int tls_generate_keys ( struct tls_connection *tls ) {
-	struct tls_cipherspec *tx_cipherspec = &tls->tx_cipherspec_pending;
-	struct tls_cipherspec *rx_cipherspec = &tls->rx_cipherspec_pending;
+	struct tls_cipherspec *tx_cipherspec = &tls->tx.cipherspec.pending;
+	struct tls_cipherspec *rx_cipherspec = &tls->rx.cipherspec.pending;
 	size_t hash_size = tx_cipherspec->suite->mac_len;
 	size_t key_size = tx_cipherspec->suite->key_len;
 	size_t iv_size = tx_cipherspec->suite->fixed_iv_len;
@@ -936,10 +936,10 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		return rc;
 
 	/* Set ciphers */
-	if ( ( rc = tls_set_cipher ( tls, &tls->tx_cipherspec_pending,
+	if ( ( rc = tls_set_cipher ( tls, &tls->tx.cipherspec.pending,
 				     suite ) ) != 0 )
 		return rc;
-	if ( ( rc = tls_set_cipher ( tls, &tls->rx_cipherspec_pending,
+	if ( ( rc = tls_set_cipher ( tls, &tls->rx.cipherspec.pending,
 				     suite ) ) != 0 )
 		return rc;
 
@@ -955,22 +955,20 @@ static int tls_select_cipher ( struct tls_connection *tls,
  * Activate next cipher suite
  *
  * @v tls		TLS connection
- * @v pending		Pending cipher specification
- * @v active		Active cipher specification to replace
+ * @v pair		Cipher specification pair
  * @ret rc		Return status code
  */
 static int tls_change_cipher ( struct tls_connection *tls,
-			       struct tls_cipherspec *pending,
-			       struct tls_cipherspec *active ) {
+			       struct tls_cipherspec_pair *pair ) {
 
 	/* Sanity check */
-	if ( pending->suite == &tls_cipher_suite_null ) {
+	if ( pair->pending.suite == &tls_cipher_suite_null ) {
 		DBGC ( tls, "TLS %p refusing to use null cipher\n", tls );
 		return -ENOTSUP_NULL;
 	}
 
-	tls_clear_cipher ( tls, active );
-	memswap ( active, pending, sizeof ( *active ) );
+	tls_clear_cipher ( tls, &pair->active );
+	memswap ( &pair->active, &pair->pending, sizeof ( pair->active ) );
 	return 0;
 }
 
@@ -1088,7 +1086,7 @@ tls_find_named_curve ( unsigned int named_curve ) {
  * @v tls		TLS connection
  */
 static void tls_tx_resume ( struct tls_connection *tls ) {
-	process_add ( &tls->process );
+	process_add ( &tls->tx.process );
 }
 
 /**
@@ -1111,13 +1109,13 @@ static void tls_tx_resume_all ( struct tls_session *session ) {
 static void tls_restart ( struct tls_connection *tls ) {
 
 	/* Sanity check */
-	assert ( ! tls->tx_pending );
+	assert ( ! tls->tx.pending );
 	assert ( ! is_pending ( &tls->client_negotiation ) );
 	assert ( ! is_pending ( &tls->server_negotiation ) );
 	assert ( ! is_pending ( &tls->validation ) );
 
 	/* (Re)start negotiation */
-	tls->tx_pending = TLS_TX_CLIENT_HELLO;
+	tls->tx.pending = TLS_TX_CLIENT_HELLO;
 	tls_tx_resume ( tls );
 	pending_get ( &tls->client_negotiation );
 	pending_get ( &tls->server_negotiation );
@@ -1392,7 +1390,7 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
-	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	size_t max_len = pubkey_max_len ( pubkey, cipherspec->pubkey_ctx );
 	struct {
@@ -1458,7 +1456,7 @@ struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
  */
 static int tls_verify_dh_params ( struct tls_connection *tls,
 				  size_t param_len ) {
-	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct pubkey_algorithm *pubkey;
 	struct digest_algorithm *digest;
 	int use_sig_hash = tls_version ( tls, TLS_VERSION_TLS_1_2 );
@@ -1783,7 +1781,7 @@ struct tls_key_exchange_algorithm tls_ecdhe_exchange_algorithm = {
  * @ret rc		Return status code
  */
 static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
-	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	int rc;
 
@@ -1976,13 +1974,12 @@ static int tls_new_change_cipher ( struct tls_connection *tls,
 	iob_pull ( iobuf, sizeof ( *change_cipher ) );
 
 	/* Change receive cipher spec */
-	if ( ( rc = tls_change_cipher ( tls, &tls->rx_cipherspec_pending,
-					&tls->rx_cipherspec ) ) != 0 ) {
+	if ( ( rc = tls_change_cipher ( tls, &tls->rx.cipherspec ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not activate RX cipher: %s\n",
 		       tls, strerror ( rc ) );
 		return rc;
 	}
-	tls->rx_seq = ~( ( uint64_t ) 0 );
+	tls->rx.seq = ~( ( uint64_t ) 0 );
 
 	return 0;
 }
@@ -2587,7 +2584,7 @@ static int tls_new_finished ( struct tls_connection *tls,
 	 * transmission of Change Cipher and Finished.
 	 */
 	if ( is_pending ( &tls->client_negotiation ) ) {
-		tls->tx_pending |= ( TLS_TX_CHANGE_CIPHER | TLS_TX_FINISHED );
+		tls->tx.pending |= ( TLS_TX_CHANGE_CIPHER | TLS_TX_FINISHED );
 		tls_tx_resume ( tls );
 	}
 
@@ -2788,7 +2785,7 @@ static int tls_new_record ( struct tls_connection *tls, unsigned int type,
 		break;
 	case TLS_TYPE_HANDSHAKE:
 		handler = tls_new_handshake;
-		iobuf = &tls->rx_handshake;
+		iobuf = &tls->rx.handshake;
 		break;
 	default:
 		DBGC ( tls, "TLS %p unknown record type %d\n", tls, type );
@@ -2935,7 +2932,7 @@ static void tls_hmac_list ( struct tls_cipherspec *cipherspec,
  */
 static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len ) {
-	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec;
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct cipher_algorithm *cipher = suite->cipher;
 	struct digest_algorithm *digest = suite->digest;
@@ -2962,7 +2959,7 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	}
 
 	/* Construct authentication data */
-	authhdr.seq = cpu_to_be64 ( tls->tx_seq );
+	authhdr.seq = cpu_to_be64 ( tls->tx.seq );
 	authhdr.header.type = type;
 	authhdr.header.version = htons ( tls->version );
 	authhdr.header.length = htons ( len );
@@ -3046,7 +3043,7 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	}
 
 	/* Update TX state machine to next record */
-	tls->tx_seq += 1;
+	tls->tx.seq += 1;
 
 	assert ( plaintext == NULL );
 	assert ( ciphertext == NULL );
@@ -3107,7 +3104,7 @@ static int tls_verify_padding ( struct tls_connection *tls,
 static int tls_new_ciphertext ( struct tls_connection *tls,
 				struct tls_header *tlshdr,
 				struct list_head *rx_data ) {
-	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
+	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec.active;
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct cipher_algorithm *cipher = suite->cipher;
 	struct digest_algorithm *digest = suite->digest;
@@ -3156,7 +3153,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	auth = last->tail;
 
 	/* Construct authentication data */
-	authhdr.seq = cpu_to_be64 ( tls->rx_seq );
+	authhdr.seq = cpu_to_be64 ( tls->rx.seq );
 	authhdr.header.type = tlshdr->type;
 	authhdr.header.version = tlshdr->version;
 	authhdr.header.length = htons ( len );
@@ -3172,7 +3169,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 
 	/* Decrypt the received data */
 	check_len = 0;
-	list_for_each_entry ( iobuf, &tls->rx_data, list ) {
+	list_for_each_entry ( iobuf, &tls->rx.data, list ) {
 		cipher_decrypt ( cipher, cipherspec->cipher_ctx,
 				 iobuf->data, iobuf->data, iob_len ( iobuf ) );
 		check_len += iob_len ( iobuf );
@@ -3334,10 +3331,10 @@ static struct interface_descriptor tls_plainstream_desc =
  * @ret rc		Returned status code
  */
 static int tls_newdata_process_header ( struct tls_connection *tls ) {
-	struct tls_cipherspec *cipherspec = &tls->rx_cipherspec;
+	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec.active;
 	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
 	size_t iv_len = cipherspec->suite->record_iv_len;
-	size_t data_len = ntohs ( tls->rx_header.length );
+	size_t data_len = ntohs ( tls->rx.header.length );
 	size_t remaining = data_len;
 	size_t frag_len;
 	size_t reserve;
@@ -3353,7 +3350,7 @@ static int tls_newdata_process_header ( struct tls_connection *tls ) {
 	remaining += reserve;
 
 	/* Allocate data buffers now that we know the length */
-	assert ( list_empty ( &tls->rx_data ) );
+	assert ( list_empty ( &tls->rx.data ) );
 	while ( remaining ) {
 
 		/* Calculate fragment length.  Ensure that no block is
@@ -3394,16 +3391,16 @@ static int tls_newdata_process_header ( struct tls_connection *tls ) {
 		reserve = 0;
 
 		/* Add I/O buffer to list */
-		list_add_tail ( &iobuf->list, &tls->rx_data );
+		list_add_tail ( &iobuf->list, &tls->rx.data );
 	}
 
 	/* Move to data state */
-	tls->rx_state = TLS_RX_DATA;
+	tls->rx.state = TLS_RX_DATA;
 
 	return 0;
 
  err:
-	list_for_each_entry_safe ( iobuf, tmp, &tls->rx_data, list ) {
+	list_for_each_entry_safe ( iobuf, tmp, &tls->rx.data, list ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
 	}
@@ -3421,27 +3418,27 @@ static int tls_newdata_process_data ( struct tls_connection *tls ) {
 	int rc;
 
 	/* Move current buffer to end of list */
-	iobuf = list_first_entry ( &tls->rx_data, struct io_buffer, list );
+	iobuf = list_first_entry ( &tls->rx.data, struct io_buffer, list );
 	list_del ( &iobuf->list );
-	list_add_tail ( &iobuf->list, &tls->rx_data );
+	list_add_tail ( &iobuf->list, &tls->rx.data );
 
 	/* Continue receiving data if any space remains */
-	iobuf = list_first_entry ( &tls->rx_data, struct io_buffer, list );
+	iobuf = list_first_entry ( &tls->rx.data, struct io_buffer, list );
 	if ( iob_tailroom ( iobuf ) )
 		return 0;
 
 	/* Process record */
-	if ( ( rc = tls_new_ciphertext ( tls, &tls->rx_header,
-					 &tls->rx_data ) ) != 0 )
+	if ( ( rc = tls_new_ciphertext ( tls, &tls->rx.header,
+					 &tls->rx.data ) ) != 0 )
 		return rc;
 
 	/* Increment RX sequence number */
-	tls->rx_seq += 1;
+	tls->rx.seq += 1;
 
 	/* Return to header state */
-	assert ( list_empty ( &tls->rx_data ) );
-	tls->rx_state = TLS_RX_HEADER;
-	iob_unput ( &tls->rx_header_iobuf, sizeof ( tls->rx_header ) );
+	assert ( list_empty ( &tls->rx.data ) );
+	tls->rx.state = TLS_RX_HEADER;
+	iob_unput ( &tls->rx.iobuf, sizeof ( tls->rx.header ) );
 
 	return 0;
 }
@@ -3480,13 +3477,13 @@ static int tls_cipherstream_deliver ( struct tls_connection *tls,
 	while ( iob_len ( iobuf ) ) {
 
 		/* Select buffer according to current state */
-		switch ( tls->rx_state ) {
+		switch ( tls->rx.state ) {
 		case TLS_RX_HEADER:
-			dest = &tls->rx_header_iobuf;
+			dest = &tls->rx.iobuf;
 			process = tls_newdata_process_header;
 			break;
 		case TLS_RX_DATA:
-			dest = list_first_entry ( &tls->rx_data,
+			dest = list_first_entry ( &tls->rx.data,
 						  struct io_buffer, list );
 			assert ( dest != NULL );
 			process = tls_newdata_process_data;
@@ -3550,7 +3547,7 @@ static struct interface_descriptor tls_cipherstream_desc =
  */
 static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	struct tls_session *session = tls->session;
-	struct tls_cipherspec *cipherspec = &tls->tx_cipherspec_pending;
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct x509_certificate *cert;
 
@@ -3588,11 +3585,11 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	}
 
 	/* Schedule Client Key Exchange, Change Cipher, and Finished */
-	tls->tx_pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
+	tls->tx.pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
 			     TLS_TX_CHANGE_CIPHER |
 			     TLS_TX_FINISHED );
 	if ( tls->certs ) {
-		tls->tx_pending |= ( TLS_TX_CERTIFICATE |
+		tls->tx.pending |= ( TLS_TX_CERTIFICATE |
 				     TLS_TX_CERTIFICATE_VERIFY );
 	}
 	tls_tx_resume ( tls );
@@ -3635,7 +3632,7 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 		return;
 
 	/* Send first pending transmission */
-	if ( tls->tx_pending & TLS_TX_CLIENT_HELLO ) {
+	if ( tls->tx.pending & TLS_TX_CLIENT_HELLO ) {
 		/* Serialise server negotiations within a session, to
 		 * provide a consistent view of session IDs and
 		 * session tickets.
@@ -3668,32 +3665,32 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 			       tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_pending &= ~TLS_TX_CLIENT_HELLO;
-	} else if ( tls->tx_pending & TLS_TX_CERTIFICATE ) {
+		tls->tx.pending &= ~TLS_TX_CLIENT_HELLO;
+	} else if ( tls->tx.pending & TLS_TX_CERTIFICATE ) {
 		/* Send Certificate */
 		if ( ( rc = tls_send_certificate ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p cold not send Certificate: %s\n",
 			       tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_pending &= ~TLS_TX_CERTIFICATE;
-	} else if ( tls->tx_pending & TLS_TX_CLIENT_KEY_EXCHANGE ) {
+		tls->tx.pending &= ~TLS_TX_CERTIFICATE;
+	} else if ( tls->tx.pending & TLS_TX_CLIENT_KEY_EXCHANGE ) {
 		/* Send Client Key Exchange */
 		if ( ( rc = tls_send_client_key_exchange ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Client Key "
 			       "Exchange: %s\n", tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_pending &= ~TLS_TX_CLIENT_KEY_EXCHANGE;
-	} else if ( tls->tx_pending & TLS_TX_CERTIFICATE_VERIFY ) {
+		tls->tx.pending &= ~TLS_TX_CLIENT_KEY_EXCHANGE;
+	} else if ( tls->tx.pending & TLS_TX_CERTIFICATE_VERIFY ) {
 		/* Send Certificate Verify */
 		if ( ( rc = tls_send_certificate_verify ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Certificate "
 			       "Verify: %s\n", tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_pending &= ~TLS_TX_CERTIFICATE_VERIFY;
-	} else if ( tls->tx_pending & TLS_TX_CHANGE_CIPHER ) {
+		tls->tx.pending &= ~TLS_TX_CERTIFICATE_VERIFY;
+	} else if ( tls->tx.pending & TLS_TX_CHANGE_CIPHER ) {
 		/* Send Change Cipher, and then change the cipher in use */
 		if ( ( rc = tls_send_change_cipher ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Change Cipher: "
@@ -3701,28 +3698,27 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 			goto err;
 		}
 		if ( ( rc = tls_change_cipher ( tls,
-						&tls->tx_cipherspec_pending,
-						&tls->tx_cipherspec )) != 0 ){
+						&tls->tx.cipherspec ) ) != 0 ){
 			DBGC ( tls, "TLS %p could not activate TX cipher: "
 			       "%s\n", tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_seq = 0;
-		tls->tx_pending &= ~TLS_TX_CHANGE_CIPHER;
-	} else if ( tls->tx_pending & TLS_TX_FINISHED ) {
+		tls->tx.seq = 0;
+		tls->tx.pending &= ~TLS_TX_CHANGE_CIPHER;
+	} else if ( tls->tx.pending & TLS_TX_FINISHED ) {
 		/* Send Finished */
 		if ( ( rc = tls_send_finished ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Finished: %s\n",
 			       tls, strerror ( rc ) );
 			goto err;
 		}
-		tls->tx_pending &= ~TLS_TX_FINISHED;
+		tls->tx.pending &= ~TLS_TX_FINISHED;
 	}
 
 	/* Reschedule process if pending transmissions remain,
 	 * otherwise send notification of a window change.
 	 */
-	if ( tls->tx_pending ) {
+	if ( tls->tx.pending ) {
 		tls_tx_resume ( tls );
 	} else {
 		xfer_window_changed ( &tls->plainstream );
@@ -3736,7 +3732,7 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 
 /** TLS TX process descriptor */
 static struct process_descriptor tls_process_desc =
-	PROC_DESC_ONCE ( struct tls_connection, process, tls_tx_step );
+	PROC_DESC_ONCE ( struct tls_connection, tx.process, tls_tx_step );
 
 /******************************************************************************
  *
@@ -3829,20 +3825,20 @@ int add_tls ( struct interface *xfer, const char *name,
 	intf_init ( &tls->plainstream, &tls_plainstream_desc, &tls->refcnt );
 	intf_init ( &tls->cipherstream, &tls_cipherstream_desc, &tls->refcnt );
 	intf_init ( &tls->validator, &tls_validator_desc, &tls->refcnt );
-	process_init_stopped ( &tls->process, &tls_process_desc,
+	process_init_stopped ( &tls->tx.process, &tls_process_desc,
 			       &tls->refcnt );
 	tls->key = privkey_get ( key ? key : &private_key );
 	tls->root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_MAX;
-	tls_clear_cipher ( tls, &tls->tx_cipherspec );
-	tls_clear_cipher ( tls, &tls->tx_cipherspec_pending );
-	tls_clear_cipher ( tls, &tls->rx_cipherspec );
-	tls_clear_cipher ( tls, &tls->rx_cipherspec_pending );
+	tls_clear_cipher ( tls, &tls->tx.cipherspec.active );
+	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
+	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
+	tls_clear_cipher ( tls, &tls->rx.cipherspec.pending );
 	tls_clear_handshake ( tls );
 	tls->client_random.gmt_unix_time = time ( NULL );
-	iob_populate ( &tls->rx_header_iobuf, &tls->rx_header, 0,
-		       sizeof ( tls->rx_header ) );
-	INIT_LIST_HEAD ( &tls->rx_data );
+	iob_populate ( &tls->rx.iobuf, &tls->rx.header, 0,
+		       sizeof ( tls->rx.header ) );
+	INIT_LIST_HEAD ( &tls->rx.data );
 	if ( ( rc = tls_generate_random ( tls, &tls->client_random.random,
 			  ( sizeof ( tls->client_random.random ) ) ) ) != 0 ) {
 		goto err_random;
