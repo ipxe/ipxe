@@ -378,6 +378,38 @@ struct tls_rx {
 	struct io_buffer *handshake;
 };
 
+/** TLS client state */
+struct tls_client {
+	/** Random bytes */
+	struct tls_client_random random;
+	/** Private key (if used) */
+	struct private_key *key;
+	/** Certificate chain (if used) */
+	struct x509_chain *chain;
+	/** Security negotiation pending operation */
+	struct pending_operation negotiation;
+};
+
+/** TLS server state */
+struct tls_server {
+	/** Random bytes */
+	uint8_t random[32];
+	/** Server Key Exchange record (if any) */
+	void *exchange;
+	/** Server Key Exchange record length */
+	size_t exchange_len;
+	/** Root of trust */
+	struct x509_root *root;
+	/** Certificate chain */
+	struct x509_chain *chain;
+	/** Certificate validator */
+	struct interface validator;
+	/** Certificate validation pending operation */
+	struct pending_operation validation;
+	/** Security negotiation pending operation */
+	struct pending_operation negotiation;
+};
+
 /** A TLS connection */
 struct tls_connection {
 	/** Reference counter */
@@ -405,45 +437,23 @@ struct tls_connection {
 	uint16_t version;
 	/** Master secret */
 	uint8_t master_secret[48];
-	/** Server random bytes */
-	uint8_t server_random[32];
-	/** Client random bytes */
-	struct tls_client_random client_random;
-	/** Server Key Exchange record (if any) */
-	void *server_key;
-	/** Server Key Exchange record length */
-	size_t server_key_len;
 	/** Digest algorithm used for handshake verification */
 	struct digest_algorithm *handshake_digest;
 	/** Digest algorithm context used for handshake verification */
 	uint8_t *handshake_ctx;
-	/** Private key */
-	struct private_key *key;
-	/** Client certificate chain (if used) */
-	struct x509_chain *certs;
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
 	/** Verification data */
 	struct tls_verify_data verify;
 
-	/** Root of trust */
-	struct x509_root *root;
-	/** Server certificate chain */
-	struct x509_chain *chain;
-	/** Certificate validator */
-	struct interface validator;
-
-	/** Client security negotiation pending operation */
-	struct pending_operation client_negotiation;
-	/** Server security negotiation pending operation */
-	struct pending_operation server_negotiation;
-	/** Certificate validation pending operation */
-	struct pending_operation validation;
-
 	/** Transmit state */
 	struct tls_tx tx;
 	/** Receive state */
 	struct tls_rx rx;
+	/** Client state */
+	struct tls_client client;
+	/** Server state */
+	struct tls_server server;
 };
 
 /** RX I/O buffer size
