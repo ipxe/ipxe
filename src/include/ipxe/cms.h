@@ -64,6 +64,13 @@ struct cms_message {
 	struct x509_chain *certificates;
 	/** List of participant information blocks */
 	struct list_head participants;
+
+	/** Cipher algorithm */
+	struct cipher_algorithm *cipher;
+	/** Cipher initialization vector */
+	struct asn1_cursor iv;
+	/** Cipher authentication tag */
+	struct asn1_cursor mac;
 };
 
 /**
@@ -101,9 +108,24 @@ cms_is_signature ( struct cms_message *cms ) {
 	return ( cms->certificates != NULL );
 }
 
+/**
+ * Check if CMS message is an encrypted message
+ *
+ * @v cms		CMS message
+ * @ret is_encrypted	Message is an encrypted message
+ */
+static inline __attribute__ (( always_inline )) int
+cms_is_encrypted ( struct cms_message *cms ) {
+
+	/* CMS encrypted messages have a cipher algorithm */
+	return ( cms->cipher != NULL );
+}
+
 extern int cms_message ( struct image *image, struct cms_message **cms );
 extern int cms_verify ( struct cms_message *cms, struct image *image,
 			const char *name, time_t time, struct x509_chain *store,
 			struct x509_root *root );
+extern int cms_decrypt ( struct cms_message *cms, struct image *image,
+			 const char *name, struct private_key *private_key );
 
 #endif /* _IPXE_CMS_H */
