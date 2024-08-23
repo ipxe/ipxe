@@ -48,15 +48,15 @@ struct cms_participant {
 	struct pubkey_algorithm *pubkey;
 
 	/** Signature or key value */
-	void *value;
-	/** Length of signature or key value */
-	size_t len;
+	struct asn1_cursor value;
 };
 
 /** A CMS message */
 struct cms_message {
 	/** Reference count */
 	struct refcnt refcnt;
+	/** Raw ASN.1 data */
+	struct asn1_cursor *raw;
 	/** Message type */
 	struct cms_type *type;
 

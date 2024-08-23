@@ -293,26 +293,18 @@ static int cms_parse_pubkey_algorithm ( struct cms_message *cms,
 static int cms_parse_value ( struct cms_message *cms,
 			     struct cms_participant *part,
 			     const struct asn1_cursor *raw ) {
-	struct asn1_cursor cursor;
 	int rc;
 
 	/* Enter signature */
-	memcpy ( &cursor, raw, sizeof ( cursor ) );
-	if ( ( rc = asn1_enter ( &cursor, ASN1_OCTET_STRING ) ) != 0 ) {
+	memcpy ( &part->value, raw, sizeof ( part->value ) );
+	if ( ( rc = asn1_enter ( &part->value, ASN1_OCTET_STRING ) ) != 0 ) {
 		DBGC ( cms, "CMS %p/%p could not locate value:\n",
 		       cms, part );
 		DBGC_HDA ( cms, 0, raw->data, raw->len );
 		return rc;
 	}
-
-	/* Record signature */
-	part->len = cursor.len;
-	part->value = malloc ( part->len );
-	if ( ! part->value )
-		return -ENOMEM;
-	memcpy ( part->value, cursor.data, part->len );
 	DBGC ( cms, "CMS %p/%p value is:\n", cms, part );
-	DBGC_HDA ( cms, 0, part->value, part->len );
+	DBGC_HDA ( cms, 0, part->value.data, part->value.len );
 
 	return 0;
 }
@@ -456,16 +448,14 @@ static int cms_parse_signed ( struct cms_message *cms,
  * Parse CMS message from ASN.1 data
  *
  * @v cms		CMS message
- * @v raw		ASN.1 cursor
  * @ret rc		Return status code
  */
-static int cms_parse ( struct cms_message *cms,
-		       const struct asn1_cursor *raw ) {
+static int cms_parse ( struct cms_message *cms ) {
 	struct asn1_cursor cursor;
 	int rc;
 
 	/* Enter contentInfo */
-	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	memcpy ( &cursor, cms->raw, sizeof ( cursor ) );
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Parse contentType */
@@ -497,10 +487,10 @@ static void cms_free ( struct refcnt *refcnt ) {
 	list_for_each_entry_safe ( part, tmp, &cms->participants, list ) {
 		list_del ( &part->list );
 		x509_chain_put ( part->chain );
-		free ( part->value );
 		free ( part );
 	}
 	x509_chain_put ( cms->certificates );
+	free ( cms->raw );
 	free ( cms );
 }
 
@@ -515,7 +505,6 @@ static void cms_free ( struct refcnt *refcnt ) {
  * is responsible for ultimately calling cms_put().
  */
 int cms_message ( struct image *image, struct cms_message **cms ) {
-	struct asn1_cursor *raw;
 	int next;
 	int rc;
 
@@ -529,7 +518,7 @@ int cms_message ( struct image *image, struct cms_message **cms ) {
 	INIT_LIST_HEAD ( &(*cms)->participants );
 
 	/* Get raw message data */
-	next = image_asn1 ( image, 0, &raw );
+	next = image_asn1 ( image, 0, &(*cms)->raw );
 	if ( next < 0 ) {
 		rc = next;
 		DBGC ( *cms, "CMS %p could not get raw ASN.1 data: %s\n",
@@ -538,19 +527,15 @@ int cms_message ( struct image *image, struct cms_message **cms ) {
 	}
 
 	/* Use only first message in image */
-	asn1_shrink_any ( raw );
+	asn1_shrink_any ( (*cms)->raw );
 
 	/* Parse message */
-	if ( ( rc = cms_parse ( *cms, raw ) ) != 0 )
+	if ( ( rc = cms_parse ( *cms ) ) != 0 )
 		goto err_parse;
-
-	/* Free raw message data */
-	free ( raw );
 
 	return 0;
 
  err_parse:
-	free ( raw );
  err_asn1:
 	cms_put ( *cms );
  err_alloc:
@@ -612,7 +597,8 @@ static int cms_verify_digest ( struct cms_message *cms,
 			       userptr_t data, size_t len ) {
 	struct digest_algorithm *digest = part->digest;
 	struct pubkey_algorithm *pubkey = part->pubkey;
-	struct asn1_cursor *key = &cert->subject.public_key.raw;
+	const struct asn1_cursor *key = &cert->subject.public_key.raw;
+	const struct asn1_cursor *value = &part->value;
 	uint8_t digest_out[ digest->digestsize ];
 	int rc;
 
@@ -621,7 +607,7 @@ static int cms_verify_digest ( struct cms_message *cms,
 
 	/* Verify digest */
 	if ( ( rc = pubkey_verify ( pubkey, key, digest, digest_out,
-				    part->value, part->len ) ) != 0 ) {
+				    value->data, value->len ) ) != 0 ) {
 		DBGC ( cms, "CMS %p/%p signature verification failed: %s\n",
 		       cms, part, strerror ( rc ) );
 		return rc;
