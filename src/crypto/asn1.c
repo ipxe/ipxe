@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <time.h>
 #include <ipxe/tables.h>
 #include <ipxe/image.h>
+#include <ipxe/crypto.h>
 #include <ipxe/asn1.h>
 
 /** @file
@@ -509,18 +510,26 @@ asn1_find_algorithm ( const struct asn1_cursor *cursor ) {
  *
  * @v cursor		ASN.1 object cursor
  * @ret algorithm	Algorithm
+ * @ret params		Algorithm parameters, or NULL
  * @ret rc		Return status code
  */
 int asn1_algorithm ( const struct asn1_cursor *cursor,
-		     struct asn1_algorithm **algorithm ) {
+		     struct asn1_algorithm **algorithm,
+		     struct asn1_cursor *params ) {
 	struct asn1_cursor contents;
 	int rc;
 
-	/* Enter signatureAlgorithm */
+	/* Enter algorithm */
 	memcpy ( &contents, cursor, sizeof ( contents ) );
 	asn1_enter ( &contents, ASN1_SEQUENCE );
 
-	/* Enter algorithm */
+	/* Get raw parameters, if applicable */
+	if ( params ) {
+		memcpy ( params, &contents, sizeof ( *params ) );
+		asn1_skip_any ( params );
+	}
+
+	/* Enter algorithm identifier */
 	if ( ( rc = asn1_enter ( &contents, ASN1_OID ) ) != 0 ) {
 		DBGC ( cursor, "ASN1 %p cannot locate algorithm OID:\n",
 		       cursor );
@@ -534,6 +543,14 @@ int asn1_algorithm ( const struct asn1_cursor *cursor,
 		DBGC ( cursor, "ASN1 %p unrecognised algorithm:\n", cursor );
 		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
 		return -ENOTSUP_ALGORITHM;
+	}
+
+	/* Parse parameters, if applicable */
+	if ( params && (*algorithm)->parse &&
+	     ( ( rc = (*algorithm)->parse ( *algorithm, params ) ) != 0 ) ) {
+		DBGC ( cursor, "ASN1 %p cannot parse %s parameters: %s\n",
+		       cursor, (*algorithm)->name, strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;
@@ -551,7 +568,7 @@ int asn1_pubkey_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm has a public key */
@@ -577,7 +594,7 @@ int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm has a digest */
@@ -596,14 +613,16 @@ int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
  *
  * @v cursor		ASN.1 object cursor
  * @ret algorithm	Algorithm
+ * @ret params		Algorithm parameters, or NULL
  * @ret rc		Return status code
  */
 int asn1_cipher_algorithm ( const struct asn1_cursor *cursor,
-			    struct asn1_algorithm **algorithm ) {
+			    struct asn1_algorithm **algorithm,
+			    struct asn1_cursor *params ) {
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, params ) ) != 0 )
 		return rc;
 
 	/* Check algorithm has a cipher */
@@ -629,7 +648,7 @@ int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm has a public key */
@@ -664,7 +683,7 @@ int asn1_check_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, &actual ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, &actual, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm matches */
@@ -675,6 +694,47 @@ int asn1_check_algorithm ( const struct asn1_cursor *cursor,
 	}
 
 	return 0;
+}
+
+/**
+ * Parse ASN.1 CBC cipher parameters
+ *
+ * @v algorithm		Algorithm
+ * @v param		Parameters to parse
+ * @ret rc		Return status code
+ */
+int asn1_parse_cbc ( struct asn1_algorithm *algorithm,
+		     struct asn1_cursor *params ) {
+	struct cipher_algorithm *cipher = algorithm->cipher;
+
+	/* Sanity check */
+	assert ( cipher != NULL );
+
+	/* Enter parameters */
+	asn1_enter ( params, ASN1_OCTET_STRING );
+
+	/* Check length */
+	if ( params->len != cipher->blocksize )
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * Parse ASN.1 GCM cipher parameters
+ *
+ * @v algorithm		Algorithm
+ * @v param		Parameters to parse
+ * @ret rc		Return status code
+ */
+int asn1_parse_gcm ( struct asn1_algorithm *algorithm __unused,
+		     struct asn1_cursor *params ) {
+
+	/* Enter parameters */
+	asn1_enter ( params, ASN1_SEQUENCE );
+
+	/* Enter nonce */
+	return asn1_enter ( params, ASN1_OCTET_STRING );
 }
 
 /**

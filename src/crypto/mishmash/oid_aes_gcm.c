@@ -40,6 +40,7 @@ struct asn1_algorithm aes_128_gcm_algorithm __asn1_algorithm = {
 	.name = "aes128-gcm",
 	.cipher = &aes_gcm_algorithm,
 	.oid = ASN1_CURSOR ( oid_aes_128_gcm ),
+	.parse = asn1_parse_gcm,
 };
 
 /** "aes192-gcm" OID-identified algorithm */
@@ -47,6 +48,7 @@ struct asn1_algorithm aes_192_gcm_algorithm __asn1_algorithm = {
 	.name = "aes192-gcm",
 	.cipher = &aes_gcm_algorithm,
 	.oid = ASN1_CURSOR ( oid_aes_192_gcm ),
+	.parse = asn1_parse_gcm,
 };
 
 /** "aes256-gcm" OID-identified algorithm */
@@ -54,4 +56,5 @@ struct asn1_algorithm aes_256_gcm_algorithm __asn1_algorithm = {
 	.name = "aes256-gcm",
 	.cipher = &aes_gcm_algorithm,
 	.oid = ASN1_CURSOR ( oid_aes_256_gcm ),
+	.parse = asn1_parse_gcm,
 };

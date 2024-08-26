@@ -40,6 +40,7 @@ struct asn1_algorithm aes_128_cbc_algorithm __asn1_algorithm = {
 	.name = "aes128-cbc",
 	.cipher = &aes_cbc_algorithm,
 	.oid = ASN1_CURSOR ( oid_aes_128_cbc ),
+	.parse = asn1_parse_cbc,
 };
 
 /** "aes192-cbc" OID-identified algorithm */
@@ -47,6 +48,7 @@ struct asn1_algorithm aes_192_cbc_algorithm __asn1_algorithm = {
 	.name = "aes192-cbc",
 	.cipher = &aes_cbc_algorithm,
 	.oid = ASN1_CURSOR ( oid_aes_192_cbc ),
+	.parse = asn1_parse_cbc,
 };
 
 /** "aes256-cbc" OID-identified algorithm */
@@ -54,4 +56,5 @@ struct asn1_algorithm aes_256_cbc_algorithm __asn1_algorithm = {
 	.name = "aes256-cbc",
 	.cipher = &aes_cbc_algorithm,
 	.oid = ASN1_CURSOR ( oid_aes_256_cbc ),
+	.parse = asn1_parse_cbc,
 };
