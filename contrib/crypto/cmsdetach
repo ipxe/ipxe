@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+"""Detach CMS encrypted data.
+
+Detach encrypted data from a CMS envelopedData or authEnvelopedData
+message into a separate file.
+"""
+
+import argparse
+
+import asn1
+
+# Parse command-line arguments
+#
+parser = argparse.ArgumentParser(
+    description=__doc__,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
+parser.add_argument("-d", "--data", metavar="FILE",
+                    help="Write detached data (without envelope) to FILE")
+parser.add_argument("-e", "--envelope", metavar="FILE",
+                    help="Write envelope (without data) to FILE")
+parser.add_argument("-o", "--overwrite", action="store_true",
+                    help="Overwrite output files")
+parser.add_argument("file", help="Input envelope file")
+args = parser.parse_args()
+if args.data is None and args.envelope is None:
+    parser.error("at least one of --data and --envelope is required")
+outmode = "wb" if args.overwrite else "xb"
+
+# Create decoder
+#
+decoder = asn1.Decoder()
+with open(args.file, mode="rb") as fh:
+    decoder.start(fh.read())
+
+# Create encoder
+#
+encoder = asn1.Encoder()
+encoder.start()
+
+# Detach encrypted data
+#
+data = None
+datastack = [
+    asn1.Numbers.Sequence, 0, asn1.Numbers.Sequence, asn1.Numbers.Sequence
+]
+stack = []
+while stack or not decoder.eof():
+    if decoder.eof():
+        encoder.leave()
+        decoder.leave()
+        stack.pop()
+    else:
+        tag = decoder.peek()
+        if tag.typ == asn1.Types.Constructed:
+            encoder.enter(nr=tag.nr, cls=tag.cls)
+            decoder.enter()
+            stack.append(tag.nr)
+        else:
+            (tag, value) = decoder.read()
+            if stack == datastack and tag.nr == 0:
+                data = value
+            else:
+                encoder.write(value, nr=tag.nr, cls=tag.cls)
+envelope = encoder.output()
+if data is None:
+    parser.error("Input file does not contain any encrypted data")
+
+# Write envelope (without data), if applicable
+#
+if args.envelope:
+    with open(args.envelope, mode=outmode) as fh:
+        fh.write(envelope)
+
+# Write data (without envelope), if applicable
+#
+if args.data:
+    with open(args.data, mode=outmode) as fh:
+        fh.write(data)
