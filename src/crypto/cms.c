@@ -1101,12 +1101,14 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	/* Duplicate cipher context for potential reencryption on error */
 	memcpy ( ctxdup, ctx, cipher->ctxsize );
 
-	/* Temporarily unregister image */
-	image_get ( image );
-	unregister_image ( image );
-
 	/* Clear trusted flag before modifying image */
 	image_untrust ( image );
+
+	/* Temporarily unregister image, if applicable */
+	if ( original_flags & IMAGE_REGISTERED ) {
+		image_get ( image );
+		unregister_image ( image );
+	}
 
 	/* Decrypt one block at a time */
 	offset = 0;
@@ -1167,10 +1169,12 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	copy_to_user ( image->data, ( offset - frag_len ), tmp, frag_len );
 	image->len -= pad_len;
 
-	/* Clear image type and re-register image */
+	/* Clear image type and re-register image, if applicable */
 	image->type = NULL;
-	register_image ( image );
-	image_put ( image );
+	if ( original_flags & IMAGE_REGISTERED ) {
+		register_image ( image );
+		image_put ( image );
+	}
 
 	/* Free temporary working space */
 	free ( tmp );
@@ -1191,9 +1195,11 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 		cipher_encrypt ( cipher, ctxdup, tmp, tmp, CMS_DECRYPT_BLKSZ );
 		copy_to_user ( image->data, offset, tmp, CMS_DECRYPT_BLKSZ );
 	}
+	if ( original_flags & IMAGE_REGISTERED ) {
+		register_image ( image ); /* Cannot fail on re-registration */
+		image_put ( image );
+	}
 	image->flags = original_flags;
-	register_image ( image ); /* Cannot fail on re-registration */
-	image_put ( image );
  err_cipher:
 	free ( tmp );
  err_alloc:
