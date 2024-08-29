@@ -173,6 +173,25 @@ int image_set_name ( struct image *image, const char *name ) {
 }
 
 /**
+ * Strip dot suffix from image name, if present
+ *
+ * @v image		Image
+ * @ret sep		Position of old dot separator, or NULL
+ */
+char * image_strip_suffix ( struct image *image ) {
+	char *dot;
+
+	/* Locate and strip suffix, if present */
+	if ( image->name &&
+	     ( ( dot = strrchr ( image->name, '.' ) ) != NULL ) ) {
+		*dot = '\0';
+		return dot;
+	}
+
+	return NULL;
+}
+
+/**
  * Set image command line
  *
  * @v image		Image

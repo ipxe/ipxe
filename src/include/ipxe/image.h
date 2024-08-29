@@ -188,6 +188,7 @@ static inline struct image * first_image ( void ) {
 extern struct image * alloc_image ( struct uri *uri );
 extern int image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_name ( struct image *image, const char *name );
+extern char * image_strip_suffix ( struct image *image );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
 extern int image_set_len ( struct image *image, size_t len );
 extern int image_set_data ( struct image *image, userptr_t data, size_t len );
