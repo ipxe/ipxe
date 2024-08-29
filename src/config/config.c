@@ -299,6 +299,9 @@ REQUIRE_OBJECT ( image_mem_cmd );
 #ifdef SHIM_CMD
 REQUIRE_OBJECT ( shim_cmd );
 #endif
+#ifdef IMAGE_CRYPT_CMD
+REQUIRE_OBJECT ( image_crypt_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
