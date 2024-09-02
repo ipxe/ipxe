@@ -2225,13 +2225,16 @@ falcon_xaui_link_ok ( struct efab_nic *efab )
 		sync = ( sync == FCN_XX_SYNC_STAT_DECODE_SYNCED );
 		
 		link_ok = align_done && sync;
-	}
 
-	/* Clear link status ready for next read */
-	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_COMMA_DET, FCN_XX_COMMA_DET_RESET );
-	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_CHARERR, FCN_XX_CHARERR_RESET);
-	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_DISPERR, FCN_XX_DISPERR_RESET);
-	falcon_xmac_writel ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
+		/* Clear link status ready for next read */
+		EFAB_SET_DWORD_FIELD ( reg, FCN_XX_COMMA_DET,
+				       FCN_XX_COMMA_DET_RESET );
+		EFAB_SET_DWORD_FIELD ( reg, FCN_XX_CHARERR,
+				       FCN_XX_CHARERR_RESET );
+		EFAB_SET_DWORD_FIELD ( reg, FCN_XX_DISPERR,
+				       FCN_XX_DISPERR_RESET );
+		falcon_xmac_writel ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
+	}
 
 	has_phyxs = ( efab->phy_op->mmds & ( 1 << MDIO_MMD_PHYXS ) );
 	if ( link_ok && has_phyxs ) {
