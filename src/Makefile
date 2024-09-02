@@ -77,6 +77,7 @@ SRCDIRS		+= drivers/net/efi
 SRCDIRS		+= drivers/net/tg3
 SRCDIRS		+= drivers/net/bnxt
 SRCDIRS		+= drivers/net/sfc
+SRCDIRS		+= drivers/net/marvell
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
