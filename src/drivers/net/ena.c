@@ -1163,7 +1163,7 @@ static int ena_probe ( struct pci_device *pci ) {
 	}
 	ena->info = info;
 	memset ( info, 0, PAGE_SIZE );
-	info->type = cpu_to_le32 ( ENA_HOST_INFO_TYPE_LINUX );
+	info->type = cpu_to_le32 ( ENA_HOST_INFO_TYPE_IPXE );
 	snprintf ( info->dist_str, sizeof ( info->dist_str ), "%s",
 		   ( product_name[0] ? product_name : product_short_name ) );
 	snprintf ( info->kernel_str, sizeof ( info->kernel_str ), "%s",

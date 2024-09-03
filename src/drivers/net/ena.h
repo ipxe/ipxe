@@ -191,14 +191,7 @@ struct ena_host_info {
 	uint32_t features;
 } __attribute__ (( packed ));
 
-/** Linux operating system type
- *
- * There is a defined "iPXE" operating system type (with value 5).
- * However, some very broken versions of the ENA firmware will refuse
- * to allow a completion queue to be created if the "iPXE" type is
- * used.
- */
-#define ENA_HOST_INFO_TYPE_LINUX 1
+#define ENA_HOST_INFO_TYPE_IPXE 5
 
 /** Driver version
  *
