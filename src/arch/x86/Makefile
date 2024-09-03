@@ -3,9 +3,9 @@
 ASM_TCHAR	:= @
 ASM_TCHAR_OPS	:= @
 
-# Include common x86 headers
+# Include x86-specific headers
 #
-INCDIRS		+= arch/x86/include
+INCDIRS		:= arch/$(ARCH)/include arch/x86/include $(INCDIRS)
 
 # x86-specific directories containing source files
 #

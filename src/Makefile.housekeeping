@@ -366,11 +366,6 @@ MAKEDEPS	+= arch/$(ARCH)/Makefile
 include arch/$(ARCH)/Makefile
 endif
 
-# Include architecture-specific include path
-ifdef ARCH
-INCDIRS		+= arch/$(ARCH)/include
-endif
-
 ###############################################################################
 #
 # Especially ugly workarounds
