@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** Current system clock offset */
-signed long time_offset;
+signed long long time_offset;
 
 /** Days of week (for debugging) */
 static const char *weekdays[] = {
