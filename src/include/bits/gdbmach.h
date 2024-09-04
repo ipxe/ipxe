@@ -1,12 +1,12 @@
-#ifndef GDBMACH_H
-#define GDBMACH_H
+#ifndef _BITS_GDBMACH_H
+#define _BITS_GDBMACH_H
 
 /** @file
  *
- * GDB architecture specifics
+ * Dummy GDB architecture specifics
  *
- * This file declares functions for manipulating the machine state and
- * debugging context.
+ * This file is included only if the architecture does not provide its
+ * own version of this file.
  *
  */
 
@@ -42,4 +42,4 @@ extern int gdbmach_set_breakpoint ( int type, unsigned long addr, size_t len,
 				    int enable );
 extern void gdbmach_init ( void );
 
-#endif /* GDBMACH_H */
+#endif /* _BITS_GDBMACH_H */
