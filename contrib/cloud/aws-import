@@ -22,11 +22,12 @@ def detect_architecture(image):
     return 'x86_64'
 
 
-def create_snapshot(region, description, image):
+def create_snapshot(region, description, image, tags):
     """Create an EBS snapshot"""
     client = boto3.client('ebs', region_name=region)
     snapshot = client.start_snapshot(VolumeSize=1,
-                                     Description=description)
+                                     Description=description,
+                                     Tags=tags)
     snapshot_id = snapshot['SnapshotId']
     with open(image, 'rb') as fh:
         for block in count():
@@ -46,11 +47,15 @@ def create_snapshot(region, description, image):
     return snapshot_id
 
 
-def import_image(region, name, architecture, image, public, overwrite):
+def import_image(region, name, family, architecture, image, public, overwrite):
     """Import an AMI image"""
     client = boto3.client('ec2', region_name=region)
     resource = boto3.resource('ec2', region_name=region)
     description = '%s (%s)' % (name, architecture)
+    tags = [
+        {'Key': 'family', 'Value': family},
+        {'Key': 'architecture', 'Value': architecture},
+    ]
     images = client.describe_images(Filters=[{'Name': 'name',
                                               'Values': [description]}])
     if overwrite and images['Images']:
@@ -60,7 +65,7 @@ def import_image(region, name, architecture, image, public, overwrite):
         resource.Image(image_id).deregister()
         resource.Snapshot(snapshot_id).delete()
     snapshot_id = create_snapshot(region=region, description=description,
-                                  image=image)
+                                  image=image, tags=tags)
     client.get_waiter('snapshot_completed').wait(SnapshotIds=[snapshot_id])
     image = client.register_image(Architecture=architecture,
                                   BlockDeviceMappings=[{
@@ -72,6 +77,10 @@ def import_image(region, name, architecture, image, public, overwrite):
                                   }],
                                   EnaSupport=True,
                                   Name=description,
+                                  TagSpecifications=[{
+                                      'ResourceType': 'image',
+                                      'Tags': tags,
+                                  }],
                                   RootDeviceName='/dev/sda1',
                                   SriovNetSupport='simple',
                                   VirtualizationType='hvm')
@@ -94,6 +103,8 @@ def launch_link(region, image_id):
 parser = argparse.ArgumentParser(description="Import AWS EC2 image (AMI)")
 parser.add_argument('--name', '-n',
                     help="Image name")
+parser.add_argument('--family', '-f',
+                    help="Image family name")
 parser.add_argument('--public', '-p', action='store_true',
                     help="Make image public")
 parser.add_argument('--overwrite', action='store_true',
@@ -108,9 +119,13 @@ args = parser.parse_args()
 # Detect CPU architectures
 architectures = {image: detect_architecture(image) for image in args.image}
 
+# Use default family name if none specified
+if not args.family:
+    args.family = 'iPXE'
+
 # Use default name if none specified
 if not args.name:
-    args.name = 'iPXE (%s)' % date.today().strftime('%Y-%m-%d')
+    args.name = '%s (%s)' % (args.family, date.today().strftime('%Y-%m-%d'))
 
 # Use all regions if none specified
 if not args.region:
@@ -123,6 +138,7 @@ with ThreadPoolExecutor(max_workers=len(imports)) as executor:
     futures = {executor.submit(import_image,
                                region=region,
                                name=args.name,
+                               family=args.family,
                                architecture=architectures[image],
                                image=image,
                                public=args.public,
