@@ -107,7 +107,7 @@ static unsigned int ipv6_scope ( const struct in6_addr *addr ) {
 	 * global.
 	 */
 	if ( IN6_IS_ADDR_ULA ( addr ) )
-		return IPV6_SCOPE_ORGANISATION_LOCAL;
+		return IPV6_SCOPE_GLOBAL;
 
 	/* All other addresses are assumed to be global */
 	return IPV6_SCOPE_GLOBAL;
