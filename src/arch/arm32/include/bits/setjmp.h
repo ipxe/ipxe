@@ -1,5 +1,5 @@
-#ifndef _SETJMP_H
-#define _SETJMP_H
+#ifndef _BITS_SETJMP_H
+#define _BITS_SETJMP_H
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
@@ -29,10 +29,4 @@ typedef struct {
 	uint32_t lr;
 } jmp_buf[1];
 
-extern int __asmcall __attribute__ (( returns_twice ))
-setjmp ( jmp_buf env );
-
-extern void __asmcall __attribute__ (( noreturn ))
-longjmp ( jmp_buf env, int val );
-
-#endif /* _SETJMP_H */
+#endif /* _BITS_SETJMP_H */
