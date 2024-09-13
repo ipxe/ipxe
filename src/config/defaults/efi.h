@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ACPI_EFI
 #define FDT_EFI
 #define MPAPI_EFI
+#define NAP_EFI
 
 #define	NET_PROTO_IPV6		/* IPv6 protocol */
 #define	NET_PROTO_LLDP		/* Link Layer Discovery protocol */
@@ -53,7 +54,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
-#define NAP_EFIX86
 #define ENTROPY_RDRAND
 #define	CPUID_CMD		/* x86 CPU feature detection command */
 #define	UNSAFE_STD		/* Avoid setting direction flag */
@@ -61,7 +61,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #if defined ( __arm__ ) || defined ( __aarch64__ )
 #define IOAPI_ARM
-#define NAP_EFIARM
 #endif
 
 #if defined ( __aarch64__ )
@@ -70,7 +69,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #if defined ( __loongarch__ )
 #define IOAPI_LOONG64
-#define NAP_EFILOONG64
 #endif
 
 #endif /* CONFIG_DEFAULTS_EFI_H */

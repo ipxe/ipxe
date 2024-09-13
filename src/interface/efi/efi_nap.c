@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Xiaotian Wu <wuxiaotian@loongson.cn>
+ * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -36,7 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Sleep until next interrupt
  *
  */
-static void efiloong64_cpu_nap ( void ) {
+static void efi_cpu_nap ( void ) {
 	/*
 	 * I can't find any EFI API that allows us to put the CPU to
 	 * sleep.  The CpuSleep() function is defined in CpuLib.h, but
@@ -51,7 +51,7 @@ static void efiloong64_cpu_nap ( void ) {
 	 * first step of ExitBootServices().
 	 */
 	if ( ! efi_shutdown_in_progress )
-		__asm__ __volatile__ ( "idle 0" );
+		cpu_halt();
 }
 
-PROVIDE_NAP ( efiloong64, cpu_nap, efiloong64_cpu_nap );
+PROVIDE_NAP ( efi, cpu_nap, efi_cpu_nap );
