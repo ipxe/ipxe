@@ -308,6 +308,7 @@ struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 				     struct in6_addr **dest ) {
 	struct ipv6_miniroute *miniroute;
 	struct ipv6_miniroute *chosen = NULL;
+	struct ipv6_miniroute *fallback = NULL;
 	unsigned int best = 0;
 	unsigned int match_len;
 	unsigned int score;
@@ -326,6 +327,13 @@ struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 		/* Skip entries with no usable source address */
 		if ( ! ( miniroute->flags & IPV6_HAS_ADDRESS ) )
 			continue;
+
+		/* Choose a fallback route acting as default gateway.
+		 * Prefer the route with the largest scope that comes
+		 * first.
+		 */
+		if ( ! fallback || ( miniroute->scope > fallback->scope ) )
+			fallback = miniroute;
 
 		/* Skip entries with a non-matching scope ID, if
 		 * destination specifies a scope ID.
@@ -363,6 +371,12 @@ struct ipv6_miniroute * ipv6_route ( unsigned int scope_id,
 			best = score;
 		}
 	}
+
+	/* If no route scope is matched, use the fallback route to
+	 * show best efforts.
+	 */
+	if ( ! chosen )
+		chosen = fallback;
 
 	/* Return chosen route, if any */
 	if ( chosen ) {
