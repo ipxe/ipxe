@@ -1,0 +1,10 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# RISCV-specific flags
+#
+CFLAGS		+= -mcmodel=medany
+
+# Include generic EFI Makefile
+#
+MAKEDEPS	+= Makefile.efi
+include Makefile.efi

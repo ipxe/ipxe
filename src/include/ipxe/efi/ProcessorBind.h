@@ -65,6 +65,10 @@ typedef uint8_t BOOLEAN;
 #include <ipxe/efi/LoongArch64/ProcessorBind.h>
 #endif
 
+#ifdef __riscv
+#include <ipxe/efi/RiscV64/ProcessorBind.h>
+#endif
+
 #endif /* EFI_HOSTONLY */
 
 #endif /* _IPXE_EFI_PROCESSOR_BIND_H */

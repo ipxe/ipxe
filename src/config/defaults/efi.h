@@ -71,4 +71,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define IOAPI_LOONG64
 #endif
 
+#if defined ( __riscv )
+#define IOAPI_RISCV
+#endif
+
 #endif /* CONFIG_DEFAULTS_EFI_H */

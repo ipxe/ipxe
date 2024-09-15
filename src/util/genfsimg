@@ -78,6 +78,12 @@ efi_boot_name() {
 	"64aa" )
 	    echo "BOOTAA64.EFI"
 	    ;;
+	"6450" )
+	    echo "BOOTRISCV64.EFI"
+	    ;;
+	"3250" )
+	    echo "BOOTRISCV32.EFI"
+	    ;;
 	* )
 	    echo "${FILENAME}: unrecognised EFI architecture ${ARCH}" >&2
 	    exit 1
