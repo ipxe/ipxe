@@ -4,10 +4,6 @@
 #
 ELF2EFI		= $(ELF2EFI32)
 
-# Specify EFI boot file
-#
-EFI_BOOT_FILE	= bootriscv32.efi
-
 # Include generic EFI Makefile
 #
 MAKEDEPS	+= arch/riscv/Makefile.efi

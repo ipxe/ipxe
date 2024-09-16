@@ -4,10 +4,6 @@
 #
 ELF2EFI		= $(ELF2EFI64)
 
-# Specify EFI boot file
-#
-EFI_BOOT_FILE	= bootaa64.efi
-
 # Include generic EFI Makefile
 #
 MAKEDEPS	+= arch/arm/Makefile.efi

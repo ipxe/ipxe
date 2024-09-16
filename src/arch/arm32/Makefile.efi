@@ -8,10 +8,6 @@ CFLAGS		+= -mfloat-abi=soft
 #
 ELF2EFI		= $(ELF2EFI32)
 
-# Specify EFI boot file
-#
-EFI_BOOT_FILE	= bootarm.efi
-
 # Include generic EFI Makefile
 #
 MAKEDEPS	+= arch/arm/Makefile.efi
