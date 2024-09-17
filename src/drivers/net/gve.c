@@ -191,12 +191,8 @@ static int gve_reset ( struct gve_nic *gve ) {
 static int gve_admin_alloc ( struct gve_nic *gve ) {
 	struct dma_device *dma = gve->dma;
 	struct gve_admin *admin = &gve->admin;
-	struct gve_irqs *irqs = &gve->irqs;
-	struct gve_events *events = &gve->events;
 	struct gve_scratch *scratch = &gve->scratch;
 	size_t admin_len = ( GVE_ADMIN_COUNT * sizeof ( admin->cmd[0] ) );
-	size_t irqs_len = ( GVE_IRQ_COUNT * sizeof ( irqs->irq[0] ) );
-	size_t events_len = ( GVE_EVENT_MAX * sizeof ( events->event[0] ) );
 	size_t scratch_len = sizeof ( *scratch->buf );
 	int rc;
 
@@ -207,20 +203,6 @@ static int gve_admin_alloc ( struct gve_nic *gve ) {
 		goto err_admin;
 	}
 
-	/* Allocate interrupt channels */
-	irqs->irq = dma_alloc ( dma, &irqs->map, irqs_len, GVE_ALIGN );
-	if ( ! irqs->irq ) {
-		rc = -ENOMEM;
-		goto err_irqs;
-	}
-
-	/* Allocate event counters */
-	events->event = dma_alloc ( dma, &events->map, events_len, GVE_ALIGN );
-	if ( ! events->event ) {
-		rc = -ENOMEM;
-		goto err_events;
-	}
-
 	/* Allocate scratch buffer */
 	scratch->buf = dma_alloc ( dma, &scratch->map, scratch_len, GVE_ALIGN );
 	if ( ! scratch->buf ) {
@@ -228,17 +210,15 @@ static int gve_admin_alloc ( struct gve_nic *gve ) {
 		goto err_scratch;
 	}
 
-	DBGC ( gve, "GVE %p AQ at [%08lx,%08lx)\n",
+	DBGC ( gve, "GVE %p AQ at [%08lx,%08lx) scratch [%08lx,%08lx)\n",
 	       gve, virt_to_phys ( admin->cmd ),
-	       ( virt_to_phys ( admin->cmd ) + admin_len ) );
+	       ( virt_to_phys ( admin->cmd ) + admin_len ),
+	       virt_to_phys ( scratch->buf ),
+	       ( virt_to_phys ( scratch->buf ) + scratch_len ) );
 	return 0;
 
 	dma_free ( &scratch->map, scratch->buf, scratch_len );
  err_scratch:
-	dma_free ( &events->map, events->event, events_len );
- err_events:
-	dma_free ( &irqs->map, irqs->irq, irqs_len );
- err_irqs:
 	dma_free ( &admin->map, admin->cmd, admin_len );
  err_admin:
 	return rc;
@@ -251,22 +231,12 @@ static int gve_admin_alloc ( struct gve_nic *gve ) {
  */
 static void gve_admin_free ( struct gve_nic *gve ) {
 	struct gve_admin *admin = &gve->admin;
-	struct gve_irqs *irqs = &gve->irqs;
-	struct gve_events *events = &gve->events;
 	struct gve_scratch *scratch = &gve->scratch;
 	size_t admin_len = ( GVE_ADMIN_COUNT * sizeof ( admin->cmd[0] ) );
-	size_t irqs_len = ( GVE_IRQ_COUNT * sizeof ( irqs->irq[0] ) );
-	size_t events_len = ( GVE_EVENT_MAX * sizeof ( events->event[0] ) );
 	size_t scratch_len = sizeof ( *scratch->buf );
 
 	/* Free scratch buffer */
 	dma_free ( &scratch->map, scratch->buf, scratch_len );
-
-	/* Free event counter */
-	dma_free ( &events->map, events->event, events_len );
-
-	/* Free interrupt channels */
-	dma_free ( &irqs->map, irqs->irq, irqs_len );
 
 	/* Free admin queue */
 	dma_free ( &admin->map, admin->cmd, admin_len );
@@ -467,13 +437,10 @@ static int gve_describe ( struct gve_nic *gve ) {
 
 	/* Extract queue parameters */
 	gve->events.count = be16_to_cpu ( desc->counters );
-	if ( gve->events.count > GVE_EVENT_MAX )
-		gve->events.count = GVE_EVENT_MAX;
 	gve->tx.count = be16_to_cpu ( desc->tx_count );
 	gve->rx.count = be16_to_cpu ( desc->rx_count );
-	DBGC ( gve, "GVE %p using %d TX, %d RX, %d/%d events\n",
-	       gve, gve->tx.count, gve->rx.count, gve->events.count,
-	       be16_to_cpu ( desc->counters ) );
+	DBGC ( gve, "GVE %p using %d TX, %d RX, %d events\n",
+	       gve, gve->tx.count, gve->rx.count, gve->events.count );
 
 	/* Extract network parameters */
 	build_assert ( sizeof ( desc->mac ) == ETH_ALEN );
@@ -703,6 +670,67 @@ static int gve_destroy_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
  *
  ******************************************************************************
  */
+
+/**
+ * Allocate shared queue resources
+ *
+ * @v gve		GVE device
+ * @ret rc		Return status code
+ */
+static int gve_alloc_shared ( struct gve_nic *gve ) {
+	struct dma_device *dma = gve->dma;
+	struct gve_irqs *irqs = &gve->irqs;
+	struct gve_events *events = &gve->events;
+	size_t irqs_len = ( GVE_IRQ_COUNT * sizeof ( irqs->irq[0] ) );
+	size_t events_len = ( gve->events.count * sizeof ( events->event[0] ) );
+	int rc;
+
+	/* Allocate interrupt channels */
+	irqs->irq = dma_alloc ( dma, &irqs->map, irqs_len, GVE_ALIGN );
+	if ( ! irqs->irq ) {
+		rc = -ENOMEM;
+		goto err_irqs;
+	}
+	DBGC ( gve, "GVE %p IRQs at [%08lx,%08lx)\n",
+	       gve, virt_to_phys ( irqs->irq ),
+	       ( virt_to_phys ( irqs->irq ) + irqs_len ) );
+
+	/* Allocate event counters */
+	events->event = dma_alloc ( dma, &events->map, events_len, GVE_ALIGN );
+	if ( ! events->event ) {
+		rc = -ENOMEM;
+		goto err_events;
+	}
+	DBGC ( gve, "GVE %p events at [%08lx,%08lx)\n",
+	       gve, virt_to_phys ( events->event ),
+	       ( virt_to_phys ( events->event ) + events_len ) );
+
+	return 0;
+
+	dma_free ( &events->map, events->event, events_len );
+ err_events:
+	dma_free ( &irqs->map, irqs->irq, irqs_len );
+ err_irqs:
+	return rc;
+}
+
+/**
+ * Free shared queue resources
+ *
+ * @v gve		GVE device
+ */
+static void gve_free_shared ( struct gve_nic *gve ) {
+	struct gve_irqs *irqs = &gve->irqs;
+	struct gve_events *events = &gve->events;
+	size_t irqs_len = ( GVE_IRQ_COUNT * sizeof ( irqs->irq[0] ) );
+	size_t events_len = ( gve->events.count * sizeof ( events->event[0] ) );
+
+	/* Free event counters */
+	dma_free ( &events->map, events->event, events_len );
+
+	/* Free interrupt channels */
+	dma_free ( &irqs->map, irqs->irq, irqs_len );
+}
 
 /**
  * Allocate queue page list
@@ -1117,6 +1145,10 @@ static int gve_open ( struct net_device *netdev ) {
 	struct gve_queue *rx = &gve->rx;
 	int rc;
 
+	/* Allocate shared queue resources */
+	if ( ( rc = gve_alloc_shared ( gve ) ) != 0 )
+		goto err_alloc_shared;
+
 	/* Allocate and prepopulate transmit queue */
 	if ( ( rc = gve_alloc_queue ( gve, tx ) ) != 0 )
 		goto err_alloc_tx;
@@ -1137,6 +1169,8 @@ static int gve_open ( struct net_device *netdev ) {
  err_alloc_rx:
 	gve_free_queue ( gve, tx );
  err_alloc_tx:
+	gve_free_shared ( gve );
+ err_alloc_shared:
 	return rc;
 }
 
@@ -1163,6 +1197,9 @@ static void gve_close ( struct net_device *netdev ) {
 	/* Free queues */
 	gve_free_queue ( gve, rx );
 	gve_free_queue ( gve, tx );
+
+	/* Free shared queue resources */
+	gve_free_shared ( gve );
 }
 
 /**

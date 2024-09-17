@@ -50,15 +50,6 @@ struct google_mac {
  */
 #define GVE_ALIGN GVE_PAGE_SIZE
 
-/**
- * Length alignment
- *
- * All DMA data structure lengths seem to need to be aligned to a
- * multiple of 64 bytes.  (This is not documented anywhere, but is
- * inferred from existing source code and experimentation.)
- */
-#define GVE_LEN_ALIGN 64
-
 /** Configuration BAR */
 #define GVE_CFG_BAR PCI_BASE_ADDRESS_0
 
@@ -349,22 +340,6 @@ struct gve_event {
 	/** Number of events that have occurred */
 	volatile uint32_t count;
 } __attribute__ (( packed ));
-
-/**
- * Maximum number of event counters
- *
- * We tell the device how many event counters we have provided via the
- * "configure device resources" admin queue command.  The device will
- * accept being given only a single counter, but will subsequently
- * fail to create a receive queue.
- *
- * There is, of course, no documentation indicating how may event
- * counters actually need to be provided.  In the absence of evidence
- * to the contrary, assume that 16 counters (i.e. the smallest number
- * we can allocate, given the length alignment constraint on
- * allocations) will be sufficient.
- */
-#define GVE_EVENT_MAX ( GVE_LEN_ALIGN / sizeof ( struct gve_event ) )
 
 /** Event counter array */
 struct gve_events {
