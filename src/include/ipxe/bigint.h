@@ -208,13 +208,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v multiplicand	Big integer to be multiplied
  * @v multiplier	Big integer to be multiplied
  * @v result		Big integer to hold result
+ * @v carry		Big integer to hold temporary carry space
  */
-#define bigint_multiply( multiplicand, multiplier, result ) do {	\
+#define bigint_multiply( multiplicand, multiplier, result, carry ) do {	\
 	unsigned int multiplicand_size = bigint_size (multiplicand);	\
 	unsigned int multiplier_size = bigint_size (multiplier);	\
 	bigint_multiply_raw ( (multiplicand)->element,			\
 			      multiplicand_size, (multiplier)->element,	\
-			      multiplier_size, (result)->element );	\
+			      multiplier_size, (result)->element,	\
+			      (carry)->element );			\
 	} while ( 0 )
 
 /**
@@ -245,7 +247,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	unsigned int size = bigint_size (modulus);			\
 	sizeof ( struct {						\
 		bigint_t ( size * 2 ) temp_result;			\
-		bigint_t ( size * 2 ) temp_modulus;			\
+		union {							\
+			bigint_t ( size * 2 ) temp_modulus;		\
+			bigint_t ( size * 2 ) temp_carry;		\
+		};							\
 	} ); } )
 
 /**
@@ -311,11 +316,16 @@ void bigint_shrink_raw ( const bigint_element_t *source0,
 			 unsigned int dest_size );
 void bigint_swap_raw ( bigint_element_t *first0, bigint_element_t *second0,
 		       unsigned int size, int swap );
+void bigint_multiply_one ( const bigint_element_t multiplicand,
+			   const bigint_element_t multiplier,
+			   bigint_element_t *result,
+			   bigint_element_t *carry );
 void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 			   unsigned int multiplicand_size,
 			   const bigint_element_t *multiplier0,
 			   unsigned int multiplier_size,
-			   bigint_element_t *result0 );
+			   bigint_element_t *result0,
+			   bigint_element_t *carry0 );
 void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 			       const bigint_element_t *multiplier0,
 			       const bigint_element_t *modulus0,

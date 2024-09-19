@@ -309,10 +309,34 @@ bigint_done_raw ( const uint32_t *value0, unsigned int size __unused,
 		*(--out_byte) = *(value_byte++);
 }
 
-extern void bigint_multiply_raw ( const uint32_t *multiplicand0,
-				  unsigned int multiplicand_size,
-				  const uint32_t *multiplier0,
-				  unsigned int multiplier_size,
-				  uint32_t *value0 );
+/**
+ * Multiply big integer elements
+ *
+ * @v multiplicand	Multiplicand element
+ * @v multiplier	Multiplier element
+ * @v result		Result element pair
+ * @v carry		Carry element
+ */
+static inline __attribute__ (( always_inline )) void
+bigint_multiply_one ( const uint32_t multiplicand, const uint32_t multiplier,
+		      uint32_t *result, uint32_t *carry ) {
+	uint32_t discard_low;
+	uint32_t discard_high;
+
+	__asm__ __volatile__ ( /* Perform multiplication */
+			       "umull %0, %1, %5, %6\n\t"
+			       /* Accumulate result */
+			       "adds %2, %0\n\t"
+			       "adcs %3, %1\n\t"
+			       /* Accumulate carry (cannot overflow) */
+			       "adc %4, #0\n\t"
+			       : "=r" ( discard_low ),
+				 "=r" ( discard_high ),
+				 "+r" ( result[0] ),
+				 "+r" ( result[1] ),
+				 "+r" ( *carry )
+			       : "r" ( multiplicand ),
+				 "r" ( multiplier ) );
+}
 
 #endif /* _BITS_BIGINT_H */

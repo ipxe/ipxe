@@ -76,6 +76,115 @@ void bigint_swap_raw ( bigint_element_t *first0, bigint_element_t *second0,
 }
 
 /**
+ * Multiply big integers
+ *
+ * @v multiplicand0	Element 0 of big integer to be multiplied
+ * @v multiplicand_size	Number of elements in multiplicand
+ * @v multiplier0	Element 0 of big integer to be multiplied
+ * @v multiplier_size	Number of elements in multiplier
+ * @v result0		Element 0 of big integer to hold result
+ * @v carry0		Element 0 of big integer to hold temporary carry
+ */
+void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
+			   unsigned int multiplicand_size,
+			   const bigint_element_t *multiplier0,
+			   unsigned int multiplier_size,
+			   bigint_element_t *result0,
+			   bigint_element_t *carry0 ) {
+	unsigned int result_size = ( multiplicand_size + multiplier_size );
+	const bigint_t ( multiplicand_size ) __attribute__ (( may_alias ))
+		*multiplicand = ( ( const void * ) multiplicand0 );
+	const bigint_t ( multiplier_size ) __attribute__ (( may_alias ))
+		*multiplier = ( ( const void * ) multiplier0 );
+	bigint_t ( result_size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	bigint_t ( result_size ) __attribute__ (( may_alias ))
+		*carry = ( ( void * ) carry0 );
+	bigint_element_t multiplicand_element;
+	const bigint_element_t *multiplier_element;
+	bigint_element_t *result_elements;
+	bigint_element_t *carry_element;
+	unsigned int i;
+	unsigned int j;
+
+	/* Zero result and temporary carry space */
+	memset ( result, 0, sizeof ( *result ) );
+	memset ( carry, 0, sizeof ( *carry ) );
+
+	/* Multiply integers one element at a time, adding the double
+	 * element directly into the result and accumulating any
+	 * overall carry out from this double-element addition into
+	 * the temporary carry space.
+	 *
+	 * We could propagate the carry immediately instead of using a
+	 * temporary carry space.  However, this would cause the
+	 * multiplication to run in non-constant time, which is
+	 * undesirable.
+	 *
+	 * The carry elements can never overflow, provided that the
+	 * element size is large enough to accommodate any plausible
+	 * big integer.  The total number of potential carries (across
+	 * all elements) is the sum of the number of elements in the
+	 * multiplicand and multiplier.  With a 16-bit element size,
+	 * this therefore allows for up to a 1Mbit multiplication
+	 * result (e.g. a 512kbit integer multiplied by another
+	 * 512kbit integer), which is around 100x higher than could be
+	 * needed in practice.  With a more realistic 32-bit element
+	 * size, the limit becomes a totally implausible 128Gbit
+	 * multiplication result.
+	 */
+	for ( i = 0 ; i < multiplicand_size ; i++ ) {
+		multiplicand_element = multiplicand->element[i];
+		multiplier_element = &multiplier->element[0];
+		result_elements = &result->element[i];
+		carry_element = &carry->element[i];
+		for ( j = 0 ; j < multiplier_size ; j++ ) {
+			bigint_multiply_one ( multiplicand_element,
+					      *(multiplier_element++),
+					      result_elements++,
+					      carry_element++ );
+		}
+	}
+
+	/* Add the temporary carry into the result.  The least
+	 * significant element of the carry represents the carry out
+	 * from multiplying the least significant elements of the
+	 * multiplicand and multiplier, and therefore must be added to
+	 * the third-least significant element of the result (i.e. the
+	 * carry needs to be shifted left by two elements before being
+	 * adding to the result).
+	 *
+	 * The most significant two elements of the carry are
+	 * guaranteed to be zero, since:
+	 *
+	 *     a < 2^{n}, b < 2^{m} => ab < 2^{n+m}
+	 *
+	 * and the overall result of the multiplication (including
+	 * adding in the shifted carries) is therefore guaranteed not
+	 * to overflow beyond the end of the result.
+	 *
+	 * We could avoid this shifting by writing the carry directly
+	 * into the "correct" element during the element-by-element
+	 * multiplication stage above.  However, this would add
+	 * complexity to the loop since we would have to arrange for
+	 * the (provably zero) most significant two carry out results
+	 * to be discarded, in order to avoid writing beyond the end
+	 * of the temporary carry space.
+	 *
+	 * Performing the logical shift is essentially free, since we
+	 * simply adjust the element pointers.
+	 *
+	 * To avoid requiring additional checks in each architecture's
+	 * implementation of bigint_add_raw(), we explicitly avoid
+	 * calling bigint_add_raw() with a size of zero.
+	 */
+	if ( result_size > 2 ) {
+		bigint_add_raw ( &carry->element[0], &result->element[2],
+				 ( result_size - 2 ) );
+	}
+}
+
+/**
  * Perform modular multiplication of big integers
  *
  * @v multiplicand0	Element 0 of big integer to be multiplied
@@ -100,7 +209,10 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 		( ( void * ) result0 );
 	struct {
 		bigint_t ( size * 2 ) result;
-		bigint_t ( size * 2 ) modulus;
+		union {
+			bigint_t ( size * 2 ) modulus;
+			bigint_t ( size * 2 ) carry;
+		};
 	} *temp = tmp;
 	int rotation;
 	int i;
@@ -113,7 +225,8 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 
 	/* Perform multiplication */
 	profile_start ( &bigint_mod_multiply_multiply_profiler );
-	bigint_multiply ( multiplicand, multiplier, &temp->result );
+	bigint_multiply ( multiplicand, multiplier, &temp->result,
+			  &temp->carry );
 	profile_stop ( &bigint_mod_multiply_multiply_profiler );
 
 	/* Rescale modulus to match result */
