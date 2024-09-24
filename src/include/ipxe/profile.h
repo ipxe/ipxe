@@ -60,6 +60,8 @@ struct profiler {
 #define __profiler
 #endif
 
+unsigned long profile_timestamp ( void );
+
 extern unsigned long profile_excluded;
 
 extern void profile_update ( struct profiler *profiler, unsigned long sample );
