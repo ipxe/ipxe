@@ -314,7 +314,7 @@ bigint_done_raw ( const uint32_t *value0, unsigned int size __unused,
  *
  * @v multiplicand	Multiplicand element
  * @v multiplier	Multiplier element
- * @v result		Result element pair
+ * @v result		Result element
  * @v carry		Carry element
  */
 static inline __attribute__ (( always_inline )) void
@@ -324,19 +324,20 @@ bigint_multiply_one ( const uint32_t multiplicand, const uint32_t multiplier,
 	uint32_t discard_high;
 
 	__asm__ __volatile__ ( /* Perform multiplication */
-			       "umull %0, %1, %5, %6\n\t"
+			       "umull %0, %1, %4, %5\n\t"
 			       /* Accumulate result */
 			       "adds %2, %0\n\t"
-			       "adcs %3, %1\n\t"
+			       "adc %1, #0\n\t"
 			       /* Accumulate carry (cannot overflow) */
-			       "adc %4, #0\n\t"
+			       "adds %2, %3\n\t"
+			       "adc %3, %1, #0\n\t"
 			       : "=r" ( discard_low ),
 				 "=r" ( discard_high ),
-				 "+r" ( result[0] ),
-				 "+r" ( result[1] ),
+				 "+r" ( *result ),
 				 "+r" ( *carry )
 			       : "r" ( multiplicand ),
-				 "r" ( multiplier ) );
+				 "r" ( multiplier )
+			       : "cc" );
 }
 
 #endif /* _BITS_BIGINT_H */

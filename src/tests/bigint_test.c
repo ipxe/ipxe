@@ -173,8 +173,7 @@ void bigint_multiply_sample ( const bigint_element_t *multiplicand0,
 			      unsigned int multiplicand_size,
 			      const bigint_element_t *multiplier0,
 			      unsigned int multiplier_size,
-			      bigint_element_t *result0,
-			      bigint_element_t *carry0 ) {
+			      bigint_element_t *result0 ) {
 	unsigned int result_size = ( multiplicand_size + multiplier_size );
 	const bigint_t ( multiplicand_size ) __attribute__ (( may_alias ))
 		*multiplicand = ( ( const void * ) multiplicand0 );
@@ -182,10 +181,8 @@ void bigint_multiply_sample ( const bigint_element_t *multiplicand0,
 		*multiplier = ( ( const void * ) multiplier0 );
 	bigint_t ( result_size ) __attribute__ (( may_alias ))
 		*result = ( ( void * ) result0 );
-	bigint_t ( result_size ) __attribute__ (( may_alias ))
-		*carry = ( ( void * ) carry0 );
 
-	bigint_multiply ( multiplicand, multiplier, result, carry );
+	bigint_multiply ( multiplicand, multiplier, result );
 }
 
 void bigint_mod_multiply_sample ( const bigint_element_t *multiplicand0,
@@ -498,14 +495,11 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	bigint_t ( multiplicand_size ) multiplicand_temp;		\
 	bigint_t ( multiplier_size ) multiplier_temp;			\
 	bigint_t ( multiplicand_size + multiplier_size ) result_temp;	\
-	bigint_t ( multiplicand_size + multiplier_size ) carry_temp;	\
 	{} /* Fix emacs alignment */					\
 									\
 	assert ( bigint_size ( &result_temp ) ==			\
 		 ( bigint_size ( &multiplicand_temp ) +			\
 		   bigint_size ( &multiplier_temp ) ) );		\
-	assert ( bigint_size ( &carry_temp ) ==				\
-		 bigint_size ( &result_temp ) );			\
 	bigint_init ( &multiplicand_temp, multiplicand_raw,		\
 		      sizeof ( multiplicand_raw ) );			\
 	bigint_init ( &multiplier_temp, multiplier_raw,			\
@@ -514,7 +508,7 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	DBG_HDA ( 0, &multiplicand_temp, sizeof ( multiplicand_temp ) );\
 	DBG_HDA ( 0, &multiplier_temp, sizeof ( multiplier_temp ) );	\
 	bigint_multiply ( &multiplicand_temp, &multiplier_temp,		\
-			  &result_temp, &carry_temp );			\
+			  &result_temp );				\
 	DBG_HDA ( 0, &result_temp, sizeof ( result_temp ) );		\
 	bigint_done ( &result_temp, result_raw, sizeof ( result_raw ) );\
 									\

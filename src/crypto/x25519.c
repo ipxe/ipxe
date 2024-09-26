@@ -43,7 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Storage size of each big integer	     128	      40
  * (in bytes)
  *
- * Stack usage for key exchange		    1144	     424
+ * Stack usage for key exchange		    1144	     360
  * (in bytes, large objects only)
  *
  * Cost of big integer addition		      16	       5
@@ -207,60 +207,35 @@ union x25519_multiply_step3 {
  * We overlap the buffers used by each step of the multiplication
  * calculation to reduce the total stack space required:
  *
- * |--------------------------------------------------------------------------|
- * | <------- step 1 carry ------> | <----------- step 1 result ------------> |
- * |                               | <- low 256 bits -> | <- high 260 bits -> |
- * | <- step 2 carry -> | <-- step 2 result --> | <pad> |                     |
- * | <- s3 carry -> | <--------- pad ---------> | <- step 3 result -> |       |
- * |--------------------------------------------------------------------------|
+ * |--------------------------------------------------------|
+ * | <- pad -> | <------------ step 1 result -------------> |
+ * |           | <- low 256 bits -> | <-- high 260 bits --> |
+ * | <------- step 2 result ------> | <-- step 3 result --> |
+ * |--------------------------------------------------------|
  */
 union x25519_multiply_workspace {
-	/** Step 1 */
+	/** Step 1 result */
 	struct {
-		/** Step 1 temporary carry workspace */
-		union x25519_multiply_step1 carry;
+		/** Padding to avoid collision between steps 1 and 2
+		 *
+		 * The step 2 multiplication consumes the high 260
+		 * bits of step 1, and so the step 2 multiplication
+		 * result must not overlap this portion of the step 1
+		 * result.
+		 */
+		uint8_t pad[ sizeof ( union x25519_multiply_step2 ) -
+			     offsetof ( union x25519_multiply_step1,
+					parts.high_260bit ) ];
 		/** Step 1 result */
-		union x25519_multiply_step1 result;
-	} __attribute__ (( packed )) step1;
-	/** Step 2
-	 *
-	 * The step 2 multiplication consumes the high 260 bits of
-	 * step 1, and so the step 2 multiplication result (and
-	 * temporary carry workspace) must not overlap this portion of
-	 * the step 1 result.
-	 */
+		union x25519_multiply_step1 step1;
+	} __attribute__ (( packed ));
+	/** Steps 2 and 3 results */
 	struct {
-		/** Step 2 temporary carry workspace */
-		union x25519_multiply_step2 carry;
 		/** Step 2 result */
-		union x25519_multiply_step2 result;
-		/** Avoid collision between step 1 result and step 2 result */
-		uint8_t pad[ ( int )
-			     ( sizeof ( union x25519_multiply_step1 ) +
-			       offsetof ( union x25519_multiply_step1,
-					  parts.high_260bit ) -
-			       sizeof ( union x25519_multiply_step2 ) -
-			       sizeof ( union x25519_multiply_step2 ) ) ];
-	} __attribute__ (( packed )) step2;
-	/** Step 3
-	 *
-	 * The step 3 multiplication consumes the high 11 bits of step
-	 * 2, and so the step 3 multiplication result (and temporary
-	 * carry workspace) must not overlap this portion of the step
-	 * 2 result.
-	 */
-	struct {
-		/** Step 3 temporary carry workspace */
-		union x25519_multiply_step3 carry;
-		/** Avoid collision between step 2 result and step 3 carry */
-		uint8_t pad1[ ( int )
-			      ( sizeof ( union x25519_multiply_step2 ) -
-				sizeof ( union x25519_multiply_step3 ) ) ];
-		/** Avoid collision between step 2 result and step 3 result */
-		uint8_t pad2[ sizeof ( union x25519_multiply_step2 ) ];
+		union x25519_multiply_step2 step2;
 		/** Step 3 result */
-		union x25519_multiply_step3 result;
-	} __attribute__ (( packed )) step3;
+		union x25519_multiply_step3 step3;
+	} __attribute__ (( packed ));
 };
 
 /** An X25519 elliptic curve point in projective coordinates
@@ -451,9 +426,9 @@ void x25519_multiply ( const union x25519_oct258 *multiplicand,
 		       const union x25519_oct258 *multiplier,
 		       union x25519_quad257 *result ) {
 	union x25519_multiply_workspace tmp;
-	union x25519_multiply_step1 *step1 = &tmp.step1.result;
-	union x25519_multiply_step2 *step2 = &tmp.step2.result;
-	union x25519_multiply_step3 *step3 = &tmp.step3.result;
+	union x25519_multiply_step1 *step1 = &tmp.step1;
+	union x25519_multiply_step2 *step2 = &tmp.step2;
+	union x25519_multiply_step3 *step3 = &tmp.step3;
 
 	/* Step 1: perform raw multiplication
 	 *
@@ -464,7 +439,7 @@ void x25519_multiply ( const union x25519_oct258 *multiplicand,
 	 */
 	static_assert ( sizeof ( step1->product ) >= sizeof ( step1->parts ) );
 	bigint_multiply ( &multiplicand->value, &multiplier->value,
-			  &step1->product, &tmp.step1.carry.product );
+			  &step1->product );
 
 	/* Step 2: reduce high-order 516-256=260 bits of step 1 result
 	 *
@@ -490,7 +465,7 @@ void x25519_multiply ( const union x25519_oct258 *multiplicand,
 	static_assert ( sizeof ( step2->product ) >= sizeof ( step2->parts ) );
 	bigint_grow ( &step1->parts.low_256bit, &result->value );
 	bigint_multiply ( &step1->parts.high_260bit, &x25519_reduce_256,
-			  &step2->product, &tmp.step2.carry.product );
+			  &step2->product );
 	bigint_add ( &result->value, &step2->value );
 
 	/* Step 3: reduce high-order 267-256=11 bits of step 2 result
@@ -528,7 +503,7 @@ void x25519_multiply ( const union x25519_oct258 *multiplicand,
 	memset ( &step3->value, 0, sizeof ( step3->value ) );
 	bigint_grow ( &step2->parts.low_256bit, &result->value );
 	bigint_multiply ( &step2->parts.high_11bit, &x25519_reduce_256,
-			  &step3->product, &tmp.step3.carry.product );
+			  &step3->product );
 	bigint_add ( &step3->value, &result->value );
 
 	/* Step 1 calculates the product of the input operands, and
