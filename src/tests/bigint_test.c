@@ -78,18 +78,18 @@ void bigint_subtract_sample ( const bigint_element_t *subtrahend0,
 	bigint_subtract ( subtrahend, value );
 }
 
-void bigint_rol_sample ( bigint_element_t *value0, unsigned int size ) {
+void bigint_shl_sample ( bigint_element_t *value0, unsigned int size ) {
 	bigint_t ( size ) *value __attribute__ (( may_alias ))
 		= ( ( void * ) value0 );
 
-	bigint_rol ( value );
+	bigint_shl ( value );
 }
 
-void bigint_ror_sample ( bigint_element_t *value0, unsigned int size ) {
+void bigint_shr_sample ( bigint_element_t *value0, unsigned int size ) {
 	bigint_t ( size ) *value __attribute__ (( may_alias ))
 		= ( ( void * ) value0 );
 
-	bigint_ror ( value );
+	bigint_shr ( value );
 }
 
 int bigint_is_zero_sample ( const bigint_element_t *value0,
@@ -290,12 +290,12 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	} while ( 0 )
 
 /**
- * Report result of big integer left rotation test
+ * Report result of big integer left shift test
  *
  * @v value		Big integer
  * @v expected		Big integer expected result
  */
-#define bigint_rol_ok( value, expected ) do {				\
+#define bigint_shl_ok( value, expected ) do {				\
 	static const uint8_t value_raw[] = value;			\
 	static const uint8_t expected_raw[] = expected;			\
 	uint8_t result_raw[ sizeof ( expected_raw ) ];			\
@@ -305,9 +305,9 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	{} /* Fix emacs alignment */					\
 									\
 	bigint_init ( &value_temp, value_raw, sizeof ( value_raw ) );	\
-	DBG ( "Rotate left:\n" );					\
+	DBG ( "Shift left:\n" );					\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
-	bigint_rol ( &value_temp );					\
+	bigint_shl ( &value_temp );					\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
 	bigint_done ( &value_temp, result_raw, sizeof ( result_raw ) );	\
 									\
@@ -316,12 +316,12 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	} while ( 0 )
 
 /**
- * Report result of big integer right rotation test
+ * Report result of big integer right shift test
  *
  * @v value		Big integer
  * @v expected		Big integer expected result
  */
-#define bigint_ror_ok( value, expected ) do {				\
+#define bigint_shr_ok( value, expected ) do {				\
 	static const uint8_t value_raw[] = value;			\
 	static const uint8_t expected_raw[] = expected;			\
 	uint8_t result_raw[ sizeof ( expected_raw ) ];			\
@@ -331,9 +331,9 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	{} /* Fix emacs alignment */					\
 									\
 	bigint_init ( &value_temp, value_raw, sizeof ( value_raw ) );	\
-	DBG ( "Rotate right:\n" );					\
+	DBG ( "Shift right:\n" );					\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
-	bigint_ror ( &value_temp );					\
+	bigint_shr ( &value_temp );					\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
 	bigint_done ( &value_temp, result_raw, sizeof ( result_raw ) );	\
 									\
@@ -801,15 +801,15 @@ static void bigint_test_exec ( void ) {
 				      0xda, 0xc8, 0x8c, 0x71, 0x86, 0x97,
 				      0x7f, 0xcb, 0x94, 0x31, 0x1d, 0xbc,
 				      0x44, 0x1a ) );
-	bigint_rol_ok ( BIGINT ( 0xe0 ),
+	bigint_shl_ok ( BIGINT ( 0xe0 ),
 			BIGINT ( 0xc0 ) );
-	bigint_rol_ok ( BIGINT ( 0x43, 0x1d ),
+	bigint_shl_ok ( BIGINT ( 0x43, 0x1d ),
 			BIGINT ( 0x86, 0x3a ) );
-	bigint_rol_ok ( BIGINT ( 0xac, 0xed, 0x9b ),
+	bigint_shl_ok ( BIGINT ( 0xac, 0xed, 0x9b ),
 			BIGINT ( 0x59, 0xdb, 0x36 ) );
-	bigint_rol_ok ( BIGINT ( 0x2c, 0xe8, 0x3a, 0x22 ),
+	bigint_shl_ok ( BIGINT ( 0x2c, 0xe8, 0x3a, 0x22 ),
 			BIGINT ( 0x59, 0xd0, 0x74, 0x44 ) );
-	bigint_rol_ok ( BIGINT ( 0x4e, 0x88, 0x4a, 0x05, 0x5e, 0x10, 0xee,
+	bigint_shl_ok ( BIGINT ( 0x4e, 0x88, 0x4a, 0x05, 0x5e, 0x10, 0xee,
 				 0x5b, 0xc6, 0x40, 0x0e, 0x03, 0xd7, 0x0d,
 				 0x28, 0xa5, 0x55, 0xb2, 0x50, 0xef, 0x69,
 				 0xd1, 0x1d ),
@@ -817,7 +817,7 @@ static void bigint_test_exec ( void ) {
 				 0xb7, 0x8c, 0x80, 0x1c, 0x07, 0xae, 0x1a,
 				 0x51, 0x4a, 0xab, 0x64, 0xa1, 0xde, 0xd3,
 				 0xa2, 0x3a ) );
-	bigint_rol_ok ( BIGINT ( 0x07, 0x62, 0x78, 0x70, 0x2e, 0xd4, 0x41,
+	bigint_shl_ok ( BIGINT ( 0x07, 0x62, 0x78, 0x70, 0x2e, 0xd4, 0x41,
 				 0xaa, 0x9b, 0x50, 0xb1, 0x9a, 0x71, 0xf5,
 				 0x1c, 0x2f, 0xe7, 0x0d, 0xf1, 0x46, 0x57,
 				 0x04, 0x99, 0x78, 0x4e, 0x84, 0x78, 0xba,
@@ -855,15 +855,15 @@ static void bigint_test_exec ( void ) {
 				 0x49, 0x7c, 0x1e, 0xdb, 0xc7, 0x65, 0xa6,
 				 0x0e, 0xd1, 0xd2, 0x00, 0xb3, 0x41, 0xc9,
 				 0x3c, 0xbc ) );
-	bigint_ror_ok ( BIGINT ( 0x8f ),
+	bigint_shr_ok ( BIGINT ( 0x8f ),
 			BIGINT ( 0x47 ) );
-	bigint_ror_ok ( BIGINT ( 0xaa, 0x1d ),
+	bigint_shr_ok ( BIGINT ( 0xaa, 0x1d ),
 			BIGINT ( 0x55, 0x0e ) );
-	bigint_ror_ok ( BIGINT ( 0xf0, 0xbd, 0x68 ),
+	bigint_shr_ok ( BIGINT ( 0xf0, 0xbd, 0x68 ),
 			BIGINT ( 0x78, 0x5e, 0xb4 ) );
-	bigint_ror_ok ( BIGINT ( 0x33, 0xa0, 0x3d, 0x95 ),
+	bigint_shr_ok ( BIGINT ( 0x33, 0xa0, 0x3d, 0x95 ),
 			BIGINT ( 0x19, 0xd0, 0x1e, 0xca ) );
-	bigint_ror_ok ( BIGINT ( 0xa1, 0xf4, 0xb9, 0x64, 0x91, 0x99, 0xa1,
+	bigint_shr_ok ( BIGINT ( 0xa1, 0xf4, 0xb9, 0x64, 0x91, 0x99, 0xa1,
 				 0xf4, 0xae, 0xeb, 0x71, 0x97, 0x1b, 0x71,
 				 0x09, 0x38, 0x3f, 0x8f, 0xc5, 0x3a, 0xb9,
 				 0x75, 0x94 ),
@@ -871,7 +871,7 @@ static void bigint_test_exec ( void ) {
 				 0xfa, 0x57, 0x75, 0xb8, 0xcb, 0x8d, 0xb8,
 				 0x84, 0x9c, 0x1f, 0xc7, 0xe2, 0x9d, 0x5c,
 				 0xba, 0xca ) );
-	bigint_ror_ok ( BIGINT ( 0xc0, 0xb3, 0x78, 0x46, 0x69, 0x6e, 0x35,
+	bigint_shr_ok ( BIGINT ( 0xc0, 0xb3, 0x78, 0x46, 0x69, 0x6e, 0x35,
 				 0x94, 0xed, 0x28, 0xdc, 0xfd, 0xf6, 0xdb,
 				 0x2d, 0x24, 0xcb, 0xa4, 0x6f, 0x0e, 0x58,
 				 0x89, 0x04, 0xec, 0xc8, 0x0c, 0x2d, 0xb3,

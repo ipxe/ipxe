@@ -171,7 +171,7 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 		bigint_t ( size * 2 ) result;
 		bigint_t ( size * 2 ) modulus;
 	} *temp = tmp;
-	int rotation;
+	int shift;
 	int i;
 
 	/* Start profiling */
@@ -188,18 +188,18 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 	/* Rescale modulus to match result */
 	profile_start ( &bigint_mod_multiply_rescale_profiler );
 	bigint_grow ( modulus, &temp->modulus );
-	rotation = ( bigint_max_set_bit ( &temp->result ) -
-		     bigint_max_set_bit ( &temp->modulus ) );
-	for ( i = 0 ; i < rotation ; i++ )
-		bigint_rol ( &temp->modulus );
+	shift = ( bigint_max_set_bit ( &temp->result ) -
+		  bigint_max_set_bit ( &temp->modulus ) );
+	for ( i = 0 ; i < shift ; i++ )
+		bigint_shl ( &temp->modulus );
 	profile_stop ( &bigint_mod_multiply_rescale_profiler );
 
 	/* Subtract multiples of modulus */
 	profile_start ( &bigint_mod_multiply_subtract_profiler );
-	for ( i = 0 ; i <= rotation ; i++ ) {
+	for ( i = 0 ; i <= shift ; i++ ) {
 		if ( bigint_is_geq ( &temp->result, &temp->modulus ) )
 			bigint_subtract ( &temp->modulus, &temp->result );
-		bigint_ror ( &temp->modulus );
+		bigint_shr ( &temp->modulus );
 	}
 	profile_stop ( &bigint_mod_multiply_subtract_profiler );
 
@@ -255,7 +255,7 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			bigint_mod_multiply ( result, &temp->base, modulus,
 					      result, temp->mod_multiply );
 		}
-		bigint_ror ( &temp->exponent );
+		bigint_shr ( &temp->exponent );
 		bigint_mod_multiply ( &temp->base, &temp->base, modulus,
 				      &temp->base, temp->mod_multiply );
 	}

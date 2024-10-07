@@ -135,13 +135,13 @@ bigint_subtract_raw ( const unsigned long *subtrahend0, unsigned long *value0,
 }
 
 /**
- * Rotate big integer left
+ * Shift big integer left
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
 static inline __attribute__ (( always_inline )) void
-bigint_rol_raw ( unsigned long *value0, unsigned int size ) {
+bigint_shl_raw ( unsigned long *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	unsigned long *valueN = ( value0 + size );
@@ -174,13 +174,13 @@ bigint_rol_raw ( unsigned long *value0, unsigned int size ) {
 }
 
 /**
- * Rotate big integer right
+ * Shift big integer right
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
 static inline __attribute__ (( always_inline )) void
-bigint_ror_raw ( unsigned long *value0, unsigned int size ) {
+bigint_shr_raw ( unsigned long *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	unsigned long *valueN = ( value0 + size );

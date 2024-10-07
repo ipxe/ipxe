@@ -89,23 +89,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} while ( 0 )
 
 /**
- * Rotate big integer left
+ * Shift big integer left
  *
  * @v value		Big integer
  */
-#define bigint_rol( value ) do {					\
+#define bigint_shl( value ) do {					\
 	unsigned int size = bigint_size (value);			\
-	bigint_rol_raw ( (value)->element, size );			\
+	bigint_shl_raw ( (value)->element, size );			\
 	} while ( 0 )
 
 /**
- * Rotate big integer right
+ * Shift big integer right
  *
  * @v value		Big integer
  */
-#define bigint_ror( value ) do {					\
+#define bigint_shr( value ) do {					\
 	unsigned int size = bigint_size (value);			\
-	bigint_ror_raw ( (value)->element, size );			\
+	bigint_shr_raw ( (value)->element, size );			\
 	} while ( 0 )
 
 /**
@@ -293,8 +293,8 @@ void bigint_add_raw ( const bigint_element_t *addend0,
 		      bigint_element_t *value0, unsigned int size );
 void bigint_subtract_raw ( const bigint_element_t *subtrahend0,
 			   bigint_element_t *value0, unsigned int size );
-void bigint_rol_raw ( bigint_element_t *value0, unsigned int size );
-void bigint_ror_raw ( bigint_element_t *value0, unsigned int size );
+void bigint_shl_raw ( bigint_element_t *value0, unsigned int size );
+void bigint_shr_raw ( bigint_element_t *value0, unsigned int size );
 int bigint_is_zero_raw ( const bigint_element_t *value0, unsigned int size );
 int bigint_is_geq_raw ( const bigint_element_t *value0,
 			const bigint_element_t *reference0,
