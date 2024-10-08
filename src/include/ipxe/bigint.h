@@ -285,6 +285,25 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <bits/bigint.h>
 
+/**
+ * Test if bit is set in big integer
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @v bit		Bit to test
+ * @ret is_set		Bit is set
+ */
+static inline __attribute__ (( always_inline )) int
+bigint_bit_is_set_raw ( const bigint_element_t *value0, unsigned int size,
+			unsigned int bit ) {
+	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( const void * ) value0 );
+	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
+	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
+
+	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
+}
+
 void bigint_init_raw ( bigint_element_t *value0, unsigned int size,
 		       const void *data, size_t len );
 void bigint_done_raw ( const bigint_element_t *value0, unsigned int size,

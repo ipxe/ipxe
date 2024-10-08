@@ -265,25 +265,6 @@ bigint_is_geq_raw ( const uint64_t *value0, const uint64_t *reference0,
 }
 
 /**
- * Test if bit is set in big integer
- *
- * @v value0		Element 0 of big integer
- * @v size		Number of elements
- * @v bit		Bit to test
- * @ret is_set		Bit is set
- */
-static inline __attribute__ (( always_inline )) int
-bigint_bit_is_set_raw ( const uint64_t *value0, unsigned int size,
-			unsigned int bit ) {
-	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
-		( ( const void * ) value0 );
-	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
-	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
-
-	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
-}
-
-/**
  * Find highest bit set in big integer
  *
  * @v value0		Element 0 of big integer
