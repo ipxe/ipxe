@@ -34,21 +34,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Big integer support
  */
 
+/** Modular direct reduction profiler */
+static struct profiler bigint_mod_profiler __profiler =
+	{ .name = "bigint_mod" };
+
 /** Modular multiplication overall profiler */
 static struct profiler bigint_mod_multiply_profiler __profiler =
 	{ .name = "bigint_mod_multiply" };
-
-/** Modular multiplication multiply step profiler */
-static struct profiler bigint_mod_multiply_multiply_profiler __profiler =
-	{ .name = "bigint_mod_multiply.multiply" };
-
-/** Modular multiplication rescale step profiler */
-static struct profiler bigint_mod_multiply_rescale_profiler __profiler =
-	{ .name = "bigint_mod_multiply.rescale" };
-
-/** Modular multiplication subtract step profiler */
-static struct profiler bigint_mod_multiply_subtract_profiler __profiler =
-	{ .name = "bigint_mod_multiply.subtract" };
 
 /**
  * Conditionally swap big integers (in constant time)
@@ -145,6 +137,175 @@ void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 }
 
 /**
+ * Reduce big integer
+ *
+ * @v minuend0		Element 0 of big integer to be reduced
+ * @v minuend_size	Number of elements in minuend
+ * @v modulus0		Element 0 of big integer modulus
+ * @v modulus_size	Number of elements in modulus and result
+ * @v result0		Element 0 of big integer to hold result
+ * @v tmp		Temporary working space
+ */
+void bigint_reduce_raw ( const bigint_element_t *minuend0,
+			 unsigned int minuend_size,
+			 const bigint_element_t *modulus0,
+			 unsigned int modulus_size,
+			 bigint_element_t *result0, void *tmp ) {
+	const bigint_t ( minuend_size ) __attribute__ (( may_alias ))
+		*minuend = ( ( const void * ) minuend0 );
+	const bigint_t ( modulus_size ) __attribute__ (( may_alias ))
+		*modulus = ( ( const void * ) modulus0 );
+	bigint_t ( modulus_size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	struct {
+		bigint_t ( minuend_size ) minuend;
+		bigint_t ( minuend_size ) modulus;
+	} *temp = tmp;
+	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
+	const bigint_element_t msb_mask = ( 1UL << ( width - 1 ) );
+	bigint_element_t *element;
+	unsigned int minuend_max;
+	unsigned int modulus_max;
+	unsigned int subshift;
+	bigint_element_t msb;
+	int offset;
+	int shift;
+	int i;
+
+	/* Start profiling */
+	profile_start ( &bigint_mod_profiler );
+
+	/* Sanity check */
+	assert ( minuend_size >= modulus_size );
+	assert ( sizeof ( *temp ) == bigint_reduce_tmp_len ( minuend ) );
+
+	/* Copy minuend and modulus to temporary working space */
+	bigint_shrink ( minuend, &temp->minuend );
+	bigint_grow ( modulus, &temp->modulus );
+
+	/* Normalise the modulus
+	 *
+	 * Scale the modulus by shifting left such that both modulus
+	 * "m" and minuend "x" have the same most significant set bit.
+	 * (If this is not possible, then the minuend is already less
+	 * than the modulus, and we may therefore skip reduction
+	 * completely.)
+	 */
+	minuend_max = bigint_max_set_bit ( minuend );
+	modulus_max = bigint_max_set_bit ( modulus );
+	shift = ( minuend_max - modulus_max );
+	if ( shift < 0 )
+		goto skip;
+	subshift = ( shift & ( width - 1 ) );
+	offset = ( shift / width );
+	element = temp->modulus.element;
+	for ( i = ( ( minuend_max - 1 ) / width ) ; ; i-- ) {
+		element[i] = ( element[ i - offset ] << subshift );
+		if ( i <= offset )
+			break;
+		if ( subshift ) {
+			element[i] |= ( element[ i - offset - 1 ]
+					>> ( width - subshift ) );
+		}
+	}
+	for ( i-- ; i >= 0 ; i-- )
+		element[i] = 0;
+
+	/* Reduce the minuend "x" by iteratively adding or subtracting
+	 * the scaled modulus "m".
+	 *
+	 * On each loop iteration, we maintain the invariant:
+	 *
+	 *    -2m <= x < 2m
+	 *
+	 * If x is positive, we obtain the new minuend x' by
+	 * subtracting m, otherwise we add m:
+	 *
+	 *      0 <= x < 2m   =>   x' := x - m   =>   -m <= x' < m
+	 *    -2m <= x < 0    =>   x' := x + m   =>   -m <= x' < m
+	 *
+	 * and then halve the modulus (by shifting right):
+	 *
+	 *      m' = m/2
+	 *
+	 * We therefore end up with:
+	 *
+	 *     -m <= x' < m   =>   -2m' <= x' < 2m'
+	 *
+	 * i.e. we have preseved the invariant while reducing the
+	 * bounds on x' by one power of two.
+	 *
+	 * The issue remains of how to determine on each iteration
+	 * whether or not x is currently positive, given that both
+	 * input values are unsigned big integers that may use all
+	 * available bits (including the MSB).
+	 *
+	 * On the first loop iteration, we may simply assume that x is
+	 * positive, since it is unmodified from the input value and
+	 * so is positive by definition (even if the MSB is set).  We
+	 * therefore unconditionally perform a subtraction on the
+	 * first loop iteration.
+	 *
+	 * Let k be the MSB after normalisation.  We then have:
+	 *
+	 *    2^k <= m < 2^(k+1)
+	 *    2^k <= x < 2^(k+1)
+	 *
+	 * On the first loop iteration, we therefore have:
+	 *
+	 *     x' = (x - m)
+	 *        < 2^(k+1) - 2^k
+	 *        < 2^k
+	 *
+	 * Any positive value of x' therefore has its MSB set to zero,
+	 * and so we may validly treat the MSB of x' as a sign bit at
+	 * the end of the first loop iteration.
+	 *
+	 * On all subsequent loop iterations, the starting value m is
+	 * guaranteed to have its MSB set to zero (since it has
+	 * already been shifted right at least once).  Since we know
+	 * from above that we preserve the loop invariant:
+	 *
+	 *     -m <= x' < m
+	 *
+	 * we immediately know that any positive value of x' also has
+	 * its MSB set to zero, and so we may validly treat the MSB of
+	 * x' as a sign bit at the end of all subsequent loop
+	 * iterations.
+	 *
+	 * After the last loop iteration (when m' has been shifted
+	 * back down to the original value of the modulus), we may
+	 * need to add a single multiple of m' to ensure that x' is
+	 * positive, i.e. lies within the range 0 <= x' < m'.  To
+	 * allow for reusing the (inlined) expansion of
+	 * bigint_subtract(), we achieve this via a potential
+	 * additional loop iteration that performs the addition and is
+	 * then guaranteed to terminate (since the result will be
+	 * positive).
+	 */
+	for ( msb = 0 ; ( msb || ( shift >= 0 ) ) ; shift-- ) {
+		if ( msb ) {
+			bigint_add ( &temp->modulus, &temp->minuend );
+		} else {
+			bigint_subtract ( &temp->modulus, &temp->minuend );
+		}
+		msb = ( temp->minuend.element[ minuend_size - 1 ] & msb_mask );
+		if ( shift > 0 )
+			bigint_shr ( &temp->modulus );
+	}
+
+ skip:
+	/* Sanity check */
+	assert ( ! bigint_is_geq ( &temp->minuend, &temp->modulus ) );
+
+	/* Copy result */
+	bigint_shrink ( &temp->minuend, result );
+
+	/* Stop profiling */
+	profile_stop ( &bigint_mod_profiler );
+}
+
+/**
  * Perform modular multiplication of big integers
  *
  * @v multiplicand0	Element 0 of big integer to be multiplied
@@ -171,8 +332,6 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 		bigint_t ( size * 2 ) result;
 		bigint_t ( size * 2 ) modulus;
 	} *temp = tmp;
-	int shift;
-	int i;
 
 	/* Start profiling */
 	profile_start ( &bigint_mod_multiply_profiler );
@@ -181,33 +340,13 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 	assert ( sizeof ( *temp ) == bigint_mod_multiply_tmp_len ( modulus ) );
 
 	/* Perform multiplication */
-	profile_start ( &bigint_mod_multiply_multiply_profiler );
 	bigint_multiply ( multiplicand, multiplier, &temp->result );
-	profile_stop ( &bigint_mod_multiply_multiply_profiler );
 
-	/* Rescale modulus to match result */
-	profile_start ( &bigint_mod_multiply_rescale_profiler );
-	bigint_grow ( modulus, &temp->modulus );
-	shift = ( bigint_max_set_bit ( &temp->result ) -
-		  bigint_max_set_bit ( &temp->modulus ) );
-	for ( i = 0 ; i < shift ; i++ )
-		bigint_shl ( &temp->modulus );
-	profile_stop ( &bigint_mod_multiply_rescale_profiler );
-
-	/* Subtract multiples of modulus */
-	profile_start ( &bigint_mod_multiply_subtract_profiler );
-	for ( i = 0 ; i <= shift ; i++ ) {
-		if ( bigint_is_geq ( &temp->result, &temp->modulus ) )
-			bigint_subtract ( &temp->modulus, &temp->result );
-		bigint_shr ( &temp->modulus );
-	}
-	profile_stop ( &bigint_mod_multiply_subtract_profiler );
-
-	/* Resize result */
-	bigint_shrink ( &temp->result, result );
+	/* Reduce result */
+	bigint_reduce ( &temp->result, modulus, result, temp );
 
 	/* Sanity check */
-	assert ( bigint_is_geq ( modulus, result ) );
+	assert ( ! bigint_is_geq ( result, modulus ) );
 
 	/* Stop profiling */
 	profile_stop ( &bigint_mod_multiply_profiler );
