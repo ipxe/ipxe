@@ -1323,7 +1323,8 @@ usb_probe_all ( struct usb_device *usb,
 		func->name = func->dev.name;
 		func->usb = usb;
 		func->dev.desc.bus_type = BUS_TYPE_USB;
-		func->dev.desc.location = usb->address;
+		func->dev.desc.location =
+			USB_BUSDEV ( bus->address, usb->address );
 		func->dev.desc.vendor = le16_to_cpu ( usb->device.vendor );
 		func->dev.desc.device = le16_to_cpu ( usb->device.product );
 		snprintf ( func->dev.name, sizeof ( func->dev.name ),
@@ -1725,6 +1726,25 @@ static void free_usb ( struct usb_device *usb ) {
 	free ( usb );
 }
 
+/**
+ * Find USB device by address
+ *
+ * @v bus		USB bus
+ * @v address		Device address
+ * @ret usb		USB device, or NULL if not found
+ */
+struct usb_device * find_usb ( struct usb_bus *bus, unsigned int address ) {
+	struct usb_device *usb;
+
+	/* Search for a matching non-zero address */
+	list_for_each_entry ( usb, &bus->devices, list ) {
+		if ( address && ( usb->address == address ) )
+			return usb;
+	}
+
+	return NULL;
+}
+
 /******************************************************************************
  *
  * USB device hotplug event handling
@@ -2115,6 +2135,11 @@ int register_usb_bus ( struct usb_bus *bus ) {
 	/* Sanity checks */
 	assert ( bus->hub != NULL );
 
+	/* Assign the first available bus address */
+	bus->address = 0;
+	while ( find_usb_bus ( bus->address ) != NULL )
+		bus->address++;
+
 	/* Open bus */
 	if ( ( rc = bus->host->open ( bus ) ) != 0 )
 		goto err_open;
@@ -2188,6 +2213,23 @@ void free_usb_bus ( struct usb_bus *bus ) {
 }
 
 /**
+ * Find USB bus by address
+ *
+ * @v address		Bus address
+ * @ret bus		USB bus, or NULL
+ */
+struct usb_bus * find_usb_bus ( unsigned int address ) {
+	struct usb_bus *bus;
+
+	for_each_usb_bus ( bus ) {
+		if ( bus->address == address )
+			return bus;
+	}
+
+	return NULL;
+}
+
+/**
  * Find USB bus by device location
  *
  * @v bus_type		Bus type
@@ -2209,7 +2251,7 @@ struct usb_bus * find_usb_bus_by_location ( unsigned int bus_type,
 
 /******************************************************************************
  *
- * USB address assignment
+ * USB device addressing
  *
  ******************************************************************************
  */
@@ -2248,6 +2290,35 @@ void usb_free_address ( struct usb_bus *bus, unsigned int address ) {
 
 	/* Mark address as free */
 	bus->addresses &= ~( 1ULL << ( address - 1 ) );
+}
+
+/**
+ * Find next USB device
+ *
+ * @v usb		USB device to fill in
+ * @v busdev		Starting bus:dev address
+ * @ret busdev		Bus:dev address of next USB device
+ * @ret rc		Return status code
+ */
+int usb_find_next ( struct usb_device **usb, uint16_t *busdev ) {
+	struct usb_bus *bus;
+
+	do {
+		/* Find USB bus, if any */
+		bus = find_usb_bus ( USB_BUS ( *busdev ) );
+		if ( ! bus ) {
+			*busdev |= ( USB_BUS ( 1 ) - 1 );
+			continue;
+		}
+
+		/* Find USB device, if any */
+		*usb = find_usb ( bus, USB_DEV ( *busdev ) );
+		if ( *usb )
+			return 0;
+
+	} while ( ++(*busdev) );
+
+	return -ENODEV;
 }
 
 /******************************************************************************
