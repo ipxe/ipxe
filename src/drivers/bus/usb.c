@@ -914,10 +914,9 @@ static unsigned int usb_get_default_language ( struct usb_device *usb ) {
  */
 int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
 				unsigned int language, char *buf, size_t len ) {
-	size_t max = ( len ? ( len - 1 /* NUL */ ) : 0 );
 	struct {
 		struct usb_descriptor_header header;
-		uint16_t character[max];
+		uint16_t character[len];
 	} __attribute__ (( packed )) *desc;
 	unsigned int actual;
 	unsigned int i;
@@ -952,10 +951,9 @@ int usb_get_string_descriptor ( struct usb_device *usb, unsigned int index,
 		   sizeof ( desc->character[0] ) );
 
 	/* Copy to buffer */
-	for ( i = 0 ; ( ( i < actual ) && ( i < max ) ) ; i++ )
+	memset ( buf, 0, len );
+	for ( i = 0 ; ( ( i < actual ) && ( i < len ) ) ; i++ )
 		buf[i] = le16_to_cpu ( desc->character[i] );
-	if ( len )
-		buf[i] = '\0';
 
 	/* Free buffer */
 	free ( desc );
