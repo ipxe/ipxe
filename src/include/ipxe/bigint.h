@@ -247,6 +247,31 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} ); } )
 
 /**
+ * Compute inverse of odd big integer modulo its own size
+ *
+ * @v invertend		Odd big integer to be inverted
+ * @v inverse		Big integer to hold result
+ * @v tmp		Temporary working space
+ */
+#define bigint_mod_invert( invertend, inverse, tmp ) do {		\
+	unsigned int size = bigint_size (invertend);			\
+	bigint_mod_invert_raw ( (invertend)->element,			\
+				(inverse)->element, size, tmp );	\
+	} while ( 0 )
+
+/**
+ * Calculate temporary working space required for modular inversion
+ *
+ * @v invertend		Odd big integer to be inverted
+ * @ret len		Length of temporary working space
+ */
+#define bigint_mod_invert_tmp_len( invertend ) ( {			\
+	unsigned int size = bigint_size (invertend);			\
+	sizeof ( struct {						\
+		bigint_t ( size ) temp_residue;				\
+	} ); } )
+
+/**
  * Perform modular multiplication of big integers
  *
  * @v multiplicand	Big integer to be multiplied
@@ -373,6 +398,9 @@ void bigint_reduce_raw ( const bigint_element_t *minuend0,
 			 const bigint_element_t *modulus0,
 			 unsigned int modulus_size,
 			 bigint_element_t *result0, void *tmp );
+void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
+			     bigint_element_t *inverse0,
+			     unsigned int size, void *tmp );
 void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 			       const bigint_element_t *multiplier0,
 			       const bigint_element_t *modulus0,

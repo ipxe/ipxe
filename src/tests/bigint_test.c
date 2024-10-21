@@ -200,6 +200,17 @@ void bigint_reduce_sample ( const bigint_element_t *minuend0,
 	bigint_reduce ( minuend, modulus, result, tmp );
 }
 
+void bigint_mod_invert_sample ( const bigint_element_t *invertend0,
+				bigint_element_t *inverse0,
+				unsigned int size, void *tmp ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*invertend = ( ( const void * ) invertend0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*inverse = ( ( void * ) inverse0 );
+
+	bigint_mod_invert ( invertend, inverse, tmp );
+}
+
 void bigint_mod_multiply_sample ( const bigint_element_t *multiplicand0,
 				  const bigint_element_t *multiplier0,
 				  const bigint_element_t *modulus0,
@@ -571,6 +582,39 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 									\
 	ok ( memcmp ( result_raw, expected_raw,				\
 		      sizeof ( result_raw ) ) == 0 );			\
+	} while ( 0 )
+
+/**
+ * Report result of big integer modular inversion test
+ *
+ * @v invertend		Big integer to be inverted
+ * @v expected		Big integer expected result
+ */
+#define bigint_mod_invert_ok( invertend, expected ) do {		\
+	static const uint8_t invertend_raw[] = invertend;		\
+	static const uint8_t expected_raw[] = expected;			\
+	uint8_t inverse_raw[ sizeof ( expected_raw ) ];			\
+	unsigned int size =						\
+		bigint_required_size ( sizeof ( invertend_raw ) );	\
+	bigint_t ( size ) invertend_temp;				\
+	bigint_t ( size ) inverse_temp;					\
+	size_t tmp_len = bigint_mod_invert_tmp_len ( &invertend_temp );	\
+	uint8_t tmp[tmp_len];						\
+	{} /* Fix emacs alignment */					\
+									\
+	assert ( bigint_size ( &invertend_temp ) ==			\
+		 bigint_size ( &inverse_temp ) );			\
+	bigint_init ( &invertend_temp, invertend_raw,			\
+		      sizeof ( invertend_raw ) );			\
+	DBG ( "Modular invert:\n" );					\
+	DBG_HDA ( 0, &invertend_temp, sizeof ( invertend_temp ) );	\
+	bigint_mod_invert ( &invertend_temp, &inverse_temp, tmp );	\
+	DBG_HDA ( 0, &inverse_temp, sizeof ( inverse_temp ) );		\
+	bigint_done ( &inverse_temp, inverse_raw,			\
+		      sizeof ( inverse_raw ) );				\
+									\
+	ok ( memcmp ( inverse_raw, expected_raw,			\
+		      sizeof ( inverse_raw ) ) == 0 );			\
 	} while ( 0 )
 
 /**
@@ -1760,6 +1804,23 @@ static void bigint_test_exec ( void ) {
 				    0xfb, 0x5d, 0x55 ),
 			   BIGINT ( 0x27, 0x31, 0x49, 0xc3, 0xf5, 0x06, 0x1f,
 				    0x3c, 0x7c, 0xd5 ) );
+	bigint_mod_invert_ok ( BIGINT ( 0x01 ), BIGINT ( 0x01 ) );
+	bigint_mod_invert_ok ( BIGINT ( 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+					0xff, 0xff ),
+			       BIGINT ( 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+					0xff, 0xff ) );
+	bigint_mod_invert_ok ( BIGINT ( 0x95, 0x6a, 0xc5, 0xe7, 0x2e, 0x5b,
+					0x44, 0xed, 0xbf, 0x7e, 0xfe, 0x8d,
+					0xf4, 0x5a, 0x48, 0xc1 ),
+			       BIGINT ( 0xad, 0xb8, 0x3d, 0x85, 0x10, 0xdf,
+					0xea, 0x70, 0x71, 0x2c, 0x80, 0xf4,
+					0x6e, 0x66, 0x47, 0x41 ) );
+	bigint_mod_invert_ok ( BIGINT ( 0x35, 0xe4, 0x80, 0x48, 0xdd, 0xa1,
+					0x46, 0xc0, 0x84, 0x63, 0xc1, 0xe4,
+					0xf7, 0xbf, 0xb3, 0x05 ),
+			       BIGINT ( 0xf2, 0x9c, 0x63, 0x29, 0xfa, 0xe4,
+					0xbf, 0x90, 0xa6, 0x9a, 0xec, 0xcf,
+					0x5f, 0xe2, 0x21, 0xcd ) );
 	bigint_mod_multiply_ok ( BIGINT ( 0x37 ),
 				 BIGINT ( 0x67 ),
 				 BIGINT ( 0x3f ),

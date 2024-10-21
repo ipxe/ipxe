@@ -306,6 +306,60 @@ void bigint_reduce_raw ( const bigint_element_t *minuend0,
 }
 
 /**
+ * Compute inverse of odd big integer modulo any power of two
+ *
+ * @v invertend0	Element 0 of odd big integer to be inverted
+ * @v inverse0		Element 0 of big integer to hold result
+ * @v size		Number of elements in invertend and result
+ * @v tmp		Temporary working space
+ */
+void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
+			     bigint_element_t *inverse0,
+			     unsigned int size, void *tmp ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*invertend = ( ( const void * ) invertend0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*inverse = ( ( void * ) inverse0 );
+	struct {
+		bigint_t ( size ) residue;
+	} *temp = tmp;
+	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
+	unsigned int i;
+
+	/* Sanity check */
+	assert ( invertend->element[0] & 1 );
+
+	/* Initialise temporary working space and output value */
+	memset ( &temp->residue, 0xff, sizeof ( temp->residue ) );
+	memset ( inverse, 0, sizeof ( *inverse ) );
+
+	/* Compute inverse modulo 2^(width)
+	 *
+	 * This method is a lightly modified version of the pseudocode
+	 * presented in "A New Algorithm for Inversion mod p^k (Koç,
+	 * 2017)".
+	 *
+	 * Each loop iteration calculates one bit of the inverse.  The
+	 * residue value is the two's complement negation of the value
+	 * "b" as used by Koç, to allow for division by two using a
+	 * logical right shift (since we have no arithmetic right
+	 * shift operation for big integers).
+	 *
+	 * Due to the suffix property of inverses mod 2^k, the result
+	 * represents the least significant bits of the inverse modulo
+	 * an arbitrarily large 2^k.
+	 */
+	for ( i = 0 ; i < ( 8 * sizeof ( *inverse ) ) ; i++ ) {
+		if ( temp->residue.element[0] & 1 ) {
+			inverse->element[ i / width ] |=
+				( 1UL << ( i % width ) );
+			bigint_add ( invertend, &temp->residue );
+		}
+		bigint_shr ( &temp->residue );
+	}
+}
+
+/**
  * Perform modular multiplication of big integers
  *
  * @v multiplicand0	Element 0 of big integer to be multiplied
