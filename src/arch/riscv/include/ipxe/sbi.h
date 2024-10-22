@@ -148,6 +148,16 @@ sbi_ecall_3 ( int eid, int fid, unsigned long p0, unsigned long p1,
 	return ret;
 }
 
+/** Convert an SBI error code to an iPXE status code */
+#define ESBI( error ) EPLATFORM ( EINFO_EPLATFORM, error )
+
+/** System reset extension */
+#define SBI_SRST SBI_EID ( 'S', 'R', 'S', 'T' )
+#define SBI_SRST_SYSTEM_RESET 0x00	/**< Reset system */
+#define SBI_RESET_SHUTDOWN 0x00000000	/**< Shutdown */
+#define SBI_RESET_COLD 0x00000001	/**< Cold reboot */
+#define SBI_RESET_WARM 0x00000002	/**< Warm reboot */
+
 /** Debug console extension */
 #define SBI_DBCN SBI_EID ( 'D', 'B', 'C', 'N' )
 #define SBI_DBCN_WRITE 0x00		/**< Console Write */
