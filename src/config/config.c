@@ -78,6 +78,9 @@ REQUIRE_OBJECT ( vmconsole );
 #ifdef CONSOLE_DEBUGCON
 REQUIRE_OBJECT ( debugcon );
 #endif
+#ifdef CONSOLE_SBI
+REQUIRE_OBJECT ( sbi_console );
+#endif
 
 /*
  * Drag in all requested network protocols
