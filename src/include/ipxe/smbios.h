@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	PROVIDE_SINGLE_API ( SMBIOS_PREFIX_ ## _subsys, _api_func, _func )
 
 /* Include all architecture-independent SMBIOS API headers */
+#include <ipxe/null_smbios.h>
 #include <ipxe/efi/efi_smbios.h>
 #include <ipxe/linux/linux_smbios.h>
 
