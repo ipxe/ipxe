@@ -9,7 +9,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#define UACCESS_EFI
+#define UACCESS_FLAT
 #define IOMAP_VIRT
 #define PCIAPI_EFI
 #define DMAAPI_OP

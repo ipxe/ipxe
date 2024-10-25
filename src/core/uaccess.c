@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2024 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -24,21 +24,21 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/uaccess.h>
-#include <ipxe/efi/efi.h>
 
 /** @file
  *
- * iPXE user access API for EFI
+ * iPXE user access API
  *
  */
 
-PROVIDE_UACCESS_INLINE ( efi, phys_to_user );
-PROVIDE_UACCESS_INLINE ( efi, user_to_phys );
-PROVIDE_UACCESS_INLINE ( efi, virt_to_user );
-PROVIDE_UACCESS_INLINE ( efi, user_to_virt );
-PROVIDE_UACCESS_INLINE ( efi, userptr_add );
-PROVIDE_UACCESS_INLINE ( efi, memcpy_user );
-PROVIDE_UACCESS_INLINE ( efi, memmove_user );
-PROVIDE_UACCESS_INLINE ( efi, memset_user );
-PROVIDE_UACCESS_INLINE ( efi, strlen_user );
-PROVIDE_UACCESS_INLINE ( efi, memchr_user );
+/* Flat address space user access API */
+PROVIDE_UACCESS_INLINE ( flat, phys_to_user );
+PROVIDE_UACCESS_INLINE ( flat, user_to_phys );
+PROVIDE_UACCESS_INLINE ( flat, virt_to_user );
+PROVIDE_UACCESS_INLINE ( flat, user_to_virt );
+PROVIDE_UACCESS_INLINE ( flat, userptr_add );
+PROVIDE_UACCESS_INLINE ( flat, memcpy_user );
+PROVIDE_UACCESS_INLINE ( flat, memmove_user );
+PROVIDE_UACCESS_INLINE ( flat, memset_user );
+PROVIDE_UACCESS_INLINE ( flat, strlen_user );
+PROVIDE_UACCESS_INLINE ( flat, memchr_user );

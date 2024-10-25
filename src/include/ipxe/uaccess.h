@@ -26,6 +26,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/api.h>
 #include <config/ioapi.h>
 
+#ifdef UACCESS_FLAT
+#define UACCESS_PREFIX_flat
+#else
+#define UACCESS_PREFIX_flat __flat_
+#endif
+
 /**
  * A pointer to a user buffer
  *
@@ -216,8 +222,76 @@ trivial_memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
 #define PROVIDE_UACCESS_INLINE( _subsys, _api_func ) \
 	PROVIDE_SINGLE_API_INLINE ( UACCESS_PREFIX_ ## _subsys, _api_func )
 
+static inline __always_inline userptr_t
+UACCESS_INLINE ( flat, phys_to_user ) ( unsigned long phys_addr ) {
+	return phys_addr;
+}
+
+static inline __always_inline unsigned long
+UACCESS_INLINE ( flat, user_to_phys ) ( userptr_t userptr, off_t offset ) {
+	return ( userptr + offset );
+}
+
+static inline __always_inline userptr_t
+UACCESS_INLINE ( flat, virt_to_user ) ( volatile const void *addr ) {
+	return trivial_virt_to_user ( addr );
+}
+
+static inline __always_inline void *
+UACCESS_INLINE ( flat, user_to_virt ) ( userptr_t userptr, off_t offset ) {
+	return trivial_user_to_virt ( userptr, offset );
+}
+
+static inline __always_inline userptr_t
+UACCESS_INLINE ( flat, userptr_add ) ( userptr_t userptr, off_t offset ) {
+	return trivial_userptr_add ( userptr, offset );
+}
+
+static inline __always_inline off_t
+UACCESS_INLINE ( flat, userptr_sub ) ( userptr_t userptr,
+				       userptr_t subtrahend ) {
+	return trivial_userptr_sub ( userptr, subtrahend );
+}
+
+static inline __always_inline void
+UACCESS_INLINE ( flat, memcpy_user ) ( userptr_t dest, off_t dest_off,
+				       userptr_t src, off_t src_off,
+				       size_t len ) {
+	trivial_memcpy_user ( dest, dest_off, src, src_off, len );
+}
+
+static inline __always_inline void
+UACCESS_INLINE ( flat, memmove_user ) ( userptr_t dest, off_t dest_off,
+					userptr_t src, off_t src_off,
+					size_t len ) {
+	trivial_memmove_user ( dest, dest_off, src, src_off, len );
+}
+
+static inline __always_inline int
+UACCESS_INLINE ( flat, memcmp_user ) ( userptr_t first, off_t first_off,
+				       userptr_t second, off_t second_off,
+				       size_t len ) {
+	return trivial_memcmp_user ( first, first_off, second, second_off, len);
+}
+
+static inline __always_inline void
+UACCESS_INLINE ( flat, memset_user ) ( userptr_t buffer, off_t offset,
+				       int c, size_t len ) {
+	trivial_memset_user ( buffer, offset, c, len );
+}
+
+static inline __always_inline size_t
+UACCESS_INLINE ( flat, strlen_user ) ( userptr_t buffer, off_t offset ) {
+	return trivial_strlen_user ( buffer, offset );
+}
+
+static inline __always_inline off_t
+UACCESS_INLINE ( flat, memchr_user ) ( userptr_t buffer, off_t offset,
+				       int c, size_t len ) {
+	return trivial_memchr_user ( buffer, offset, c, len );
+}
+
 /* Include all architecture-independent user access API headers */
-#include <ipxe/efi/efi_uaccess.h>
 #include <ipxe/linux/linux_uaccess.h>
 
 /* Include all architecture-dependent user access API headers */
