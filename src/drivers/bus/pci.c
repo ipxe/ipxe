@@ -438,3 +438,9 @@ struct root_device pci_root_device __root_device = {
 	.dev = { .name = "PCI" },
 	.driver = &pci_root_driver,
 };
+
+/* Drag in objects via pcibus_probe() */
+REQUIRING_SYMBOL ( pcibus_probe );
+
+/* Drag in PCI configuration */
+REQUIRE_OBJECT ( config_pci );
