@@ -59,6 +59,7 @@ struct pci_range {
 	PROVIDE_SINGLE_API_INLINE ( PCIAPI_PREFIX_ ## _subsys, _api_func )
 
 /* Include all architecture-independent I/O API headers */
+#include <ipxe/null_pci.h>
 #include <ipxe/ecam_io.h>
 #include <ipxe/efi/efi_pci_api.h>
 #include <ipxe/linux/linux_pci.h>
