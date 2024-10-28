@@ -284,7 +284,7 @@ ifeq ($(wildcard $(BIN)),)
 $(shell $(MKDIR) -p $(BIN))
 endif
 
-# Target to allow e.g. "make bin-efi arch"
+# Target to allow e.g. "make bin-x86_64-efi arch"
 #
 $(BIN) :
 	@# Do nothing, silently
@@ -333,8 +333,13 @@ else
 BIN_AP		:= $(BIN_APS)
 BIN_SECUREBOOT	:= 0
 endif
-BIN_PLATFORM	:= $(lastword $(BIN_AP))
-BIN_ARCH	:= $(wordlist 2,$(words $(BIN_AP)),discard $(BIN_AP))
+ifeq ($(BIN_AP),efi)
+BIN_ARCH	:= i386
+BIN_PLATFORM	:= efi
+else
+BIN_ARCH	:= $(word 1,$(BIN_AP))
+BIN_PLATFORM	:= $(word 2,$(BIN_AP))
+endif
 
 # Determine build architecture
 DEFAULT_ARCH	:= i386
@@ -345,8 +350,10 @@ arch :
 .PHONY : arch
 
 # Determine build platform
-DEFAULT_PLATFORM := pcbios
-PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM))
+DEFAULT_PLATFORM_i386 := pcbios
+DEFAULT_PLATFORM_x86_64 := pcbios
+DEFAULT_PLATFORM := $(DEFAULT_PLATFORM_$(ARCH))
+PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM) none)
 CFLAGS		+= -DPLATFORM=$(PLATFORM) -DPLATFORM_$(PLATFORM)
 platform :
 	@$(ECHO) $(PLATFORM)
