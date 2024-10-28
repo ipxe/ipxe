@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <ipxe/hart.h>
+#include <ipxe/csr.h>
 #include <ipxe/entropy.h>
 #include <ipxe/drbg.h>
 
@@ -58,6 +59,12 @@ static int zkr_entropy_enable ( void ) {
 	if ( ( rc = hart_supported ( "_zkr" ) ) != 0 ) {
 		DBGC ( colour, "ZKR not supported: %s\n", strerror ( rc ) );
 		return rc;
+	}
+
+	/* Check if seed CSR is accessible in S-mode */
+	if ( ! csr_can_write ( "seed", 0 ) ) {
+		DBGC ( colour, "ZKR cannot access seed CSR\n" );
+		return -ENOTSUP;
 	}
 
 	/* RISC-V ISA mandates that 128 bits of full entropy shall be
