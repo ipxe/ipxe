@@ -64,7 +64,7 @@ rdtime_low ( void ) {
 	unsigned long time;
 
 	/* Read low XLEN bits of current time */
-	__asm__ ( "rdtime %0" : "=r" ( time ) );
+	__asm__ __volatile__ ( "rdtime %0" : "=r" ( time ) );
 	return time;
 }
 
@@ -86,14 +86,15 @@ rdtime_scaled ( void ) {
 
 	/* Read full current time */
 #if __riscv_xlen >= 64
-	__asm__ ( "rdtime %0" : "=r" ( u.time ) );
+	__asm__ __volatile__ ( "rdtime %0" : "=r" ( u.time ) );
 #else
-	__asm__ ( "1:\n\t"
-		  "rdtimeh %1\n\t"
-		  "rdtime %0\n\t"
-		  "rdtimeh %2\n\t"
-		  "bne %1, %2, 1b\n\t"
-		  : "=r" ( u.low ), "=r" ( u.high ), "=r" ( tmp ) );
+	__asm__ __volatile__ ( "1:\n\t"
+			       "rdtimeh %1\n\t"
+			       "rdtime %0\n\t"
+			       "rdtimeh %2\n\t"
+			       "bne %1, %2, 1b\n\t"
+			       : "=r" ( u.low ), "=r" ( u.high ),
+				 "=r" ( tmp ) );
 #endif
 
 	/* Scale time to avoid XLEN-bit rollover */

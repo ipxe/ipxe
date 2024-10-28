@@ -85,7 +85,8 @@ static int zkr_get_noise ( noise_sample_t *noise ) {
 	for ( i = 0 ; i < ZKR_SEED_MAX_RETRY ; i++ ) {
 
 		/* Read seed CSR */
-		__asm__ ( "csrrw %0, seed, zero" : "=r" ( seed ) );
+		__asm__ __volatile__ ( "csrrw %0, seed, zero" :
+				       "=r" ( seed ) );
 
 		/* Check operationsl state */
 		if ( ( seed & ZKR_SEED_OPST_MASK ) == ZKR_SEED_OPST_ES16 ) {
