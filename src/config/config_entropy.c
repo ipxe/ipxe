@@ -49,3 +49,6 @@ REQUIRE_OBJECT ( linux_entropy );
 #ifdef ENTROPY_RDRAND
 REQUIRE_OBJECT ( rdrand );
 #endif
+#ifdef ENTROPY_ZKR
+REQUIRE_OBJECT ( zkr );
+#endif
