@@ -11,6 +11,7 @@ INCDIRS		:= arch/$(ARCH)/include arch/riscv/include $(INCDIRS)
 #
 SRCDIRS		+= arch/riscv/core
 SRCDIRS		+= arch/riscv/interface/sbi
+SRCDIRS		+= arch/riscv/prefix
 
 # RISCV-specific flags
 #

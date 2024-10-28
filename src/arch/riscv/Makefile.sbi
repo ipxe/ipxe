@@ -1,0 +1,16 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Build a position-independent executable, with relocations required
+# only for data values.  Runtime relocations are applied by the
+# prefix code.
+#
+CFLAGS		+= -mcmodel=medany -fpie
+LDFLAGS		+= -pie --no-dynamic-linker
+
+# Linker script
+#
+LDSCRIPT	= arch/riscv/scripts/sbi.lds
+
+# Media types
+#
+MEDIA		+= sbi
