@@ -563,7 +563,6 @@ void x25519_invert ( const union x25519_oct258 *invertend,
  * @v value		Big integer to be subtracted from, if possible
  */
 static void x25519_reduce_by ( const x25519_t *subtrahend, x25519_t *value ) {
-	unsigned int max_bit = ( ( 8 * sizeof ( *value ) ) - 1 );
 	x25519_t tmp;
 
 	/* Conditionally subtract subtrahend
@@ -573,7 +572,7 @@ static void x25519_reduce_by ( const x25519_t *subtrahend, x25519_t *value ) {
 	 */
 	bigint_copy ( value, &tmp );
 	bigint_subtract ( subtrahend, value );
-	bigint_swap ( value, &tmp, bigint_bit_is_set ( value, max_bit ) );
+	bigint_swap ( value, &tmp, bigint_msb_is_set ( value ) );
 }
 
 /**

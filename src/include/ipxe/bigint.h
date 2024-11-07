@@ -143,6 +143,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	bigint_bit_is_set_raw ( (value)->element, size, bit ); } )
 
 /**
+ * Test if most significant bit is set in big integer
+ *
+ * @v value		Big integer
+ * @ret is_set		Most significant bit is set
+ */
+#define bigint_msb_is_set( value ) ( {					\
+	unsigned int size = bigint_size (value);			\
+	bigint_msb_is_set_raw ( (value)->element, size ); } )
+
+/**
  * Find highest bit set in big integer
  *
  * @v value		Big integer
@@ -354,6 +364,23 @@ bigint_bit_is_set_raw ( const bigint_element_t *value0, unsigned int size,
 		( ( const void * ) value0 );
 	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
 	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
+
+	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
+}
+
+/**
+ * Test if most significant bit is set in big integer
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @ret is_set		Most significant bit is set
+ */
+static inline __attribute__ (( always_inline )) int
+bigint_msb_is_set_raw ( const bigint_element_t *value0, unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( const void * ) value0 );
+	unsigned int index = ( size - 1 );
+	unsigned int subindex = ( ( 8 * sizeof ( value->element[0] ) ) - 1 );
 
 	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
 }

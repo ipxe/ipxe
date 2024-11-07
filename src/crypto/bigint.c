@@ -162,14 +162,13 @@ void bigint_reduce_raw ( const bigint_element_t *minuend0,
 		bigint_t ( minuend_size ) modulus;
 	} *temp = tmp;
 	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
-	const bigint_element_t msb_mask = ( 1UL << ( width - 1 ) );
 	bigint_element_t *element;
 	unsigned int minuend_max;
 	unsigned int modulus_max;
 	unsigned int subshift;
-	bigint_element_t msb;
 	int offset;
 	int shift;
+	int msb;
 	int i;
 
 	/* Start profiling */
@@ -289,7 +288,7 @@ void bigint_reduce_raw ( const bigint_element_t *minuend0,
 		} else {
 			bigint_subtract ( &temp->modulus, &temp->minuend );
 		}
-		msb = ( temp->minuend.element[ minuend_size - 1 ] & msb_mask );
+		msb = bigint_msb_is_set ( &temp->minuend );
 		if ( shift > 0 )
 			bigint_shr ( &temp->modulus );
 	}
