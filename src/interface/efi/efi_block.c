@@ -990,6 +990,9 @@ static int efi_block_boot ( unsigned int drive,
 	EFI_STATUS efirc;
 	int rc;
 
+	/* Ensure that any local drives are connected */
+	efi_driver_reconnect_all();
+
 	/* Release SNP devices */
 	efi_snp_release();
 
