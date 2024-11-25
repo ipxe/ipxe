@@ -505,25 +505,142 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 		*exponent = ( ( const void * ) exponent0 );
 	bigint_t ( size ) __attribute__ (( may_alias )) *result =
 		( ( void * ) result0 );
-	size_t mod_multiply_len = bigint_mod_multiply_tmp_len ( modulus );
+	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
 	struct {
-		bigint_t ( size ) base;
-		bigint_t ( exponent_size ) exponent;
-		uint8_t mod_multiply[mod_multiply_len];
+		union {
+			bigint_t ( 2 * size ) padded_modulus;
+			struct {
+				bigint_t ( size ) modulus;
+				bigint_t ( size ) stash;
+			};
+		};
+		union {
+			bigint_t ( 2 * size ) full;
+			bigint_t ( size ) low;
+		} product;
 	} *temp = tmp;
-	static const uint8_t start[1] = { 0x01 };
+	const uint8_t one[1] = { 1 };
+	bigint_t ( 1 ) modinv;
+	bigint_element_t submask;
+	unsigned int subsize;
+	unsigned int scale;
+	unsigned int max;
+	unsigned int bit;
 
-	memcpy ( &temp->base, base, sizeof ( temp->base ) );
-	memcpy ( &temp->exponent, exponent, sizeof ( temp->exponent ) );
-	bigint_init ( result, start, sizeof ( start ) );
+	/* Sanity check */
+	assert ( sizeof ( *temp ) == bigint_mod_exp_tmp_len ( modulus ) );
 
-	while ( ! bigint_is_zero ( &temp->exponent ) ) {
-		if ( bigint_bit_is_set ( &temp->exponent, 0 ) ) {
-			bigint_mod_multiply ( result, &temp->base, modulus,
-					      result, temp->mod_multiply );
+	/* Handle degenerate case of zero modulus */
+	if ( ! bigint_max_set_bit ( modulus ) ) {
+		memset ( result, 0, sizeof ( *result ) );
+		return;
+	}
+
+	/* Factor modulus as (N * 2^scale) where N is odd */
+	bigint_grow ( modulus, &temp->padded_modulus );
+	for ( scale = 0 ; ( ! bigint_bit_is_set ( &temp->modulus, 0 ) ) ;
+	      scale++ ) {
+		bigint_shr ( &temp->modulus );
+	}
+	subsize = ( ( scale + width - 1 ) / width );
+	submask = ( ( 1UL << ( scale % width ) ) - 1 );
+	if ( ! submask )
+		submask = ~submask;
+
+	/* Calculate inverse of (scaled) modulus N modulo element size */
+	bigint_mod_invert ( &temp->modulus, &modinv );
+
+	/* Calculate (R^2 mod N) via direct reduction of (R^2 - N) */
+	memset ( &temp->product.full, 0, sizeof ( temp->product.full ) );
+	bigint_subtract ( &temp->padded_modulus, &temp->product.full );
+	bigint_reduce ( &temp->padded_modulus, &temp->product.full );
+	bigint_copy ( &temp->product.low, &temp->stash );
+
+	/* Initialise result = Montgomery(1, R^2 mod N) */
+	bigint_montgomery ( &temp->modulus, &modinv,
+			    &temp->product.full, result );
+
+	/* Convert base into Montgomery form */
+	bigint_multiply ( base, &temp->stash, &temp->product.full );
+	bigint_montgomery ( &temp->modulus, &modinv, &temp->product.full,
+			    &temp->stash );
+
+	/* Calculate x1 = base^exponent modulo N */
+	max = bigint_max_set_bit ( exponent );
+	for ( bit = 1 ; bit <= max ; bit++ ) {
+
+		/* Square (and reduce) */
+		bigint_multiply ( result, result, &temp->product.full );
+		bigint_montgomery ( &temp->modulus, &modinv,
+				    &temp->product.full, result );
+
+		/* Multiply (and reduce) */
+		bigint_multiply ( &temp->stash, result, &temp->product.full );
+		bigint_montgomery ( &temp->modulus, &modinv,
+				    &temp->product.full, &temp->product.low );
+
+		/* Conditionally swap the multiplied result */
+		bigint_swap ( result, &temp->product.low,
+			      bigint_bit_is_set ( exponent, ( max - bit ) ) );
+	}
+
+	/* Convert back out of Montgomery form */
+	bigint_grow ( result, &temp->product.full );
+	bigint_montgomery ( &temp->modulus, &modinv, &temp->product.full,
+			    result );
+
+	/* Handle even moduli via Garner's algorithm */
+	if ( subsize ) {
+		const bigint_t ( subsize ) __attribute__ (( may_alias ))
+			*subbase = ( ( const void * ) base );
+		bigint_t ( subsize ) __attribute__ (( may_alias ))
+			*submodulus = ( ( void * ) &temp->modulus );
+		bigint_t ( subsize ) __attribute__ (( may_alias ))
+			*substash = ( ( void * ) &temp->stash );
+		bigint_t ( subsize ) __attribute__ (( may_alias ))
+			*subresult = ( ( void * ) result );
+		union {
+			bigint_t ( 2 * subsize ) full;
+			bigint_t ( subsize ) low;
+		} __attribute__ (( may_alias ))
+			*subproduct = ( ( void * ) &temp->product.full );
+
+		/* Calculate x2 = base^exponent modulo 2^k */
+		bigint_init ( substash, one, sizeof ( one ) );
+		for ( bit = 1 ; bit <= max ; bit++ ) {
+
+			/* Square (and reduce) */
+			bigint_multiply ( substash, substash,
+					  &subproduct->full );
+			bigint_copy ( &subproduct->low, substash );
+
+			/* Multiply (and reduce) */
+			bigint_multiply ( subbase, substash,
+					  &subproduct->full );
+
+			/* Conditionally swap the multiplied result */
+			bigint_swap ( substash, &subproduct->low,
+				      bigint_bit_is_set ( exponent,
+							  ( max - bit ) ) );
 		}
-		bigint_shr ( &temp->exponent );
-		bigint_mod_multiply ( &temp->base, &temp->base, modulus,
-				      &temp->base, temp->mod_multiply );
+
+		/* Calculate N^-1 modulo 2^k */
+		bigint_mod_invert ( submodulus, &subproduct->low );
+		bigint_copy ( &subproduct->low, submodulus );
+
+		/* Calculate y = (x2 - x1) * N^-1 modulo 2^k */
+		bigint_subtract ( subresult, substash );
+		bigint_multiply ( substash, submodulus, &subproduct->full );
+		subproduct->low.element[ subsize - 1 ] &= submask;
+		bigint_grow ( &subproduct->low, &temp->stash );
+
+		/* Reconstruct N */
+		bigint_mod_invert ( submodulus, &subproduct->low );
+		bigint_copy ( &subproduct->low, submodulus );
+
+		/* Calculate x = x1 + N * y */
+		bigint_multiply ( &temp->modulus, &temp->stash,
+				  &temp->product.full );
+		bigint_add ( &temp->product.low, result );
 	}
 }

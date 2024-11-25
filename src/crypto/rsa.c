@@ -109,8 +109,7 @@ static int rsa_alloc ( struct rsa_context *context, size_t modulus_len,
 	unsigned int size = bigint_required_size ( modulus_len );
 	unsigned int exponent_size = bigint_required_size ( exponent_len );
 	bigint_t ( size ) *modulus;
-	bigint_t ( exponent_size ) *exponent;
-	size_t tmp_len = bigint_mod_exp_tmp_len ( modulus, exponent );
+	size_t tmp_len = bigint_mod_exp_tmp_len ( modulus );
 	struct {
 		bigint_t ( size ) modulus;
 		bigint_t ( exponent_size ) exponent;

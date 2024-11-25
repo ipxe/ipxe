@@ -322,18 +322,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Calculate temporary working space required for moduluar exponentiation
  *
  * @v modulus		Big integer modulus
- * @v exponent		Big integer exponent
  * @ret len		Length of temporary working space
  */
-#define bigint_mod_exp_tmp_len( modulus, exponent ) ( {			\
+#define bigint_mod_exp_tmp_len( modulus ) ( {				\
 	unsigned int size = bigint_size (modulus);			\
-	unsigned int exponent_size = bigint_size (exponent);		\
-	size_t mod_multiply_len =					\
-		bigint_mod_multiply_tmp_len (modulus);			\
 	sizeof ( struct {						\
-		bigint_t ( size ) temp_base;				\
-		bigint_t ( exponent_size ) temp_exponent;		\
-		uint8_t mod_multiply[mod_multiply_len];			\
+		bigint_t ( size ) temp[4];				\
 	} ); } )
 
 #include <bits/bigint.h>
