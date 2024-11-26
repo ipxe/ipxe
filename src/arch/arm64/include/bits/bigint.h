@@ -43,8 +43,9 @@ bigint_init_raw ( uint64_t *value0, unsigned int size,
  * @v addend0		Element 0 of big integer to add
  * @v value0		Element 0 of big integer to be added to
  * @v size		Number of elements
+ * @ret carry		Carry out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 		 unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -54,6 +55,7 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 	uint64_t discard_addend_i;
 	uint64_t discard_value_i;
 	unsigned int discard_size;
+	int carry;
 
 	__asm__ __volatile__ ( "cmn xzr, xzr\n\t" /* clear CF */
 			       "\n1:\n\t"
@@ -68,9 +70,11 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 				 "=r" ( discard_size ),
 				 "=r" ( discard_addend_i ),
 				 "=r" ( discard_value_i ),
+				 "=@cccs" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( addend0 ), "1" ( value0 ), "2" ( size )
-			       : "cc" );
+			       : "0" ( addend0 ), "1" ( value0 ),
+				 "2" ( size ) );
+	return carry;
 }
 
 /**
@@ -79,8 +83,9 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
  * @v subtrahend0	Element 0 of big integer to subtract
  * @v value0		Element 0 of big integer to be subtracted from
  * @v size		Number of elements
+ * @ret borrow		Borrow out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
 		      unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -90,6 +95,7 @@ bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
 	uint64_t discard_subtrahend_i;
 	uint64_t discard_value_i;
 	unsigned int discard_size;
+	int borrow;
 
 	__asm__ __volatile__ ( "cmp xzr, xzr\n\t" /* set CF */
 			       "\n1:\n\t"
@@ -104,10 +110,11 @@ bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
 				 "=r" ( discard_size ),
 				 "=r" ( discard_subtrahend_i ),
 				 "=r" ( discard_value_i ),
+				 "=@cccc" ( borrow ),
 				 "+m" ( *value )
 			       : "0" ( subtrahend0 ), "1" ( value0 ),
-				 "2" ( size )
-			       : "cc" );
+				 "2" ( size ) );
+	return borrow;
 }
 
 /**

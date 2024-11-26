@@ -43,8 +43,9 @@ bigint_init_raw ( uint32_t *value0, unsigned int size,
  * @v addend0		Element 0 of big integer to add
  * @v value0		Element 0 of big integer to be added to
  * @v size		Number of elements
+ * @ret carry		Carry out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_add_raw ( const uint32_t *addend0, uint32_t *value0,
 		 unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -54,8 +55,9 @@ bigint_add_raw ( const uint32_t *addend0, uint32_t *value0,
 	uint32_t *discard_end;
 	uint32_t discard_addend_i;
 	uint32_t discard_value_i;
+	int carry;
 
-	__asm__ __volatile__ ( "adds %2, %0, %8, lsl #2\n\t" /* clear CF */
+	__asm__ __volatile__ ( "adds %2, %0, %9, lsl #2\n\t" /* clear CF */
 			       "\n1:\n\t"
 			       "ldmia %0!, {%3}\n\t"
 			       "ldr %4, [%1]\n\t"
@@ -68,9 +70,11 @@ bigint_add_raw ( const uint32_t *addend0, uint32_t *value0,
 				 "=l" ( discard_end ),
 				 "=l" ( discard_addend_i ),
 				 "=l" ( discard_value_i ),
+				 "=@cccs" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( addend0 ), "1" ( value0 ), "l" ( size )
-			       : "cc" );
+			       : "0" ( addend0 ), "1" ( value0 ),
+				 "l" ( size ) );
+	return carry;
 }
 
 /**
@@ -79,8 +83,9 @@ bigint_add_raw ( const uint32_t *addend0, uint32_t *value0,
  * @v subtrahend0	Element 0 of big integer to subtract
  * @v value0		Element 0 of big integer to be subtracted from
  * @v size		Number of elements
+ * @ret borrow		Borrow out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_subtract_raw ( const uint32_t *subtrahend0, uint32_t *value0,
 		      unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -90,8 +95,9 @@ bigint_subtract_raw ( const uint32_t *subtrahend0, uint32_t *value0,
 	uint32_t *discard_end;
 	uint32_t discard_subtrahend_i;
 	uint32_t discard_value_i;
+	int borrow;
 
-	__asm__ __volatile__ ( "add %2, %0, %8, lsl #2\n\t"
+	__asm__ __volatile__ ( "add %2, %0, %9, lsl #2\n\t"
 			       "cmp %2, %0\n\t" /* set CF */
 			       "\n1:\n\t"
 			       "ldmia %0!, {%3}\n\t"
@@ -105,10 +111,11 @@ bigint_subtract_raw ( const uint32_t *subtrahend0, uint32_t *value0,
 				 "=l" ( discard_end ),
 				 "=l" ( discard_subtrahend_i ),
 				 "=l" ( discard_value_i ),
+				 "=@cccc" ( borrow ),
 				 "+m" ( *value )
 			       : "0" ( subtrahend0 ), "1" ( value0 ),
-				 "l" ( size )
-			       : "cc" );
+				 "l" ( size ) );
+	return borrow;
 }
 
 /**

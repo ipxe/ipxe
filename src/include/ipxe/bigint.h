@@ -70,23 +70,25 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v addend		Big integer to add
  * @v value		Big integer to be added to
+ * @ret carry		Carry out
  */
-#define bigint_add( addend, value ) do {				\
+#define bigint_add( addend, value ) ( {					\
 	unsigned int size = bigint_size (addend);			\
 	bigint_add_raw ( (addend)->element, (value)->element, size );	\
-	} while ( 0 )
+	} )
 
 /**
  * Subtract big integers
  *
  * @v subtrahend	Big integer to subtract
  * @v value		Big integer to be subtracted from
+ * @ret borrow		Borrow out
  */
-#define bigint_subtract( subtrahend, value ) do {			\
+#define bigint_subtract( subtrahend, value ) ( {			\
 	unsigned int size = bigint_size (subtrahend);			\
 	bigint_subtract_raw ( (subtrahend)->element, (value)->element,	\
 			      size );					\
-	} while ( 0 )
+	} )
 
 /**
  * Shift big integer left
@@ -389,10 +391,10 @@ void bigint_init_raw ( bigint_element_t *value0, unsigned int size,
 		       const void *data, size_t len );
 void bigint_done_raw ( const bigint_element_t *value0, unsigned int size,
 		       void *out, size_t len );
-void bigint_add_raw ( const bigint_element_t *addend0,
-		      bigint_element_t *value0, unsigned int size );
-void bigint_subtract_raw ( const bigint_element_t *subtrahend0,
-			   bigint_element_t *value0, unsigned int size );
+int bigint_add_raw ( const bigint_element_t *addend0,
+		     bigint_element_t *value0, unsigned int size );
+int bigint_subtract_raw ( const bigint_element_t *subtrahend0,
+			  bigint_element_t *value0, unsigned int size );
 void bigint_shl_raw ( bigint_element_t *value0, unsigned int size );
 void bigint_shr_raw ( bigint_element_t *value0, unsigned int size );
 int bigint_is_zero_raw ( const bigint_element_t *value0, unsigned int size );

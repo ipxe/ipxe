@@ -43,8 +43,9 @@ bigint_init_raw ( unsigned long *value0, unsigned int size,
  * @v addend0		Element 0 of big integer to add
  * @v value0		Element 0 of big integer to be added to
  * @v size		Number of elements
+ * @ret carry		Carry out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_add_raw ( const unsigned long *addend0, unsigned long *value0,
 		 unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -54,19 +55,19 @@ bigint_add_raw ( const unsigned long *addend0, unsigned long *value0,
 	unsigned long *discard_value;
 	unsigned long discard_addend_i;
 	unsigned long discard_value_i;
-	unsigned long discard_carry;
 	unsigned long discard_temp;
+	unsigned long carry;
 
 	__asm__ __volatile__ ( "\n1:\n\t"
 			       /* Load addend[i] and value[i] */
 			       LOADN " %2, (%0)\n\t"
 			       LOADN " %3, (%1)\n\t"
 			       /* Add carry flag and addend */
-			       "add %3, %3, %4\n\t"
-			       "sltu %5, %3, %4\n\t"
+			       "add %3, %3, %5\n\t"
+			       "sltu %4, %3, %5\n\t"
 			       "add %3, %3, %2\n\t"
-			       "sltu %4, %3, %2\n\t"
-			       "or %4, %4, %5\n\t"
+			       "sltu %5, %3, %2\n\t"
+			       "or %5, %4, %5\n\t"
 			       /* Store value[i] */
 			       STOREN " %3, (%1)\n\t"
 			       /* Loop */
@@ -77,12 +78,13 @@ bigint_add_raw ( const unsigned long *addend0, unsigned long *value0,
 				 "=&r" ( discard_value ),
 				 "=&r" ( discard_addend_i ),
 				 "=&r" ( discard_value_i ),
-				 "=&r" ( discard_carry ),
 				 "=&r" ( discard_temp ),
+				 "=&r" ( carry ),
 				 "+m" ( *value )
 			       : "r" ( valueN ),
 				 "i" ( sizeof ( unsigned long ) ),
-				 "0" ( addend0 ), "1" ( value0 ), "4" ( 0 ) );
+				 "0" ( addend0 ), "1" ( value0 ), "5" ( 0 ) );
+	return carry;
 }
 
 /**
@@ -91,8 +93,9 @@ bigint_add_raw ( const unsigned long *addend0, unsigned long *value0,
  * @v subtrahend0	Element 0 of big integer to subtract
  * @v value0		Element 0 of big integer to be subtracted from
  * @v size		Number of elements
+ * @ret borrow		Borrow out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_subtract_raw ( const unsigned long *subtrahend0, unsigned long *value0,
 		      unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -102,19 +105,19 @@ bigint_subtract_raw ( const unsigned long *subtrahend0, unsigned long *value0,
 	unsigned long *discard_value;
 	unsigned long discard_subtrahend_i;
 	unsigned long discard_value_i;
-	unsigned long discard_carry;
 	unsigned long discard_temp;
+	unsigned long borrow;
 
 	__asm__ __volatile__ ( "\n1:\n\t"
 			       /* Load subtrahend[i] and value[i] */
 			       LOADN " %2, (%0)\n\t"
 			       LOADN " %3, (%1)\n\t"
 			       /* Subtract carry flag and subtrahend */
-			       "sltu %5, %3, %4\n\t"
-			       "sub %3, %3, %4\n\t"
-			       "sltu %4, %3, %2\n\t"
+			       "sltu %4, %3, %5\n\t"
+			       "sub %3, %3, %5\n\t"
+			       "sltu %5, %3, %2\n\t"
 			       "sub %3, %3, %2\n\t"
-			       "or %4, %4, %5\n\t"
+			       "or %5, %5, %4\n\t"
 			       /* Store value[i] */
 			       STOREN " %3, (%1)\n\t"
 			       /* Loop */
@@ -125,13 +128,14 @@ bigint_subtract_raw ( const unsigned long *subtrahend0, unsigned long *value0,
 				 "=&r" ( discard_value ),
 				 "=&r" ( discard_subtrahend_i ),
 				 "=&r" ( discard_value_i ),
-				 "=&r" ( discard_carry ),
 				 "=&r" ( discard_temp ),
+				 "=&r" ( borrow ),
 				 "+m" ( *value )
 			       : "r" ( valueN ),
 				 "i" ( sizeof ( unsigned long ) ),
 				 "0" ( subtrahend0 ), "1" ( value0 ),
-				 "4" ( 0 ) );
+				 "5" ( 0 ) );
+	return borrow;
 }
 
 /**

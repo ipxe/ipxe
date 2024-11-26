@@ -564,6 +564,7 @@ void x25519_invert ( const union x25519_oct258 *invertend,
  */
 static void x25519_reduce_by ( const x25519_t *subtrahend, x25519_t *value ) {
 	x25519_t tmp;
+	int underflow;
 
 	/* Conditionally subtract subtrahend
 	 *
@@ -571,8 +572,8 @@ static void x25519_reduce_by ( const x25519_t *subtrahend, x25519_t *value ) {
 	 * time) if the subtraction underflows.
 	 */
 	bigint_copy ( value, &tmp );
-	bigint_subtract ( subtrahend, value );
-	bigint_swap ( value, &tmp, bigint_msb_is_set ( value ) );
+	underflow = bigint_subtract ( subtrahend, value );
+	bigint_swap ( value, &tmp, underflow );
 }
 
 /**

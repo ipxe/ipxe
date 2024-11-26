@@ -58,24 +58,24 @@ void bigint_done_sample ( const bigint_element_t *value0, unsigned int size,
 	bigint_done ( value, out, len );
 }
 
-void bigint_add_sample ( const bigint_element_t *addend0,
-			 bigint_element_t *value0, unsigned int size ) {
+int bigint_add_sample ( const bigint_element_t *addend0,
+			bigint_element_t *value0, unsigned int size ) {
 	const bigint_t ( size ) *addend __attribute__ (( may_alias ))
 		= ( ( const void * ) addend0 );
 	bigint_t ( size ) *value __attribute__ (( may_alias ))
 		= ( ( void * ) value0 );
 
-	bigint_add ( addend, value );
+	return bigint_add ( addend, value );
 }
 
-void bigint_subtract_sample ( const bigint_element_t *subtrahend0,
-			      bigint_element_t *value0, unsigned int size ) {
+int bigint_subtract_sample ( const bigint_element_t *subtrahend0,
+			     bigint_element_t *value0, unsigned int size ) {
 	const bigint_t ( size ) *subtrahend __attribute__ (( may_alias ))
 		= ( ( const void * ) subtrahend0 );
 	bigint_t ( size ) *value __attribute__ (( may_alias ))
 		= ( ( void * ) value0 );
 
-	bigint_subtract ( subtrahend, value );
+	return bigint_subtract ( subtrahend, value );
 }
 
 void bigint_shl_sample ( bigint_element_t *value0, unsigned int size ) {
@@ -253,16 +253,19 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
  * @v addend		Big integer to add
  * @v value		Big integer to be added to
  * @v expected		Big integer expected result
+ * @v overflow		Expected result overflows range
  */
-#define bigint_add_ok( addend, value, expected ) do {			\
+#define bigint_add_ok( addend, value, expected, overflow ) do {		\
 	static const uint8_t addend_raw[] = addend;			\
 	static const uint8_t value_raw[] = value;			\
 	static const uint8_t expected_raw[] = expected;			\
 	uint8_t result_raw[ sizeof ( expected_raw ) ];			\
 	unsigned int size =						\
 		bigint_required_size ( sizeof ( value_raw ) );		\
+	unsigned int msb = ( 8 * sizeof ( value_raw ) );		\
 	bigint_t ( size ) addend_temp;					\
 	bigint_t ( size ) value_temp;					\
+	int carry;							\
 	{} /* Fix emacs alignment */					\
 									\
 	assert ( bigint_size ( &addend_temp ) ==			\
@@ -273,12 +276,15 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	DBG ( "Add:\n" );						\
 	DBG_HDA ( 0, &addend_temp, sizeof ( addend_temp ) );		\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
-	bigint_add ( &addend_temp, &value_temp );			\
+	carry = bigint_add ( &addend_temp, &value_temp );		\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
 	bigint_done ( &value_temp, result_raw, sizeof ( result_raw ) );	\
 									\
 	ok ( memcmp ( result_raw, expected_raw,				\
 		      sizeof ( result_raw ) ) == 0 );			\
+	if ( sizeof ( result_raw ) < sizeof ( value_temp ) )		\
+		carry += bigint_bit_is_set ( &value_temp, msb );	\
+	ok ( carry == overflow );					\
 	} while ( 0 )
 
 /**
@@ -287,8 +293,10 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
  * @v subtrahend	Big integer to subtract
  * @v value		Big integer to be subtracted from
  * @v expected		Big integer expected result
+ * @v underflow		Expected result underflows range
  */
-#define bigint_subtract_ok( subtrahend, value, expected ) do {		\
+#define bigint_subtract_ok( subtrahend, value, expected,		\
+			    underflow ) do {				\
 	static const uint8_t subtrahend_raw[] = subtrahend;		\
 	static const uint8_t value_raw[] = value;			\
 	static const uint8_t expected_raw[] = expected;			\
@@ -297,6 +305,7 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 		bigint_required_size ( sizeof ( value_raw ) );		\
 	bigint_t ( size ) subtrahend_temp;				\
 	bigint_t ( size ) value_temp;					\
+	int borrow;							\
 	{} /* Fix emacs alignment */					\
 									\
 	assert ( bigint_size ( &subtrahend_temp ) ==			\
@@ -307,12 +316,13 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	DBG ( "Subtract:\n" );						\
 	DBG_HDA ( 0, &subtrahend_temp, sizeof ( subtrahend_temp ) );	\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
-	bigint_subtract ( &subtrahend_temp, &value_temp );		\
+	borrow = bigint_subtract ( &subtrahend_temp, &value_temp );	\
 	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
 	bigint_done ( &value_temp, result_raw, sizeof ( result_raw ) );	\
 									\
 	ok ( memcmp ( result_raw, expected_raw,				\
 		      sizeof ( result_raw ) ) == 0 );			\
+	ok ( borrow == underflow );					\
 	} while ( 0 )
 
 /**
@@ -724,16 +734,28 @@ static void bigint_test_exec ( void ) {
 
 	bigint_add_ok ( BIGINT ( 0x8a ),
 			BIGINT ( 0x43 ),
-			BIGINT ( 0xcd ) );
+			BIGINT ( 0xcd ), 0 );
 	bigint_add_ok ( BIGINT ( 0xc5, 0x7b ),
 			BIGINT ( 0xd6, 0xb1 ),
-			BIGINT ( 0x9c, 0x2c ) );
+			BIGINT ( 0x9c, 0x2c ), 1 );
 	bigint_add_ok ( BIGINT ( 0xf9, 0xd9, 0xdc ),
 			BIGINT ( 0x6d, 0x4b, 0xca ),
-			BIGINT ( 0x67, 0x25, 0xa6 ) );
+			BIGINT ( 0x67, 0x25, 0xa6 ), 1 );
 	bigint_add_ok ( BIGINT ( 0xdd, 0xc2, 0x20, 0x5f ),
 			BIGINT ( 0x80, 0x32, 0xc4, 0xb0 ),
-			BIGINT ( 0x5d, 0xf4, 0xe5, 0x0f ) );
+			BIGINT ( 0x5d, 0xf4, 0xe5, 0x0f ), 1 );
+	bigint_add_ok ( BIGINT ( 0x5e, 0x46, 0x4d, 0xc6, 0xa2, 0x7d, 0x45,
+				 0xc3 ),
+			BIGINT ( 0xd6, 0xc0, 0xd7, 0xd4, 0xf6, 0x04, 0x47,
+				 0xed ),
+			BIGINT ( 0x35, 0x07, 0x25, 0x9b, 0x98, 0x81, 0x8d,
+				 0xb0 ), 1 );
+	bigint_add_ok ( BIGINT ( 0x0e, 0x46, 0x4d, 0xc6, 0xa2, 0x7d, 0x45,
+				 0xc3 ),
+			BIGINT ( 0xd6, 0xc0, 0xd7, 0xd4, 0xf6, 0x04, 0x47,
+				 0xed ),
+			BIGINT ( 0xe5, 0x07, 0x25, 0x9b, 0x98, 0x81, 0x8d,
+				 0xb0 ), 0 );
 	bigint_add_ok ( BIGINT ( 0x01, 0xed, 0x45, 0x4b, 0x41, 0xeb, 0x4c,
 				 0x2e, 0x53, 0x07, 0x15, 0x51, 0x56, 0x47,
 				 0x29, 0xfc, 0x9c, 0xbd, 0xbd, 0xfb, 0x1b,
@@ -745,7 +767,7 @@ static void bigint_test_exec ( void ) {
 			BIGINT ( 0x75, 0xdb, 0x41, 0x80, 0x73, 0x0e, 0x23,
 				 0xe0, 0x3d, 0x98, 0x70, 0x36, 0x11, 0x03,
 				 0xcb, 0x35, 0x0f, 0x6c, 0x09, 0x17, 0xdc,
-				 0xd6, 0xd0 ) );
+				 0xd6, 0xd0 ), 0 );
 	bigint_add_ok ( BIGINT ( 0x06, 0x8e, 0xd6, 0x18, 0xbb, 0x4b, 0x0c,
 				 0xc5, 0x85, 0xde, 0xee, 0x9b, 0x3f, 0x65,
 				 0x63, 0x86, 0xf5, 0x5a, 0x9f, 0xa2, 0xd7,
@@ -802,19 +824,19 @@ static void bigint_test_exec ( void ) {
 				 0x68, 0x76, 0xf5, 0x20, 0xa1, 0xa8, 0x1a,
 				 0x9f, 0x60, 0x58, 0xff, 0xb6, 0x76, 0x45,
 				 0xe6, 0xed, 0x61, 0x8d, 0xe6, 0xc0, 0x72,
-				 0x1c, 0x07 ) );
+				 0x1c, 0x07 ), 0 );
 	bigint_subtract_ok ( BIGINT ( 0x83 ),
 			     BIGINT ( 0x50 ),
-			     BIGINT ( 0xcd ) );
+			     BIGINT ( 0xcd ), 1 );
 	bigint_subtract_ok ( BIGINT ( 0x2c, 0x7c ),
 			     BIGINT ( 0x49, 0x0e ),
-			     BIGINT ( 0x1c, 0x92 ) );
+			     BIGINT ( 0x1c, 0x92 ), 0 );
 	bigint_subtract_ok ( BIGINT ( 0x9c, 0x30, 0xbf ),
 			     BIGINT ( 0xde, 0x4e, 0x07 ),
-			     BIGINT ( 0x42, 0x1d, 0x48 ) );
+			     BIGINT ( 0x42, 0x1d, 0x48 ), 0 );
 	bigint_subtract_ok ( BIGINT ( 0xbb, 0x77, 0x32, 0x5a ),
 			     BIGINT ( 0x5a, 0xd5, 0xfe, 0x28 ),
-			     BIGINT ( 0x9f, 0x5e, 0xcb, 0xce ) );
+			     BIGINT ( 0x9f, 0x5e, 0xcb, 0xce ), 1 );
 	bigint_subtract_ok ( BIGINT ( 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
 				      0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				      0xff, 0xff, 0xff, 0xff, 0xff, 0xff ),
@@ -823,7 +845,7 @@ static void bigint_test_exec ( void ) {
 				      0x00, 0x00, 0x00, 0x00, 0x00, 0x2a ),
 			     BIGINT ( 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
 				      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				      0x00, 0x00, 0x00, 0x00, 0x00, 0x2b ) );
+				      0x00, 0x00, 0x00, 0x00, 0x00, 0x2b ), 1 );
 	bigint_subtract_ok ( BIGINT ( 0x7b, 0xaa, 0x16, 0xcf, 0x15, 0x87,
 				      0xe0, 0x4f, 0x2c, 0xa3, 0xec, 0x2f,
 				      0x46, 0xfb, 0x83, 0xc6, 0xe0, 0xee,
@@ -835,7 +857,7 @@ static void bigint_test_exec ( void ) {
 			     BIGINT ( 0xca, 0xab, 0x9f, 0x54, 0x4e, 0x48,
 				      0x75, 0x8c, 0x63, 0x28, 0x69, 0x78,
 				      0xe8, 0x8a, 0x3d, 0xd8, 0x4b, 0x24,
-				      0xb8, 0xa4, 0x71, 0x6d, 0x6b ) );
+				      0xb8, 0xa4, 0x71, 0x6d, 0x6b ), 1 );
 	bigint_subtract_ok ( BIGINT ( 0x5b, 0x06, 0x77, 0x7b, 0xfd, 0x34,
 				      0x5f, 0x0f, 0xd9, 0xbd, 0x8e, 0x5d,
 				      0xc8, 0x4a, 0x70, 0x95, 0x1b, 0xb6,
@@ -901,7 +923,7 @@ static void bigint_test_exec ( void ) {
 				      0x29, 0x8c, 0x43, 0x9f, 0xf0, 0x9d,
 				      0xda, 0xc8, 0x8c, 0x71, 0x86, 0x97,
 				      0x7f, 0xcb, 0x94, 0x31, 0x1d, 0xbc,
-				      0x44, 0x1a ) );
+				      0x44, 0x1a ), 0 );
 	bigint_shl_ok ( BIGINT ( 0xe0 ),
 			BIGINT ( 0xc0 ) );
 	bigint_shl_ok ( BIGINT ( 0x43, 0x1d ),
