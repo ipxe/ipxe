@@ -139,32 +139,20 @@ void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 /**
  * Reduce big integer
  *
- * @v minuend0		Element 0 of big integer to be reduced
- * @v minuend_size	Number of elements in minuend
  * @v modulus0		Element 0 of big integer modulus
- * @v modulus_size	Number of elements in modulus and result
- * @v result0		Element 0 of big integer to hold result
- * @v tmp		Temporary working space
+ * @v value0		Element 0 of big integer to be reduced
+ * @v size		Number of elements in modulus and value
  */
-void bigint_reduce_raw ( const bigint_element_t *minuend0,
-			 unsigned int minuend_size,
-			 const bigint_element_t *modulus0,
-			 unsigned int modulus_size,
-			 bigint_element_t *result0, void *tmp ) {
-	const bigint_t ( minuend_size ) __attribute__ (( may_alias ))
-		*minuend = ( ( const void * ) minuend0 );
-	const bigint_t ( modulus_size ) __attribute__ (( may_alias ))
-		*modulus = ( ( const void * ) modulus0 );
-	bigint_t ( modulus_size ) __attribute__ (( may_alias ))
-		*result = ( ( void * ) result0 );
-	struct {
-		bigint_t ( minuend_size ) minuend;
-		bigint_t ( minuend_size ) modulus;
-	} *temp = tmp;
+void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
+			 unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( void * ) modulus0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*value = ( ( void * ) value0 );
 	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
 	bigint_element_t *element;
-	unsigned int minuend_max;
 	unsigned int modulus_max;
+	unsigned int value_max;
 	unsigned int subshift;
 	int offset;
 	int shift;
@@ -174,31 +162,23 @@ void bigint_reduce_raw ( const bigint_element_t *minuend0,
 	/* Start profiling */
 	profile_start ( &bigint_mod_profiler );
 
-	/* Sanity check */
-	assert ( minuend_size >= modulus_size );
-	assert ( sizeof ( *temp ) == bigint_reduce_tmp_len ( minuend ) );
-
-	/* Copy minuend and modulus to temporary working space */
-	bigint_shrink ( minuend, &temp->minuend );
-	bigint_grow ( modulus, &temp->modulus );
-
 	/* Normalise the modulus
 	 *
 	 * Scale the modulus by shifting left such that both modulus
-	 * "m" and minuend "x" have the same most significant set bit.
-	 * (If this is not possible, then the minuend is already less
+	 * "m" and value "x" have the same most significant set bit.
+	 * (If this is not possible, then the value is already less
 	 * than the modulus, and we may therefore skip reduction
 	 * completely.)
 	 */
-	minuend_max = bigint_max_set_bit ( minuend );
+	value_max = bigint_max_set_bit ( value );
 	modulus_max = bigint_max_set_bit ( modulus );
-	shift = ( minuend_max - modulus_max );
+	shift = ( value_max - modulus_max );
 	if ( shift < 0 )
 		goto skip;
 	subshift = ( shift & ( width - 1 ) );
 	offset = ( shift / width );
-	element = temp->modulus.element;
-	for ( i = ( ( minuend_max - 1 ) / width ) ; ; i-- ) {
+	element = modulus->element;
+	for ( i = ( ( value_max - 1 ) / width ) ; ; i-- ) {
 		element[i] = ( element[ i - offset ] << subshift );
 		if ( i <= offset )
 			break;
@@ -210,14 +190,14 @@ void bigint_reduce_raw ( const bigint_element_t *minuend0,
 	for ( i-- ; i >= 0 ; i-- )
 		element[i] = 0;
 
-	/* Reduce the minuend "x" by iteratively adding or subtracting
+	/* Reduce the value "x" by iteratively adding or subtracting
 	 * the scaled modulus "m".
 	 *
 	 * On each loop iteration, we maintain the invariant:
 	 *
 	 *    -2m <= x < 2m
 	 *
-	 * If x is positive, we obtain the new minuend x' by
+	 * If x is positive, we obtain the new value x' by
 	 * subtracting m, otherwise we add m:
 	 *
 	 *      0 <= x < 2m   =>   x' := x - m   =>   -m <= x' < m
@@ -284,21 +264,18 @@ void bigint_reduce_raw ( const bigint_element_t *minuend0,
 	 */
 	for ( msb = 0 ; ( msb || ( shift >= 0 ) ) ; shift-- ) {
 		if ( msb ) {
-			bigint_add ( &temp->modulus, &temp->minuend );
+			bigint_add ( modulus, value );
 		} else {
-			bigint_subtract ( &temp->modulus, &temp->minuend );
+			bigint_subtract ( modulus, value );
 		}
-		msb = bigint_msb_is_set ( &temp->minuend );
+		msb = bigint_msb_is_set ( value );
 		if ( shift > 0 )
-			bigint_shr ( &temp->modulus );
+			bigint_shr ( modulus );
 	}
 
  skip:
 	/* Sanity check */
-	assert ( ! bigint_is_geq ( &temp->minuend, &temp->modulus ) );
-
-	/* Copy result */
-	bigint_shrink ( &temp->minuend, result );
+	assert ( ! bigint_is_geq ( value, modulus ) );
 
 	/* Stop profiling */
 	profile_stop ( &bigint_mod_profiler );
@@ -396,7 +373,9 @@ void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
 	bigint_multiply ( multiplicand, multiplier, &temp->result );
 
 	/* Reduce result */
-	bigint_reduce ( &temp->result, modulus, result, temp );
+	bigint_grow ( modulus, &temp->modulus );
+	bigint_reduce ( &temp->modulus, &temp->result );
+	bigint_shrink ( &temp->result, result );
 
 	/* Sanity check */
 	assert ( ! bigint_is_geq ( result, modulus ) );

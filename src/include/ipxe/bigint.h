@@ -232,31 +232,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Reduce big integer
  *
- * @v minuend		Big integer to be reduced
  * @v modulus		Big integer modulus
- * @v result		Big integer to hold result
- * @v tmp		Temporary working space
+ * @v value		Big integer to be reduced
  */
-#define bigint_reduce( minuend, modulus, result, tmp ) do {		\
-	unsigned int minuend_size = bigint_size (minuend);		\
-	unsigned int modulus_size = bigint_size (modulus);		\
-	bigint_reduce_raw ( (minuend)->element, minuend_size,		\
-			    (modulus)->element, modulus_size,		\
-			    (result)->element, tmp );			\
+#define bigint_reduce( modulus, value ) do {	\
+		unsigned int size = bigint_size (modulus);		\
+		bigint_reduce_raw ( (modulus)->element,			\
+				    (value)->element, size );		\
 	} while ( 0 )
-
-/**
- * Calculate temporary working space required for reduction
- *
- * @v minuend		Big integer to be reduced
- * @ret len		Length of temporary working space
- */
-#define bigint_reduce_tmp_len( minuend ) ( {				\
-	unsigned int size = bigint_size (minuend);			\
-	sizeof ( struct {						\
-		bigint_t ( size ) temp_minuend;				\
-		bigint_t ( size ) temp_modulus;				\
-	} ); } )
 
 /**
  * Compute inverse of odd big integer modulo its own size
@@ -422,11 +405,8 @@ void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 			   const bigint_element_t *multiplier0,
 			   unsigned int multiplier_size,
 			   bigint_element_t *result0 );
-void bigint_reduce_raw ( const bigint_element_t *minuend0,
-			 unsigned int minuend_size,
-			 const bigint_element_t *modulus0,
-			 unsigned int modulus_size,
-			 bigint_element_t *result0, void *tmp );
+void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
+			 unsigned int size );
 void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 			     bigint_element_t *inverse0,
 			     unsigned int size, void *tmp );

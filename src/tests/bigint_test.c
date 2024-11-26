@@ -185,19 +185,14 @@ void bigint_multiply_sample ( const bigint_element_t *multiplicand0,
 	bigint_multiply ( multiplicand, multiplier, result );
 }
 
-void bigint_reduce_sample ( const bigint_element_t *minuend0,
-			    unsigned int minuend_size,
-			    const bigint_element_t *modulus0,
-			    unsigned int modulus_size,
-			    bigint_element_t *result0, void *tmp ) {
-	const bigint_t ( minuend_size ) __attribute__ (( may_alias ))
-		*minuend = ( ( const void * ) minuend0 );
-	const bigint_t ( modulus_size ) __attribute__ (( may_alias ))
-		*modulus = ( ( const void * ) modulus0 );
-	bigint_t ( modulus_size ) __attribute__ (( may_alias ))
-		*result = ( ( void * ) result0 );
+void bigint_reduce_sample ( bigint_element_t *modulus0,
+			    bigint_element_t *value0, unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( void * ) modulus0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*value = ( ( void * ) value0 );
 
-	bigint_reduce ( minuend, modulus, result, tmp );
+	bigint_reduce ( modulus, value );
 }
 
 void bigint_mod_invert_sample ( const bigint_element_t *invertend0,
@@ -555,43 +550,40 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 /**
  * Report result of big integer modular direct reduction test
  *
- * @v minuend		Big integer to be reduced
  * @v modulus		Big integer modulus
+ * @v value		Big integer to be reduced
  * @v expected		Big integer expected result
  */
-#define bigint_reduce_ok( minuend, modulus, expected ) do {		\
-	static const uint8_t minuend_raw[] = minuend;			\
+#define bigint_reduce_ok( modulus, value, expected ) do {		\
 	static const uint8_t modulus_raw[] = modulus;			\
+	static const uint8_t value_raw[] = value;			\
 	static const uint8_t expected_raw[] = expected;			\
 	uint8_t result_raw[ sizeof ( expected_raw ) ];			\
-	unsigned int minuend_size =					\
-		bigint_required_size ( sizeof ( minuend_raw ) );	\
-	unsigned int modulus_size =					\
+	unsigned int size =						\
 		bigint_required_size ( sizeof ( modulus_raw ) );	\
-	bigint_t ( minuend_size ) minuend_temp;				\
-	bigint_t ( modulus_size ) modulus_temp;				\
-	bigint_t ( modulus_size ) result_temp;				\
-	size_t tmp_len = bigint_reduce_tmp_len ( &minuend_temp );	\
-	uint8_t tmp[tmp_len];						\
+	bigint_t ( size ) modulus_temp;					\
+	bigint_t ( size ) value_temp;					\
 	{} /* Fix emacs alignment */					\
 									\
-	assert ( bigint_size ( &result_temp ) ==			\
-		 bigint_size ( &modulus_temp ) );			\
-	bigint_init ( &minuend_temp, minuend_raw,			\
-		      sizeof ( minuend_raw ) );				\
+	assert ( bigint_size ( &modulus_temp ) ==			\
+		 bigint_size ( &value_temp ) );				\
 	bigint_init ( &modulus_temp, modulus_raw,			\
 		      sizeof ( modulus_raw ) );				\
+	bigint_init ( &value_temp, value_raw, sizeof ( value_raw ) );	\
 	DBG ( "Modular reduce:\n" );					\
-	DBG_HDA ( 0, &minuend_temp, sizeof ( minuend_temp ) );		\
 	DBG_HDA ( 0, &modulus_temp, sizeof ( modulus_temp ) );		\
-	bigint_reduce ( &minuend_temp, &modulus_temp, &result_temp,	\
-			tmp );						\
-	DBG_HDA ( 0, &result_temp, sizeof ( result_temp ) );		\
-	bigint_done ( &result_temp, result_raw,				\
-		      sizeof ( result_raw ) );				\
+	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
+	bigint_reduce ( &modulus_temp, &value_temp );			\
+	DBG_HDA ( 0, &value_temp, sizeof ( value_temp ) );		\
+	bigint_done ( &value_temp, result_raw, sizeof ( result_raw ) );	\
 									\
 	ok ( memcmp ( result_raw, expected_raw,				\
 		      sizeof ( result_raw ) ) == 0 );			\
+									\
+	bigint_init ( &value_temp, modulus_raw,				\
+		      sizeof ( modulus_raw ) );				\
+	ok ( memcmp ( &modulus_temp, &value_temp,			\
+		      sizeof ( modulus_temp ) ) == 0 );			\
 	} while ( 0 )
 
 /**
@@ -1797,16 +1789,16 @@ static void bigint_test_exec ( void ) {
 				      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				      0x00, 0x00, 0x00, 0x01 ) );
-	bigint_reduce_ok ( BIGINT ( 0x00 ),
-			   BIGINT ( 0xaf ),
+	bigint_reduce_ok ( BIGINT ( 0xaf ),
+			   BIGINT ( 0x00 ),
 			   BIGINT ( 0x00 ) );
 	bigint_reduce_ok ( BIGINT ( 0xab ),
 			   BIGINT ( 0xab ),
 			   BIGINT ( 0x00 ) );
-	bigint_reduce_ok ( BIGINT ( 0x1d, 0x97, 0x63, 0xc9, 0x97, 0xcd, 0x43,
-				    0xcb, 0x8e, 0x71, 0xac, 0x41, 0xdd ),
-			   BIGINT ( 0xcc, 0x9d, 0xa0, 0x79, 0x96, 0x6a, 0x46,
+	bigint_reduce_ok ( BIGINT ( 0xcc, 0x9d, 0xa0, 0x79, 0x96, 0x6a, 0x46,
 				    0xd5, 0xb4, 0x30, 0xd2, 0x2b, 0xbf ),
+			   BIGINT ( 0x1d, 0x97, 0x63, 0xc9, 0x97, 0xcd, 0x43,
+				    0xcb, 0x8e, 0x71, 0xac, 0x41, 0xdd ),
 			   BIGINT ( 0x1d, 0x97, 0x63, 0xc9, 0x97, 0xcd, 0x43,
 				    0xcb, 0x8e, 0x71, 0xac, 0x41, 0xdd ) );
 	bigint_reduce_ok ( BIGINT ( 0x21, 0xfa, 0x4f, 0xce, 0x0f, 0x0f, 0x4d,
@@ -1815,15 +1807,19 @@ static void bigint_test_exec ( void ) {
 				    0x43, 0xaa, 0xad, 0x21, 0x30, 0xe5 ),
 			   BIGINT ( 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				    0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ) );
-	bigint_reduce_ok ( BIGINT ( 0xf9, 0x78, 0x96, 0x39, 0xee, 0x98, 0x42,
+	bigint_reduce_ok ( BIGINT ( 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				    0x00, 0x00, 0x00, 0xf3, 0x65, 0x35, 0x41,
+				    0x66, 0x65 ),
+			   BIGINT ( 0xf9, 0x78, 0x96, 0x39, 0xee, 0x98, 0x42,
 				    0x6a, 0xb8, 0x74, 0x0b, 0xe8, 0x5c, 0x76,
 				    0x34, 0xaf ),
-			   BIGINT ( 0xf3, 0x65, 0x35, 0x41, 0x66, 0x65 ),
-			   BIGINT ( 0xb3, 0x07, 0xe8, 0xb7, 0x01, 0xf6 ) );
-	bigint_reduce_ok ( BIGINT ( 0xfe, 0x30, 0xe1, 0xc6, 0x65, 0x97, 0x48,
-				    0x2e, 0x94, 0xd4 ),
-			   BIGINT ( 0x47, 0xaa, 0x88, 0x00, 0xd0, 0x30, 0x62,
+			   BIGINT ( 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				    0x00, 0x00, 0x00, 0xb3, 0x07, 0xe8, 0xb7,
+				    0x01, 0xf6 ) );
+	bigint_reduce_ok ( BIGINT ( 0x47, 0xaa, 0x88, 0x00, 0xd0, 0x30, 0x62,
 				    0xfb, 0x5d, 0x55 ),
+			   BIGINT ( 0xfe, 0x30, 0xe1, 0xc6, 0x65, 0x97, 0x48,
+				    0x2e, 0x94, 0xd4 ),
 			   BIGINT ( 0x27, 0x31, 0x49, 0xc3, 0xf5, 0x06, 0x1f,
 				    0x3c, 0x7c, 0xd5 ) );
 	bigint_mod_invert_ok ( BIGINT ( 0x01 ), BIGINT ( 0x01 ) );
