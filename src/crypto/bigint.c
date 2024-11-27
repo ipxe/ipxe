@@ -287,27 +287,22 @@ void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
  * @v invertend0	Element 0 of odd big integer to be inverted
  * @v inverse0		Element 0 of big integer to hold result
  * @v size		Number of elements in invertend and result
- * @v tmp		Temporary working space
  */
 void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
-			     bigint_element_t *inverse0,
-			     unsigned int size, void *tmp ) {
+			     bigint_element_t *inverse0, unsigned int size ) {
 	const bigint_t ( size ) __attribute__ (( may_alias ))
 		*invertend = ( ( const void * ) invertend0 );
 	bigint_t ( size ) __attribute__ (( may_alias ))
 		*inverse = ( ( void * ) inverse0 );
-	struct {
-		bigint_t ( size ) residue;
-	} *temp = tmp;
-	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
+	bigint_element_t accum;
+	bigint_element_t bit;
 	unsigned int i;
 
 	/* Sanity check */
-	assert ( invertend->element[0] & 1 );
+	assert ( bigint_bit_is_set ( invertend, 0 ) );
 
-	/* Initialise temporary working space and output value */
-	memset ( &temp->residue, 0xff, sizeof ( temp->residue ) );
-	memset ( inverse, 0, sizeof ( *inverse ) );
+	/* Initialise output */
+	memset ( inverse, 0xff, sizeof ( *inverse ) );
 
 	/* Compute inverse modulo 2^(width)
 	 *
@@ -315,23 +310,47 @@ void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 	 * presented in "A New Algorithm for Inversion mod p^k (Koç,
 	 * 2017)".
 	 *
-	 * Each loop iteration calculates one bit of the inverse.  The
-	 * residue value is the two's complement negation of the value
-	 * "b" as used by Koç, to allow for division by two using a
-	 * logical right shift (since we have no arithmetic right
-	 * shift operation for big integers).
+	 * Each inner loop iteration calculates one bit of the
+	 * inverse.  The residue value is the two's complement
+	 * negation of the value "b" as used by Koç, to allow for
+	 * division by two using a logical right shift (since we have
+	 * no arithmetic right shift operation for big integers).
+	 *
+	 * The residue is stored in the as-yet uncalculated portion of
+	 * the inverse.  The size of the residue therefore decreases
+	 * by one element for each outer loop iteration.  Trivial
+	 * inspection of the algorithm shows that any higher bits
+	 * could not contribute to the eventual output value, and so
+	 * we may safely reuse storage this way.
 	 *
 	 * Due to the suffix property of inverses mod 2^k, the result
 	 * represents the least significant bits of the inverse modulo
 	 * an arbitrarily large 2^k.
 	 */
-	for ( i = 0 ; i < ( 8 * sizeof ( *inverse ) ) ; i++ ) {
-		if ( temp->residue.element[0] & 1 ) {
-			inverse->element[ i / width ] |=
-				( 1UL << ( i % width ) );
-			bigint_add ( invertend, &temp->residue );
+	for ( i = size ; i > 0 ; i-- ) {
+		const bigint_t ( i ) __attribute__ (( may_alias ))
+			*addend = ( ( const void * ) invertend );
+		bigint_t ( i ) __attribute__ (( may_alias ))
+			*residue = ( ( void * ) inverse );
+
+		/* Calculate one element's worth of inverse bits */
+		for ( accum = 0, bit = 1 ; bit ; bit <<= 1 ) {
+			if ( bigint_bit_is_set ( residue, 0 ) ) {
+				accum |= bit;
+				bigint_add ( addend, residue );
+			}
+			bigint_shr ( residue );
 		}
-		bigint_shr ( &temp->residue );
+
+		/* Store in the element no longer required to hold residue */
+		inverse->element[ i - 1 ] = accum;
+	}
+
+	/* Correct order of inverse elements */
+	for ( i = 0 ; i < ( size / 2 ) ; i++ ) {
+		accum = inverse->element[i];
+		inverse->element[i] = inverse->element[ size - 1 - i ];
+		inverse->element[ size - 1 - i ] = accum;
 	}
 }
 

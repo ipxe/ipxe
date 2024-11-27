@@ -197,13 +197,13 @@ void bigint_reduce_sample ( bigint_element_t *modulus0,
 
 void bigint_mod_invert_sample ( const bigint_element_t *invertend0,
 				bigint_element_t *inverse0,
-				unsigned int size, void *tmp ) {
+				unsigned int size ) {
 	const bigint_t ( size ) __attribute__ (( may_alias ))
 		*invertend = ( ( const void * ) invertend0 );
 	bigint_t ( size ) __attribute__ (( may_alias ))
 		*inverse = ( ( void * ) inverse0 );
 
-	bigint_mod_invert ( invertend, inverse, tmp );
+	bigint_mod_invert ( invertend, inverse );
 }
 
 void bigint_mod_multiply_sample ( const bigint_element_t *multiplicand0,
@@ -600,8 +600,6 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 		bigint_required_size ( sizeof ( invertend_raw ) );	\
 	bigint_t ( size ) invertend_temp;				\
 	bigint_t ( size ) inverse_temp;					\
-	size_t tmp_len = bigint_mod_invert_tmp_len ( &invertend_temp );	\
-	uint8_t tmp[tmp_len];						\
 	{} /* Fix emacs alignment */					\
 									\
 	assert ( bigint_size ( &invertend_temp ) ==			\
@@ -610,7 +608,7 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 		      sizeof ( invertend_raw ) );			\
 	DBG ( "Modular invert:\n" );					\
 	DBG_HDA ( 0, &invertend_temp, sizeof ( invertend_temp ) );	\
-	bigint_mod_invert ( &invertend_temp, &inverse_temp, tmp );	\
+	bigint_mod_invert ( &invertend_temp, &inverse_temp );		\
 	DBG_HDA ( 0, &inverse_temp, sizeof ( inverse_temp ) );		\
 	bigint_done ( &inverse_temp, inverse_raw,			\
 		      sizeof ( inverse_raw ) );				\
@@ -1827,6 +1825,10 @@ static void bigint_test_exec ( void ) {
 					0xff, 0xff ),
 			       BIGINT ( 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 					0xff, 0xff ) );
+	bigint_mod_invert_ok ( BIGINT ( 0xa4, 0xcb, 0xbc, 0xc9, 0x9f, 0x7a,
+					0x65, 0xbf ),
+			       BIGINT ( 0xb9, 0xd5, 0xf4, 0x88, 0x0b, 0xf8,
+					0x8a, 0x3f ) );
 	bigint_mod_invert_ok ( BIGINT ( 0x95, 0x6a, 0xc5, 0xe7, 0x2e, 0x5b,
 					0x44, 0xed, 0xbf, 0x7e, 0xfe, 0x8d,
 					0xf4, 0x5a, 0x48, 0xc1 ),
@@ -1839,6 +1841,18 @@ static void bigint_test_exec ( void ) {
 			       BIGINT ( 0xf2, 0x9c, 0x63, 0x29, 0xfa, 0xe4,
 					0xbf, 0x90, 0xa6, 0x9a, 0xec, 0xcf,
 					0x5f, 0xe2, 0x21, 0xcd ) );
+	bigint_mod_invert_ok ( BIGINT ( 0xb9, 0xbb, 0x7f, 0x9c, 0x7a, 0x32,
+					0x43, 0xed, 0x9d, 0xd4, 0x0d, 0x6f,
+					0x32, 0xfa, 0x4b, 0x62, 0x38, 0x3a,
+					0xbf, 0x4c, 0xbd, 0xa8, 0x47, 0xce,
+					0xa2, 0x30, 0x34, 0xe0, 0x2c, 0x09,
+					0x14, 0x89 ),
+			       BIGINT ( 0xfc, 0x05, 0xc4, 0x2a, 0x90, 0x99,
+					0x82, 0xf8, 0x81, 0x1d, 0x87, 0xb8,
+					0xca, 0xe4, 0x95, 0xe2, 0xac, 0x18,
+					0xb3, 0xe1, 0x3e, 0xc6, 0x5a, 0x03,
+					0x51, 0x6f, 0xb7, 0xe3, 0xa5, 0xd6,
+					0xa1, 0xb9 ) );
 	bigint_mod_multiply_ok ( BIGINT ( 0x37 ),
 				 BIGINT ( 0x67 ),
 				 BIGINT ( 0x3f ),
