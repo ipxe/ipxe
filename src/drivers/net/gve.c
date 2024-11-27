@@ -1050,6 +1050,9 @@ static void gve_startup ( struct gve_nic *gve ) {
 	struct net_device *netdev = gve->netdev;
 	int rc;
 
+	if ( ! netdev_is_open( netdev ) )
+		return;
+
 	/* Reset device */
 	if ( ( rc = gve_reset ( gve ) ) != 0 )
 		goto err_reset;
