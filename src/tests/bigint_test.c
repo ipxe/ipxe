@@ -206,6 +206,23 @@ void bigint_mod_invert_sample ( const bigint_element_t *invertend0,
 	bigint_mod_invert ( invertend, inverse );
 }
 
+void bigint_montgomery_sample ( const bigint_element_t *modulus0,
+				const bigint_element_t *modinv0,
+				bigint_element_t *mont0,
+				bigint_element_t *result0,
+				unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( const void * ) modulus0 );
+	const bigint_t ( 1 ) __attribute__ (( may_alias ))
+		*modinv = ( ( const void * ) modinv0 );
+	bigint_t ( 2 * size ) __attribute__ (( may_alias ))
+		*mont = ( ( void * ) mont0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+
+	bigint_montgomery ( modulus, modinv, mont, result );
+}
+
 void bigint_mod_multiply_sample ( const bigint_element_t *multiplicand0,
 				  const bigint_element_t *multiplier0,
 				  const bigint_element_t *modulus0,
@@ -615,6 +632,46 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 									\
 	ok ( memcmp ( inverse_raw, expected_raw,			\
 		      sizeof ( inverse_raw ) ) == 0 );			\
+	} while ( 0 )
+
+/**
+ * Report result of Montgomery reduction (REDC) test
+ *
+ * @v modulus		Big integer modulus
+ * @v mont		Big integer Montgomery product
+ * @v expected		Big integer expected result
+ */
+#define bigint_montgomery_ok( modulus, mont, expected ) do {		\
+	static const uint8_t modulus_raw[] = modulus;			\
+	static const uint8_t mont_raw[] = mont;				\
+	static const uint8_t expected_raw[] = expected;			\
+	uint8_t result_raw[ sizeof ( expected_raw ) ];			\
+	unsigned int size =						\
+		bigint_required_size ( sizeof ( modulus_raw ) );	\
+	bigint_t ( size ) modulus_temp;					\
+	bigint_t ( 1 ) modinv_temp;					\
+	bigint_t ( 2 * size ) mont_temp;				\
+	bigint_t ( size ) result_temp;					\
+	{} /* Fix emacs alignment */					\
+									\
+	assert ( ( sizeof ( modulus_raw ) %				\
+		   sizeof ( bigint_element_t ) ) == 0 );		\
+	bigint_init ( &modulus_temp, modulus_raw,			\
+		      sizeof ( modulus_raw ) );				\
+	bigint_init ( &mont_temp, mont_raw, sizeof ( mont_raw ) );	\
+	bigint_mod_invert ( &modulus_temp, &modinv_temp );		\
+	DBG ( "Montgomery:\n" );					\
+	DBG_HDA ( 0, &modulus_temp, sizeof ( modulus_temp ) );		\
+	DBG_HDA ( 0, &modinv_temp, sizeof ( modinv_temp ) );		\
+	DBG_HDA ( 0, &mont_temp, sizeof ( mont_temp ) );		\
+	bigint_montgomery ( &modulus_temp, &modinv_temp, &mont_temp,	\
+			    &result_temp );				\
+	DBG_HDA ( 0, &result_temp, sizeof ( result_temp ) );		\
+	bigint_done ( &result_temp, result_raw,				\
+		      sizeof ( result_raw ) );				\
+									\
+	ok ( memcmp ( result_raw, expected_raw,				\
+		      sizeof ( result_raw ) ) == 0 );			\
 	} while ( 0 )
 
 /**
@@ -1858,6 +1915,25 @@ static void bigint_test_exec ( void ) {
 					0x2e, 0xe6, 0x22, 0x07 ),
 			       BIGINT ( 0x7b, 0xd1, 0x0f, 0x78, 0x0c, 0x65,
 					0xab, 0xb7 ) );
+	bigint_montgomery_ok ( BIGINT ( 0x74, 0xdf, 0xd1, 0xb8, 0x14, 0xf7,
+					0x05, 0x83 ),
+			       BIGINT ( 0x50, 0x6a, 0x38, 0x55, 0x9f, 0xb9,
+					0x9d, 0xba, 0xff, 0x23, 0x86, 0x65,
+					0xe3, 0x2c, 0x3f, 0x17 ),
+			       BIGINT ( 0x45, 0x1f, 0x51, 0x44, 0x6f, 0x3c,
+					0x09, 0x6b ) );
+	bigint_montgomery_ok ( BIGINT ( 0x2e, 0x32, 0x90, 0x69, 0x6e, 0xa8,
+					0x47, 0x4c, 0xad, 0xe4, 0xe7, 0x4c,
+					0x03, 0xcb, 0xe6, 0x55 ),
+			       BIGINT ( 0x1e, 0x43, 0xf9, 0xc2, 0x61, 0xdd,
+					0xe8, 0xbf, 0xb8, 0xea, 0xe0, 0xdb,
+					0xed, 0x66, 0x80, 0x1e, 0xe8, 0xf8,
+					0xd1, 0x1d, 0xca, 0x8d, 0x45, 0xe9,
+					0xc5, 0xeb, 0x77, 0x21, 0x34, 0xe0,
+					0xf5, 0x5a ),
+			       BIGINT ( 0x03, 0x38, 0xfb, 0xb6, 0xf3, 0x80,
+					0x91, 0xb2, 0x68, 0x2f, 0x81, 0x44,
+					0xbf, 0x43, 0x0a, 0x4e ) );
 	bigint_mod_multiply_ok ( BIGINT ( 0x37 ),
 				 BIGINT ( 0x67 ),
 				 BIGINT ( 0x3f ),

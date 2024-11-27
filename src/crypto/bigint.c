@@ -355,6 +355,83 @@ void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 }
 
 /**
+ * Perform Montgomery reduction (REDC) of a big integer product
+ *
+ * @v modulus0		Element 0 of big integer modulus
+ * @v modinv0		Element 0 of the inverse of the modulus modulo 2^k
+ * @v mont0		Element 0 of big integer Montgomery product
+ * @v result0		Element 0 of big integer to hold result
+ * @v size		Number of elements in modulus and result
+ *
+ * Note that only the least significant element of the inverse modulo
+ * 2^k is required, and that the Montgomery product will be
+ * overwritten.
+ */
+void bigint_montgomery_raw ( const bigint_element_t *modulus0,
+			     const bigint_element_t *modinv0,
+			     bigint_element_t *mont0,
+			     bigint_element_t *result0, unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( const void * ) modulus0 );
+	const bigint_t ( 1 ) __attribute__ (( may_alias ))
+		*modinv = ( ( const void * ) modinv0 );
+	union {
+		bigint_t ( size * 2 ) full;
+		struct {
+			bigint_t ( size ) low;
+			bigint_t ( size ) high;
+		} __attribute__ (( packed ));
+	} __attribute__ (( may_alias )) *mont = ( ( void * ) mont0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	bigint_element_t negmodinv = -modinv->element[0];
+	bigint_element_t multiple;
+	bigint_element_t carry;
+	unsigned int i;
+	unsigned int j;
+	int overflow;
+	int underflow;
+
+	/* Sanity checks */
+	assert ( bigint_bit_is_set ( modulus, 0 ) );
+
+	/* Perform multiprecision Montgomery reduction */
+	for ( i = 0 ; i < size ; i++ ) {
+
+		/* Determine scalar multiple for this round */
+		multiple = ( mont->low.element[i] * negmodinv );
+
+		/* Multiply value to make it divisible by 2^(width*i) */
+		carry = 0;
+		for ( j = 0 ; j < size ; j++ ) {
+			bigint_multiply_one ( multiple, modulus->element[j],
+					      &mont->full.element[ i + j ],
+					      &carry );
+		}
+
+		/* Since value is now divisible by 2^(width*i), we
+		 * know that the current low element must have been
+		 * zeroed.  We can store the multiplication carry out
+		 * in this element, avoiding the need to immediately
+		 * propagate the carry through the remaining elements.
+		 */
+		assert ( mont->low.element[i] == 0 );
+		mont->low.element[i] = carry;
+	}
+
+	/* Add the accumulated carries */
+	overflow = bigint_add ( &mont->low, &mont->high );
+
+	/* Conditionally subtract the modulus once */
+	memcpy ( result, &mont->high, sizeof ( *result ) );
+	underflow = bigint_subtract ( modulus, result );
+	bigint_swap ( result, &mont->high, ( underflow & ~overflow ) );
+
+	/* Sanity check */
+	assert ( ! bigint_is_geq ( result, modulus ) );
+}
+
+/**
  * Perform modular multiplication of big integers
  *
  * @v multiplicand0	Element 0 of big integer to be multiplied
