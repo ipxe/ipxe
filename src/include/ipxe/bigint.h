@@ -248,7 +248,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v inverse		Big integer to hold result
  */
 #define bigint_mod_invert( invertend, inverse ) do {			\
-	unsigned int size = bigint_size ( invertend );			\
+	unsigned int size = bigint_size ( inverse );			\
 	bigint_mod_invert_raw ( (invertend)->element,			\
 				(inverse)->element, size );		\
 	} while ( 0 )

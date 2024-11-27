@@ -596,14 +596,14 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	static const uint8_t invertend_raw[] = invertend;		\
 	static const uint8_t expected_raw[] = expected;			\
 	uint8_t inverse_raw[ sizeof ( expected_raw ) ];			\
-	unsigned int size =						\
+	unsigned int invertend_size =					\
 		bigint_required_size ( sizeof ( invertend_raw ) );	\
-	bigint_t ( size ) invertend_temp;				\
-	bigint_t ( size ) inverse_temp;					\
+	unsigned int inverse_size =					\
+		bigint_required_size ( sizeof ( inverse_raw ) );	\
+	bigint_t ( invertend_size ) invertend_temp;			\
+	bigint_t ( inverse_size ) inverse_temp;				\
 	{} /* Fix emacs alignment */					\
 									\
-	assert ( bigint_size ( &invertend_temp ) ==			\
-		 bigint_size ( &inverse_temp ) );			\
 	bigint_init ( &invertend_temp, invertend_raw,			\
 		      sizeof ( invertend_raw ) );			\
 	DBG ( "Modular invert:\n" );					\
@@ -1853,6 +1853,11 @@ static void bigint_test_exec ( void ) {
 					0xb3, 0xe1, 0x3e, 0xc6, 0x5a, 0x03,
 					0x51, 0x6f, 0xb7, 0xe3, 0xa5, 0xd6,
 					0xa1, 0xb9 ) );
+	bigint_mod_invert_ok ( BIGINT ( 0xfe, 0x43, 0xf6, 0xa0, 0x32, 0x02,
+					0x47, 0xaa, 0xaa, 0x0e, 0x33, 0x19,
+					0x2e, 0xe6, 0x22, 0x07 ),
+			       BIGINT ( 0x7b, 0xd1, 0x0f, 0x78, 0x0c, 0x65,
+					0xab, 0xb7 ) );
 	bigint_mod_multiply_ok ( BIGINT ( 0x37 ),
 				 BIGINT ( 0x67 ),
 				 BIGINT ( 0x3f ),
