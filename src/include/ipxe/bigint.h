@@ -271,37 +271,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} while ( 0 )
 
 /**
- * Perform modular multiplication of big integers
- *
- * @v multiplicand	Big integer to be multiplied
- * @v multiplier	Big integer to be multiplied
- * @v modulus		Big integer modulus
- * @v result		Big integer to hold result
- * @v tmp		Temporary working space
- */
-#define bigint_mod_multiply( multiplicand, multiplier, modulus,		\
-			     result, tmp ) do {				\
-	unsigned int size = bigint_size (multiplicand);			\
-	bigint_mod_multiply_raw ( (multiplicand)->element,		\
-				  (multiplier)->element,		\
-				  (modulus)->element,			\
-				  (result)->element, size, tmp );	\
-	} while ( 0 )
-
-/**
- * Calculate temporary working space required for moduluar multiplication
- *
- * @v modulus		Big integer modulus
- * @ret len		Length of temporary working space
- */
-#define bigint_mod_multiply_tmp_len( modulus ) ( {			\
-	unsigned int size = bigint_size (modulus);			\
-	sizeof ( struct {						\
-		bigint_t ( size * 2 ) temp_result;			\
-		bigint_t ( size * 2 ) temp_modulus;			\
-	} ); } )
-
-/**
  * Perform modular exponentiation of big integers
  *
  * @v base		Big integer base
@@ -411,11 +380,6 @@ void bigint_montgomery_raw ( const bigint_element_t *modulus0,
 			     const bigint_element_t *modinv0,
 			     bigint_element_t *mont0,
 			     bigint_element_t *result0, unsigned int size );
-void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
-			       const bigint_element_t *multiplier0,
-			       const bigint_element_t *modulus0,
-			       bigint_element_t *result0,
-			       unsigned int size, void *tmp );
 void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			  const bigint_element_t *modulus0,
 			  const bigint_element_t *exponent0,

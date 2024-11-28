@@ -38,10 +38,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static struct profiler bigint_mod_profiler __profiler =
 	{ .name = "bigint_mod" };
 
-/** Modular multiplication overall profiler */
-static struct profiler bigint_mod_multiply_profiler __profiler =
-	{ .name = "bigint_mod_multiply" };
-
 /**
  * Conditionally swap big integers (in constant time)
  *
@@ -429,55 +425,6 @@ void bigint_montgomery_raw ( const bigint_element_t *modulus0,
 
 	/* Sanity check */
 	assert ( ! bigint_is_geq ( result, modulus ) );
-}
-
-/**
- * Perform modular multiplication of big integers
- *
- * @v multiplicand0	Element 0 of big integer to be multiplied
- * @v multiplier0	Element 0 of big integer to be multiplied
- * @v modulus0		Element 0 of big integer modulus
- * @v result0		Element 0 of big integer to hold result
- * @v size		Number of elements in base, modulus, and result
- * @v tmp		Temporary working space
- */
-void bigint_mod_multiply_raw ( const bigint_element_t *multiplicand0,
-			       const bigint_element_t *multiplier0,
-			       const bigint_element_t *modulus0,
-			       bigint_element_t *result0,
-			       unsigned int size, void *tmp ) {
-	const bigint_t ( size ) __attribute__ (( may_alias )) *multiplicand =
-		( ( const void * ) multiplicand0 );
-	const bigint_t ( size ) __attribute__ (( may_alias )) *multiplier =
-		( ( const void * ) multiplier0 );
-	const bigint_t ( size ) __attribute__ (( may_alias )) *modulus =
-		( ( const void * ) modulus0 );
-	bigint_t ( size ) __attribute__ (( may_alias )) *result =
-		( ( void * ) result0 );
-	struct {
-		bigint_t ( size * 2 ) result;
-		bigint_t ( size * 2 ) modulus;
-	} *temp = tmp;
-
-	/* Start profiling */
-	profile_start ( &bigint_mod_multiply_profiler );
-
-	/* Sanity check */
-	assert ( sizeof ( *temp ) == bigint_mod_multiply_tmp_len ( modulus ) );
-
-	/* Perform multiplication */
-	bigint_multiply ( multiplicand, multiplier, &temp->result );
-
-	/* Reduce result */
-	bigint_grow ( modulus, &temp->modulus );
-	bigint_reduce ( &temp->modulus, &temp->result );
-	bigint_shrink ( &temp->result, result );
-
-	/* Sanity check */
-	assert ( ! bigint_is_geq ( result, modulus ) );
-
-	/* Stop profiling */
-	profile_stop ( &bigint_mod_multiply_profiler );
 }
 
 /**
