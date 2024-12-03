@@ -984,6 +984,7 @@ static void x509_validate_chain_fail_okx ( struct x509_test_chain *chn,
  *
  */
 static void x509_test_exec ( void ) {
+	struct x509_link *link;
 
 	/* Parse all certificates */
 	x509_certificate_ok ( &root_crt );
@@ -1088,6 +1089,22 @@ static void x509_test_exec ( void ) {
 				 &empty_store, &test_root );
 	x509_validate_chain_fail_ok ( &useless_chain, test_ca_expired,
 				      &empty_store, &test_root );
+
+	/* Check chain truncation */
+	link = list_last_entry ( &server_chain.chain->links,
+				 struct x509_link, list );
+	ok ( link->cert == root_crt.cert );
+	link = list_prev_entry ( link, &server_chain.chain->links, list );
+	ok ( link->cert == intermediate_crt.cert );
+	x509_validate_chain_ok ( &server_chain, test_time,
+				 &empty_store, &test_root );
+	x509_truncate ( server_chain.chain, link );
+	x509_validate_chain_fail_ok ( &server_chain, test_time,
+				      &empty_store, &test_root );
+
+	/* Check self-signedess */
+	ok ( x509_is_self_signed ( root_crt.cert ) );
+	ok ( ! x509_is_self_signed ( intermediate_crt.cert ) );
 
 	/* Sanity check */
 	assert ( list_empty ( &empty_store.links ) );

@@ -63,67 +63,200 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Check for a matching PCI root bridge I/O protocol
+ * Find closest bus:dev.fn address range within a root bridge
  *
- * @v pci		PCI device
+ * @v pci		Starting PCI device
  * @v handle		EFI PCI root bridge handle
- * @v root		EFI PCI root bridge I/O protocol
+ * @v range		PCI bus:dev.fn address range to fill in
  * @ret rc		Return status code
  */
-static int efipci_root_match ( struct pci_device *pci, EFI_HANDLE handle,
-			       EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root ) {
+static int efipci_discover_one ( struct pci_device *pci, EFI_HANDLE handle,
+				 struct pci_range *range ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		void *interface;
+		EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
+	} root;
 	union {
 		union acpi_resource *res;
 		void *raw;
-	} u;
-	unsigned int segment = PCI_SEG ( pci->busdevfn );
-	unsigned int bus = PCI_BUS ( pci->busdevfn );
-	unsigned int start;
-	unsigned int end;
+	} acpi;
+	uint32_t best = 0;
+	uint32_t start;
+	uint32_t count;
+	uint32_t index;
 	unsigned int tag;
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Check segment number */
-	if ( root->SegmentNumber != segment )
-		return -ENOENT;
+	/* Return empty range on error */
+	range->start = 0;
+	range->count = 0;
+
+	/* Open root bridge I/O protocol */
+	if ( ( efirc = bs->OpenProtocol ( handle,
+			&efi_pci_root_bridge_io_protocol_guid,
+			&root.interface, efi_image_handle, handle,
+			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot open %s: %s\n",
+		       PCI_ARGS ( pci ), efi_handle_name ( handle ),
+		       strerror ( rc ) );
+		goto err_open;
+	}
 
 	/* Get ACPI resource descriptors */
-	if ( ( efirc = root->Configuration ( root, &u.raw ) ) != 0 ) {
+	if ( ( efirc = root.root->Configuration ( root.root,
+						  &acpi.raw ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( pci, "EFIPCI " PCI_FMT " cannot get configuration for "
 		       "%s: %s\n", PCI_ARGS ( pci ),
 		       efi_handle_name ( handle ), strerror ( rc ) );
-		return rc;
+		goto err_config;
 	}
 
-	/* Assume success if no bus number range descriptors are found */
-	rc = 0;
-
 	/* Parse resource descriptors */
-	for ( ; ( ( tag = acpi_resource_tag ( u.res ) ) != ACPI_END_RESOURCE ) ;
-	      u.res = acpi_resource_next ( u.res ) ) {
+	for ( ; ( ( tag = acpi_resource_tag ( acpi.res ) ) !=
+		  ACPI_END_RESOURCE ) ;
+	      acpi.res = acpi_resource_next ( acpi.res ) ) {
 
 		/* Ignore anything other than a bus number range descriptor */
 		if ( tag != ACPI_QWORD_ADDRESS_SPACE_RESOURCE )
 			continue;
-		if ( u.res->qword.type != ACPI_ADDRESS_TYPE_BUS )
+		if ( acpi.res->qword.type != ACPI_ADDRESS_TYPE_BUS )
 			continue;
 
-		/* Check for a matching bus number */
-		start = le64_to_cpu ( u.res->qword.min );
-		end = ( start + le64_to_cpu ( u.res->qword.len ) );
-		if ( ( bus >= start ) && ( bus < end ) )
-			return 0;
+		/* Get range for this descriptor */
+		start = PCI_BUSDEVFN ( root.root->SegmentNumber,
+				       le64_to_cpu ( acpi.res->qword.min ),
+				       0, 0 );
+		count = PCI_BUSDEVFN ( 0, le64_to_cpu ( acpi.res->qword.len ),
+				       0, 0 );
+		DBGC2 ( pci, "EFIPCI " PCI_FMT " found %04x:[%02x-%02x] via "
+			"%s\n", PCI_ARGS ( pci ), root.root->SegmentNumber,
+			PCI_BUS ( start ), PCI_BUS ( start + count - 1 ),
+			efi_handle_name ( handle ) );
 
-		/* We have seen at least one non-matching range
-		 * descriptor, so assume failure unless we find a
-		 * subsequent match.
-		 */
-		rc = -ENOENT;
+		/* Check for a matching or new closest range */
+		index = ( pci->busdevfn - start );
+		if ( ( index < count ) || ( index > best ) ) {
+			range->start = start;
+			range->count = count;
+			best = index;
+		}
+
+		/* Stop if this range contains the target bus:dev.fn address */
+		if ( index < count )
+			break;
 	}
 
+	/* If no range descriptors were seen, assume that the root
+	 * bridge has a single bus.
+	 */
+	if ( ! range->count ) {
+		range->start = PCI_BUSDEVFN ( root.root->SegmentNumber,
+					      0, 0, 0 );
+		range->count = PCI_BUSDEVFN ( 0, 1, 0, 0 );
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_config:
+	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
+			    efi_image_handle, handle );
+ err_open:
 	return rc;
+}
+
+/**
+ * Find closest bus:dev.fn address range within any root bridge
+ *
+ * @v pci		Starting PCI device
+ * @v range		PCI bus:dev.fn address range to fill in
+ * @v handle		PCI root bridge I/O handle to fill in
+ * @ret rc		Return status code
+ */
+static int efipci_discover_any ( struct pci_device *pci,
+				 struct pci_range *range,
+				 EFI_HANDLE *handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	uint32_t best = 0;
+	uint32_t index;
+	struct pci_range tmp;
+	EFI_HANDLE *handles;
+	UINTN num_handles;
+	UINTN i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Return an empty range and no handle on error */
+	range->start = 0;
+	range->count = 0;
+	*handle = NULL;
+
+	/* Enumerate all root bridge I/O protocol handles */
+	if ( ( efirc = bs->LocateHandleBuffer ( ByProtocol,
+			&efi_pci_root_bridge_io_protocol_guid,
+			NULL, &num_handles, &handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot locate root bridges: "
+		       "%s\n", PCI_ARGS ( pci ), strerror ( rc ) );
+		goto err_locate;
+	}
+
+	/* Iterate over all root bridge I/O protocols */
+	for ( i = 0 ; i < num_handles ; i++ ) {
+
+		/* Get matching or closest range for this root bridge */
+		if ( ( rc = efipci_discover_one ( pci, handles[i],
+						  &tmp ) ) != 0 )
+			continue;
+
+		/* Check for a matching or new closest range */
+		index = ( pci->busdevfn - tmp.start );
+		if ( ( index < tmp.count ) || ( index > best ) ) {
+			range->start = tmp.start;
+			range->count = tmp.count;
+			best = index;
+		}
+
+		/* Stop if this range contains the target bus:dev.fn address */
+		if ( index < tmp.count ) {
+			*handle = handles[i];
+			break;
+		}
+	}
+
+	/* Check for a range containing the target bus:dev.fn address */
+	if ( ! *handle ) {
+		rc = -ENOENT;
+		goto err_range;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_range:
+	bs->FreePool ( handles );
+ err_locate:
+	return rc;
+}
+
+/**
+ * Find next PCI bus:dev.fn address range in system
+ *
+ * @v busdevfn		Starting PCI bus:dev.fn address
+ * @v range		PCI bus:dev.fn address range to fill in
+ */
+static void efipci_discover ( uint32_t busdevfn, struct pci_range *range ) {
+	struct pci_device pci;
+	EFI_HANDLE handle;
+
+	/* Find range */
+	memset ( &pci, 0, sizeof ( pci ) );
+	pci_init ( &pci, busdevfn );
+	efipci_discover_any ( &pci, range, &handle );
 }
 
 /**
@@ -137,55 +270,34 @@ static int efipci_root_match ( struct pci_device *pci, EFI_HANDLE handle,
 static int efipci_root_open ( struct pci_device *pci, EFI_HANDLE *handle,
 			      EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL **root ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_HANDLE *handles;
-	UINTN num_handles;
+	struct pci_range tmp;
 	union {
 		void *interface;
 		EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
 	} u;
 	EFI_STATUS efirc;
-	UINTN i;
 	int rc;
 
-	/* Enumerate all handles */
-	if ( ( efirc = bs->LocateHandleBuffer ( ByProtocol,
+	/* Find matching root bridge I/O protocol handle */
+	if ( ( rc = efipci_discover_any ( pci, &tmp, handle ) ) != 0 )
+		return rc;
+
+	/* (Re)open PCI root bridge I/O protocol */
+	if ( ( efirc = bs->OpenProtocol ( *handle,
 			&efi_pci_root_bridge_io_protocol_guid,
-			NULL, &num_handles, &handles ) ) != 0 ) {
+			&u.interface, efi_image_handle, *handle,
+			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
-		DBGC ( pci, "EFIPCI " PCI_FMT " cannot locate root bridges: "
-		       "%s\n", PCI_ARGS ( pci ), strerror ( rc ) );
-		goto err_locate;
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot open %s: %s\n",
+		       PCI_ARGS ( pci ), efi_handle_name ( *handle ),
+		       strerror ( rc ) );
+		return rc;
 	}
 
-	/* Look for matching root bridge I/O protocol */
-	for ( i = 0 ; i < num_handles ; i++ ) {
-		*handle = handles[i];
-		if ( ( efirc = bs->OpenProtocol ( *handle,
-				&efi_pci_root_bridge_io_protocol_guid,
-				&u.interface, efi_image_handle, *handle,
-				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( pci, "EFIPCI " PCI_FMT " cannot open %s: %s\n",
-			       PCI_ARGS ( pci ), efi_handle_name ( *handle ),
-			       strerror ( rc ) );
-			continue;
-		}
-		if ( efipci_root_match ( pci, *handle, u.root ) == 0 ) {
-			*root = u.root;
-			bs->FreePool ( handles );
-			return 0;
-		}
-		bs->CloseProtocol ( *handle,
-				    &efi_pci_root_bridge_io_protocol_guid,
-				    efi_image_handle, *handle );
-	}
-	DBGC ( pci, "EFIPCI " PCI_FMT " found no root bridge\n",
-	       PCI_ARGS ( pci ) );
-	rc = -ENOENT;
+	/* Return opened protocol */
+	*root = u.root;
 
-	bs->FreePool ( handles );
- err_locate:
-	return rc;
+	return 0;
 }
 
 /**
@@ -362,7 +474,8 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	return ioremap ( bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( efi, pci_discover );
+PROVIDE_PCIAPI_INLINE ( efi, pci_can_probe );
+PROVIDE_PCIAPI ( efi, pci_discover, efipci_discover );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_dword );

@@ -69,66 +69,28 @@ static struct asn1_cursor certstore_raw[] = {
 static struct x509_certificate certstore_certs[ sizeof ( certstore_raw ) /
 						sizeof ( certstore_raw[0] ) ];
 
+/**
+ * Mark stored certificate as most recently used
+ *
+ * @v store		Certificate store
+ * @v cert		X.509 certificate
+ */
+static void certstore_found ( struct x509_chain *store,
+			      struct x509_certificate *cert ) {
+
+	/* Mark as most recently used */
+	list_del ( &cert->store.list );
+	list_add ( &cert->store.list, &store->links );
+	DBGC2 ( store, "CERTSTORE found certificate %s\n",
+		x509_name ( cert ) );
+}
+
 /** Certificate store */
 struct x509_chain certstore = {
 	.refcnt = REF_INIT ( ref_no_free ),
 	.links = LIST_HEAD_INIT ( certstore.links ),
+	.found = certstore_found,
 };
-
-/**
- * Mark stored certificate as most recently used
- *
- * @v cert		X.509 certificate
- * @ret cert		X.509 certificate
- */
-static struct x509_certificate *
-certstore_found ( struct x509_certificate *cert ) {
-
-	/* Mark as most recently used */
-	list_del ( &cert->store.list );
-	list_add ( &cert->store.list, &certstore.links );
-	DBGC2 ( &certstore, "CERTSTORE found certificate %s\n",
-		x509_name ( cert ) );
-
-	return cert;
-}
-
-/**
- * Find certificate in store
- *
- * @v raw		Raw certificate data
- * @ret cert		X.509 certificate, or NULL if not found
- */
-struct x509_certificate * certstore_find ( struct asn1_cursor *raw ) {
-	struct x509_certificate *cert;
-
-	/* Search for certificate within store */
-	list_for_each_entry ( cert, &certstore.links, store.list ) {
-		if ( asn1_compare ( raw, &cert->raw ) == 0 )
-			return certstore_found ( cert );
-	}
-	return NULL;
-}
-
-/**
- * Find certificate in store corresponding to a private key
- *
- * @v key		Private key
- * @ret cert		X.509 certificate, or NULL if not found
- */
-struct x509_certificate * certstore_find_key ( struct private_key *key ) {
-	struct x509_certificate *cert;
-
-	/* Search for certificate within store */
-	list_for_each_entry ( cert, &certstore.links, store.list ) {
-		if ( pubkey_match ( cert->signature_algorithm->pubkey,
-				    key->builder.data, key->builder.len,
-				    cert->subject.public_key.raw.data,
-				    cert->subject.public_key.raw.len ) == 0 )
-			return certstore_found ( cert );
-	}
-	return NULL;
-}
 
 /**
  * Add certificate to store
@@ -219,7 +181,7 @@ static void certstore_init ( void ) {
 
 		/* Skip if certificate already present in store */
 		raw = &certstore_raw[i];
-		if ( ( cert = certstore_find ( raw ) ) != NULL ) {
+		if ( ( cert = x509_find ( &certstore, raw ) ) != NULL ) {
 			DBGC ( &certstore, "CERTSTORE permanent certificate %d "
 			       "is a duplicate of %s\n", i, x509_name ( cert ));
 			continue;

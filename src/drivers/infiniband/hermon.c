@@ -779,8 +779,8 @@ static int hermon_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
 	union hermonprm_mad mad_ifc;
 	int rc;
 
-	linker_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ),
-			mad_size_mismatch );
+	/* Sanity check */
+	static_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ) );
 
 	/* Copy in request packet */
 	memcpy ( &mad_ifc.mad, mad, sizeof ( mad_ifc.mad ) );
@@ -4214,6 +4214,9 @@ static void hermon_bofm_remove ( struct pci_device *pci ) {
 }
 
 static struct pci_device_id hermon_nics[] = {
+	/* Mellanox ConnectX-3 VPI (ethernet + infiniband) */
+	PCI_ROM ( 0x15b3, 0x1003, "mt4099", "ConnectX-3 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x1007, "mt4103", "ConnectX-3 Pro HCA driver", 0 ),
 	/* Mellanox ConnectX VPI (ethernet + infiniband) */
 	PCI_ROM ( 0x15b3, 0x6340, "mt25408", "MT25408 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x634a, "mt25418", "MT25418 HCA driver", 0 ),
@@ -4226,17 +4229,13 @@ static struct pci_device_id hermon_nics[] = {
 	PCI_ROM ( 0x15b3, 0x6732, "mt26418", "MT26418 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x673c, "mt26428", "MT26428 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x6746, "mt26438", "MT26438 HCA driver", 0 ),
-	PCI_ROM ( 0x15b3, 0x6778, "mt26488", "MT26488 HCA driver", 0 ),
 
 	/* Mellanox ConnectX-2 EN (ethernet only) */
 	PCI_ROM ( 0x15b3, 0x6750, "mt26448", "MT26448 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x675a, "mt26458", "MT26458 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x6764, "mt26468", "MT26468 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x676e, "mt26478", "MT26478 HCA driver", 0 ),
-
-	/* Mellanox ConnectX-3 VPI (ethernet + infiniband) */
-	PCI_ROM ( 0x15b3, 0x1003, "mt4099", "ConnectX-3 HCA driver", 0 ),
-	PCI_ROM ( 0x15b3, 0x1007, "mt4103", "ConnectX-3 Pro HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6778, "mt26488", "MT26488 HCA driver", 0 ),
 };
 
 struct pci_driver hermon_driver __pci_driver = {

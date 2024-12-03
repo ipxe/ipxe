@@ -560,8 +560,11 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	req->create_cq.address = cpu_to_le64 ( virt_to_bus ( cq->cqe.raw ) );
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p CQ%d creation failed (broken firmware?)\n",
+		       ena, cq->id );
 		goto err_admin;
+	}
 
 	/* Parse response */
 	cq->id = le16_to_cpu ( rsp->create_cq.id );
@@ -1163,7 +1166,7 @@ static int ena_probe ( struct pci_device *pci ) {
 	}
 	ena->info = info;
 	memset ( info, 0, PAGE_SIZE );
-	info->type = cpu_to_le32 ( ENA_HOST_INFO_TYPE_LINUX );
+	info->type = cpu_to_le32 ( ENA_HOST_INFO_TYPE_IPXE );
 	snprintf ( info->dist_str, sizeof ( info->dist_str ), "%s",
 		   ( product_name[0] ? product_name : product_short_name ) );
 	snprintf ( info->kernel_str, sizeof ( info->kernel_str ), "%s",

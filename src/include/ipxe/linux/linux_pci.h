@@ -23,6 +23,16 @@ extern int linux_pci_write ( struct pci_device *pci, unsigned long where,
 			     unsigned long value, size_t len );
 
 /**
+ * Check if PCI bus probing is allowed
+ *
+ * @ret ok		Bus probing is allowed
+ */
+static inline __always_inline int
+PCIAPI_INLINE ( linux, pci_can_probe ) ( void ) {
+	return 1;
+}
+
+/**
  * Find next PCI bus:dev.fn address range in system
  *
  * @v busdevfn		Starting PCI bus:dev.fn address

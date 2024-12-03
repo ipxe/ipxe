@@ -2225,13 +2225,16 @@ falcon_xaui_link_ok ( struct efab_nic *efab )
 		sync = ( sync == FCN_XX_SYNC_STAT_DECODE_SYNCED );
 		
 		link_ok = align_done && sync;
-	}
 
-	/* Clear link status ready for next read */
-	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_COMMA_DET, FCN_XX_COMMA_DET_RESET );
-	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_CHARERR, FCN_XX_CHARERR_RESET);
-	EFAB_SET_DWORD_FIELD ( reg, FCN_XX_DISPERR, FCN_XX_DISPERR_RESET);
-	falcon_xmac_writel ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
+		/* Clear link status ready for next read */
+		EFAB_SET_DWORD_FIELD ( reg, FCN_XX_COMMA_DET,
+				       FCN_XX_COMMA_DET_RESET );
+		EFAB_SET_DWORD_FIELD ( reg, FCN_XX_CHARERR,
+				       FCN_XX_CHARERR_RESET );
+		EFAB_SET_DWORD_FIELD ( reg, FCN_XX_DISPERR,
+				       FCN_XX_DISPERR_RESET );
+		falcon_xmac_writel ( efab, &reg, FCN_XX_CORE_STAT_REG_MAC );
+	}
 
 	has_phyxs = ( efab->phy_op->mmds & ( 1 << MDIO_MMD_PHYXS ) );
 	if ( link_ok && has_phyxs ) {
@@ -3725,7 +3728,7 @@ efab_receive ( struct efab_nic *efab, unsigned int id, int len, int drop )
 static int
 efab_transmit ( struct net_device *netdev, struct io_buffer *iob )
 {
-	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_nic *efab = netdev->priv;
 	struct efab_tx_queue *tx_queue = &efab->tx_queue;
 	int fill_level, space;
 	falcon_tx_desc_t *txd;
@@ -3844,7 +3847,7 @@ falcon_handle_event ( struct efab_nic *efab, falcon_event_t *evt )
 static void
 efab_poll ( struct net_device *netdev )
 {
-	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_nic *efab = netdev->priv;
 	struct efab_ev_queue *ev_queue = &efab->ev_queue;
 	struct efab_rx_queue *rx_queue = &efab->rx_queue;
 	falcon_event_t *evt;
@@ -3883,7 +3886,7 @@ efab_poll ( struct net_device *netdev )
 static void
 efab_irq ( struct net_device *netdev, int enable )
 {
-	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_nic *efab = netdev->priv;
 	struct efab_ev_queue *ev_queue = &efab->ev_queue;
 
 	switch ( enable ) {
@@ -4032,7 +4035,7 @@ efab_init_mac ( struct efab_nic *efab )
 static void
 efab_close ( struct net_device *netdev )
 {
-	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_nic *efab = netdev->priv;
 
 	falcon_fini_resources ( efab );
 	efab_free_resources ( efab );
@@ -4043,7 +4046,7 @@ efab_close ( struct net_device *netdev )
 static int
 efab_open ( struct net_device *netdev )
 {
-	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_nic *efab = netdev->priv;
 	struct efab_rx_queue *rx_queue = &efab->rx_queue;
 	int rc;
 
@@ -4104,7 +4107,7 @@ static void
 efab_remove ( struct pci_device *pci )
 {
 	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct efab_nic *efab = netdev_priv ( netdev );
+	struct efab_nic *efab = netdev->priv;
 
 	if ( efab->membase ) {
 		falcon_reset ( efab );
@@ -4143,7 +4146,7 @@ efab_probe ( struct pci_device *pci )
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 
-	efab = netdev_priv ( netdev );
+	efab = netdev->priv;
 	memset ( efab, 0, sizeof ( *efab ) );
 	efab->netdev = netdev;
 

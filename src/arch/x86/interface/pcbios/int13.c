@@ -183,8 +183,8 @@ static int int13_parse_eltorito ( struct san_device *sandev, void *scratch ) {
 	/* Read boot record volume descriptor */
 	if ( ( rc = sandev_read ( sandev, ELTORITO_LBA, 1,
 				  virt_to_user ( boot ) ) ) != 0 ) {
-		DBGC ( sandev, "INT13 drive %02x could not read El Torito boot "
-		       "record volume descriptor: %s\n",
+		DBGC ( sandev->drive, "INT13 drive %02x could not read El "
+		       "Torito boot record volume descriptor: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		return rc;
 	}
@@ -192,10 +192,11 @@ static int int13_parse_eltorito ( struct san_device *sandev, void *scratch ) {
 	/* Check for an El Torito boot catalog */
 	if ( memcmp ( boot, &boot_check, sizeof ( boot_check ) ) == 0 ) {
 		int13->boot_catalog = boot->sector;
-		DBGC ( sandev, "INT13 drive %02x has an El Torito boot catalog "
-		       "at LBA %08x\n", sandev->drive, int13->boot_catalog );
+		DBGC ( sandev->drive, "INT13 drive %02x has an El Torito boot "
+		       "catalog at LBA %08x\n", sandev->drive,
+		       int13->boot_catalog );
 	} else {
-		DBGC ( sandev, "INT13 drive %02x has no El Torito boot "
+		DBGC ( sandev->drive, "INT13 drive %02x has no El Torito boot "
 		       "catalog\n", sandev->drive );
 	}
 
@@ -228,14 +229,14 @@ static int int13_guess_geometry_hdd ( struct san_device *sandev, void *scratch,
 
 	/* Read partition table */
 	if ( ( rc = sandev_read ( sandev, 0, 1, virt_to_user ( mbr ) ) ) != 0 ) {
-		DBGC ( sandev, "INT13 drive %02x could not read "
+		DBGC ( sandev->drive, "INT13 drive %02x could not read "
 		       "partition table to guess geometry: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		return rc;
 	}
-	DBGC2 ( sandev, "INT13 drive %02x has MBR:\n", sandev->drive );
-	DBGC2_HDA ( sandev, 0, mbr, sizeof ( *mbr ) );
-	DBGC ( sandev, "INT13 drive %02x has signature %08x\n",
+	DBGC2 ( sandev->drive, "INT13 drive %02x has MBR:\n", sandev->drive );
+	DBGC2_HDA ( sandev->drive, 0, mbr, sizeof ( *mbr ) );
+	DBGC ( sandev->drive, "INT13 drive %02x has signature %08x\n",
 	       sandev->drive, mbr->signature );
 
 	/* Scan through partition table and modify guesses for
@@ -260,8 +261,8 @@ static int int13_guess_geometry_hdd ( struct san_device *sandev, void *scratch,
 		if ( ( start_cylinder == 0 ) && ( start_head != 0 ) ) {
 			*sectors = ( ( partition->start + 1 - start_sector ) /
 				     start_head );
-			DBGC ( sandev, "INT13 drive %02x guessing C/H/S "
-			       "xx/xx/%d based on partition %d\n",
+			DBGC ( sandev->drive, "INT13 drive %02x guessing "
+			       "C/H/S xx/xx/%d based on partition %d\n",
 			       sandev->drive, *sectors, ( i + 1 ) );
 		}
 
@@ -272,14 +273,14 @@ static int int13_guess_geometry_hdd ( struct san_device *sandev, void *scratch,
 		end_sector = PART_SECTOR ( partition->chs_end );
 		if ( ( end_head + 1 ) > *heads ) {
 			*heads = ( end_head + 1 );
-			DBGC ( sandev, "INT13 drive %02x guessing C/H/S "
-			       "xx/%d/xx based on partition %d\n",
+			DBGC ( sandev->drive, "INT13 drive %02x guessing "
+			       "C/H/S xx/%d/xx based on partition %d\n",
 			       sandev->drive, *heads, ( i + 1 ) );
 		}
 		if ( end_sector > *sectors ) {
 			*sectors = end_sector;
-			DBGC ( sandev, "INT13 drive %02x guessing C/H/S "
-			       "xx/xx/%d based on partition %d\n",
+			DBGC ( sandev->drive, "INT13 drive %02x guessing "
+			       "C/H/S xx/xx/%d based on partition %d\n",
 			       sandev->drive, *sectors, ( i + 1 ) );
 		}
 	}
@@ -343,9 +344,10 @@ static int int13_guess_geometry_fdd ( struct san_device *sandev,
 		*heads = INT13_FDD_HEADS ( geometry );
 		*sectors = INT13_FDD_SECTORS ( geometry );
 		if ( ( cylinders * (*heads) * (*sectors) ) == blocks ) {
-			DBGC ( sandev, "INT13 drive %02x guessing C/H/S "
-			       "%d/%d/%d based on size %dK\n", sandev->drive,
-			       cylinders, *heads, *sectors, ( blocks / 2 ) );
+			DBGC ( sandev->drive, "INT13 drive %02x guessing "
+			       "C/H/S %d/%d/%d based on size %dK\n",
+			       sandev->drive, cylinders, *heads, *sectors,
+			       ( blocks / 2 ) );
 			return 0;
 		}
 	}
@@ -355,8 +357,9 @@ static int int13_guess_geometry_fdd ( struct san_device *sandev,
 	 */
 	*heads = 2;
 	*sectors = 18;
-	DBGC ( sandev, "INT13 drive %02x guessing C/H/S xx/%d/%d based on size "
-	       "%dK\n", sandev->drive, *heads, *sectors, ( blocks / 2 ) );
+	DBGC ( sandev->drive, "INT13 drive %02x guessing C/H/S xx/%d/%d "
+	       "based on size %dK\n", sandev->drive, *heads, *sectors,
+	       ( blocks / 2 ) );
 	return 0;
 }
 
@@ -431,8 +434,8 @@ static void int13_sync_num_drives ( void ) {
 		required = ( ( max_drive & 0x7f ) + 1 );
 		if ( *counter < required ) {
 			*counter = required;
-			DBGC ( sandev, "INT13 drive %02x added to drive count: "
-			       "%d HDDs, %d FDDs\n",
+			DBGC ( sandev->drive, "INT13 drive %02x added to "
+			       "drive count: %d HDDs, %d FDDs\n",
 			       sandev->drive, num_drives, num_fdds );
 		}
 	}
@@ -472,7 +475,7 @@ static int int13_reset ( struct san_device *sandev,
 			 struct i386_all_regs *ix86 __unused ) {
 	int rc;
 
-	DBGC2 ( sandev, "Reset drive\n" );
+	DBGC2 ( sandev->drive, "Reset drive\n" );
 
 	/* Reset SAN device */
 	if ( ( rc = sandev_reset ( sandev ) ) != 0 )
@@ -491,7 +494,7 @@ static int int13_get_last_status ( struct san_device *sandev,
 				   struct i386_all_regs *ix86 __unused ) {
 	struct int13_data *int13 = sandev->priv;
 
-	DBGC2 ( sandev, "Get status of last operation\n" );
+	DBGC2 ( sandev->drive, "Get status of last operation\n" );
 	return int13->last_status;
 }
 
@@ -524,8 +527,8 @@ static int int13_rw_sectors ( struct san_device *sandev,
 
 	/* Validate blocksize */
 	if ( sandev_blksize ( sandev ) != INT13_BLKSIZE ) {
-		DBGC ( sandev, "\nINT 13 drive %02x invalid blocksize (%zd) "
-		       "for non-extended read/write\n",
+		DBGC ( sandev->drive, "\nINT 13 drive %02x invalid blocksize "
+		       "(%zd) for non-extended read/write\n",
 		       sandev->drive, sandev_blksize ( sandev ) );
 		return -INT13_STATUS_INVALID;
 	}
@@ -537,9 +540,10 @@ static int int13_rw_sectors ( struct san_device *sandev,
 	if ( ( cylinder >= int13->cylinders ) ||
 	     ( head >= int13->heads ) ||
 	     ( sector < 1 ) || ( sector > int13->sectors_per_track ) ) {
-		DBGC ( sandev, "C/H/S %d/%d/%d out of range for geometry "
-		       "%d/%d/%d\n", cylinder, head, sector, int13->cylinders,
-		       int13->heads, int13->sectors_per_track );
+		DBGC ( sandev->drive, "C/H/S %d/%d/%d out of range for "
+		       "geometry %d/%d/%d\n", cylinder, head, sector,
+		       int13->cylinders, int13->heads,
+		       int13->sectors_per_track );
 		return -INT13_STATUS_INVALID;
 	}
 	lba = ( ( ( ( cylinder * int13->heads ) + head )
@@ -547,13 +551,13 @@ static int int13_rw_sectors ( struct san_device *sandev,
 	count = ix86->regs.al;
 	buffer = real_to_user ( ix86->segs.es, ix86->regs.bx );
 
-	DBGC2 ( sandev, "C/H/S %d/%d/%d = LBA %08lx <-> %04x:%04x (count %d)\n",
-		cylinder, head, sector, lba, ix86->segs.es, ix86->regs.bx,
-		count );
+	DBGC2 ( sandev->drive, "C/H/S %d/%d/%d = LBA %08lx <-> %04x:%04x "
+		"(count %d)\n", cylinder, head, sector, lba, ix86->segs.es,
+		ix86->regs.bx, count );
 
 	/* Read from / write to block device */
 	if ( ( rc = sandev_rw ( sandev, lba, count, buffer ) ) != 0 ){
-		DBGC ( sandev, "INT13 drive %02x I/O failed: %s\n",
+		DBGC ( sandev->drive, "INT13 drive %02x I/O failed: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		return -INT13_STATUS_READ_ERROR;
 	}
@@ -577,7 +581,7 @@ static int int13_rw_sectors ( struct san_device *sandev,
 static int int13_read_sectors ( struct san_device *sandev,
 				struct i386_all_regs *ix86 ) {
 
-	DBGC2 ( sandev, "Read: " );
+	DBGC2 ( sandev->drive, "Read: " );
 	return int13_rw_sectors ( sandev, ix86, sandev_read );
 }
 
@@ -597,7 +601,7 @@ static int int13_read_sectors ( struct san_device *sandev,
 static int int13_write_sectors ( struct san_device *sandev,
 				 struct i386_all_regs *ix86 ) {
 
-	DBGC2 ( sandev, "Write: " );
+	DBGC2 ( sandev->drive, "Write: " );
 	return int13_rw_sectors ( sandev, ix86, sandev_write );
 }
 
@@ -619,12 +623,12 @@ static int int13_get_parameters ( struct san_device *sandev,
 	unsigned int max_head = int13->heads - 1;
 	unsigned int max_sector = int13->sectors_per_track; /* sic */
 
-	DBGC2 ( sandev, "Get drive parameters\n" );
+	DBGC2 ( sandev->drive, "Get drive parameters\n" );
 
 	/* Validate blocksize */
 	if ( sandev_blksize ( sandev ) != INT13_BLKSIZE ) {
-		DBGC ( sandev, "\nINT 13 drive %02x invalid blocksize (%zd) "
-		       "for non-extended parameters\n",
+		DBGC ( sandev->drive, "\nINT 13 drive %02x invalid blocksize "
+		       "(%zd) for non-extended parameters\n",
 		       sandev->drive, sandev_blksize ( sandev ) );
 		return -INT13_STATUS_INVALID;
 	}
@@ -657,7 +661,7 @@ static int int13_get_disk_type ( struct san_device *sandev,
 				 struct i386_all_regs *ix86 ) {
 	uint32_t blocks;
 
-	DBGC2 ( sandev, "Get disk type\n" );
+	DBGC2 ( sandev->drive, "Get disk type\n" );
 
 	if ( int13_is_fdd ( sandev ) ) {
 		return INT13_DISK_TYPE_FDD;
@@ -682,7 +686,7 @@ static int int13_extension_check ( struct san_device *sandev,
 				   struct i386_all_regs *ix86 ) {
 
 	if ( ( ix86->regs.bx == 0x55aa ) && ! int13_is_fdd ( sandev ) ) {
-		DBGC2 ( sandev, "INT13 extensions installation check\n" );
+		DBGC2 ( sandev->drive, "INT13 extensions check\n" );
 		ix86->regs.bx = 0xaa55;
 		ix86->regs.cx = ( INT13_EXTENSION_LINEAR |
 				  INT13_EXTENSION_EDD |
@@ -725,7 +729,8 @@ static int int13_extended_rw ( struct san_device *sandev,
 	get_real ( bufsize, ix86->segs.ds,
 		   ( ix86->regs.si + offsetof ( typeof ( addr ), bufsize ) ) );
 	if ( bufsize < offsetof ( typeof ( addr ), buffer_phys ) ) {
-		DBGC2 ( sandev, "<invalid buffer size %#02x\n>\n", bufsize );
+		DBGC2 ( sandev->drive, "<invalid buffer size %#02x\n>\n",
+			bufsize );
 		return -INT13_STATUS_INVALID;
 	}
 
@@ -733,17 +738,18 @@ static int int13_extended_rw ( struct san_device *sandev,
 	memset ( &addr, 0, sizeof ( addr ) );
 	copy_from_real ( &addr, ix86->segs.ds, ix86->regs.si, bufsize );
 	lba = addr.lba;
-	DBGC2 ( sandev, "LBA %08llx <-> ", ( ( unsigned long long ) lba ) );
+	DBGC2 ( sandev->drive, "LBA %08llx <-> ",
+		( ( unsigned long long ) lba ) );
 	if ( ( addr.count == 0xff ) ||
 	     ( ( addr.buffer.segment == 0xffff ) &&
 	       ( addr.buffer.offset == 0xffff ) ) ) {
 		buffer = phys_to_user ( addr.buffer_phys );
-		DBGC2 ( sandev, "%08llx",
+		DBGC2 ( sandev->drive, "%08llx",
 			( ( unsigned long long ) addr.buffer_phys ) );
 	} else {
 		buffer = real_to_user ( addr.buffer.segment,
 					addr.buffer.offset );
-		DBGC2 ( sandev, "%04x:%04x", addr.buffer.segment,
+		DBGC2 ( sandev->drive, "%04x:%04x", addr.buffer.segment,
 			addr.buffer.offset );
 	}
 	if ( addr.count <= 0x7f ) {
@@ -751,15 +757,15 @@ static int int13_extended_rw ( struct san_device *sandev,
 	} else if ( addr.count == 0xff ) {
 		count = addr.long_count;
 	} else {
-		DBGC2 ( sandev, " <invalid count %#02x>\n", addr.count );
+		DBGC2 ( sandev->drive, " <invalid count %#02x>\n", addr.count );
 		return -INT13_STATUS_INVALID;
 	}
-	DBGC2 ( sandev, " (count %ld)\n", count );
+	DBGC2 ( sandev->drive, " (count %ld)\n", count );
 
 	/* Read from / write to block device */
 	if ( ( rc = sandev_rw ( sandev, lba, count, buffer ) ) != 0 ) {
-		DBGC ( sandev, "INT13 drive %02x extended I/O failed: %s\n",
-		       sandev->drive, strerror ( rc ) );
+		DBGC ( sandev->drive, "INT13 drive %02x extended I/O failed: "
+		       "%s\n", sandev->drive, strerror ( rc ) );
 		/* Record that no blocks were transferred successfully */
 		addr.count = 0;
 		put_real ( addr.count, ix86->segs.ds,
@@ -781,7 +787,7 @@ static int int13_extended_rw ( struct san_device *sandev,
 static int int13_extended_read ( struct san_device *sandev,
 				 struct i386_all_regs *ix86 ) {
 
-	DBGC2 ( sandev, "Extended read: " );
+	DBGC2 ( sandev->drive, "Extended read: " );
 	return int13_extended_rw ( sandev, ix86, sandev_read );
 }
 
@@ -795,7 +801,7 @@ static int int13_extended_read ( struct san_device *sandev,
 static int int13_extended_write ( struct san_device *sandev,
 				  struct i386_all_regs *ix86 ) {
 
-	DBGC2 ( sandev, "Extended write: " );
+	DBGC2 ( sandev->drive, "Extended write: " );
 	return int13_extended_rw ( sandev, ix86, sandev_write );
 }
 
@@ -818,7 +824,7 @@ static int int13_extended_verify ( struct san_device *sandev,
 				 sizeof ( addr ));
 		lba = addr.lba;
 		count = addr.count;
-		DBGC2 ( sandev, "Verify: LBA %08llx (count %ld)\n",
+		DBGC2 ( sandev->drive, "Verify: LBA %08llx (count %ld)\n",
 			( ( unsigned long long ) lba ), count );
 	}
 
@@ -845,7 +851,7 @@ static int int13_extended_seek ( struct san_device *sandev,
 				 sizeof ( addr ));
 		lba = addr.lba;
 		count = addr.count;
-		DBGC2 ( sandev, "Seek: LBA %08llx (count %ld)\n",
+		DBGC2 ( sandev->drive, "Seek: LBA %08llx (count %ld)\n",
 			( ( unsigned long long ) lba ), count );
 	}
 
@@ -879,8 +885,8 @@ static int int13_device_path_info ( struct san_device *sandev,
 	/* Get underlying hardware device */
 	device = identify_device ( &sanpath->block );
 	if ( ! device ) {
-		DBGC ( sandev, "INT13 drive %02x cannot identify hardware "
-		       "device\n", sandev->drive );
+		DBGC ( sandev->drive, "INT13 drive %02x cannot identify "
+		       "hardware device\n", sandev->drive );
 		return -ENODEV;
 	}
 
@@ -895,16 +901,16 @@ static int int13_device_path_info ( struct san_device *sandev,
 		dpi->interface_path.pci.channel = 0xff; /* unused */
 		break;
 	default:
-		DBGC ( sandev, "INT13 drive %02x unrecognised bus type %d\n",
-		       sandev->drive, desc->bus_type );
+		DBGC ( sandev->drive, "INT13 drive %02x unrecognised bus "
+		       "type %d\n", sandev->drive, desc->bus_type );
 		return -ENOTSUP;
 	}
 
 	/* Get EDD block device description */
 	if ( ( rc = edd_describe ( &sanpath->block, &dpi->interface_type,
 				   &dpi->device_path ) ) != 0 ) {
-		DBGC ( sandev, "INT13 drive %02x cannot identify block device: "
-		       "%s\n", sandev->drive, strerror ( rc ) );
+		DBGC ( sandev->drive, "INT13 drive %02x cannot identify "
+		       "block device: %s\n", sandev->drive, strerror ( rc ) );
 		return rc;
 	}
 
@@ -938,8 +944,8 @@ static int int13_get_extended_parameters ( struct san_device *sandev,
 	get_real ( bufsize, ix86->segs.ds,
 		   ( ix86->regs.si + offsetof ( typeof ( params ), bufsize )));
 
-	DBGC2 ( sandev, "Get extended drive parameters to %04x:%04x+%02x\n",
-		ix86->segs.ds, ix86->regs.si, bufsize );
+	DBGC2 ( sandev->drive, "Get extended drive parameters to "
+		"%04x:%04x+%02x\n", ix86->segs.ds, ix86->regs.si, bufsize );
 
 	/* Build drive parameters */
 	memset ( &params, 0, sizeof ( params ) );
@@ -955,8 +961,8 @@ static int int13_get_extended_parameters ( struct san_device *sandev,
 	params.sector_size = sandev_blksize ( sandev );
 	memset ( &params.dpte, 0xff, sizeof ( params.dpte ) );
 	if ( ( rc = int13_device_path_info ( sandev, &params.dpi ) ) != 0 ) {
-		DBGC ( sandev, "INT13 drive %02x could not provide device "
-		       "path information: %s\n",
+		DBGC ( sandev->drive, "INT13 drive %02x could not provide "
+		       "device path information: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		len = offsetof ( typeof ( params ), dpi );
 	}
@@ -973,11 +979,11 @@ static int int13_get_extended_parameters ( struct san_device *sandev,
 		params.bufsize = offsetof ( typeof ( params ), dpi );
 	}
 
-	DBGC ( sandev, "INT 13 drive %02x described using extended "
+	DBGC ( sandev->drive, "INT 13 drive %02x described using extended "
 	       "parameters:\n", sandev->drive );
 	address.segment = ix86->segs.ds;
 	address.offset = ix86->regs.si;
-	DBGC_HDA ( sandev, address, &params, len );
+	DBGC_HDA ( sandev->drive, address, &params, len );
 
 	/* Return drive parameters */
 	if ( len > bufsize )
@@ -998,13 +1004,13 @@ static int int13_cdrom_status_terminate ( struct san_device *sandev,
 					  struct i386_all_regs *ix86 ) {
 	struct int13_cdrom_specification specification;
 
-	DBGC2 ( sandev, "Get CD-ROM emulation status to %04x:%04x%s\n",
+	DBGC2 ( sandev->drive, "Get CD-ROM emulation status to %04x:%04x%s\n",
 		ix86->segs.ds, ix86->regs.si,
 		( ix86->regs.al ? "" : " and terminate" ) );
 
 	/* Fail if we are not a CD-ROM */
 	if ( ! sandev->is_cdrom ) {
-		DBGC ( sandev, "INT13 drive %02x is not a CD-ROM\n",
+		DBGC ( sandev->drive, "INT13 drive %02x is not a CD-ROM\n",
 		       sandev->drive );
 		return -INT13_STATUS_INVALID;
 	}
@@ -1039,11 +1045,12 @@ static int int13_cdrom_read_boot_catalog ( struct san_device *sandev,
 	/* Read parameters from command packet */
 	copy_from_real ( &command, ix86->segs.ds, ix86->regs.si,
 			 sizeof ( command ) );
-	DBGC2 ( sandev, "Read CD-ROM boot catalog to %08x\n", command.buffer );
+	DBGC2 ( sandev->drive, "Read CD-ROM boot catalog to %08x\n",
+		command.buffer );
 
 	/* Fail if we have no boot catalog */
 	if ( ! int13->boot_catalog ) {
-		DBGC ( sandev, "INT13 drive %02x has no boot catalog\n",
+		DBGC ( sandev->drive, "INT13 drive %02x has no boot catalog\n",
 		       sandev->drive );
 		return -INT13_STATUS_INVALID;
 	}
@@ -1052,8 +1059,8 @@ static int int13_cdrom_read_boot_catalog ( struct san_device *sandev,
 	/* Read from boot catalog */
 	if ( ( rc = sandev_read ( sandev, start, command.count,
 				  phys_to_user ( command.buffer ) ) ) != 0 ) {
-		DBGC ( sandev, "INT13 drive %02x could not read boot catalog: "
-		       "%s\n", sandev->drive, strerror ( rc ) );
+		DBGC ( sandev->drive, "INT13 drive %02x could not read boot "
+		       "catalog: %s\n", sandev->drive, strerror ( rc ) );
 		return -INT13_STATUS_READ_ERROR;
 	}
 
@@ -1080,8 +1087,8 @@ static __asmcall __used void int13 ( struct i386_all_regs *ix86 ) {
 		if ( bios_drive != sandev->drive ) {
 			/* Remap any accesses to this drive's natural number */
 			if ( bios_drive == int13->natural_drive ) {
-				DBGC2 ( sandev, "INT13,%02x (%02x) remapped to "
-					"(%02x)\n", ix86->regs.ah,
+				DBGC2 ( sandev->drive, "INT13,%02x (%02x) "
+					"remapped to (%02x)\n", ix86->regs.ah,
 					bios_drive, sandev->drive );
 				ix86->regs.dl = sandev->drive;
 				return;
@@ -1094,7 +1101,7 @@ static __asmcall __used void int13 ( struct i386_all_regs *ix86 ) {
 			}
 		}
 		
-		DBGC2 ( sandev, "INT13,%02x (%02x): ",
+		DBGC2 ( sandev->drive, "INT13,%02x (%02x): ",
 			ix86->regs.ah, bios_drive );
 
 		switch ( command ) {
@@ -1141,7 +1148,7 @@ static __asmcall __used void int13 ( struct i386_all_regs *ix86 ) {
 			status = int13_cdrom_read_boot_catalog ( sandev, ix86 );
 			break;
 		default:
-			DBGC2 ( sandev, "*** Unrecognised INT13 ***\n" );
+			DBGC2 ( sandev->drive, "*** Unrecognised INT13 ***\n" );
 			status = -INT13_STATUS_INVALID;
 			break;
 		}
@@ -1152,8 +1159,9 @@ static __asmcall __used void int13 ( struct i386_all_regs *ix86 ) {
 		/* Negative status indicates an error */
 		if ( status < 0 ) {
 			status = -status;
-			DBGC ( sandev, "INT13,%02x (%02x) failed with status "
-			       "%02x\n", ix86->regs.ah, sandev->drive, status );
+			DBGC ( sandev->drive, "INT13,%02x (%02x) failed with "
+			       "status %02x\n", ix86->regs.ah, sandev->drive,
+			       status );
 		} else {
 			ix86->flags &= ~CF;
 		}
@@ -1269,7 +1277,7 @@ static int int13_hook ( unsigned int drive, struct uri **uris,
 
 	/* Register SAN device */
 	if ( ( rc = register_sandev ( sandev, drive, flags ) ) != 0 ) {
-		DBGC ( sandev, "INT13 drive %02x could not register: %s\n",
+		DBGC ( drive, "INT13 drive %02x could not register: %s\n",
 		       drive, strerror ( rc ) );
 		goto err_register;
 	}
@@ -1289,10 +1297,9 @@ static int int13_hook ( unsigned int drive, struct uri **uris,
 	     ( ( rc = int13_guess_geometry ( sandev, scratch ) ) != 0 ) )
 		goto err_guess_geometry;
 
-	DBGC ( sandev, "INT13 drive %02x (naturally %02x) registered with "
-	       "C/H/S geometry %d/%d/%d\n",
-	       sandev->drive, int13->natural_drive, int13->cylinders,
-	       int13->heads, int13->sectors_per_track );
+	DBGC ( drive, "INT13 drive %02x (naturally %02x) registered with "
+	       "C/H/S geometry %d/%d/%d\n", drive, int13->natural_drive,
+	       int13->cylinders, int13->heads, int13->sectors_per_track );
 
 	/* Hook INT 13 vector if not already hooked */
 	if ( need_hook ) {
@@ -1332,7 +1339,7 @@ static void int13_unhook ( unsigned int drive ) {
 	/* Find drive */
 	sandev = sandev_find ( drive );
 	if ( ! sandev ) {
-		DBG ( "INT13 cannot find drive %02x\n", drive );
+		DBGC ( drive, "INT13 drive %02x is not a SAN drive\n", drive );
 		return;
 	}
 
@@ -1343,7 +1350,7 @@ static void int13_unhook ( unsigned int drive ) {
 	 * to do so reliably.
 	 */
 
-	DBGC ( sandev, "INT13 drive %02x unregistered\n", sandev->drive );
+	DBGC ( drive, "INT13 drive %02x unregistered\n", drive );
 
 	/* Unhook INT 13 vector if no more drives */
 	if ( ! have_sandevs() ) {
@@ -1387,8 +1394,8 @@ static int int13_load_mbr ( unsigned int drive, struct segoff *address ) {
 			       : "a" ( 0x0201 ), "b" ( *address ),
 				 "c" ( 1 ), "d" ( drive ) );
 	if ( status ) {
-		DBG ( "INT13 drive %02x could not read MBR (status %04x)\n",
-		      drive, status );
+		DBGC ( drive, "INT13 drive %02x could not read MBR (status "
+		       "%04x)\n", drive, status );
 		return -EIO;
 	}
 
@@ -1397,8 +1404,8 @@ static int int13_load_mbr ( unsigned int drive, struct segoff *address ) {
 		   ( address->offset +
 		     offsetof ( struct master_boot_record, magic ) ) );
 	if ( magic != INT13_MBR_MAGIC ) {
-		DBG ( "INT13 drive %02x does not contain a valid MBR\n",
-		      drive );
+		DBGC ( drive, "INT13 drive %02x does not contain a valid MBR\n",
+		       drive );
 		return -ENOEXEC;
 	}
 
@@ -1444,8 +1451,8 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 			       : "a" ( 0x4d00 ), "d" ( drive ),
 				 "S" ( __from_data16 ( &eltorito_cmd ) ) );
 	if ( status ) {
-		DBG ( "INT13 drive %02x could not read El Torito boot catalog "
-		      "(status %04x)\n", drive, status );
+		DBGC ( drive, "INT13 drive %02x could not read El Torito boot "
+		       "catalog (status %04x)\n", drive, status );
 		return -EIO;
 	}
 	copy_from_user ( &catalog, phys_to_user ( eltorito_cmd.buffer ), 0,
@@ -1453,26 +1460,27 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 
 	/* Sanity checks */
 	if ( catalog.valid.platform_id != ELTORITO_PLATFORM_X86 ) {
-		DBG ( "INT13 drive %02x El Torito specifies unknown platform "
-		      "%02x\n", drive, catalog.valid.platform_id );
+		DBGC ( drive, "INT13 drive %02x El Torito specifies unknown "
+		       "platform %02x\n", drive, catalog.valid.platform_id );
 		return -ENOEXEC;
 	}
 	if ( catalog.boot.indicator != ELTORITO_BOOTABLE ) {
-		DBG ( "INT13 drive %02x El Torito is not bootable\n", drive );
+		DBGC ( drive, "INT13 drive %02x El Torito is not bootable\n",
+		       drive );
 		return -ENOEXEC;
 	}
 	if ( catalog.boot.media_type != ELTORITO_NO_EMULATION ) {
-		DBG ( "INT13 drive %02x El Torito requires emulation "
+		DBGC ( drive, "INT13 drive %02x El Torito requires emulation "
 		       "type %02x\n", drive, catalog.boot.media_type );
 		return -ENOTSUP;
 	}
-	DBG ( "INT13 drive %02x El Torito boot image at LBA %08x (count %d)\n",
-	      drive, catalog.boot.start, catalog.boot.length );
+	DBGC ( drive, "INT13 drive %02x El Torito boot image at LBA %08x "
+	       "(count %d)\n", drive, catalog.boot.start, catalog.boot.length );
 	address->segment = ( catalog.boot.load_segment ?
 			     catalog.boot.load_segment : 0x7c0 );
 	address->offset = 0;
-	DBG ( "INT13 drive %02x El Torito boot image loads at %04x:%04x\n",
-	      drive, address->segment, address->offset );
+	DBGC ( drive, "INT13 drive %02x El Torito boot image loads at "
+	       "%04x:%04x\n", drive, address->segment, address->offset );
 
 	/* Use INT 13, 42 to read the boot image */
 	eltorito_address.bufsize =
@@ -1491,8 +1499,8 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 			       : "a" ( 0x4200 ), "d" ( drive ),
 				 "S" ( __from_data16 ( &eltorito_address ) ) );
 	if ( status ) {
-		DBG ( "INT13 drive %02x could not read El Torito boot image "
-		      "(status %04x)\n", drive, status );
+		DBGC ( drive, "INT13 drive %02x could not read El Torito boot "
+		       "image (status %04x)\n", drive, status );
 		return -EIO;
 	}
 
@@ -1503,7 +1511,7 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
  * Attempt to boot from an INT 13 drive
  *
  * @v drive		Drive number
- * @v filename		Filename (or NULL to use default)
+ * @v config		Boot configuration parameters
  * @ret rc		Return status code
  *
  * This boots from the specified INT 13 drive by loading the Master
@@ -1513,7 +1521,8 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
  *
  * Note that this function can never return success, by definition.
  */
-static int int13_boot ( unsigned int drive, const char *filename __unused ) {
+static int int13_boot ( unsigned int drive,
+			struct san_boot_config *config __unused ) {
 	struct memory_map memmap;
 	struct segoff address;
 	int rc;
@@ -1533,8 +1542,8 @@ static int int13_boot ( unsigned int drive, const char *filename __unused ) {
 	/* Jump to boot sector */
 	if ( ( rc = call_bootsector ( address.segment, address.offset,
 				      drive ) ) != 0 ) {
-		DBG ( "INT13 drive %02x boot returned: %s\n",
-		      drive, strerror ( rc ) );
+		DBGC ( drive, "INT13 drive %02x boot returned: %s\n",
+		       drive, strerror ( rc ) );
 		return rc;
 	}
 

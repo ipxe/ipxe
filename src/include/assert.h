@@ -56,19 +56,31 @@ assert_printf ( const char *fmt, ... ) asm ( "printf" );
 	} while ( 0 )
 
 /**
- * Assert a condition at link-time.
+ * Assert a condition at build time
  *
- * If the condition is not true, the link will fail with an unresolved
- * symbol (error_symbol).
+ * If the compiler cannot prove that the condition is true, the build
+ * will fail with an error message.
+ */
+#undef static_assert
+#define static_assert(x) _Static_assert( x, #x )
+
+/**
+ * Assert a condition at build time (after dead code elimination)
+ *
+ * If the compiler cannot prove that the condition is true, the build
+ * will fail with an error message.
  *
  * This macro is iPXE-specific.  Do not use this macro in code
  * intended to be portable.
- *
  */
-#define linker_assert( condition, error_symbol )	\
-        if ( ! (condition) ) {				\
-                extern void error_symbol ( void );	\
-                error_symbol();				\
-        }
+#define build_assert( condition )					     \
+	do { 								     \
+		if ( ! (condition) ) {					     \
+			extern void __attribute__ (( warning (		     \
+				"build_assert(" #condition ") failed"	     \
+			) )) _C2 ( build_assert_, __LINE__ ) ( void );	     \
+			_C2 ( build_assert_, __LINE__ ) ();		     \
+		}							     \
+	} while ( 0 )
 
 #endif /* _ASSERT_H */

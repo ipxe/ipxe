@@ -17,6 +17,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/list.h>
 
 struct image;
+struct private_key;
 
 /** An X.509 serial number */
 struct x509_serial {
@@ -171,6 +172,28 @@ struct x509_link {
 	struct list_head list;
 	/** Certificate */
 	struct x509_certificate *cert;
+	/** Flags */
+	unsigned int flags;
+};
+
+/** X.509 certficate chain link flags */
+enum x509_link_flags {
+	/** Cross-signed certificate download has been attempted
+	 *
+	 * This indicates that a cross-signature download attempt has
+	 * been made to find a cross-signed issuer for this link's
+	 * certificate.
+	 */
+	X509_LINK_FL_CROSSED = 0x0001,
+	/** OCSP has been attempted
+	 *
+	 * This indicates that an OCSP attempt has been made using
+	 * this link's certificate as an issuer.  (We record the flag
+	 * on the issuer rather than on the issued certificate, since
+	 * we want to retry OCSP if an issuer is replaced with a
+	 * downloaded cross-signed certificate.)
+	 */
+	X509_LINK_FL_OCSPED = 0x0002,
 };
 
 /** An X.509 certificate chain */
@@ -179,6 +202,13 @@ struct x509_chain {
 	struct refcnt refcnt;
 	/** List of links */
 	struct list_head links;
+	/** Mark certificate as found
+	 *
+	 * @v store		Certificate store
+	 * @v cert		X.509 certificate
+	 */
+	void ( * found ) ( struct x509_chain *store,
+			   struct x509_certificate *cert );
 };
 
 /** An X.509 certificate */
@@ -374,6 +404,16 @@ x509_root_put ( struct x509_root *root ) {
 	ref_put ( &root->refcnt );
 }
 
+/**
+ * Check if X.509 certificate is self-signed
+ *
+ * @v cert		X.509 certificate
+ * @ret is_self_signed	X.509 certificate is self-signed
+ */
+static inline int x509_is_self_signed ( struct x509_certificate *cert ) {
+	return ( asn1_compare ( &cert->issuer.raw, &cert->subject.raw ) == 0 );
+}
+
 extern const char * x509_name ( struct x509_certificate *cert );
 extern int x509_parse ( struct x509_certificate *cert,
 			const struct asn1_cursor *raw );
@@ -391,8 +431,20 @@ extern int x509_append ( struct x509_chain *chain,
 			 struct x509_certificate *cert );
 extern int x509_append_raw ( struct x509_chain *chain, const void *data,
 			     size_t len );
+extern void x509_truncate ( struct x509_chain *chain, struct x509_link *link );
+extern struct x509_certificate * x509_find ( struct x509_chain *store,
+					     const struct asn1_cursor *raw );
+extern struct x509_certificate *
+x509_find_subject ( struct x509_chain *store,
+		    const struct asn1_cursor *subject );
+extern struct x509_certificate *
+x509_find_issuer_serial ( struct x509_chain *store,
+			  const struct asn1_cursor *issuer,
+			  const struct asn1_cursor *serial );
+extern struct x509_certificate * x509_find_key ( struct x509_chain *store,
+						 struct private_key *key );
 extern int x509_auto_append ( struct x509_chain *chain,
-			      struct x509_chain *certs );
+			      struct x509_chain *store );
 extern int x509_validate_chain ( struct x509_chain *chain, time_t time,
 				 struct x509_chain *store,
 				 struct x509_root *root );

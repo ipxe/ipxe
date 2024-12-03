@@ -11,7 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/tables.h>
-#include <gdbmach.h>
+#include <bits/gdbmach.h>
 
 /**
  * A transport mechanism for the GDB protocol

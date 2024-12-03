@@ -148,6 +148,7 @@ static void * pcicloud_ioremap ( struct pci_device *pci,
 	return pcicloud->pci_ioremap ( pci, bus_addr, len );
 }
 
+PROVIDE_PCIAPI_INLINE ( cloud, pci_can_probe );
 PROVIDE_PCIAPI ( cloud, pci_discover, pcicloud_discover );
 PROVIDE_PCIAPI ( cloud, pci_read_config_byte, pcicloud_read_config_byte );
 PROVIDE_PCIAPI ( cloud, pci_read_config_word, pcicloud_read_config_word );
@@ -165,24 +166,27 @@ static void pcicloud_init ( void ) {
 	static struct pci_api *apis[] = {
 		&ecam_api, &pcibios_api, &pcidirect_api
 	};
-	struct pci_range range;
+	struct pci_device pci;
+	uint32_t busdevfn;
 	unsigned int i;
+	int rc;
 
-	/* Select first API that successfully discovers an address range */
+	/* Select first API that successfully discovers a PCI device */
 	for ( i = 0 ; i < ( sizeof ( apis ) / sizeof ( apis[0] ) ) ; i++ ) {
 		pcicloud = apis[i];
-		pcicloud_discover ( 0, &range );
-		if ( range.count != 0 ) {
-			DBGC ( pcicloud, "PCICLOUD selected %s API\n",
-			       pcicloud->name );
-			break;
+		busdevfn = 0;
+		if ( ( rc = pci_find_next ( &pci, &busdevfn ) ) == 0 ) {
+			DBGC ( pcicloud, "PCICLOUD selected %s API (found "
+			       PCI_FMT ")\n", pcicloud->name,
+			       PCI_ARGS ( &pci ) );
+			return;
 		}
 	}
 
-	/* The PCI direct API can never fail discovery since the range
-	 * is hardcoded.
-	 */
-	assert ( range.count != 0 );
+	/* Fall back to using final attempted API if no devices found */
+	pcicloud = apis[ i - 1 ];
+	DBGC ( pcicloud, "PCICLOUD selected %s API (nothing detected)\n",
+	       pcicloud->name );
 }
 
 /** Cloud VM PCI configuration space access initialisation function */

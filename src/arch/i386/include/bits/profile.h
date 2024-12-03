@@ -16,12 +16,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @ret timestamp	Timestamp
  */
-static inline __attribute__ (( always_inline )) uint64_t
+static inline __attribute__ (( always_inline )) unsigned long
 profile_timestamp ( void ) {
-	uint64_t tsc;
+	uint32_t tsc;
 
 	/* Read timestamp counter */
-	__asm__ __volatile__ ( "rdtsc" : "=A" ( tsc ) );
+	__asm__ __volatile__ ( "rdtsc" : "=a" ( tsc ) : : "edx" );
 	return tsc;
 }
 

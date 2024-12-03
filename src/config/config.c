@@ -78,6 +78,9 @@ REQUIRE_OBJECT ( vmconsole );
 #ifdef CONSOLE_DEBUGCON
 REQUIRE_OBJECT ( debugcon );
 #endif
+#ifdef CONSOLE_SBI
+REQUIRE_OBJECT ( sbi_console );
+#endif
 
 /*
  * Drag in all requested network protocols
@@ -188,6 +191,9 @@ REQUIRE_OBJECT ( zlib );
 #ifdef IMAGE_GZIP
 REQUIRE_OBJECT ( gzip );
 #endif
+#ifdef IMAGE_UCODE
+REQUIRE_OBJECT ( ucode );
+#endif
 
 /*
  * Drag in all requested commands
@@ -222,7 +228,10 @@ REQUIRE_OBJECT ( dhcp_cmd );
 REQUIRE_OBJECT ( sanboot_cmd );
 #endif
 #ifdef MENU_CMD
-REQUIRE_OBJECT ( menu_cmd );
+REQUIRE_OBJECT ( dynui_cmd );
+#endif
+#ifdef FORM_CMD
+REQUIRE_OBJECT ( dynui_cmd );
 #endif
 #ifdef LOGIN_CMD
 REQUIRE_OBJECT ( login_cmd );
@@ -293,6 +302,12 @@ REQUIRE_OBJECT ( image_mem_cmd );
 #ifdef SHIM_CMD
 REQUIRE_OBJECT ( shim_cmd );
 #endif
+#ifdef IMAGE_CRYPT_CMD
+REQUIRE_OBJECT ( image_crypt_cmd );
+#endif
+#ifdef USB_CMD
+REQUIRE_OBJECT ( usb_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
@@ -337,9 +352,6 @@ REQUIRE_OBJECT ( efi_bofm );
 /*
  * Drag in relevant settings sources
  */
-#ifdef PCI_SETTINGS
-REQUIRE_OBJECT ( pci_settings );
-#endif
 #ifdef VMWARE_SETTINGS
 REQUIRE_OBJECT ( guestinfo );
 #endif

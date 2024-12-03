@@ -1,0 +1,10 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Starting virtual address
+#
+LDFLAGS += -Ttext=0x10000
+
+# Include generic Linux Makefile
+#
+MAKEDEPS += arch/riscv/Makefile.linux
+include arch/riscv/Makefile.linux

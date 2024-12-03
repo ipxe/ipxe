@@ -96,6 +96,7 @@ struct fdt {
 extern int fdt_path ( const char *path, unsigned int *offset );
 extern int fdt_alias ( const char *name, unsigned int *offset );
 extern const char * fdt_string ( unsigned int offset, const char *name );
+extern int fdt_u64 ( unsigned int offset, const char *name, uint64_t *value );
 extern int fdt_mac ( unsigned int offset, struct net_device *netdev );
 extern int register_fdt ( const struct fdt_header *hdr );
 

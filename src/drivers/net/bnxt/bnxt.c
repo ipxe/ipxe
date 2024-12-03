@@ -24,6 +24,11 @@ static int bnxt_rx_complete ( struct net_device *dev, struct rx_pkt_cmpl *rx );
 void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt );
 
 static struct pci_device_id bnxt_nics[] = {
+	PCI_ROM( 0x14e4, 0x1604, "14e4-1604", "14e4-1604", 0 ),
+	PCI_ROM( 0x14e4, 0x1605, "14e4-1605", "14e4-1605", 0 ),
+	PCI_ROM( 0x14e4, 0x1606, "14e4-1606", "14e4-1606", 0 ),
+	PCI_ROM( 0x14e4, 0x1609, "14e4-1609", "14e4-1609", 0 ),
+	PCI_ROM( 0x14e4, 0x1614, "14e4-1614", "14e4-1614", 0 ),
 	PCI_ROM( 0x14e4, 0x16c0, "14e4-16C0", "14e4-16C0", 0 ),
 	PCI_ROM( 0x14e4, 0x16c1, "14e4-16C1", "14e4-16C1", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x16c8, "14e4-16C8", "14e4-16C8", 0 ),
@@ -62,26 +67,22 @@ static struct pci_device_id bnxt_nics[] = {
 	PCI_ROM( 0x14e4, 0x16ef, "14e4-16EF", "14e4-16EF", 0 ),
 	PCI_ROM( 0x14e4, 0x16f0, "14e4-16F0", "14e4-16F0", 0 ),
 	PCI_ROM( 0x14e4, 0x16f1, "14e4-16F1", "14e4-16F1", 0 ),
-	PCI_ROM( 0x14e4, 0x1604, "14e4-1604", "14e4-1604", 0 ),
-	PCI_ROM( 0x14e4, 0x1605, "14e4-1605", "14e4-1605", 0 ),
-	PCI_ROM( 0x14e4, 0x1606, "14e4-1606", "14e4-1606", 0 ),
-	PCI_ROM( 0x14e4, 0x1609, "14e4-1609", "14e4-1609", 0 ),
-	PCI_ROM( 0x14e4, 0x1614, "14e4-1614", "14e4-1614", 0 ),
-	PCI_ROM( 0x14e4, 0xd802, "14e4-D802", "14e4-D802", 0 ),
-	PCI_ROM( 0x14e4, 0xd804, "14e4-D804", "14e4-D804", 0 ),
 	PCI_ROM( 0x14e4, 0x1750, "14e4-1750", "14e4-1750", 0 ),
-	PCI_ROM( 0x14e4, 0x1802, "14e4-1802", "14e4-1802", 0 ),
-	PCI_ROM( 0x14e4, 0x1805, "14e4-1805", "14e4-1805", 0 ),
 	PCI_ROM( 0x14e4, 0x1751, "14e4-1751", "14e4-1751", 0 ),
-	PCI_ROM( 0x14e4, 0x1801, "14e4-1801", "14e4-1801", 0 ),
-	PCI_ROM( 0x14e4, 0x1804, "14e4-1804", "14e4-1804", 0 ),
 	PCI_ROM( 0x14e4, 0x1752, "14e4-1752", "14e4-1752", 0 ),
+	PCI_ROM( 0x14e4, 0x1760, "14e4-1760", "14e4-1760", 0 ),
 	PCI_ROM( 0x14e4, 0x1800, "14e4-1800", "14e4-1800", 0 ),
+	PCI_ROM( 0x14e4, 0x1801, "14e4-1801", "14e4-1801", 0 ),
+	PCI_ROM( 0x14e4, 0x1802, "14e4-1802", "14e4-1802", 0 ),
 	PCI_ROM( 0x14e4, 0x1803, "14e4-1803", "14e4-1803", 0 ),
+	PCI_ROM( 0x14e4, 0x1804, "14e4-1804", "14e4-1804", 0 ),
+	PCI_ROM( 0x14e4, 0x1805, "14e4-1805", "14e4-1805", 0 ),
 	PCI_ROM( 0x14e4, 0x1806, "14e4-1806", "14e4-1806", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1807, "14e4-1807", "14e4-1807", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1808, "14e4-1808", "14e4-1808", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1809, "14e4-1809", "14e4-1809", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0xd802, "14e4-D802", "14e4-D802", 0 ),
+	PCI_ROM( 0x14e4, 0xd804, "14e4-D804", "14e4-D804", 0 ),
 };
 
 /**
@@ -181,7 +182,7 @@ static void bnxt_set_link ( struct bnxt *bp )
 		netdev_link_down ( bp->dev );
 }
 
-static void thor_db ( struct bnxt *bp, u32 idx, u32 xid, u32 flag )
+static void dev_p5_db ( struct bnxt *bp, u32 idx, u32 xid, u32 flag )
 {
 	void *off;
 	u64  val;
@@ -196,10 +197,28 @@ static void thor_db ( struct bnxt *bp, u32 idx, u32 xid, u32 flag )
 	write64 ( val, off );
 }
 
+static void dev_p7_db ( struct bnxt *bp, u32 idx, u32 xid, u32 flag, u32 epoch, u32 toggle )
+{
+	void *off;
+	u64  val;
+
+	off = ( void * ) ( bp->bar1 );
+
+	val = ( ( u64 )DBC_MSG_XID ( xid, flag ) << 32 ) |
+	        ( u64 )DBC_MSG_IDX ( idx ) |
+	        ( u64 )DBC_MSG_EPCH ( epoch ) |
+	        ( u64 )DBC_MSG_TOGGLE ( toggle );
+	write64 ( val, off );
+}
+
 static void bnxt_db_nq ( struct bnxt *bp )
 {
-	if ( bp->thor )
-		thor_db ( bp, ( u32 )bp->nq.cons_id,
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) )
+		dev_p7_db ( bp, ( u32 )bp->nq.cons_id,
+			 ( u32 )bp->nq_ring_id, DBC_DBC_TYPE_NQ_ARM,
+                         ( u32 )bp->nq.epoch, 0 );
+	else if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5 ) )
+		dev_p5_db ( bp, ( u32 )bp->nq.cons_id,
 			 ( u32 )bp->nq_ring_id, DBC_DBC_TYPE_NQ_ARM );
 	else
 		write32 ( CMPL_DOORBELL_KEY_CMPL, ( bp->bar1 + 0 ) );
@@ -207,8 +226,12 @@ static void bnxt_db_nq ( struct bnxt *bp )
 
 static void bnxt_db_cq ( struct bnxt *bp )
 {
-	if ( bp->thor )
-		thor_db ( bp, ( u32 )bp->cq.cons_id,
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) )
+		dev_p7_db ( bp, ( u32 )bp->cq.cons_id,
+			 ( u32 )bp->cq_ring_id, DBC_DBC_TYPE_CQ_ARMALL,
+                         ( u32 )bp->cq.epoch, ( u32 )bp->nq.toggle );
+	else if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5 ) )
+		dev_p5_db ( bp, ( u32 )bp->cq.cons_id,
 			 ( u32 )bp->cq_ring_id, DBC_DBC_TYPE_CQ_ARMALL );
 	else
 		write32 ( CQ_DOORBELL_KEY_IDX ( bp->cq.cons_id ),
@@ -217,16 +240,22 @@ static void bnxt_db_cq ( struct bnxt *bp )
 
 static void bnxt_db_rx ( struct bnxt *bp, u32 idx )
 {
-	if ( bp->thor )
-		thor_db ( bp, idx, ( u32 )bp->rx_ring_id, DBC_DBC_TYPE_SRQ );
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) )
+		dev_p7_db ( bp, idx, ( u32 )bp->rx_ring_id, DBC_DBC_TYPE_SRQ,
+                         ( u32 )bp->rx.epoch, 0 );
+	else if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5 ) )
+		dev_p5_db ( bp, idx, ( u32 )bp->rx_ring_id, DBC_DBC_TYPE_SRQ );
 	else
 		write32 ( RX_DOORBELL_KEY_RX | idx, ( bp->bar1 + 0 ) );
 }
 
 static void bnxt_db_tx ( struct bnxt *bp, u32 idx )
 {
-	if ( bp->thor )
-		thor_db ( bp, idx, ( u32 )bp->tx_ring_id, DBC_DBC_TYPE_SQ );
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) )
+		dev_p7_db ( bp, idx, ( u32 )bp->tx_ring_id, DBC_DBC_TYPE_SQ,
+                         ( u32 )bp->tx.epoch, 0 );
+	else if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5 ) )
+		dev_p5_db ( bp, idx, ( u32 )bp->tx_ring_id, DBC_DBC_TYPE_SQ );
 	else
 		write32 ( ( u32 ) ( TX_DOORBELL_KEY_TX | idx ),
 			( bp->bar1 + 0 ) );
@@ -251,6 +280,31 @@ static u16 bnxt_get_pkt_vlan ( char *src )
 	if ( * ( ( u16 * )&src[MAC_HDR_SIZE] ) == BYTE_SWAP_S ( ETHERTYPE_VLAN ) )
 		return BYTE_SWAP_S ( * ( ( u16 * )&src[MAC_HDR_SIZE + 2] ) );
 	return 0;
+}
+
+static u16 bnxt_get_rx_vlan ( struct rx_pkt_cmpl *rx_cmp, struct rx_pkt_cmpl_hi *rx_cmp_hi )
+{
+	struct rx_pkt_v3_cmpl *rx_cmp_v3 = ( struct rx_pkt_v3_cmpl * )rx_cmp;
+	struct rx_pkt_v3_cmpl_hi *rx_cmp_hi_v3 = ( struct rx_pkt_v3_cmpl_hi * )rx_cmp_hi;
+	u16 rx_vlan;
+
+	/* Get VLAN ID from RX completion ring */
+	if ( ( rx_cmp_v3->flags_type & RX_PKT_V3_CMPL_TYPE_MASK ) ==
+	     RX_PKT_V3_CMPL_TYPE_RX_L2_V3 ) {
+		if ( rx_cmp_hi_v3->flags2 & RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_ACT_REC_PTR )
+			rx_vlan = ( rx_cmp_hi_v3->metadata0 &
+				RX_PKT_V3_CMPL_HI_METADATA0_VID_MASK );
+		else
+			rx_vlan = 0;
+	} else {
+	        if ( rx_cmp_hi->flags2 & RX_PKT_CMPL_FLAGS2_META_FORMAT_VLAN )
+			rx_vlan = ( rx_cmp_hi->metadata &
+				RX_PKT_CMPL_METADATA_VID_MASK );
+	        else
+			rx_vlan = 0;
+	}
+
+	return rx_vlan;
 }
 
 int bnxt_vlan_drop ( struct bnxt *bp, u16 rx_vlan )
@@ -307,7 +361,7 @@ void bnxt_set_txq ( struct bnxt *bp, int entry, dma_addr_t mapping, int len )
 
 static void bnxt_tx_complete ( struct net_device *dev, u16 hw_idx )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct io_buffer *iob;
 
 	iob = bp->tx.iob[hw_idx];
@@ -382,6 +436,9 @@ int bnxt_post_rx_buffers ( struct bnxt *bp )
 			}
 		}
 		cons_id = NEXT_IDX ( cons_id, bp->rx.ring_cnt );
+		/* If the ring has wrapped, flip the epoch bit */
+		if ( iob_idx > cons_id )
+		        bp->rx.epoch ^= 1;
 		bp->rx.iob_cnt++;
 	}
 
@@ -396,14 +453,21 @@ int bnxt_post_rx_buffers ( struct bnxt *bp )
 }
 
 u8 bnxt_rx_drop ( struct bnxt *bp, struct io_buffer *iob,
+	struct rx_pkt_cmpl *rx_cmp,
 	struct rx_pkt_cmpl_hi *rx_cmp_hi, u16 rx_len )
 {
+	struct rx_pkt_v3_cmpl *rx_cmp_v3 = ( struct rx_pkt_v3_cmpl * )rx_cmp;
+	struct rx_pkt_v3_cmpl_hi  *rx_cmp_hi_v3 = ( struct rx_pkt_v3_cmpl_hi * )rx_cmp_hi;
 	u8  *rx_buf = ( u8 * )iob->data;
 	u16 err_flags, rx_vlan;
 	u8  ignore_chksum_err = 0;
 	int i;
 
-	err_flags = rx_cmp_hi->errors_v2 >> RX_PKT_CMPL_ERRORS_BUFFER_ERROR_SFT;
+	if ( ( rx_cmp_v3->flags_type & RX_PKT_V3_CMPL_TYPE_MASK ) ==
+	     RX_PKT_V3_CMPL_TYPE_RX_L2_V3 ) {
+	        err_flags = rx_cmp_hi_v3->errors_v2 >> RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_SFT;
+	} else
+	        err_flags = rx_cmp_hi->errors_v2 >> RX_PKT_CMPL_ERRORS_BUFFER_ERROR_SFT;
 	if ( rx_cmp_hi->errors_v2 == 0x20 || rx_cmp_hi->errors_v2 == 0x21 )
 		ignore_chksum_err = 1;
 
@@ -423,13 +487,7 @@ u8 bnxt_rx_drop ( struct bnxt *bp, struct io_buffer *iob,
 		return 2;
 	}
 
-	/* Get VLAN ID from RX completion ring */
-	if ( rx_cmp_hi->flags2 & RX_PKT_CMPL_FLAGS2_META_FORMAT_VLAN )
-		rx_vlan = ( rx_cmp_hi->metadata &
-				RX_PKT_CMPL_METADATA_VID_MASK );
-	else
-		rx_vlan = 0;
-
+	rx_vlan = bnxt_get_rx_vlan ( rx_cmp, rx_cmp_hi );
 	dbg_rx_vlan ( bp, rx_cmp_hi->metadata, rx_cmp_hi->flags2, rx_vlan );
 	if ( bnxt_vlan_drop ( bp, rx_vlan ) ) {
 		bp->rx.drop_vlan++;
@@ -449,10 +507,11 @@ static void bnxt_adv_cq_index ( struct bnxt *bp, u16 cnt )
 	u16 cons_id;
 
 	cons_id = bp->cq.cons_id + cnt;
-	if ( cons_id >= MAX_CQ_DESC_CNT ) {
+	if ( cons_id >= bp->cq.ring_cnt) {
 		/* Toggle completion bit when the ring wraps. */
 		bp->cq.completion_bit ^= 1;
-		cons_id = cons_id - MAX_CQ_DESC_CNT;
+		bp->cq.epoch ^= 1;
+		cons_id = cons_id - bp->cq.ring_cnt;
 	}
 	bp->cq.cons_id = cons_id;
 }
@@ -466,7 +525,7 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 
 	dump_rx_bd ( rx_cmp, rx_cmp_hi, desc_idx );
 	assert ( !iob );
-	drop = bnxt_rx_drop ( bp, iob, rx_cmp_hi, rx_cmp->len );
+	drop = bnxt_rx_drop ( bp, iob, rx_cmp, rx_cmp_hi, rx_cmp->len );
 	dbg_rxp ( iob->data, rx_cmp->len, drop );
 	if ( drop )
 		netdev_rx_err ( dev, iob, -EINVAL );
@@ -484,7 +543,7 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 static int bnxt_rx_complete ( struct net_device *dev,
 		struct rx_pkt_cmpl *rx_cmp )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct rx_pkt_cmpl_hi *rx_cmp_hi;
 	u8  cmpl_bit = bp->cq.completion_bit;
 
@@ -531,12 +590,17 @@ void bnxt_mm_nic ( struct bnxt *bp )
 	memset ( bp->nq.bd_virt, 0, NQ_RING_BUFFER_SIZE );
 	bp->nq.cons_id		= 0;
 	bp->nq.completion_bit	= 0x1;
+	bp->nq.epoch            = 0;
+	bp->nq.toggle           = 0;
 	bp->cq.cons_id		= 0;
 	bp->cq.completion_bit	= 0x1;
+	bp->cq.epoch            = 0;
 	bp->tx.prod_id		= 0;
 	bp->tx.cons_id		= 0;
+	bp->tx.epoch            = 0;
 	bp->rx.cons_id		= 0;
 	bp->rx.iob_cnt		= 0;
+	bp->rx.epoch            = 0;
 
 	bp->link_status		= STATUS_LINK_DOWN;
 	bp->wait_link_timeout	= LINK_DEFAULT_TIMEOUT;
@@ -722,8 +786,16 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 		 ( resp->dev_caps_cfg & SHORT_CMD_REQUIRED ) )
 		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_SUPP );
 	bp->hwrm_max_ext_req_len = resp->max_ext_req_len;
-	if ( bp->chip_num == CHIP_NUM_57500 )
-		bp->thor = 1;
+	if ( ( bp->chip_num == CHIP_NUM_57508 ) ||
+	     ( bp->chip_num == CHIP_NUM_57504 ) ||
+	     ( bp->chip_num == CHIP_NUM_57502 ) ) {
+		FLAG_SET ( bp->flags, BNXT_FLAG_IS_CHIP_P5 );
+		FLAG_SET ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS );
+	}
+	if ( bp->chip_num == CHIP_NUM_57608 ) {
+		FLAG_SET ( bp->flags, BNXT_FLAG_IS_CHIP_P7 );
+		FLAG_SET ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS );
+	}
 	dbg_fw_ver ( resp, bp->hwrm_cmd_timeout );
 	return STATUS_SUCCESS;
 }
@@ -915,6 +987,30 @@ static int bnxt_hwrm_func_qcfg_req ( struct bnxt *bp )
 	return STATUS_SUCCESS;
 }
 
+static int bnxt_hwrm_port_phy_qcaps_req ( struct bnxt *bp )
+{
+	u16 cmd_len = ( u16 )sizeof ( struct hwrm_port_phy_qcaps_input );
+	struct hwrm_port_phy_qcaps_input *req;
+	struct hwrm_port_phy_qcaps_output *resp;
+	int rc;
+
+	DBGP ( "%s\n", __func__ );
+
+	req = ( struct hwrm_port_phy_qcaps_input * )bp->hwrm_addr_req;
+	resp = ( struct hwrm_port_phy_qcaps_output * )bp->hwrm_addr_resp;
+	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_PORT_PHY_QCAPS, cmd_len );
+	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
+	if ( rc ) {
+		DBGP ( "-s %s (  ): Failed\n", __func__ );
+		return STATUS_FAILURE;
+	}
+
+	if ( resp->flags2 & PORT_PHY_QCAPS_RESP_FLAGS2_SPEEDS2_SUPPORTED )
+                FLAG_SET ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 );
+
+	return STATUS_SUCCESS;
+}
+
 static int bnxt_hwrm_func_reset_req ( struct bnxt *bp )
 {
 	u16 cmd_len = ( u16 )sizeof ( struct hwrm_func_reset_input );
@@ -942,7 +1038,7 @@ static int bnxt_hwrm_func_cfg_req ( struct bnxt *bp )
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_CFG, cmd_len );
 	req->fid = ( u16 )HWRM_NA_SIGNATURE;
 	bnxt_hwrm_assign_resources ( bp );
-	if ( bp->thor ) {
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) {
 		req->enables |= ( FUNC_CFG_REQ_ENABLES_NUM_MSIX |
 				  FUNC_CFG_REQ_ENABLES_NUM_VNICS |
 				  FUNC_CFG_REQ_ENABLES_EVB_MODE );
@@ -1009,7 +1105,7 @@ static int bnxt_hwrm_set_async_event ( struct bnxt *bp )
 	u16 idx;
 
 	DBGP ( "%s\n", __func__ );
-	if ( bp->thor )
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) )
 		idx = bp->nq_ring_id;
 	else
 		idx = bp->cq_ring_id;
@@ -1160,6 +1256,10 @@ static int bnxt_hwrm_port_phy_qcfg ( struct bnxt *bp, u16 idx )
 	if ( idx & SUPPORT_SPEEDS )
 		bp->support_speeds = resp->support_speeds;
 
+	if ( idx & SUPPORT_SPEEDS2 )
+                if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) )
+		        bp->auto_link_speeds2_mask = resp->auto_link_speeds2;
+
 	if ( idx & DETECT_MEDIA )
 		bp->media_detect = resp->module_status;
 
@@ -1199,22 +1299,24 @@ static int bnxt_get_link_speed ( struct bnxt *bp )
 	u32 *ptr32 = ( u32 * )bp->hwrm_addr_dma;
 
 	DBGP ( "%s\n", __func__ );
-	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
-		( u16 )LINK_SPEED_DRV_NUM,
-		1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
-		return STATUS_FAILURE;
-	bp->link_set = SET_LINK ( *ptr32, SPEED_DRV_MASK, SPEED_DRV_SHIFT );
+	if ( ! ( FLAG_TEST (bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ) ) {
+	        test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
+		        ( u16 )LINK_SPEED_DRV_NUM,
+		        1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
+		        return STATUS_FAILURE;
+	        bp->link_set = SET_LINK ( *ptr32, SPEED_DRV_MASK, SPEED_DRV_SHIFT );
+	        test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
+		        ( u16 )D3_LINK_SPEED_FW_NUM, 1,
+		        ( u16 )bp->port_idx ) != STATUS_SUCCESS )
+		        return STATUS_FAILURE;
+	        bp->link_set |= SET_LINK ( *ptr32, D3_SPEED_FW_MASK,
+				D3_SPEED_FW_SHIFT );
+	}
 	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
 		( u16 )LINK_SPEED_FW_NUM,
 		1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
 		return STATUS_FAILURE;
 	bp->link_set |= SET_LINK ( *ptr32, SPEED_FW_MASK, SPEED_FW_SHIFT );
-	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
-		 ( u16 )D3_LINK_SPEED_FW_NUM, 1,
-		 ( u16 )bp->port_idx ) != STATUS_SUCCESS )
-		return STATUS_FAILURE;
-	bp->link_set |= SET_LINK ( *ptr32, D3_SPEED_FW_MASK,
-			D3_SPEED_FW_SHIFT );
 	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 1,
 		 ( u16 )PORT_CFG_LINK_SETTINGS_MEDIA_AUTO_DETECT_NUM,
 		1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
@@ -1222,32 +1324,51 @@ static int bnxt_get_link_speed ( struct bnxt *bp )
 	bp->link_set |= SET_LINK ( *ptr32,
 		MEDIA_AUTO_DETECT_MASK, MEDIA_AUTO_DETECT_SHIFT );
 
-	switch ( bp->link_set & LINK_SPEED_DRV_MASK ) {
-	case LINK_SPEED_DRV_1G:
+	/* Use LINK_SPEED_FW_xxx which is valid for CHIP_P7 and earlier devices */
+	switch ( bp->link_set & LINK_SPEED_FW_MASK ) {
+	case LINK_SPEED_FW_1G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_1000MBPS );
 		break;
-	case LINK_SPEED_DRV_2_5G:
+	case LINK_SPEED_FW_2_5G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_2500MBPS );
 		break;
-	case LINK_SPEED_DRV_10G:
+	case LINK_SPEED_FW_10G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_10GBPS );
 		break;
-	case LINK_SPEED_DRV_25G:
+	case LINK_SPEED_FW_25G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_25GBPS );
 		break;
-	case LINK_SPEED_DRV_40G:
+	case LINK_SPEED_FW_40G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_40GBPS );
 		break;
-	case LINK_SPEED_DRV_50G:
+	case LINK_SPEED_FW_50G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_50GBPS );
 		break;
-	case LINK_SPEED_DRV_100G:
+	case LINK_SPEED_FW_50G_PAM4:
+		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_50PAM4GBPS );
+		break;
+	case LINK_SPEED_FW_100G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_100GBPS );
 		break;
-	case LINK_SPEED_DRV_200G:
+	case LINK_SPEED_FW_100G_PAM4:
+		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_100PAM4GBPS );
+		break;
+	case LINK_SPEED_FW_100G_PAM4_112:
+		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_100PAM4_112GBPS );
+		break;
+	case LINK_SPEED_FW_200G:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_200GBPS );
 		break;
-	case LINK_SPEED_DRV_AUTONEG:
+	case LINK_SPEED_FW_200G_PAM4_112:
+		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_200PAM4_112GBPS );
+		break;
+	case LINK_SPEED_FW_400G_PAM4:
+		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_400PAM4GBPS );
+		break;
+	case LINK_SPEED_FW_400G_PAM4_112:
+		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_400PAM4_112GBPS );
+		break;
+	case LINK_SPEED_FW_AUTONEG:
 		bp->medium = SET_MEDIUM_SPEED ( bp, MEDIUM_SPEED_AUTONEG );
 		break;
 	default:
@@ -1266,27 +1387,29 @@ static int bnxt_get_vlan ( struct bnxt *bp )
 	if ( bp->vf )
 		return STATUS_SUCCESS;
 
-	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 1,
-		 ( u16 )FUNC_CFG_PRE_BOOT_MBA_VLAN_NUM, 1,
-		 ( u16 )bp->ordinal_value ) != STATUS_SUCCESS )
-		return STATUS_FAILURE;
+	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ) ) {
+		test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 1,
+			 ( u16 )FUNC_CFG_PRE_BOOT_MBA_VLAN_NUM, 1,
+			 ( u16 )bp->ordinal_value ) != STATUS_SUCCESS )
+			return STATUS_FAILURE;
 
-	bp->mba_cfg2 = SET_MBA ( *ptr32, VLAN_MASK, VLAN_SHIFT );
-	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 16,
-		 ( u16 )FUNC_CFG_PRE_BOOT_MBA_VLAN_VALUE_NUM, 1,
-		 ( u16 )bp->ordinal_value ) != STATUS_SUCCESS )
-		return STATUS_FAILURE;
+		bp->mba_cfg2 = SET_MBA ( *ptr32, VLAN_MASK, VLAN_SHIFT );
+		test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 16,
+			 ( u16 )FUNC_CFG_PRE_BOOT_MBA_VLAN_VALUE_NUM, 1,
+			 ( u16 )bp->ordinal_value ) != STATUS_SUCCESS )
+			return STATUS_FAILURE;
 
-	bp->mba_cfg2 |= SET_MBA ( *ptr32, VLAN_VALUE_MASK, VLAN_VALUE_SHIFT );
-	if ( bp->mba_cfg2 & FUNC_CFG_PRE_BOOT_MBA_VLAN_ENABLED )
-		bp->vlan_id = bp->mba_cfg2 & VLAN_VALUE_MASK;
-	else
-		bp->vlan_id = 0;
+		bp->mba_cfg2 |= SET_MBA ( *ptr32, VLAN_VALUE_MASK, VLAN_VALUE_SHIFT );
+		if ( bp->mba_cfg2 & FUNC_CFG_PRE_BOOT_MBA_VLAN_ENABLED )
+			bp->vlan_id = bp->mba_cfg2 & VLAN_VALUE_MASK;
+		else
+			bp->vlan_id = 0;
 
-	if ( bp->mba_cfg2 & FUNC_CFG_PRE_BOOT_MBA_VLAN_ENABLED )
-		DBGP ( "VLAN MBA Enabled ( %d )\n",
-			( bp->mba_cfg2 & VLAN_VALUE_MASK ) );
+		if ( bp->mba_cfg2 & FUNC_CFG_PRE_BOOT_MBA_VLAN_ENABLED )
+			DBGP ( "VLAN MBA Enabled ( %d )\n",
+				( bp->mba_cfg2 & VLAN_VALUE_MASK ) );
 
+	}
 	return STATUS_SUCCESS;
 }
 
@@ -1296,7 +1419,7 @@ static int bnxt_hwrm_backing_store_qcfg ( struct bnxt *bp )
 	struct hwrm_func_backing_store_qcfg_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	if ( !bp->thor )
+	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 
 	req = ( struct hwrm_func_backing_store_qcfg_input * )bp->hwrm_addr_req;
@@ -1311,7 +1434,7 @@ static int bnxt_hwrm_backing_store_cfg ( struct bnxt *bp )
 	struct hwrm_func_backing_store_cfg_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	if ( !bp->thor )
+	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 
 	req = ( struct hwrm_func_backing_store_cfg_input * )bp->hwrm_addr_req;
@@ -1330,7 +1453,7 @@ static int bnxt_hwrm_queue_qportcfg ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	if ( !bp->thor )
+	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 
 	req = ( struct hwrm_queue_qportcfg_input * )bp->hwrm_addr_req;
@@ -1370,7 +1493,10 @@ static int bnxt_hwrm_port_phy_cfg ( struct bnxt *bp )
 	u32 flags;
 	u32 enables = 0;
 	u16 force_link_speed = 0;
+	u16 force_link_speeds2 = 0;
+	u16 force_pam4_link_speed = 0;
 	u16 auto_link_speed_mask = 0;
+	u16 auto_link_speeds2_mask = 0;
 	u8  auto_mode = 0;
 	u8  auto_pause = 0;
 	u8  auto_duplex = 0;
@@ -1385,34 +1511,111 @@ static int bnxt_hwrm_port_phy_cfg ( struct bnxt *bp )
 		force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_1GB;
 		break;
 	case MEDIUM_SPEED_10GBPS:
-		force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_10GB;
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_10GB;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+		        force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_10GB;
+		}
 		break;
 	case MEDIUM_SPEED_25GBPS:
-		force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_25GB;
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_25GB;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+		        force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_25GB;
+		}
 		break;
 	case MEDIUM_SPEED_40GBPS:
-		force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_40GB;
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_40GB;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+		        force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_40GB;
+		}
 		break;
 	case MEDIUM_SPEED_50GBPS:
-		force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_50GB;
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_50GB;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+		        force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_50GB;
+		}
+		break;
+	case MEDIUM_SPEED_50PAM4GBPS:
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_50GB_PAM4_56;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+		        force_pam4_link_speed = PORT_PHY_CFG_REQ_FORCE_PAM4_LINK_SPEED_50GB;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_PAM4_LINK_SPEED;
+		}
 		break;
 	case MEDIUM_SPEED_100GBPS:
-		force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_100GB;
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_100GB;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+		        force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_100GB;
+		}
+		break;
+	case MEDIUM_SPEED_100PAM4GBPS:
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_100GB_PAM4_56;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+		        force_pam4_link_speed = PORT_PHY_CFG_REQ_FORCE_PAM4_LINK_SPEED_100GB;
+                        enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_PAM4_LINK_SPEED;
+		}
+		break;
+	case MEDIUM_SPEED_100PAM4_112GBPS:
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_100GB_PAM4_112;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		}
 		break;
 	case MEDIUM_SPEED_200GBPS:
-		force_link_speed = PORT_PHY_CFG_REQ_FORCE_LINK_SPEED_200GB;
+		if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+			force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_200GB_PAM4_56;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+		} else {
+			force_pam4_link_speed = PORT_PHY_CFG_REQ_FORCE_PAM4_LINK_SPEED_200GB;
+			enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_PAM4_LINK_SPEED;
+		}
 		break;
+	case MEDIUM_SPEED_200PAM4_112GBPS:
+                if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+                        force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_200GB_PAM4_112;
+                        enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+                }
+                break;
+	case MEDIUM_SPEED_400PAM4GBPS:
+                if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+                        force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_400GB_PAM4_56;
+                        enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+                }
+		break;
+	case MEDIUM_SPEED_400PAM4_112GBPS:
+                if ( FLAG_TEST ( bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) ) {
+                        force_link_speeds2 = PORT_PHY_CFG_REQ_FORCE_LINK_SPEEDS2_400GB_PAM4_112;
+                        enables |= PORT_PHY_CFG_REQ_ENABLES_FORCE_LINK_SPEEDS2;
+                }
+                break;
 	default:
 		auto_mode = PORT_PHY_CFG_REQ_AUTO_MODE_SPEED_MASK;
 		flags &= ~PORT_PHY_CFG_REQ_FLAGS_FORCE;
 		enables |= PORT_PHY_CFG_REQ_ENABLES_AUTO_MODE |
-			PORT_PHY_CFG_REQ_ENABLES_AUTO_LINK_SPEED_MASK |
 			PORT_PHY_CFG_REQ_ENABLES_AUTO_DUPLEX |
 			PORT_PHY_CFG_REQ_ENABLES_AUTO_PAUSE;
+		if ( FLAG_TEST (bp->flags, BNXT_FLAG_LINK_SPEEDS2 ) )
+			enables |= PORT_PHY_CFG_REQ_ENABLES_AUTO_LINK_SPEEDS2_MASK;
+		else
+			enables |= PORT_PHY_CFG_REQ_ENABLES_AUTO_LINK_SPEED_MASK;
 		auto_pause = PORT_PHY_CFG_REQ_AUTO_PAUSE_TX |
 				PORT_PHY_CFG_REQ_AUTO_PAUSE_RX;
 		auto_duplex = PORT_PHY_CFG_REQ_AUTO_DUPLEX_BOTH;
 		auto_link_speed_mask = bp->support_speeds;
+		auto_link_speeds2_mask = bp->auto_link_speeds2_mask;
 		break;
 	}
 
@@ -1421,10 +1624,13 @@ static int bnxt_hwrm_port_phy_cfg ( struct bnxt *bp )
 	req->enables = enables;
 	req->port_id = bp->port_idx;
 	req->force_link_speed = force_link_speed;
+	req->force_pam4_link_speed = force_pam4_link_speed;
+	req->force_link_speeds2 = force_link_speeds2;
 	req->auto_mode = auto_mode;
 	req->auto_duplex = auto_duplex;
 	req->auto_pause = auto_pause;
 	req->auto_link_speed_mask = auto_link_speed_mask;
+	req->auto_link_speeds2_mask = auto_link_speeds2_mask;
 
 	return wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 }
@@ -1563,7 +1769,7 @@ static int bnxt_hwrm_ring_alloc_grp ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	if ( bp->thor )
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) )
 		return STATUS_SUCCESS;
 
 	req = ( struct hwrm_ring_grp_alloc_input * )bp->hwrm_addr_req;
@@ -1614,7 +1820,7 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 	switch ( type ) {
 	case RING_ALLOC_REQ_RING_TYPE_NQ:
 		req->page_size  = LM_PAGE_BITS ( 12 );
-		req->int_mode   = BNXT_CQ_INTR_MODE ( bp->vf );
+		req->int_mode   = BNXT_CQ_INTR_MODE ( ( (FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7) ) || bp->vf ) );
 		req->length 	= ( u32 )bp->nq.ring_cnt;
 		req->logical_id = 0xFFFF; // Required value for Thor FW?
 		req->page_tbl_addr = virt_to_bus ( bp->nq.bd_virt );
@@ -1624,7 +1830,7 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 		req->int_mode  = BNXT_CQ_INTR_MODE ( bp->vf );
 		req->length    = ( u32 )bp->cq.ring_cnt;
 		req->page_tbl_addr = virt_to_bus ( bp->cq.bd_virt );
-		if ( !bp->thor )
+	        if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 			break;
 		req->enables = RING_ALLOC_REQ_ENABLES_NQ_RING_ID_VALID;
 		req->nq_ring_id = bp->nq_ring_id;
@@ -1646,7 +1852,7 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 		req->stat_ctx_id = ( u32 )STAT_CTX_ID;
 		req->cmpl_ring_id  = bp->cq_ring_id;
 		req->page_tbl_addr = virt_to_bus ( bp->rx.bd_virt );
-		if ( !bp->thor )
+	        if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 			break;
 		req->queue_id    = ( u16 )RX_RING_QID;
 		req->rx_buf_size = MAX_ETHERNET_PACKET_BUFFER_SIZE;
@@ -1742,7 +1948,7 @@ static int bnxt_hwrm_ring_free_rx ( struct bnxt *bp )
 
 static int bnxt_hwrm_ring_alloc_nq ( struct bnxt *bp )
 {
-	if ( !bp->thor )
+	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 	return bnxt_hwrm_ring_alloc ( bp, RING_ALLOC_REQ_RING_TYPE_NQ );
 }
@@ -1751,7 +1957,7 @@ static int bnxt_hwrm_ring_free_nq ( struct bnxt *bp )
 {
 	int ret = STATUS_SUCCESS;
 
-	if ( !bp->thor )
+	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 
 	DBGP ( "%s\n", __func__ );
@@ -1822,7 +2028,7 @@ static int bnxt_hwrm_vnic_cfg ( struct bnxt *bp )
 	req->enables = VNIC_CFG_REQ_ENABLES_MRU;
 	req->mru	 = bp->mtu;
 
-	if ( bp->thor ) {
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) {
 		req->enables |= ( VNIC_CFG_REQ_ENABLES_DEFAULT_RX_RING_ID |
 				VNIC_CFG_REQ_ENABLES_DEFAULT_CMPL_RING_ID );
 		req->default_rx_ring_id   = bp->rx_ring_id;
@@ -1876,6 +2082,7 @@ hwrm_func_t bring_up_chip[] = {
 	bnxt_hwrm_backing_store_cfg,	/* HWRM_FUNC_BACKING_STORE_CFG  */
 	bnxt_hwrm_backing_store_qcfg,	/* HWRM_FUNC_BACKING_STORE_QCFG	*/
 	bnxt_hwrm_func_resource_qcaps,	/* HWRM_FUNC_RESOURCE_QCAPS	*/
+	bnxt_hwrm_port_phy_qcaps_req,	/* HWRM_PORT_PHY_QCAPS	*/
 	bnxt_hwrm_func_qcfg_req,	/* HWRM_FUNC_QCFG		*/
 	bnxt_get_vlan,			/* HWRM_NVM_GET_VARIABLE - vlan	*/
 	bnxt_hwrm_port_mac_cfg,		/* HWRM_PORT_MAC_CFG		*/
@@ -1927,7 +2134,7 @@ int bnxt_hwrm_run ( hwrm_func_t cmds[], struct bnxt *bp )
 
 static int bnxt_open ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 
 	DBGP ( "%s\n", __func__ );
 	bnxt_mm_nic ( bp );
@@ -1952,7 +2159,7 @@ static void bnxt_tx_adjust_pkt ( struct bnxt *bp, struct io_buffer *iob )
 
 static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	u16 len, entry;
 	dma_addr_t mapping;
 
@@ -1968,6 +2175,9 @@ static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
 	bp->tx.iob[entry] = iob;
 	bnxt_set_txq ( bp, entry, mapping, len );
 	entry = NEXT_IDX ( entry, bp->tx.ring_cnt );
+	/* If the ring has wrapped, toggle the epoch bit */
+	if ( bp->tx.prod_id > entry )
+		bp->tx.epoch ^= 1;
 	dump_tx_pkt ( ( u8 * )iob->data, len, bp->tx.prod_id );
 	/* Packets are ready, update Tx producer idx local and on card. */
 	bnxt_db_tx ( bp, ( u32 )entry );
@@ -1986,6 +2196,7 @@ static void bnxt_adv_nq_index ( struct bnxt *bp, u16 cnt )
 	if ( cons_id >= bp->nq.ring_cnt ) {
 		/* Toggle completion bit when the ring wraps. */
 		bp->nq.completion_bit ^= 1;
+		bp->nq.epoch ^= 1;
 		cons_id = cons_id - bp->nq.ring_cnt;
 	}
 	bp->nq.cons_id = cons_id;
@@ -2009,7 +2220,7 @@ void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt )
 
 static void bnxt_service_cq ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct cmpl_base *cmp;
 	struct tx_cmpl *tx;
 	u16 old_cid = bp->cq.cons_id;
@@ -2026,7 +2237,7 @@ static void bnxt_service_cq ( struct net_device *dev )
 
 		cq_type = cmp->type & CMPL_BASE_TYPE_MASK;
 		dump_evt ( ( u8 * )cmp, cq_type, bp->cq.cons_id, 0 );
-		dump_cq ( cmp, bp->cq.cons_id );
+		dump_cq ( cmp, bp->cq.cons_id, bp->nq.toggle );
 
 		switch ( cq_type ) {
 		case CMPL_BASE_TYPE_TX_L2:
@@ -2037,6 +2248,7 @@ static void bnxt_service_cq ( struct net_device *dev )
 			bnxt_adv_cq_index ( bp, 1 );
 			break;
 		case CMPL_BASE_TYPE_RX_L2:
+		case CMPL_BASE_TYPE_RX_L2_V3:
 			done = bnxt_rx_complete ( dev,
 				( struct rx_pkt_cmpl * )cmp );
 			break;
@@ -2057,13 +2269,13 @@ static void bnxt_service_cq ( struct net_device *dev )
 
 static void bnxt_service_nq ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 	struct nq_base *nqp;
 	u16 old_cid = bp->nq.cons_id;
 	int done = SERVICE_NEXT_NQ_BD;
 	u32 nq_type;
 
-	if ( !bp->thor )
+	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return;
 
 	while ( done == SERVICE_NEXT_NQ_BD ) {
@@ -2072,6 +2284,7 @@ static void bnxt_service_nq ( struct net_device *dev )
 		if ( ( nqp->v & NQ_CN_V ) ^ bp->nq.completion_bit )
 			break;
 		nq_type = ( nqp->type & NQ_CN_TYPE_MASK );
+		bp->nq.toggle = ( ( nqp->type & NQ_CN_TOGGLE_MASK ) >> NQ_CN_TOGGLE_SFT );
 		dump_evt ( ( u8 * )nqp, nq_type, bp->nq.cons_id, 1 );
 		dump_nq ( nqp, bp->nq.cons_id );
 
@@ -2096,13 +2309,13 @@ static void bnxt_service_nq ( struct net_device *dev )
 static void bnxt_poll ( struct net_device *dev )
 {
 	mb (  );
-	bnxt_service_cq ( dev );
 	bnxt_service_nq ( dev );
+	bnxt_service_cq ( dev );
 }
 
 static void bnxt_close ( struct net_device *dev )
 {
-	struct bnxt *bp = netdev_priv ( dev );
+	struct bnxt *bp = dev->priv;
 
 	DBGP ( "%s\n", __func__ );
 	bnxt_down_nic (bp);
@@ -2143,7 +2356,7 @@ static int bnxt_init_one ( struct pci_device *pci )
 	netdev_init ( netdev, &bnxt_netdev_ops );
 
 	/* Driver private area for this device */
-	bp = netdev_priv ( netdev );
+	bp = netdev->priv;
 
 	/* Set PCI driver private data */
 	pci_set_drvdata ( pci, netdev );
@@ -2197,7 +2410,7 @@ disable_pdev:
 static void bnxt_remove_one ( struct pci_device *pci )
 {
 	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct bnxt *bp = netdev_priv ( netdev );
+	struct bnxt *bp = netdev->priv;
 
 	DBGP ( "%s\n", __func__ );
 	/* Unregister network device */

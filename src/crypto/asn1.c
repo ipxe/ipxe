@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <time.h>
 #include <ipxe/tables.h>
 #include <ipxe/image.h>
+#include <ipxe/crypto.h>
 #include <ipxe/asn1.h>
 
 /** @file
@@ -94,8 +95,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * object body (i.e. the first byte following the length byte(s)), and
  * the length of the object body (i.e. the number of bytes until the
  * following object tag, if any) is returned.
+ *
+ * If the expected type is not found, the object cursor will not be
+ * modified.  If any other error occurs, the object cursor will be
+ * invalidated.
  */
-int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
+static int asn1_start ( struct asn1_cursor *cursor, unsigned int type,
+			size_t extra ) {
 	unsigned int len_len;
 	unsigned int len;
 
@@ -103,6 +109,7 @@ int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
 	if ( cursor->len < 2 /* Tag byte and first length byte */ ) {
 		if ( cursor->len )
 			DBGC ( cursor, "ASN1 %p too short\n", cursor );
+		asn1_invalidate_cursor ( cursor );
 		return -EINVAL_ASN1_EMPTY;
 	}
 
@@ -127,6 +134,7 @@ int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
 	if ( cursor->len < len_len ) {
 		DBGC ( cursor, "ASN1 %p bad length field length %d (max "
 		       "%zd)\n", cursor, len_len, cursor->len );
+		asn1_invalidate_cursor ( cursor );
 		return -EINVAL_ASN1_LEN_LEN;
 	}
 
@@ -140,10 +148,46 @@ int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
 	if ( ( cursor->len + extra ) < len ) {
 		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
 		       cursor, len, ( cursor->len + extra ) );
+		asn1_invalidate_cursor ( cursor );
 		return -EINVAL_ASN1_LEN;
 	}
 
 	return len;
+}
+
+/**
+ * Enter ASN.1 partial object
+ *
+ * @v cursor		ASN.1 object cursor
+ * @v type		Expected type, or ASN1_ANY
+ * @v extra		Additional length beyond partial object
+ * @ret rc		Return status code
+ *
+ * The object cursor and additional length will be updated to point to
+ * the body of the current ASN.1 object.
+ *
+ * If any error occurs, the object cursor will be invalidated.
+ */
+int asn1_enter_partial ( struct asn1_cursor *cursor, unsigned int type,
+			 size_t *extra ) {
+	int len;
+
+	/* Parse current object */
+	len = asn1_start ( cursor, type, *extra );
+	if ( len < 0 ) {
+		asn1_invalidate_cursor ( cursor );
+		return len;
+	}
+
+	/* Update cursor and additional length */
+	if ( ( ( size_t ) len ) <= cursor->len )
+		cursor->len = len;
+	assert ( ( len - cursor->len ) <= *extra );
+	*extra = ( len - cursor->len );
+
+	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
+	       cursor, type, len );
+	return 0;
 }
 
 /**
@@ -154,23 +198,14 @@ int asn1_start ( struct asn1_cursor *cursor, unsigned int type, size_t extra ) {
  * @ret rc		Return status code
  *
  * The object cursor will be updated to point to the body of the
- * current ASN.1 object.  If any error occurs, the object cursor will
- * be invalidated.
+ * current ASN.1 object.
+ *
+ * If any error occurs, the object cursor will be invalidated.
  */
 int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
-	int len;
+	static size_t no_extra = 0;
 
-	len = asn1_start ( cursor, type, 0 );
-	if ( len < 0 ) {
-		asn1_invalidate_cursor ( cursor );
-		return len;
-	}
-
-	cursor->len = len;
-	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
-	       cursor, type, len );
-
-	return 0;
+	return asn1_enter_partial ( cursor, type, &no_extra );
 }
 
 /**
@@ -181,26 +216,26 @@ int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
  * @ret rc		Return status code
  *
  * The object cursor will be updated to point to the next ASN.1
- * object.  If any error occurs, the object cursor will not be
- * modified.
+ * object.
+ *
+ * If the expected type is not found, the object cursor will not be
+ * modified.  If any other error occurs, the object cursor will be
+ * invalidated.
  */
 int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
+	/* Parse current object */
 	len = asn1_start ( cursor, type, 0 );
 	if ( len < 0 )
 		return len;
 
+	/* Update cursor */
 	cursor->data += len;
 	cursor->len -= len;
+
 	DBGC ( cursor, "ASN1 %p skipped object type %02x (len %x)\n",
 	       cursor, type, len );
-
-	if ( ! cursor->len ) {
-		DBGC ( cursor, "ASN1 %p reached end of object\n", cursor );
-		return -ENOENT;
-	}
-
 	return 0;
 }
 
@@ -212,8 +247,9 @@ int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
  * @ret rc		Return status code
  *
  * The object cursor will be updated to point to the next ASN.1
- * object.  If any error occurs, the object cursor will be
- * invalidated.
+ * object.
+ *
+ * If any error occurs, the object cursor will be invalidated.
  */
 int asn1_skip ( struct asn1_cursor *cursor, unsigned int type ) {
 	int rc;
@@ -234,8 +270,9 @@ int asn1_skip ( struct asn1_cursor *cursor, unsigned int type ) {
  * @ret rc		Return status code
  *
  * The object cursor will be shrunk to contain only the current ASN.1
- * object.  If any error occurs, the object cursor will be
- * invalidated.
+ * object.
+ *
+ * If any error occurs, the object cursor will be invalidated.
  */
 int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type ) {
 	struct asn1_cursor temp;
@@ -473,18 +510,26 @@ asn1_find_algorithm ( const struct asn1_cursor *cursor ) {
  *
  * @v cursor		ASN.1 object cursor
  * @ret algorithm	Algorithm
+ * @ret params		Algorithm parameters, or NULL
  * @ret rc		Return status code
  */
 int asn1_algorithm ( const struct asn1_cursor *cursor,
-		     struct asn1_algorithm **algorithm ) {
+		     struct asn1_algorithm **algorithm,
+		     struct asn1_cursor *params ) {
 	struct asn1_cursor contents;
 	int rc;
 
-	/* Enter signatureAlgorithm */
+	/* Enter algorithm */
 	memcpy ( &contents, cursor, sizeof ( contents ) );
 	asn1_enter ( &contents, ASN1_SEQUENCE );
 
-	/* Enter algorithm */
+	/* Get raw parameters, if applicable */
+	if ( params ) {
+		memcpy ( params, &contents, sizeof ( *params ) );
+		asn1_skip_any ( params );
+	}
+
+	/* Enter algorithm identifier */
 	if ( ( rc = asn1_enter ( &contents, ASN1_OID ) ) != 0 ) {
 		DBGC ( cursor, "ASN1 %p cannot locate algorithm OID:\n",
 		       cursor );
@@ -498,6 +543,14 @@ int asn1_algorithm ( const struct asn1_cursor *cursor,
 		DBGC ( cursor, "ASN1 %p unrecognised algorithm:\n", cursor );
 		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
 		return -ENOTSUP_ALGORITHM;
+	}
+
+	/* Parse parameters, if applicable */
+	if ( params && (*algorithm)->parse &&
+	     ( ( rc = (*algorithm)->parse ( *algorithm, params ) ) != 0 ) ) {
+		DBGC ( cursor, "ASN1 %p cannot parse %s parameters: %s\n",
+		       cursor, (*algorithm)->name, strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;
@@ -515,7 +568,7 @@ int asn1_pubkey_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm has a public key */
@@ -541,12 +594,40 @@ int asn1_digest_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm has a digest */
 	if ( ! (*algorithm)->digest ) {
 		DBGC ( cursor, "ASN1 %p algorithm %s is not a digest "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
+}
+
+/**
+ * Parse ASN.1 OID-identified cipher algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret algorithm	Algorithm
+ * @ret params		Algorithm parameters, or NULL
+ * @ret rc		Return status code
+ */
+int asn1_cipher_algorithm ( const struct asn1_cursor *cursor,
+			    struct asn1_algorithm **algorithm,
+			    struct asn1_cursor *params ) {
+	int rc;
+
+	/* Parse algorithm */
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, params ) ) != 0 )
+		return rc;
+
+	/* Check algorithm has a cipher */
+	if ( ! (*algorithm)->cipher ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not a cipher "
 		       "algorithm:\n", cursor, (*algorithm)->name );
 		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
 		return -ENOTTY_ALGORITHM;
@@ -567,7 +648,7 @@ int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, algorithm ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, algorithm, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm has a public key */
@@ -602,7 +683,7 @@ int asn1_check_algorithm ( const struct asn1_cursor *cursor,
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, &actual ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, &actual, NULL ) ) != 0 )
 		return rc;
 
 	/* Check algorithm matches */
@@ -613,6 +694,47 @@ int asn1_check_algorithm ( const struct asn1_cursor *cursor,
 	}
 
 	return 0;
+}
+
+/**
+ * Parse ASN.1 CBC cipher parameters
+ *
+ * @v algorithm		Algorithm
+ * @v param		Parameters to parse
+ * @ret rc		Return status code
+ */
+int asn1_parse_cbc ( struct asn1_algorithm *algorithm,
+		     struct asn1_cursor *params ) {
+	struct cipher_algorithm *cipher = algorithm->cipher;
+
+	/* Sanity check */
+	assert ( cipher != NULL );
+
+	/* Enter parameters */
+	asn1_enter ( params, ASN1_OCTET_STRING );
+
+	/* Check length */
+	if ( params->len != cipher->blocksize )
+		return -EINVAL;
+
+	return 0;
+}
+
+/**
+ * Parse ASN.1 GCM cipher parameters
+ *
+ * @v algorithm		Algorithm
+ * @v param		Parameters to parse
+ * @ret rc		Return status code
+ */
+int asn1_parse_gcm ( struct asn1_algorithm *algorithm __unused,
+		     struct asn1_cursor *params ) {
+
+	/* Enter parameters */
+	asn1_enter ( params, ASN1_SEQUENCE );
+
+	/* Enter nonce */
+	return asn1_enter ( params, ASN1_OCTET_STRING );
 }
 
 /**

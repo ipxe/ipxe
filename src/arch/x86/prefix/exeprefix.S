@@ -37,10 +37,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define PSP_CMDLINE_START 0x81
 
 	.section ".note.GNU-stack", "", @progbits
-	.text
+	.code16
 	.arch i386
 	.org 0
-	.code16
 	.section ".prefix", "awx", @progbits
 
 signature:

@@ -361,6 +361,10 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 	uint32_t busdevfn = 0;
 	int rc;
 
+	/* Skip automatic probing if prohibited */
+	if ( ! pci_can_probe() )
+		return 0;
+
 	do {
 		/* Allocate struct pci_device */
 		if ( ! pci )
@@ -434,3 +438,9 @@ struct root_device pci_root_device __root_device = {
 	.dev = { .name = "PCI" },
 	.driver = &pci_root_driver,
 };
+
+/* Drag in objects via pcibus_probe() */
+REQUIRING_SYMBOL ( pcibus_probe );
+
+/* Drag in PCI configuration */
+REQUIRE_OBJECT ( config_pci );

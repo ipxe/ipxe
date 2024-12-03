@@ -1006,17 +1006,17 @@ ISA_ROM("ne","NE1000/2000 and clones");
 #ifdef	INCLUDE_NS8390
 static struct pci_device_id nepci_nics[] = {
 /* A few NE2000 PCI clones, list not exhaustive */
-PCI_ROM(0x10ec, 0x8029, "rtl8029",      "Realtek 8029", 0),
-PCI_ROM(0x1186, 0x0300, "dlink-528",    "D-Link DE-528", 0),
 PCI_ROM(0x1050, 0x0940, "winbond940",   "Winbond NE2000-PCI", 0),		/* Winbond 86C940 / 89C940 */
 PCI_ROM(0x1050, 0x5a5a, "winbond940f",  "Winbond W89c940F", 0),		/* Winbond 89C940F */
+PCI_ROM(0x10bd, 0x0e34, "surecom-ne34", "Surecom NE34", 0),
+PCI_ROM(0x10ec, 0x8029, "rtl8029",      "Realtek 8029", 0),
+PCI_ROM(0x1106, 0x0926, "via86c926",    "Via 86c926", 0),
+PCI_ROM(0x1186, 0x0300, "dlink-528",    "D-Link DE-528", 0),
 PCI_ROM(0x11f6, 0x1401, "compexrl2000", "Compex ReadyLink 2000", 0),
-PCI_ROM(0x8e2e, 0x3000, "ktiet32p2",    "KTI ET32P2", 0),
-PCI_ROM(0x4a14, 0x5000, "nv5000sc",     "NetVin NV5000SC", 0),
 PCI_ROM(0x12c3, 0x0058, "holtek80232",  "Holtek HT80232", 0),
 PCI_ROM(0x12c3, 0x5598, "holtek80229",  "Holtek HT80229", 0),
-PCI_ROM(0x10bd, 0x0e34, "surecom-ne34", "Surecom NE34", 0),
-PCI_ROM(0x1106, 0x0926, "via86c926",    "Via 86c926", 0),
+PCI_ROM(0x4a14, 0x5000, "nv5000sc",     "NetVin NV5000SC", 0),
+PCI_ROM(0x8e2e, 0x3000, "ktiet32p2",    "KTI ET32P2", 0),
 };
 
 PCI_DRIVER ( nepci_driver, nepci_nics, PCI_NO_CLASS );

@@ -1062,7 +1062,7 @@ static inline int phantom_del_macaddr ( struct phantom_nic *phantom,
  * @v netdev		Network device
  */
 static void phantom_poll_link_state ( struct net_device *netdev ) {
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 	uint32_t xg_state_p3;
 	unsigned int link;
 
@@ -1109,7 +1109,7 @@ static void phantom_poll_link_state ( struct net_device *netdev ) {
  * @v netdev		Net device
  */
 static void phantom_refill_rx_ring ( struct net_device *netdev ) {
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 	struct io_buffer *iobuf;
 	struct phantom_rds rds;
 	unsigned int handle;
@@ -1160,7 +1160,7 @@ static void phantom_refill_rx_ring ( struct net_device *netdev ) {
  * @ret rc		Return status code
  */
 static int phantom_open ( struct net_device *netdev ) {
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 	int rc;
 
 	/* Allocate and zero descriptor rings */
@@ -1220,7 +1220,7 @@ static int phantom_open ( struct net_device *netdev ) {
  * @v netdev		Net device
  */
 static void phantom_close ( struct net_device *netdev ) {
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 	struct io_buffer *iobuf;
 	unsigned int i;
 
@@ -1258,7 +1258,7 @@ static void phantom_close ( struct net_device *netdev ) {
  */
 static int phantom_transmit ( struct net_device *netdev,
 			      struct io_buffer *iobuf ) {
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 	union phantom_cds cds;
 	int index;
 
@@ -1297,7 +1297,7 @@ static int phantom_transmit ( struct net_device *netdev,
  * @v netdev	Network device
  */
 static void phantom_poll ( struct net_device *netdev ) {
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 	struct io_buffer *iobuf;
 	unsigned int irq_vector;
 	unsigned int irq_state;
@@ -1434,7 +1434,7 @@ static void phantom_poll ( struct net_device *netdev ) {
  * @v enable	Interrupts should be enabled
  */
 static void phantom_irq ( struct net_device *netdev, int enable ) {
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 
 	phantom_writel ( phantom, ( enable ? 1 : 0 ),
 			 phantom->sds_irq_mask_crb );
@@ -2070,7 +2070,7 @@ static int phantom_probe ( struct pci_device *pci ) {
 		goto err_alloc_etherdev;
 	}
 	netdev_init ( netdev, &phantom_operations );
-	phantom = netdev_priv ( netdev );
+	phantom = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( phantom, 0, sizeof ( *phantom ) );
@@ -2161,7 +2161,7 @@ static int phantom_probe ( struct pci_device *pci ) {
  */
 static void phantom_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct phantom_nic *phantom = netdev_priv ( netdev );
+	struct phantom_nic *phantom = netdev->priv;
 
 	unregister_settings ( &phantom->settings );
 	unregister_netdev ( netdev );

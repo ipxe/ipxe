@@ -16,7 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @ret timestamp	Timestamp
  */
-static inline __attribute__ (( always_inline )) uint64_t
+static inline __attribute__ (( always_inline )) unsigned long
 profile_timestamp ( void ) {
 	uint64_t cycles;
 

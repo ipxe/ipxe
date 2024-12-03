@@ -120,6 +120,7 @@ int pcibios_write ( struct pci_device *pci, uint32_t command, uint32_t value ){
 	return ( status >> 8 );
 }
 
+PROVIDE_PCIAPI_INLINE ( pcbios, pci_can_probe );
 PROVIDE_PCIAPI ( pcbios, pci_discover, pcibios_discover );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( pcbios, pci_read_config_word );

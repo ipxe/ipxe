@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/console.h>
 #include <ipxe/ansicol.h>
 #include <ipxe/jumpscroll.h>
-#include <ipxe/menu.h>
+#include <ipxe/dynui.h>
 
 /* Screen layout */
 #define TITLE_ROW	1U
@@ -49,31 +49,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** A menu user interface */
 struct menu_ui {
-	/** Menu */
-	struct menu *menu;
+	/** Dynamic user interface */
+	struct dynamic_ui *dynui;
 	/** Jump scroller */
 	struct jump_scroller scroll;
 	/** Timeout (0=indefinite) */
 	unsigned long timeout;
 };
-
-/**
- * Return a numbered menu item
- *
- * @v menu		Menu
- * @v index		Index
- * @ret item		Menu item, or NULL
- */
-static struct menu_item * menu_item ( struct menu *menu, unsigned int index ) {
-	struct menu_item *item;
-
-	list_for_each_entry ( item, &menu->items, list ) {
-		if ( index-- == 0 )
-			return item;
-	}
-
-	return NULL;
-}
 
 /**
  * Draw a numbered menu item
@@ -82,7 +64,7 @@ static struct menu_item * menu_item ( struct menu *menu, unsigned int index ) {
  * @v index		Index
  */
 static void draw_menu_item ( struct menu_ui *ui, unsigned int index ) {
-	struct menu_item *item;
+	struct dynamic_item *item;
 	unsigned int row_offset;
 	char buf[ MENU_COLS + 1 /* NUL */ ];
 	char timeout_buf[6]; /* "(xxx)" + NUL */
@@ -95,11 +77,11 @@ static void draw_menu_item ( struct menu_ui *ui, unsigned int index ) {
 	move ( ( MENU_ROW + row_offset ), MENU_COL );
 
 	/* Get menu item */
-	item = menu_item ( ui->menu, index );
+	item = dynui_item ( ui->dynui, index );
 	if ( item ) {
 
 		/* Draw separators in a different colour */
-		if ( ! item->label )
+		if ( ! item->name )
 			color_set ( CPAIR_SEPARATOR, NULL );
 
 		/* Highlight if this is the selected item */
@@ -171,13 +153,12 @@ static void draw_menu_items ( struct menu_ui *ui ) {
  * @ret selected	Selected item
  * @ret rc		Return status code
  */
-static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
-	struct menu_item *item;
+static int menu_loop ( struct menu_ui *ui, struct dynamic_item **selected ) {
+	struct dynamic_item *item;
 	unsigned long timeout;
 	unsigned int previous;
+	unsigned int move;
 	int key;
-	int i;
-	int move;
 	int chosen = 0;
 	int rc = 0;
 
@@ -192,7 +173,7 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 		ui->timeout -= timeout;
 
 		/* Get key */
-		move = 0;
+		move = SCROLL_NONE;
 		key = getkey ( timeout );
 		if ( key < 0 ) {
 			/* Choose default if we finally time out */
@@ -216,19 +197,13 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 				chosen = 1;
 				break;
 			default:
-				i = 0;
-				list_for_each_entry ( item, &ui->menu->items,
-						      list ) {
-					if ( ! ( item->shortcut &&
-						 ( item->shortcut == key ) ) ) {
-						i++;
-						continue;
-					}
-					ui->scroll.current = i;
-					if ( item->label ) {
+				item = dynui_shortcut ( ui->dynui, key );
+				if ( item ) {
+					ui->scroll.current = item->index;
+					if ( item->name ) {
 						chosen = 1;
 					} else {
-						move = +1;
+						move = SCROLL_DOWN;
 					}
 				}
 				break;
@@ -238,8 +213,8 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 		/* Move selection, if applicable */
 		while ( move ) {
 			move = jump_scroll_move ( &ui->scroll, move );
-			item = menu_item ( ui->menu, ui->scroll.current );
-			if ( item->label )
+			item = dynui_item ( ui->dynui, ui->scroll.current );
+			if ( item->name )
 				break;
 		}
 
@@ -252,9 +227,9 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 		}
 
 		/* Record selection */
-		item = menu_item ( ui->menu, ui->scroll.current );
+		item = dynui_item ( ui->dynui, ui->scroll.current );
 		assert ( item != NULL );
-		assert ( item->label != NULL );
+		assert ( item->name != NULL );
 		*selected = item;
 
 	} while ( ( rc == 0 ) && ! chosen );
@@ -265,43 +240,43 @@ static int menu_loop ( struct menu_ui *ui, struct menu_item **selected ) {
 /**
  * Show menu
  *
- * @v menu		Menu
+ * @v dynui		Dynamic user interface
  * @v timeout		Timeout period, in ticks (0=indefinite)
  * @ret selected	Selected item
  * @ret rc		Return status code
  */
-int show_menu ( struct menu *menu, unsigned long timeout,
-		const char *select, struct menu_item **selected ) {
-	struct menu_item *item;
+int show_menu ( struct dynamic_ui *dynui, unsigned long timeout,
+		const char *select, struct dynamic_item **selected ) {
+	struct dynamic_item *item;
 	struct menu_ui ui;
 	char buf[ MENU_COLS + 1 /* NUL */ ];
-	int labelled_count = 0;
+	int named_count = 0;
 	int rc;
 
 	/* Initialise UI */
 	memset ( &ui, 0, sizeof ( ui ) );
-	ui.menu = menu;
+	ui.dynui = dynui;
 	ui.scroll.rows = MENU_ROWS;
 	ui.timeout = timeout;
-	list_for_each_entry ( item, &menu->items, list ) {
-		if ( item->label ) {
-			if ( ! labelled_count )
+	list_for_each_entry ( item, &dynui->items, list ) {
+		if ( item->name ) {
+			if ( ! named_count )
 				ui.scroll.current = ui.scroll.count;
-			labelled_count++;
+			named_count++;
 			if ( select ) {
-				if ( strcmp ( select, item->label ) == 0 )
+				if ( strcmp ( select, item->name ) == 0 )
 					ui.scroll.current = ui.scroll.count;
 			} else {
-				if ( item->is_default )
+				if ( item->flags & DYNUI_DEFAULT )
 					ui.scroll.current = ui.scroll.count;
 			}
 		}
 		ui.scroll.count++;
 	}
-	if ( ! labelled_count ) {
-		/* Menus with no labelled items cannot be selected
-		 * from, and will seriously confuse the navigation
-		 * logic.  Refuse to display any such menus.
+	if ( ! named_count ) {
+		/* Menus with no named items cannot be selected from,
+		 * and will seriously confuse the navigation logic.
+		 * Refuse to display any such menus.
 		 */
 		return -ENOENT;
 	}
@@ -315,7 +290,7 @@ int show_menu ( struct menu *menu, unsigned long timeout,
 
 	/* Draw initial content */
 	attron ( A_BOLD );
-	snprintf ( buf, sizeof ( buf ), "%s", ui.menu->title );
+	snprintf ( buf, sizeof ( buf ), "%s", ui.dynui->title );
 	mvprintw ( TITLE_ROW, ( ( COLS - strlen ( buf ) ) / 2 ), "%s", buf );
 	attroff ( A_BOLD );
 	jump_scroll ( &ui.scroll );

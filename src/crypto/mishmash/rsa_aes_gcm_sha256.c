@@ -29,24 +29,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/sha256.h>
 #include <ipxe/tls.h>
 
-/** TLS_DHE_RSA_WITH_AES_128_GCM_SHA256 cipher suite */
-struct tls_cipher_suite
-tls_dhe_rsa_with_aes_128_gcm_sha256 __tls_cipher_suite ( 01 ) = {
-	.code = htons ( TLS_DHE_RSA_WITH_AES_128_GCM_SHA256 ),
-	.key_len = ( 128 / 8 ),
-	.fixed_iv_len = 4,
-	.record_iv_len = 8,
-	.mac_len = 0,
-	.exchange = &tls_dhe_exchange_algorithm,
-	.pubkey = &rsa_algorithm,
-	.cipher = &aes_gcm_algorithm,
-	.digest = &sha256_algorithm,
-	.handshake = &sha256_algorithm,
-};
-
 /** TLS_RSA_WITH_AES_128_GCM_SHA256 cipher suite */
 struct tls_cipher_suite
-tls_rsa_with_aes_128_gcm_sha256 __tls_cipher_suite ( 11 ) = {
+tls_rsa_with_aes_128_gcm_sha256 __tls_cipher_suite ( 21 ) = {
 	.code = htons ( TLS_RSA_WITH_AES_128_GCM_SHA256 ),
 	.key_len = ( 128 / 8 ),
 	.fixed_iv_len = 4,

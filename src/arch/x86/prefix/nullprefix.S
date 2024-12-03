@@ -2,11 +2,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 	.section ".note.GNU-stack", "", @progbits
 	.org	0
-	.text
+	.code16
 	.arch i386
 
 	.section ".prefix", "ax", @progbits
-	.code16
 _prefix:
 
 	.section ".text16", "ax", @progbits

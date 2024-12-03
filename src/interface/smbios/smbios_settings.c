@@ -117,8 +117,16 @@ static int smbios_fetch ( struct settings *settings __unused,
 		 * <offset> contains a string index.  An <offset> of
 		 * zero indicates that the <length> contains a literal
 		 * string index.
+		 *
+		 * Since the byte at offset zero can never contain a
+		 * string index, and a literal string index can never
+		 * be zero, the combination of both <length> and
+		 * <offset> being zero indicates that the entire
+		 * structure is to be read.
 		 */
-		if ( ( tag_len == 0 ) || ( tag_offset == 0 ) ) {
+		if ( ( tag_len == 0 ) && ( tag_offset == 0 ) ) {
+			tag_len = sizeof ( buf );
+		} else if ( ( tag_len == 0 ) || ( tag_offset == 0 ) ) {
 			index = ( ( tag_offset == 0 ) ?
 				  tag_len : buf[tag_offset] );
 			if ( ( rc = read_smbios_string ( &structure, index,
@@ -128,6 +136,13 @@ static int smbios_fetch ( struct settings *settings __unused,
 			if ( ! setting->type )
 				setting->type = &setting_type_string;
 			return rc;
+		}
+
+		/* Limit length */
+		if ( tag_offset > sizeof ( buf ) ) {
+			tag_len = 0;
+		} else if ( ( tag_offset + tag_len ) > sizeof ( buf ) ) {
+			tag_len = ( sizeof ( buf ) - tag_offset );
 		}
 
 		/* Mangle UUIDs if necessary.  iPXE treats UUIDs as

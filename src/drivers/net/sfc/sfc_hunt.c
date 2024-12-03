@@ -1043,7 +1043,7 @@ static void hunt_ev_fini(struct hunt_nic *hunt)
 static void
 hunt_poll(struct net_device *netdev)
 {
-	struct hunt_nic *hunt = netdev_priv(netdev);
+	struct hunt_nic *hunt = netdev->priv;
 
 	/* If called while already polling, return immediately */
 	if (hunt->efx.state & EFX_STATE_POLLING)
@@ -1071,7 +1071,7 @@ hunt_poll(struct net_device *netdev)
  ******************************************************************************/
 static int hunt_open(struct net_device *netdev)
 {
-	struct hunt_nic *hunt = netdev_priv(netdev);
+	struct hunt_nic *hunt = netdev->priv;
 	int rc;
 
 	/* Allocate VIs */
@@ -1133,7 +1133,7 @@ fail2:
 
 static void hunt_close(struct net_device *netdev)
 {
-	struct hunt_nic *hunt = netdev_priv(netdev);
+	struct hunt_nic *hunt = netdev->priv;
 
 	/* Stop datapath */
 	efx_hunt_close(netdev);
@@ -1187,7 +1187,7 @@ hunt_probe(struct pci_device *pci)
 	netdev->dev = &pci->dev;
 	netdev->state |= NETDEV_IRQ_UNSUPPORTED;
 
-	hunt = netdev_priv(netdev);
+	hunt = netdev->priv;
 	memset(hunt, 0, sizeof(*hunt));
 	efx = &hunt->efx;
 
@@ -1290,7 +1290,7 @@ fail1:
 static void hunt_remove(struct pci_device *pci)
 {
 	struct net_device *netdev = pci_get_drvdata(pci);
-	struct hunt_nic *hunt = netdev_priv(netdev);
+	struct hunt_nic *hunt = netdev->priv;
 
 	if (!(hunt->flags &
 	      (1 << MC_CMD_DRV_ATTACH_EXT_OUT_FLAG_NO_ACTIVE_PORT))) {

@@ -57,8 +57,7 @@ struct validator_action {
 	/** Name */
 	const char *name;
 	/** Action to take upon completed transfer */
-	int ( * done ) ( struct validator *validator, const void *data,
-			 size_t len );
+	void ( * done ) ( struct validator *validator, int rc );
 };
 
 /** A certificate validator */
@@ -72,6 +71,40 @@ struct validator {
 
 	/** Process */
 	struct process process;
+	/** Most relevant status code
+	 *
+	 * The cross-signed certificate mechanism may attempt several
+	 * downloads as it works its way up the provided partial chain
+	 * to locate a suitable cross-signed certificate with which to
+	 * complete the chain.
+	 *
+	 * Some of these download or validation attempts may fail for
+	 * uninteresting reasons (i.e. because a cross-signed
+	 * certificate has never existed for that link in the chain).
+	 *
+	 * We must therefore keep track of the most relevant error
+	 * that has occurred, in order to be able to report a
+	 * meaningful overall status to the user.
+	 *
+	 * As a concrete example: consider the case of an expired OCSP
+	 * signer for an intermediate certificate.  This will cause
+	 * OCSP validation to fail for that intermediate certificate,
+	 * and this is the error that should eventually be reported to
+	 * the user.  We do not want to instead report the
+	 * uninteresting fact that no cross-signed certificate was
+	 * found for the remaining links in the chain, nor do we want
+	 * to report just a generic "OCSP required" error.
+	 *
+	 * We record the most relevant status code whenever a
+	 * definitely relevant error occurs, and clear it whenever we
+	 * successfully make forward progress (e.g. by completing
+	 * OCSP, or by adding new cross-signed certificates).
+	 *
+	 * When we subsequently attempt to validate the chain, we
+	 * report the most relevant error status code (if recorded),
+	 * otherwise we report the validation error itself.
+	 */
+	int rc;
 
 	/** Root of trust (or NULL to use default) */
 	struct x509_root *root;
@@ -84,13 +117,15 @@ struct validator {
 
 	/** Current action */
 	const struct validator_action *action;
-	/** Current certificate
+	/** Current certificate (for progress reporting)
 	 *
 	 * This will always be present within the certificate chain
 	 * and so this pointer does not hold a reference to the
 	 * certificate.
 	 */
 	struct x509_certificate *cert;
+	/** Current link within certificate chain */
+	struct x509_link *link;
 };
 
 /**
@@ -100,9 +135,11 @@ struct validator {
  * @ret name		Validator name
  */
 static const char * validator_name ( struct validator *validator ) {
+	struct x509_certificate *cert;
 
-	/* Use name of first certificate in chain */
-	return x509_name ( x509_first ( validator->chain ) );
+	/* Use name of first certificate in chain, if present */
+	cert = x509_first ( validator->chain );
+	return ( cert ? x509_name ( cert ) : "<empty>" );
 }
 
 /**
@@ -196,17 +233,36 @@ static const char crosscert_default[] = CROSSCERT;
  * Append cross-signing certificates to certificate chain
  *
  * @v validator		Certificate validator
- * @v data		Raw cross-signing certificate data
- * @v len		Length of raw data
+ * @v rc		Completion status code
  * @ret rc		Return status code
  */
-static int validator_append ( struct validator *validator,
-			      const void *data, size_t len ) {
+static void validator_append ( struct validator *validator, int rc ) {
 	struct asn1_cursor cursor;
 	struct x509_chain *certs;
 	struct x509_certificate *cert;
-	struct x509_certificate *last;
-	int rc;
+	struct x509_link *link;
+	struct x509_link *prev;
+
+	/* Check for errors */
+	if ( rc != 0 ) {
+		DBGC ( validator, "VALIDATOR %p \"%s\" could not download ",
+		       validator, validator_name ( validator ) );
+		DBGC ( validator, "\"%s\" cross-signature: %s\n",
+		       x509_name ( validator->cert ), strerror ( rc ) );
+		/* If the overall validation is going to fail, then we
+		 * will end up attempting multiple downloads for
+		 * non-existent cross-signed certificates as we work
+		 * our way up the certificate chain.  Do not record
+		 * these as relevant errors, since we want to
+		 * eventually report whichever much more relevant
+		 * error occurred previously.
+		 */
+		goto err_irrelevant;
+	}
+	DBGC ( validator, "VALIDATOR %p \"%s\" downloaded ",
+	       validator, validator_name ( validator ) );
+	DBGC ( validator, "\"%s\" cross-signature\n",
+	       x509_name ( validator->cert ) );
 
 	/* Allocate certificate list */
 	certs = x509_alloc_chain();
@@ -216,8 +272,8 @@ static int validator_append ( struct validator *validator,
 	}
 
 	/* Initialise cursor */
-	cursor.data = data;
-	cursor.len = len;
+	cursor.data = validator->buffer.data;
+	cursor.len = validator->buffer.len;
 
 	/* Enter certificateSet */
 	if ( ( rc = asn1_enter ( &cursor, ASN1_SET ) ) != 0 ) {
@@ -230,14 +286,14 @@ static int validator_append ( struct validator *validator,
 	/* Add each certificate to list */
 	while ( cursor.len ) {
 
-		/* Add certificate to chain */
+		/* Add certificate to list */
 		if ( ( rc = x509_append_raw ( certs, cursor.data,
 					      cursor.len ) ) != 0 ) {
 			DBGC ( validator, "VALIDATOR %p \"%s\" could not "
 			       "append certificate: %s\n", validator,
 			       validator_name ( validator ), strerror ( rc) );
 			DBGC_HDA ( validator, 0, cursor.data, cursor.len );
-			return rc;
+			goto err_append_raw;
 		}
 		cert = x509_last ( certs );
 		DBGC ( validator, "VALIDATOR %p \"%s\" found certificate ",
@@ -248,8 +304,12 @@ static int validator_append ( struct validator *validator,
 		asn1_skip_any ( &cursor );
 	}
 
+	/* Truncate existing certificate chain at current link */
+	link = validator->link;
+	assert ( link->flags & X509_LINK_FL_CROSSED );
+	x509_truncate ( validator->chain, link );
+
 	/* Append certificates to chain */
-	last = x509_last ( validator->chain );
 	if ( ( rc = x509_auto_append ( validator->chain, certs ) ) != 0 ) {
 		DBGC ( validator, "VALIDATOR %p \"%s\" could not append "
 		       "certificates: %s\n", validator,
@@ -257,26 +317,31 @@ static int validator_append ( struct validator *validator,
 		goto err_auto_append;
 	}
 
-	/* Check that at least one certificate has been added */
-	if ( last == x509_last ( validator->chain ) ) {
-		DBGC ( validator, "VALIDATOR %p \"%s\" failed to append any "
-		       "applicable certificates\n", validator,
-		       validator_name ( validator ) );
-		rc = -EACCES;
-		goto err_no_progress;
+	/* Record that a cross-signed certificate download has already
+	 * been performed for all but the last of the appended
+	 * certificates.  (It may be necessary to perform a further
+	 * download to complete the chain, if this download did not
+	 * extend all the way to a root of trust.)
+	 */
+	prev = NULL;
+	list_for_each_entry_continue ( link, &validator->chain->links, list ) {
+		if ( prev )
+			prev->flags |= X509_LINK_FL_CROSSED;
+		prev = link;
 	}
 
-	/* Drop reference to certificate list */
-	x509_chain_put ( certs );
+	/* Success */
+	rc = 0;
 
-	return 0;
-
- err_no_progress:
  err_auto_append:
+ err_append_raw:
  err_certificateset:
 	x509_chain_put ( certs );
  err_alloc_certs:
-	return rc;
+	validator->rc = rc;
+ err_irrelevant:
+	/* Do not record irrelevant errors */
+	return;
 }
 
 /** Cross-signing certificate download validator action */
@@ -289,11 +354,12 @@ static const struct validator_action validator_crosscert = {
  * Start download of cross-signing certificate
  *
  * @v validator		Certificate validator
- * @v cert		X.509 certificate
+ * @v link		Link in certificate chain
  * @ret rc		Return status code
  */
 static int validator_start_download ( struct validator *validator,
-				      struct x509_certificate *cert ) {
+				      struct x509_link *link ) {
+	struct x509_certificate *cert = link->cert;
 	const struct asn1_cursor *issuer = &cert->issuer.raw;
 	const char *crosscert;
 	char *crosscert_copy;
@@ -336,6 +402,7 @@ static int validator_start_download ( struct validator *validator,
 	/* Set completion handler */
 	validator->action = &validator_crosscert;
 	validator->cert = cert;
+	validator->link = link;
 
 	/* Open URI */
 	if ( ( rc = xfer_open_uri_string ( &validator->xfer,
@@ -346,14 +413,20 @@ static int validator_start_download ( struct validator *validator,
 		goto err_open_uri_string;
 	}
 
-	/* Success */
-	rc = 0;
+	/* Free temporary allocations */
+	free ( uri_string );
+	free ( crosscert_copy );
 
+	/* Success */
+	return 0;
+
+	intf_restart ( &validator->xfer, rc );
  err_open_uri_string:
 	free ( uri_string );
  err_alloc_uri_string:
  err_check_uri_string:
 	free ( crosscert_copy );
+	validator->rc = rc;
 	return rc;
 }
 
@@ -367,21 +440,27 @@ static int validator_start_download ( struct validator *validator,
  * Validate OCSP response
  *
  * @v validator		Certificate validator
- * @v data		Raw OCSP response
- * @v len		Length of raw data
- * @ret rc		Return status code
+ * @v rc		Completion status code
  */
-static int validator_ocsp_validate ( struct validator *validator,
-				     const void *data, size_t len ) {
+static void validator_ocsp_validate ( struct validator *validator, int rc ) {
+	const void *data = validator->buffer.data;
+	size_t len = validator->buffer.len;
 	time_t now;
-	int rc;
+
+	/* Check for errors */
+	if ( rc != 0 ) {
+		DBGC ( validator, "VALIDATOR %p \"%s\" could not fetch OCSP "
+		       "response: %s\n", validator,
+		       validator_name ( validator ), strerror ( rc ) );
+		goto err_status;
+	}
 
 	/* Record OCSP response */
 	if ( ( rc = ocsp_response ( validator->ocsp, data, len ) ) != 0 ) {
 		DBGC ( validator, "VALIDATOR %p \"%s\" could not record OCSP "
 		       "response: %s\n", validator,
-		       validator_name ( validator ),strerror ( rc ) );
-		return rc;
+		       validator_name ( validator ), strerror ( rc ) );
+		goto err_response;
 	}
 
 	/* Validate OCSP response */
@@ -390,14 +469,20 @@ static int validator_ocsp_validate ( struct validator *validator,
 		DBGC ( validator, "VALIDATOR %p \"%s\" could not validate "
 		       "OCSP response: %s\n", validator,
 		       validator_name ( validator ), strerror ( rc ) );
-		return rc;
+		goto err_validate;
 	}
 
-	/* Drop reference to OCSP check */
+	/* Success */
+	DBGC ( validator, "VALIDATOR %p \"%s\" checked ",
+	       validator, validator_name ( validator ) );
+	DBGC ( validator, "\"%s\" via OCSP\n", x509_name ( validator->cert ) );
+
+ err_validate:
+ err_response:
+ err_status:
 	ocsp_put ( validator->ocsp );
 	validator->ocsp = NULL;
-
-	return 0;
+	validator->rc = rc;
 }
 
 /** OCSP validator action */
@@ -426,7 +511,7 @@ static int validator_start_ocsp ( struct validator *validator,
 		DBGC ( validator, "VALIDATOR %p \"%s\" could not create OCSP "
 		       "check: %s\n", validator, validator_name ( validator ),
 		       strerror ( rc ) );
-		return rc;
+		goto err_check;
 	}
 
 	/* Set completion handler */
@@ -444,10 +529,18 @@ static int validator_start_ocsp ( struct validator *validator,
 		DBGC ( validator, "VALIDATOR %p \"%s\" could not open %s: "
 		       "%s\n", validator, validator_name ( validator ),
 		       uri_string, strerror ( rc ) );
-		return rc;
+		goto err_open;
 	}
 
 	return 0;
+
+	intf_restart ( &validator->xfer, rc );
+ err_open:
+	ocsp_put ( validator->ocsp );
+	validator->ocsp = NULL;
+ err_check:
+	validator->rc = rc;
+	return rc;
 }
 
 /****************************************************************************
@@ -466,34 +559,18 @@ static void validator_xfer_close ( struct validator *validator, int rc ) {
 
 	/* Close data transfer interface */
 	intf_restart ( &validator->xfer, rc );
-
-	/* Check for errors */
-	if ( rc != 0 ) {
-		DBGC ( validator, "VALIDATOR %p \"%s\" transfer failed: %s\n",
-		       validator, validator_name ( validator ),
-		       strerror ( rc ) );
-		goto err_transfer;
-	}
 	DBGC2 ( validator, "VALIDATOR %p \"%s\" transfer complete\n",
 		validator, validator_name ( validator ) );
 
 	/* Process completed download */
 	assert ( validator->action != NULL );
-	if ( ( rc = validator->action->done ( validator, validator->buffer.data,
-					      validator->buffer.len ) ) != 0 )
-		goto err_append;
+	validator->action->done ( validator, rc );
 
 	/* Free downloaded data */
 	xferbuf_free ( &validator->buffer );
 
 	/* Resume validation process */
 	process_add ( &validator->process );
-
-	return;
-
- err_append:
- err_transfer:
-	validator_finished ( validator, rc );
 }
 
 /**
@@ -515,7 +592,7 @@ static int validator_xfer_deliver ( struct validator *validator,
 		DBGC ( validator, "VALIDATOR %p \"%s\" could not receive "
 		       "data: %s\n", validator, validator_name ( validator ),
 		       strerror ( rc ) );
-		validator_finished ( validator, rc );
+		validator_xfer_close ( validator, rc );
 		return rc;
 	}
 
@@ -544,10 +621,10 @@ static struct interface_descriptor validator_xfer_desc =
  * @v validator		Certificate validator
  */
 static void validator_step ( struct validator *validator ) {
+	struct x509_chain *chain = validator->chain;
 	struct x509_link *link;
+	struct x509_link *prev;
 	struct x509_certificate *cert;
-	struct x509_certificate *issuer = NULL;
-	struct x509_certificate *last;
 	time_t now;
 	int rc;
 
@@ -556,57 +633,109 @@ static void validator_step ( struct validator *validator ) {
 	 * previously.
 	 */
 	now = time ( NULL );
-	if ( ( rc = x509_validate_chain ( validator->chain, now, NULL,
+	if ( ( rc = x509_validate_chain ( chain, now, NULL,
 					  validator->root ) ) == 0 ) {
 		DBGC ( validator, "VALIDATOR %p \"%s\" validated\n",
 		       validator, validator_name ( validator ) );
 		validator_finished ( validator, 0 );
 		return;
 	}
+	DBGC ( validator, "VALIDATOR %p \"%s\" not yet valid: %s\n",
+	       validator, validator_name ( validator ), strerror ( rc ) );
 
-	/* If there is a certificate that could be validated using
-	 * OCSP, try it.
+	/* Record as the most relevant error, if no more relevant
+	 * error has already been recorded.
 	 */
-	list_for_each_entry ( link, &validator->chain->links, list ) {
-		cert = issuer;
-		issuer = link->cert;
-		if ( ! cert )
-			continue;
-		if ( ! x509_is_valid ( issuer, validator->root ) )
-			continue;
-		/* The issuer is valid, but this certificate is not
-		 * yet valid.  If OCSP is applicable, start it.
-		 */
-		if ( ocsp_required ( cert ) ) {
-			/* Start OCSP */
-			if ( ( rc = validator_start_ocsp ( validator, cert,
-							   issuer ) ) != 0 ) {
-				validator_finished ( validator, rc );
-				return;
-			}
+	if ( validator->rc == 0 )
+		validator->rc = rc;
+
+	/* Find the first valid link in the chain, if any
+	 *
+	 * There is no point in attempting OCSP or cross-signed
+	 * certificate downloads for certificates after the first
+	 * valid link in the chain, since they cannot make a
+	 * difference to the overall validation of the chain.
+	 */
+	prev = NULL;
+	list_for_each_entry ( link, &chain->links, list ) {
+
+		/* Dump link information (for debugging) */
+		DBGC ( validator, "VALIDATOR %p \"%s\" has link ",
+		       validator, validator_name ( validator ) );
+		DBGC ( validator, "\"%s\"%s%s%s%s%s\n",
+		       x509_name ( link->cert ),
+		       ( ocsp_required ( link->cert ) ? " [NEEDOCSP]" : "" ),
+		       ( ( link->flags & X509_LINK_FL_OCSPED ) ?
+			 " [OCSPED]" : "" ),
+		       ( ( link->flags & X509_LINK_FL_CROSSED ) ?
+			 " [CROSSED]" : "" ),
+		       ( x509_is_self_signed ( link->cert ) ? " [SELF]" : "" ),
+		       ( x509_is_valid ( link->cert, validator->root ) ?
+			 " [VALID]" : "" ) );
+
+		/* Stop at first valid link */
+		if ( x509_is_valid ( link->cert, validator->root ) )
+			break;
+		prev = link;
+	}
+
+	/* If this link is the issuer for a certificate that is
+	 * pending an OCSP check attempt, then start OCSP to validate
+	 * that certificate.
+	 *
+	 * If OCSP is not required for the issued certificate, or has
+	 * already been attempted, or if we were unable to start OCSP
+	 * for any reason, then proceed to attempting a cross-signed
+	 * certificate download (which may end up replacing this
+	 * issuer anyway).
+	 */
+	if ( ( ! list_is_head_entry ( link, &chain->links, list ) ) &&
+	     ( ! ( link->flags & X509_LINK_FL_OCSPED ) ) &&
+	     ( prev != NULL ) && ocsp_required ( prev->cert ) ) {
+
+		/* Mark OCSP as attempted with this issuer */
+		link->flags |= X509_LINK_FL_OCSPED;
+
+		/* Start OCSP */
+		if ( ( rc = validator_start_ocsp ( validator, prev->cert,
+						   link->cert ) ) == 0 ) {
+			/* Sleep until OCSP is complete */
 			return;
 		}
-		/* Otherwise, this is a permanent failure */
-		validator_finished ( validator, rc );
-		return;
 	}
 
-	/* If chain ends with a self-issued certificate, then there is
-	 * nothing more to do.
+	/* Work back up the chain (starting from the already
+	 * identified first valid link, if any) to find a not-yet
+	 * valid certificate for which we could attempt to download a
+	 * cross-signed certificate chain.
 	 */
-	last = x509_last ( validator->chain );
-	if ( asn1_compare ( &last->issuer.raw, &last->subject.raw ) == 0 ) {
-		validator_finished ( validator, rc );
-		return;
+	list_for_each_entry_continue_reverse ( link, &chain->links, list ) {
+		cert = link->cert;
+
+		/* Sanity check */
+		assert ( ! x509_is_valid ( cert, validator->root ) );
+
+		/* Skip self-signed certificates (cannot be cross-signed) */
+		if ( x509_is_self_signed ( cert ) )
+			continue;
+
+		/* Skip previously attempted cross-signed downloads */
+		if ( link->flags & X509_LINK_FL_CROSSED )
+			continue;
+
+		/* Mark cross-signed certificate download as attempted */
+		link->flags |= X509_LINK_FL_CROSSED;
+
+		/* Start cross-signed certificate download */
+		if ( ( rc = validator_start_download ( validator,
+						       link ) ) == 0 ) {
+			/* Sleep until download is complete */
+			return;
+		}
 	}
 
-	/* Otherwise, try to download a suitable cross-signing
-	 * certificate.
-	 */
-	if ( ( rc = validator_start_download ( validator, last ) ) != 0 ) {
-		validator_finished ( validator, rc );
-		return;
-	}
+	/* Nothing more to try: fail the validation */
+	validator_finished ( validator, validator->rc );
 }
 
 /** Certificate validator process descriptor */

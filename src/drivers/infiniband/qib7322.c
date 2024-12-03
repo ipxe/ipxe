@@ -893,7 +893,7 @@ static int qib7322_init_recv ( struct qib7322 *qib7322 ) {
 		eager_array_size_user = QIB7322_EAGER_ARRAY_SIZE_18CTX_USER;
 		break;
 	default:
-		linker_assert ( 0, invalid_QIB7322_NUM_CONTEXTS );
+		build_assert ( 0 );
 		return -EINVAL;
 	}
 
@@ -1351,7 +1351,7 @@ static int qib7322_post_recv ( struct ib_device *ibdev,
 	case 16384: bufsize = QIB7322_EAGER_BUFFER_16K; break;
 	case 32768: bufsize = QIB7322_EAGER_BUFFER_32K; break;
 	case 65536: bufsize = QIB7322_EAGER_BUFFER_64K; break;
-	default:    linker_assert ( 0, invalid_rx_payload_size );
+	default:    build_assert ( 0 );
 		    bufsize = QIB7322_EAGER_BUFFER_NONE;
 	}
 

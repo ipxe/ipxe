@@ -38,7 +38,7 @@ static void null_san_unhook ( unsigned int drive __unused ) {
 }
 
 static int null_san_boot ( unsigned int drive __unused,
-			   const char *filename __unused ) {
+			   struct san_boot_config *config __unused ) {
 	return -EOPNOTSUPP;
 }
 

@@ -96,6 +96,12 @@ struct tls_header {
 #define TLS_RSA_WITH_AES_256_GCM_SHA384 0x009d
 #define TLS_DHE_RSA_WITH_AES_128_GCM_SHA256 0x009e
 #define TLS_DHE_RSA_WITH_AES_256_GCM_SHA384 0x009f
+#define TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA 0xc013
+#define TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA 0xc014
+#define TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 0xc027
+#define TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384 0xc028
+#define TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 0xc02f
+#define TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 0xc030
 
 /* TLS hash algorithm identifiers */
 #define TLS_MD5_ALGORITHM 1
@@ -118,6 +124,10 @@ struct tls_header {
 #define TLS_MAX_FRAGMENT_LENGTH_1024 2
 #define TLS_MAX_FRAGMENT_LENGTH_2048 3
 #define TLS_MAX_FRAGMENT_LENGTH_4096 4
+
+/* TLS named curve extension */
+#define TLS_NAMED_CURVE 10
+#define TLS_NAMED_CURVE_X25519 29
 
 /* TLS signature algorithms extension */
 #define TLS_SIGNATURE_ALGORITHMS 13
@@ -205,20 +215,45 @@ struct tls_cipher_suite {
 #define __tls_cipher_suite( pref )					\
 	__table_entry ( TLS_CIPHER_SUITES, pref )
 
+/** TLS named curved type */
+#define TLS_NAMED_CURVE_TYPE 3
+
+/** A TLS named curve */
+struct tls_named_curve {
+	/** Elliptic curve */
+	struct elliptic_curve *curve;
+	/** Numeric code (in network-endian order) */
+	uint16_t code;
+};
+
+/** TLS named curve table */
+#define TLS_NAMED_CURVES						\
+	__table ( struct tls_named_curve, "tls_named_curves" )
+
+/** Declare a TLS named curve */
+#define __tls_named_curve( pref )					\
+	__table_entry ( TLS_NAMED_CURVES, pref )
+
 /** A TLS cipher specification */
 struct tls_cipherspec {
 	/** Cipher suite */
 	struct tls_cipher_suite *suite;
 	/** Dynamically-allocated storage */
 	void *dynamic;
-	/** Public key encryption context */
-	void *pubkey_ctx;
 	/** Bulk encryption cipher context */
 	void *cipher_ctx;
 	/** MAC secret */
 	void *mac_secret;
 	/** Fixed initialisation vector */
 	void *fixed_iv;
+};
+
+/** A TLS cipher specification pair */
+struct tls_cipherspec_pair {
+	/** Current cipher specification */
+	struct tls_cipherspec active;
+	/** Next cipher specification */
+	struct tls_cipherspec pending;
 };
 
 /** A TLS signature and hash algorithm identifier */
@@ -311,6 +346,70 @@ struct tls_session {
 	struct list_head conn;
 };
 
+/** TLS transmit state */
+struct tls_tx {
+	/** Cipher specifications */
+	struct tls_cipherspec_pair cipherspec;
+	/** Sequence number */
+	uint64_t seq;
+	/** Pending transmissions */
+	unsigned int pending;
+	/** Transmit process */
+	struct process process;
+};
+
+/** TLS receive state */
+struct tls_rx {
+	/** Cipher specifications */
+	struct tls_cipherspec_pair cipherspec;
+	/** Sequence number */
+	uint64_t seq;
+	/** State machine current state */
+	enum tls_rx_state state;
+	/** Current received record header */
+	struct tls_header header;
+	/** Current received record header (static I/O buffer) */
+	struct io_buffer iobuf;
+	/** List of received data buffers */
+	struct list_head data;
+	/** Received handshake fragment */
+	struct io_buffer *handshake;
+};
+
+/** TLS client state */
+struct tls_client {
+	/** Random bytes */
+	struct tls_client_random random;
+	/** Private key (if used) */
+	struct private_key *key;
+	/** Certificate chain (if used) */
+	struct x509_chain *chain;
+	/** Security negotiation pending operation */
+	struct pending_operation negotiation;
+};
+
+/** TLS server state */
+struct tls_server {
+	/** Random bytes */
+	uint8_t random[32];
+	/** Server Key Exchange record (if any) */
+	void *exchange;
+	/** Server Key Exchange record length */
+	size_t exchange_len;
+	/** Root of trust */
+	struct x509_root *root;
+	/** Certificate chain */
+	struct x509_chain *chain;
+	/** Public key (within server certificate) */
+	struct asn1_cursor key;
+	/** Certificate validator */
+	struct interface validator;
+	/** Certificate validation pending operation */
+	struct pending_operation validation;
+	/** Security negotiation pending operation */
+	struct pending_operation negotiation;
+};
+
 /** A TLS connection */
 struct tls_connection {
 	/** Reference counter */
@@ -336,70 +435,25 @@ struct tls_connection {
 
 	/** Protocol version */
 	uint16_t version;
-	/** Current TX cipher specification */
-	struct tls_cipherspec tx_cipherspec;
-	/** Next TX cipher specification */
-	struct tls_cipherspec tx_cipherspec_pending;
-	/** Current RX cipher specification */
-	struct tls_cipherspec rx_cipherspec;
-	/** Next RX cipher specification */
-	struct tls_cipherspec rx_cipherspec_pending;
 	/** Master secret */
 	uint8_t master_secret[48];
-	/** Server random bytes */
-	uint8_t server_random[32];
-	/** Client random bytes */
-	struct tls_client_random client_random;
-	/** Server Key Exchange record (if any) */
-	void *server_key;
-	/** Server Key Exchange record length */
-	size_t server_key_len;
 	/** Digest algorithm used for handshake verification */
 	struct digest_algorithm *handshake_digest;
 	/** Digest algorithm context used for handshake verification */
 	uint8_t *handshake_ctx;
-	/** Private key */
-	struct private_key *key;
-	/** Client certificate chain (if used) */
-	struct x509_chain *certs;
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
 	/** Verification data */
 	struct tls_verify_data verify;
 
-	/** Root of trust */
-	struct x509_root *root;
-	/** Server certificate chain */
-	struct x509_chain *chain;
-	/** Certificate validator */
-	struct interface validator;
-
-	/** Client security negotiation pending operation */
-	struct pending_operation client_negotiation;
-	/** Server security negotiation pending operation */
-	struct pending_operation server_negotiation;
-	/** Certificate validation pending operation */
-	struct pending_operation validation;
-
-	/** TX sequence number */
-	uint64_t tx_seq;
-	/** TX pending transmissions */
-	unsigned int tx_pending;
-	/** TX process */
-	struct process process;
-
-	/** RX sequence number */
-	uint64_t rx_seq;
-	/** RX state */
-	enum tls_rx_state rx_state;
-	/** Current received record header */
-	struct tls_header rx_header;
-	/** Current received record header (static I/O buffer) */
-	struct io_buffer rx_header_iobuf;
-	/** List of received data buffers */
-	struct list_head rx_data;
-	/** Received handshake fragment */
-	struct io_buffer *rx_handshake;
+	/** Transmit state */
+	struct tls_tx tx;
+	/** Receive state */
+	struct tls_rx rx;
+	/** Client state */
+	struct tls_client client;
+	/** Server state */
+	struct tls_server server;
 };
 
 /** RX I/O buffer size
@@ -425,6 +479,7 @@ struct tls_connection {
 
 extern struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm;
 extern struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm;
+extern struct tls_key_exchange_algorithm tls_ecdhe_exchange_algorithm;
 
 extern int add_tls ( struct interface *xfer, const char *name,
 		     struct x509_root *root, struct private_key *key );

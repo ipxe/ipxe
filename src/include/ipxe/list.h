@@ -399,6 +399,17 @@ extern void extern_list_splice_tail_init ( struct list_head *list,
 	( (head)->prev == &(entry)->member )
 
 /**
+ * Test if entry is the list head
+ *
+ * @v entry		List entry
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ * @ret is_head		Entry is the list head
+ */
+#define list_is_head_entry( entry, head, member )		\
+	( (head) == &(entry)->member )
+
+/**
  * Iterate over a list
  *
  * @v pos		Iterator
@@ -477,6 +488,22 @@ extern void extern_list_splice_tail_init ( struct list_head *list,
 	      pos = list_entry ( pos->member.prev, typeof ( *pos ), member ); \
 	      &pos->member != (head);					      \
 	      pos = list_entry ( pos->member.prev, typeof ( *pos ), member ) )
+
+/**
+ * Iterate over subsequent entries in a list, safe against deletion
+ *
+ * @v pos		Iterator
+ * @v tmp		Temporary value (of same type as iterator)
+ * @v head		List head
+ * @v member		Name of list field within iterator's type
+ */
+#define list_for_each_entry_safe_continue( pos, tmp, head, member )	      \
+	for ( list_check ( (head) ),					      \
+	      pos = list_entry ( pos->member.next, typeof ( *pos ), member ), \
+	      tmp = list_entry ( pos->member.next, typeof ( *tmp ), member ); \
+	      &pos->member != (head);					      \
+	      pos = tmp,						      \
+	      tmp = list_entry ( tmp->member.next, typeof ( *tmp ), member ) )
 
 /**
  * Test if list contains a specified entry

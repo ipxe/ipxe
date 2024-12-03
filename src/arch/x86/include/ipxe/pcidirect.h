@@ -26,6 +26,16 @@ struct pci_device;
 extern void pcidirect_prepare ( struct pci_device *pci, int where );
 
 /**
+ * Check if PCI bus probing is allowed
+ *
+ * @ret ok		Bus probing is allowed
+ */
+static inline __always_inline int
+PCIAPI_INLINE ( direct, pci_can_probe ) ( void ) {
+	return 1;
+}
+
+/**
  * Find next PCI bus:dev.fn address range in system
  *
  * @v busdevfn		Starting PCI bus:dev.fn address

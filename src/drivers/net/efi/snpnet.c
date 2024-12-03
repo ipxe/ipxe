@@ -26,12 +26,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/timer.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_snp.h>
 #include "snpnet.h"
 
 /** @file
@@ -71,6 +73,19 @@ struct snp_nic {
 /** Delay between each initialisation retry */
 #define SNP_INITIALIZE_RETRY_DELAY_MS 10
 
+/** Additional padding for receive buffers
+ *
+ * Some SNP implementations seem to require additional space in the
+ * allocated receive buffers, otherwise full-length packets will be
+ * silently dropped.
+ *
+ * The EDK2 MnpDxe driver happens to allocate an additional 8 bytes of
+ * padding (4 for a VLAN tag, 4 for the Ethernet frame checksum).
+ * Match this behaviour since drivers are very likely to have been
+ * tested against MnpDxe.
+ */
+#define SNP_RX_PAD 8
+
 /**
  * Format SNP MAC address (for debugging)
  *
@@ -97,7 +112,7 @@ static const char * snpnet_mac_text ( EFI_MAC_ADDRESS *mac, size_t len ) {
  * @v netdev		Network device
  */
 static void snpnet_dump_mode ( struct net_device *netdev ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
 	size_t mac_len = mode->HwAddressSize;
 	unsigned int i;
@@ -136,7 +151,7 @@ static void snpnet_dump_mode ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void snpnet_check_link ( struct net_device *netdev ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
 
 	/* Do nothing unless media presence detection is supported */
@@ -160,7 +175,7 @@ static void snpnet_check_link ( struct net_device *netdev ) {
  */
 static int snpnet_transmit ( struct net_device *netdev,
 			     struct io_buffer *iobuf ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -173,6 +188,12 @@ static int snpnet_transmit ( struct net_device *netdev,
 		netdev_tx_defer ( netdev, iobuf );
 		return 0;
 	}
+
+	/* Pad to minimum Ethernet length, to work around underlying
+	 * drivers that do not correctly handle frame padding
+	 * themselves.
+	 */
+	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Transmit packet */
 	if ( ( efirc = snp->snp->Transmit ( snp->snp, 0, iob_len ( iobuf ),
@@ -246,7 +267,7 @@ static void snpnet_poll_rx ( struct net_device *netdev ) {
 
 		/* Allocate buffer, if required */
 		if ( ! snp->rxbuf ) {
-			snp->rxbuf = alloc_iob ( snp->mtu );
+			snp->rxbuf = alloc_iob ( snp->mtu + SNP_RX_PAD );
 			if ( ! snp->rxbuf ) {
 				/* Leave for next poll */
 				break;
@@ -463,6 +484,53 @@ static struct net_device_operations snpnet_operations = {
 	.transmit = snpnet_transmit,
 	.poll = snpnet_poll,
 };
+
+/**
+ * Check to see if driver supports a device
+ *
+ * @v device		EFI device handle
+ * @v protocol		Protocol GUID
+ * @ret rc		Return status code
+ */
+int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE parent;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Check that this is not a device we are providing ourselves */
+	if ( find_snpdev ( device ) != NULL ) {
+		DBGCP ( device, "HANDLE %s is provided by this binary\n",
+			efi_handle_name ( device ) );
+		return -ENOTTY;
+	}
+
+	/* Test for presence of protocol */
+	if ( ( efirc = bs->OpenProtocol ( device, protocol,
+					  NULL, efi_image_handle, device,
+					  EFI_OPEN_PROTOCOL_TEST_PROTOCOL))!=0){
+		DBGCP ( device, "HANDLE %s is not a %s device\n",
+			efi_handle_name ( device ),
+			efi_guid_ntoa ( protocol ) );
+		return -EEFI ( efirc );
+	}
+
+	/* Check that there are no instances of this protocol further
+	 * up this device path.
+	 */
+	if ( ( rc = efi_locate_device ( device, protocol,
+					&parent, 1 ) ) == 0 ) {
+		DBGC2 ( device, "HANDLE %s has %s-supporting parent ",
+			efi_handle_name ( device ),
+			efi_guid_ntoa ( protocol ) );
+		DBGC2 ( device, "%s\n", efi_handle_name ( parent ) );
+		return -ENOTTY;
+	}
+
+	DBGC ( device, "HANDLE %s is a %s device\n",
+	       efi_handle_name ( device ), efi_guid_ntoa ( protocol ) );
+	return 0;
+}
 
 /**
  * Attach driver to device

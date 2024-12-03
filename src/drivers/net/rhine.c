@@ -775,10 +775,10 @@ static void rhine_remove ( struct pci_device *pci ) {
 
 /** Rhine PCI device IDs */
 static struct pci_device_id rhine_nics[] = {
-	PCI_ROM ( 0x1106, 0x3065, "dlink-530tx", "VIA VT6102", 0 ),
-	PCI_ROM ( 0x1106, 0x3106, "vt6105", "VIA VT6105", 0 ),
 	PCI_ROM ( 0x1106, 0x3043, "dlink-530tx-old", "VIA VT3043", 0 ),
 	PCI_ROM ( 0x1106, 0x3053, "vt6105m", "VIA VT6105M", 0 ),
+	PCI_ROM ( 0x1106, 0x3065, "dlink-530tx", "VIA VT6102", 0 ),
+	PCI_ROM ( 0x1106, 0x3106, "vt6105", "VIA VT6105", 0 ),
 	PCI_ROM ( 0x1106, 0x6100, "via-rhine-old", "VIA 86C100A", 0 )
 };
 

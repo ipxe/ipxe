@@ -78,6 +78,12 @@ efi_boot_name() {
 	"64aa" )
 	    echo "BOOTAA64.EFI"
 	    ;;
+	"6450" )
+	    echo "BOOTRISCV64.EFI"
+	    ;;
+	"3250" )
+	    echo "BOOTRISCV32.EFI"
+	    ;;
 	* )
 	    echo "${FILENAME}: unrecognised EFI architecture ${ARCH}" >&2
 	    exit 1
@@ -268,6 +274,10 @@ if [ -n "${FATIMG}" ] ; then
 	FATCYLS=$(( ( FATSIZE + 503 ) / 504 ))
 	FATSIZE=$(( FATCYLS * 504 ))
 	FATARGS="-s 63 -h 16 -t ${FATCYLS}"
+    fi
+    if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
+	FATSERIAL=$(( SOURCE_DATE_EPOCH % 100000000 ))
+	FATARGS="${FATARGS} -N ${FATSERIAL}"
     fi
     truncate -s "${FATSIZE}K" "${FATIMG}"
     mformat -v iPXE -i "${FATIMG}" ${FATARGS} ::

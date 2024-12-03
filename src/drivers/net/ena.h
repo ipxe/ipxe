@@ -191,14 +191,17 @@ struct ena_host_info {
 	uint32_t features;
 } __attribute__ (( packed ));
 
-/** Linux operating system type
+/** Operating system type
  *
- * There is a defined "iPXE" operating system type (with value 5).
- * However, some very broken versions of the ENA firmware will refuse
- * to allow a completion queue to be created if the "iPXE" type is
- * used.
+ * Some very broken older versions of the ENA firmware will refuse to
+ * allow a completion queue to be created if "iPXE" (type 5) is used,
+ * and require us to pretend that we are "Linux" (type 1) instead.
+ *
+ * The ENA team at AWS assures us that the entire AWS fleet has been
+ * upgraded to fix this bug, and that we are now safe to use the
+ * correct operating system type value.
  */
-#define ENA_HOST_INFO_TYPE_LINUX 1
+#define ENA_HOST_INFO_TYPE_IPXE 5
 
 /** Driver version
  *

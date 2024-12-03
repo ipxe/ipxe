@@ -445,6 +445,8 @@ len6_setting __setting ( SETTING_IP6, len6 );
 extern const struct setting
 gateway6_setting __setting ( SETTING_IP6, gateway6 );
 extern const struct setting
+dns6_setting __setting ( SETTING_IP6_EXTRA, dns6 );
+extern const struct setting
 hostname_setting __setting ( SETTING_HOST, hostname );
 extern const struct setting
 domain_setting __setting ( SETTING_IP_EXTRA, domain );
@@ -468,6 +470,8 @@ extern const struct setting
 mac_setting __setting ( SETTING_NETDEV, mac );
 extern const struct setting
 busid_setting __setting ( SETTING_NETDEV, busid );
+extern const struct setting
+linktype_setting __setting ( SETTING_NETDEV, linktype );
 extern const struct setting
 user_class_setting __setting ( SETTING_HOST_EXTRA, user-class );
 extern const struct setting

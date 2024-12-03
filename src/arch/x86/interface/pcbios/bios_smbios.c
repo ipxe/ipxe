@@ -44,11 +44,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v smbios		SMBIOS entry point descriptor structure to fill in
  * @ret rc		Return status code
  */
-static int bios_find_smbios ( struct smbios *smbios ) {
+static int bios_find_smbios2 ( struct smbios *smbios ) {
 	struct smbios_entry entry;
 	int rc;
 
-	/* Scan through BIOS segment to find SMBIOS entry point */
+	/* Scan through BIOS segment to find SMBIOS 32-bit entry point */
 	if ( ( rc = find_smbios_entry ( real_to_user ( BIOS_SEG, 0 ), 0x10000,
 					&entry ) ) != 0 )
 		return rc;
@@ -60,6 +60,57 @@ static int bios_find_smbios ( struct smbios *smbios ) {
 	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
 
 	return 0;
+}
+
+/**
+ * Find SMBIOS
+ *
+ * @v smbios		SMBIOS entry point descriptor structure to fill in
+ * @ret rc		Return status code
+ */
+static int bios_find_smbios3 ( struct smbios *smbios ) {
+	struct smbios3_entry entry;
+	int rc;
+
+	/* Scan through BIOS segment to find SMBIOS 64-bit entry point */
+	if ( ( rc = find_smbios3_entry ( real_to_user ( BIOS_SEG, 0 ), 0x10000,
+					 &entry ) ) != 0 )
+		return rc;
+
+	/* Check that address is accessible */
+	if ( entry.smbios_address > ~( ( physaddr_t ) 0 ) ) {
+		DBG ( "SMBIOS3 at %08llx is inaccessible\n",
+		      ( ( unsigned long long ) entry.smbios_address ) );
+		return -ENOTSUP;
+	}
+
+	/* Fill in entry point descriptor structure */
+	smbios->address = phys_to_user ( entry.smbios_address );
+	smbios->len = entry.smbios_len;
+	smbios->count = 0;
+	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
+
+	return 0;
+}
+
+/**
+ * Find SMBIOS
+ *
+ * @v smbios		SMBIOS entry point descriptor structure to fill in
+ * @ret rc		Return status code
+ */
+static int bios_find_smbios ( struct smbios *smbios ) {
+	int rc;
+
+	/* Use 32-bit table if present */
+	if ( ( rc = bios_find_smbios2 ( smbios ) ) == 0 )
+		return 0;
+
+	/* Otherwise, use 64-bit table if present and accessible */
+	if ( ( rc = bios_find_smbios3 ( smbios ) ) == 0 )
+		return 0;
+
+	return rc;
 }
 
 PROVIDE_SMBIOS ( pcbios, find_smbios, bios_find_smbios );

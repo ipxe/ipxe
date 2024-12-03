@@ -90,7 +90,7 @@ static inline uint32_t vmxnet3_command ( struct vmxnet3_nic *vmxnet,
  */
 static int vmxnet3_transmit ( struct net_device *netdev,
 			      struct io_buffer *iobuf ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	struct vmxnet3_tx_desc *tx_desc;
 	unsigned int fill;
 	unsigned int desc_idx;
@@ -139,7 +139,7 @@ static int vmxnet3_transmit ( struct net_device *netdev,
  * @v netdev		Network device
  */
 static void vmxnet3_poll_tx ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	struct vmxnet3_tx_comp *tx_comp;
 	struct io_buffer *iobuf;
 	unsigned int comp_idx;
@@ -188,7 +188,7 @@ static void vmxnet3_poll_tx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void vmxnet3_flush_tx ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	unsigned int i;
 
 	for ( i = 0 ; i < VMXNET3_NUM_TX_DESC ; i++ ) {
@@ -206,7 +206,7 @@ static void vmxnet3_flush_tx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void vmxnet3_refill_rx ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	struct vmxnet3_rx_desc *rx_desc;
 	struct io_buffer *iobuf;
 	unsigned int orig_rx_prod = vmxnet->count.rx_prod;
@@ -261,7 +261,7 @@ static void vmxnet3_refill_rx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void vmxnet3_poll_rx ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	struct vmxnet3_rx_comp *rx_comp;
 	struct io_buffer *iobuf;
 	unsigned int comp_idx;
@@ -315,7 +315,7 @@ static void vmxnet3_poll_rx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void vmxnet3_flush_rx ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	struct io_buffer *iobuf;
 	unsigned int i;
 
@@ -333,7 +333,7 @@ static void vmxnet3_flush_rx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void vmxnet3_check_link ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	uint32_t state;
 	int link_up;
 	unsigned int link_speed;
@@ -360,7 +360,7 @@ static void vmxnet3_check_link ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void vmxnet3_poll_events ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	uint32_t events;
 
 	/* Do nothing unless there are events to process */
@@ -424,7 +424,7 @@ static void vmxnet3_poll ( struct net_device *netdev ) {
  * @v enable		Interrupts should be enabled
  */
 static void vmxnet3_irq ( struct net_device *netdev, int enable ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 
 	DBGC ( vmxnet, "VMXNET3 %p %s IRQ not implemented\n",
 	       vmxnet, ( enable ? "enable" : "disable" ) );
@@ -456,7 +456,7 @@ static void vmxnet3_set_ll_addr ( struct vmxnet3_nic *vmxnet,
  * @ret rc		Return status code
  */
 static int vmxnet3_open ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 	struct vmxnet3_shared *shared;
 	struct vmxnet3_queues *queues;
 	uint64_t shared_bus;
@@ -554,7 +554,7 @@ static int vmxnet3_open ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void vmxnet3_close ( struct net_device *netdev ) {
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 
 	vmxnet3_command ( vmxnet, VMXNET3_CMD_QUIESCE_DEV );
 	vmxnet3_command ( vmxnet, VMXNET3_CMD_RESET_DEV );
@@ -633,7 +633,7 @@ static int vmxnet3_probe ( struct pci_device *pci ) {
 		goto err_alloc_etherdev;
 	}
 	netdev_init ( netdev, &vmxnet3_operations );
-	vmxnet = netdev_priv ( netdev );
+	vmxnet = netdev->priv;
 	pci_set_drvdata ( pci, netdev );
 	netdev->dev = &pci->dev;
 	memset ( vmxnet, 0, sizeof ( *vmxnet ) );
@@ -699,7 +699,7 @@ static int vmxnet3_probe ( struct pci_device *pci ) {
  */
 static void vmxnet3_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct vmxnet3_nic *vmxnet = netdev_priv ( netdev );
+	struct vmxnet3_nic *vmxnet = netdev->priv;
 
 	unregister_netdev ( netdev );
 	iounmap ( vmxnet->vd );

@@ -112,9 +112,6 @@ struct image_tag efi_shim __image_tag = {
 /** Original GetMemoryMap() function */
 static EFI_GET_MEMORY_MAP efi_shim_orig_get_memory_map;
 
-/** Original ExitBootServices() function */
-static EFI_EXIT_BOOT_SERVICES efi_shim_orig_exit_boot_services;
-
 /** Original SetVariable() function */
 static EFI_SET_VARIABLE efi_shim_orig_set_variable;
 
@@ -158,49 +155,6 @@ static void efi_shim_unlock ( void ) {
 		u.lock->Verify ( empty, sizeof ( empty ) );
 		DBGC ( &efi_shim, "SHIM unlocked via %p\n", u.lock );
 	}
-}
-
-/**
- * Wrap GetMemoryMap()
- *
- * @v len		Memory map size
- * @v map		Memory map
- * @v key		Memory map key
- * @v desclen		Descriptor size
- * @v descver		Descriptor version
- * @ret efirc		EFI status code
- */
-static EFIAPI EFI_STATUS efi_shim_get_memory_map ( UINTN *len,
-						   EFI_MEMORY_DESCRIPTOR *map,
-						   UINTN *key, UINTN *desclen,
-						   UINT32 *descver ) {
-
-	/* Unlock shim */
-	if ( ! efi_shim_require_loader )
-		efi_shim_unlock();
-
-	/* Hand off to original GetMemoryMap() */
-	return efi_shim_orig_get_memory_map ( len, map, key, desclen,
-					      descver );
-}
-
-/**
- * Wrap ExitBootServices()
- *
- * @v handle		Image handle
- * @v key		Memory map key
- * @ret efirc		EFI status code
- */
-static EFIAPI EFI_STATUS efi_shim_exit_boot_services ( EFI_HANDLE handle,
-						       UINTN key ) {
-	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
-
-	/* Restore original runtime services functions */
-	rs->SetVariable = efi_shim_orig_set_variable;
-	rs->GetVariable = efi_shim_orig_get_variable;
-
-	/* Hand off to original ExitBootServices() */
-	return efi_shim_orig_exit_boot_services ( handle, key );
 }
 
 /**
@@ -268,6 +222,47 @@ efi_shim_get_variable ( CHAR16 *name, EFI_GUID *guid, UINT32 *attrs,
 	}
 
 	return efirc;
+}
+
+/**
+ * Wrap GetMemoryMap()
+ *
+ * @v len		Memory map size
+ * @v map		Memory map
+ * @v key		Memory map key
+ * @v desclen		Descriptor size
+ * @v descver		Descriptor version
+ * @ret efirc		EFI status code
+ */
+static EFIAPI EFI_STATUS efi_shim_get_memory_map ( UINTN *len,
+						   EFI_MEMORY_DESCRIPTOR *map,
+						   UINTN *key, UINTN *desclen,
+						   UINT32 *descver ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+
+	/* Unlock shim */
+	if ( ! efi_shim_require_loader )
+		efi_shim_unlock();
+
+	/* Uninstall runtime services wrappers, if still installed */
+	if ( rs->SetVariable == efi_shim_set_variable ) {
+		rs->SetVariable = efi_shim_orig_set_variable;
+		DBGC ( &efi_shim, "SHIM uninstalled SetVariable() wrapper\n" );
+	} else if ( rs->SetVariable != efi_shim_orig_set_variable ) {
+		DBGC ( &efi_shim, "SHIM could not uninstall SetVariable() "
+		       "wrapper!\n" );
+	}
+	if ( rs->GetVariable == efi_shim_get_variable ) {
+		rs->GetVariable = efi_shim_orig_get_variable;
+		DBGC ( &efi_shim, "SHIM uninstalled GetVariable() wrapper\n" );
+	} else if ( rs->GetVariable != efi_shim_orig_get_variable ) {
+		DBGC ( &efi_shim, "SHIM could not uninstall GetVariable() "
+		       "wrapper!\n" );
+	}
+
+	/* Hand off to original GetMemoryMap() */
+	return efi_shim_orig_get_memory_map ( len, map, key, desclen,
+					      descver );
 }
 
 /**
@@ -373,15 +368,14 @@ int efi_shim_install ( struct image *shim, EFI_HANDLE handle,
 
 	/* Record original boot and runtime services functions */
 	efi_shim_orig_get_memory_map = bs->GetMemoryMap;
-	efi_shim_orig_exit_boot_services = bs->ExitBootServices;
 	efi_shim_orig_set_variable = rs->SetVariable;
 	efi_shim_orig_get_variable = rs->GetVariable;
 
 	/* Wrap relevant boot and runtime services functions */
 	bs->GetMemoryMap = efi_shim_get_memory_map;
-	bs->ExitBootServices = efi_shim_exit_boot_services;
 	rs->SetVariable = efi_shim_set_variable;
 	rs->GetVariable = efi_shim_get_variable;
+	DBGC ( &efi_shim, "SHIM installed wrappers\n" );
 
 	return 0;
 }
@@ -396,7 +390,7 @@ void efi_shim_uninstall ( void ) {
 
 	/* Restore original boot and runtime services functions */
 	bs->GetMemoryMap = efi_shim_orig_get_memory_map;
-	bs->ExitBootServices = efi_shim_orig_exit_boot_services;
 	rs->SetVariable = efi_shim_orig_set_variable;
 	rs->GetVariable = efi_shim_orig_get_variable;
+	DBGC ( &efi_shim, "SHIM uninstalled wrappers\n" );
 }

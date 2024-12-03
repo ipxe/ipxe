@@ -1,0 +1,6 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Include generic SBI Makefile
+#
+MAKEDEPS	+= arch/riscv/Makefile.sbi
+include arch/riscv/Makefile.sbi

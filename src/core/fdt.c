@@ -368,6 +368,44 @@ const char * fdt_string ( unsigned int offset, const char *name ) {
 }
 
 /**
+ * Find integer property
+ *
+ * @v offset		Starting node offset
+ * @v name		Property name
+ * @v value		Integer value to fill in
+ * @ret rc		Return status code
+ */
+int fdt_u64 ( unsigned int offset, const char *name, uint64_t *value ) {
+	struct fdt_descriptor desc;
+	const uint8_t *data;
+	size_t remaining;
+	int rc;
+
+	/* Clear value */
+	*value = 0;
+
+	/* Find property */
+	if ( ( rc = fdt_property ( offset, name, &desc ) ) != 0 )
+		return rc;
+
+	/* Check range */
+	if ( desc.len > sizeof ( *value ) ) {
+		DBGC ( &fdt, "FDT oversized integer property \"%s\"\n", name );
+		return -ERANGE;
+	}
+
+	/* Parse value */
+	data = desc.data;
+	remaining = desc.len;
+	while ( remaining-- ) {
+		*value <<= 8;
+		*value |= *(data++);
+	}
+
+	return 0;
+}
+
+/**
  * Get MAC address from property
  *
  * @v offset		Starting node offset

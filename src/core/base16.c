@@ -78,12 +78,23 @@ int hex_decode ( char separator, const char *encoded, void *data, size_t len ) {
 	unsigned int count = 0;
 	unsigned int sixteens;
 	unsigned int units;
+	int optional;
 
+	/* Strip out optionality flag from separator character */
+	optional = ( separator & HEX_DECODE_OPTIONAL );
+	separator &= ~HEX_DECODE_OPTIONAL;
+
+	/* Decode string */
 	while ( *encoded ) {
 
 		/* Check separator, if applicable */
-		if ( count && separator && ( ( *(encoded++) != separator ) ) )
-			return -EINVAL;
+		if ( count && separator ) {
+			if ( *encoded == separator ) {
+				encoded++;
+			} else if ( ! optional ) {
+				return -EINVAL;
+			}
+		}
 
 		/* Extract digits.  Note that either digit may be NUL,
 		 * which would be interpreted as an invalid value by

@@ -237,8 +237,7 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 	int rc;
 
 	/* Sanity check */
-	linker_assert ( ( min_entropy_bits <= ( 8 * max_len ) ),
-			entropy_buffer_too_small );
+	build_assert ( min_entropy_bits <= ( 8 * max_len ) );
 
 	/* Round up minimum entropy to an integral number of bytes */
 	min_entropy_bits = ( ( min_entropy_bits + 7 ) & ~7 );
@@ -247,11 +246,11 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 	 * meet or exceed the security strength indicated by the
 	 * min_entropy parameter.
 	 */
-	linker_assert ( ( ( 8 * ENTROPY_HASH_DF_OUTLEN_BYTES ) >=
-			  min_entropy_bits ), hash_df_algorithm_too_weak );
+	build_assert ( ( 8 * ENTROPY_HASH_DF_OUTLEN_BYTES ) >=
+		       min_entropy_bits );
 
 	/* 1.  If ( min_length > max_length ), then return ( FAILURE, Null ) */
-	linker_assert ( ( min_len <= max_len ), min_len_greater_than_max_len );
+	build_assert ( min_len <= max_len );
 
 	/* 2.  n = 2 * min_entropy */
 	n = ( 2 * min_entropy_bits );
@@ -269,9 +268,8 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 	 * (The implementation of these steps is inside the function
 	 * get_entropy_input_tmp().)
 	 */
-	linker_assert ( __builtin_constant_p ( tmp_len ),
-			tmp_len_not_constant );
-	linker_assert ( ( n == ( 8 * tmp_len ) ), tmp_len_mismatch );
+	build_assert ( __builtin_constant_p ( tmp_len ) );
+	build_assert ( n == ( 8 * tmp_len ) );
 	if ( ( rc = get_entropy_input_tmp ( MIN_ENTROPY ( min_entropy_bits ),
 					    tmp, tmp_len ) ) != 0 ) {
 		return rc;
@@ -283,17 +281,17 @@ get_entropy_input ( unsigned int min_entropy_bits, void *data, size_t min_len,
 	 */
 	if ( tmp_len < min_len ) {
 		/* (Data is already in-place.) */
-		linker_assert ( ( data == tmp ), data_not_inplace );
+		build_assert ( data == tmp );
 		memset ( ( data + tmp_len ), 0, ( min_len - tmp_len ) );
 		return min_len;
 	} else if ( tmp_len > max_len ) {
-		linker_assert ( ( tmp == tmp_buf ), data_inplace );
+		build_assert ( tmp == tmp_buf );
 		hash_df ( &entropy_hash_df_algorithm, tmp, tmp_len,
 			  data, max_len );
 		return max_len;
 	} else {
 		/* (Data is already in-place.) */
-		linker_assert ( ( data == tmp ), data_not_inplace );
+		build_assert ( data == tmp );
 		return tmp_len;
 	}
 }
@@ -328,15 +326,14 @@ entropy_repetition_count_cutoff ( min_entropy_t min_entropy_per_sample ) {
 	cutoff = max_repetitions;
 	if ( cutoff < max_repetitions )
 		cutoff++;
-	linker_assert ( ( cutoff >= max_repetitions ), rounding_error );
+	build_assert ( cutoff >= max_repetitions );
 
 	/* Floating-point operations are not allowed in iPXE since we
 	 * never set up a suitable environment.  Abort the build
 	 * unless the calculated number of repetitions is a
 	 * compile-time constant.
 	 */
-	linker_assert ( __builtin_constant_p ( cutoff ),
-			repetition_count_cutoff_not_constant );
+	build_assert ( __builtin_constant_p ( cutoff ) );
 
 	return cutoff;
 }
@@ -443,12 +440,10 @@ entropy_adaptive_proportion_cutoff ( min_entropy_t min_entropy_per_sample ) {
 	cutoff = entropy_adaptive_proportion_cutoff_lookup ( n, h );
 
 	/* Fail unless cutoff value is a compile-time constant */
-	linker_assert ( __builtin_constant_p ( cutoff ),
-			adaptive_proportion_cutoff_not_constant );
+	build_assert ( __builtin_constant_p ( cutoff ) );
 
 	/* Fail if cutoff value is N/A */
-	linker_assert ( ( cutoff != APC_NA ),
-			adaptive_proportion_cutoff_not_applicable );
+	build_assert ( cutoff != APC_NA );
 
 	return cutoff;
 }
@@ -475,8 +470,7 @@ entropy_startup_test_count ( unsigned int repetition_count_cutoff,
 	num_samples = repetition_count_cutoff;
 	if ( num_samples < adaptive_proportion_cutoff )
 		num_samples = adaptive_proportion_cutoff;
-	linker_assert ( __builtin_constant_p ( num_samples ),
-			startup_test_count_not_constant );
+	build_assert ( __builtin_constant_p ( num_samples ) );
 
 	return num_samples;
 }
@@ -499,11 +493,9 @@ entropy_init ( struct entropy_source *source,
 	unsigned int startup_test_count;
 
 	/* Sanity check */
-	linker_assert ( min_entropy_per_sample > MIN_ENTROPY ( 0 ),
-			min_entropy_per_sample_is_zero );
-	linker_assert ( ( min_entropy_per_sample <=
-			  MIN_ENTROPY ( 8 * sizeof ( noise_sample_t ) ) ),
-			min_entropy_per_sample_is_impossibly_high );
+	build_assert ( min_entropy_per_sample > MIN_ENTROPY ( 0 ) );
+	build_assert ( min_entropy_per_sample <=
+		       MIN_ENTROPY ( 8 * sizeof ( noise_sample_t ) ) );
 
 	/* Calculate test cutoff values */
 	repetition_count_cutoff =

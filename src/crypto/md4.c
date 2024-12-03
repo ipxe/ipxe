@@ -155,11 +155,11 @@ static void md4_digest ( struct md4_context *context ) {
 
 	/* Sanity checks */
 	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-	linker_assert ( &u.ddd.dd.digest.h[0] == a, md4_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[1] == b, md4_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[2] == c, md4_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[3] == d, md4_bad_layout );
-	linker_assert ( &u.ddd.dd.data.dword[0] == w, md4_bad_layout );
+	build_assert ( &u.ddd.dd.digest.h[0] == a );
+	build_assert ( &u.ddd.dd.digest.h[1] == b );
+	build_assert ( &u.ddd.dd.digest.h[2] == c );
+	build_assert ( &u.ddd.dd.digest.h[3] == d );
+	build_assert ( &u.ddd.dd.data.dword[0] == w );
 
 	DBGC ( context, "MD4 digesting:\n" );
 	DBGC_HDA ( context, 0, &context->ddd.dd.digest,

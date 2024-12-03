@@ -49,3 +49,6 @@ REQUIRE_OBJECT ( linux_timer );
 #ifdef TIMER_ACPI
 REQUIRE_OBJECT ( acpi_timer );
 #endif
+#ifdef TIMER_ZICNTR
+REQUIRE_OBJECT ( zicntr );
+#endif

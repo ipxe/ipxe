@@ -65,6 +65,11 @@ const struct setting busid_setting __setting ( SETTING_NETDEV, busid ) = {
 	.description = "Bus ID",
 	.type = &setting_type_hex,
 };
+const struct setting linktype_setting __setting ( SETTING_NETDEV, linktype ) = {
+	.name = "linktype",
+	.description = "Link-layer type",
+	.type = &setting_type_string,
+};
 const struct setting chip_setting __setting ( SETTING_NETDEV, chip ) = {
 	.name = "chip",
 	.description = "Chip",
@@ -220,6 +225,22 @@ static int netdev_fetch_busid ( struct net_device *netdev, void *data,
 }
 
 /**
+ * Fetch link layer type setting
+ *
+ * @v netdev		Network device
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int netdev_fetch_linktype ( struct net_device *netdev, void *data,
+				   size_t len ) {
+	const char *linktype = netdev->ll_protocol->name;
+
+	strncpy ( data, linktype, len );
+	return strlen ( linktype );
+}
+
+/**
  * Fetch chip setting
  *
  * @v netdev		Network device
@@ -281,6 +302,7 @@ static struct netdev_setting_operation netdev_setting_operations[] = {
 	{ &bustype_setting, NULL, netdev_fetch_bustype },
 	{ &busloc_setting, NULL, netdev_fetch_busloc },
 	{ &busid_setting, NULL, netdev_fetch_busid },
+	{ &linktype_setting, NULL, netdev_fetch_linktype },
 	{ &chip_setting, NULL, netdev_fetch_chip },
 	{ &ifname_setting, NULL, netdev_fetch_ifname },
 };

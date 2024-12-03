@@ -22,9 +22,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <errno.h>
 #include <byteswap.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/vlan.h>
+#include <ipxe/uuid.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/uri.h>
 #include <ipxe/iscsi.h>
@@ -32,6 +34,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/fcp.h>
 #include <ipxe/ib_srp.h>
 #include <ipxe/usb.h>
+#include <ipxe/settings.h>
+#include <ipxe/dhcp.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_path.h>
@@ -41,6 +45,40 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * EFI device paths
  *
  */
+
+/** An EFI device path settings block */
+struct efi_path_settings {
+	/** Settings interface */
+	struct settings settings;
+	/** Device path */
+	EFI_DEVICE_PATH_PROTOCOL *path;
+};
+
+/** An EFI device path setting */
+struct efi_path_setting {
+	/** Setting */
+	const struct setting *setting;
+	/**
+	 * Fetch setting
+	 *
+	 * @v pathset		Path setting
+	 * @v path		Device path
+	 * @v data		Buffer to fill with setting data
+	 * @v len		Length of buffer
+	 * @ret len		Length of setting data, or negative error
+	 */
+	int ( * fetch ) ( struct efi_path_setting *pathset,
+			  EFI_DEVICE_PATH_PROTOCOL *path,
+			  void *data, size_t len );
+	/** Path type */
+	uint8_t type;
+	/** Path subtype */
+	uint8_t subtype;
+	/** Offset within device path */
+	uint8_t offset;
+	/** Length (if fixed) */
+	uint8_t len;
+};
 
 /**
  * Find next element in device path
@@ -110,6 +148,30 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 }
 
 /**
+ * Get MAC address from device path
+ *
+ * @v path		Device path
+ * @ret mac		MAC address, or NULL if not found
+ */
+void * efi_path_mac ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	MAC_ADDR_DEVICE_PATH *mac;
+
+	/* Search for MAC address path */
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+		if ( ( path->Type == MESSAGING_DEVICE_PATH ) &&
+		     ( path->SubType == MSG_MAC_ADDR_DP ) ) {
+			mac = container_of ( path, MAC_ADDR_DEVICE_PATH,
+					     Header );
+			return &mac->MacAddress;
+		}
+	}
+
+	/* No MAC address found */
+	return NULL;
+}
+
+/**
  * Get VLAN tag from device path
  *
  * @v path		Device path
@@ -130,6 +192,87 @@ unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 
 	/* No VLAN device path found */
 	return 0;
+}
+
+/**
+ * Get partition GUID from device path
+ *
+ * @v path		Device path
+ * @v guid		Partition GUID to fill in
+ * @ret rc		Return status code
+ */
+int efi_path_guid ( EFI_DEVICE_PATH_PROTOCOL *path, union uuid *guid ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	HARDDRIVE_DEVICE_PATH *hd;
+	int rc;
+
+	/* Search for most specific partition device path */
+	rc = -ENOENT;
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+
+		/* Skip non-harddrive device paths */
+		if ( path->Type != MEDIA_DEVICE_PATH )
+			continue;
+		if ( path->SubType != MEDIA_HARDDRIVE_DP )
+			continue;
+
+		/* Skip non-GUID signatures */
+		hd = container_of ( path, HARDDRIVE_DEVICE_PATH, Header );
+		if ( hd->SignatureType != SIGNATURE_TYPE_GUID )
+			continue;
+
+		/* Extract GUID */
+		memcpy ( guid, hd->Signature, sizeof ( *guid ) );
+		uuid_mangle ( guid );
+
+		/* Record success, but continue searching in case
+		 * there exists a more specific GUID (e.g. a partition
+		 * GUID rather than a disk GUID).
+		 */
+		rc = 0;
+	}
+
+	return rc;
+}
+
+/**
+ * Parse URI from device path
+ *
+ * @v path		Device path
+ * @ret uri		URI, or NULL if not a URI
+ */
+struct uri * efi_path_uri ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	URI_DEVICE_PATH *uripath;
+	char *uristring;
+	struct uri *uri;
+	size_t len;
+
+	/* Search for URI device path */
+	for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+		if ( ( path->Type == MESSAGING_DEVICE_PATH ) &&
+		     ( path->SubType == MSG_URI_DP ) ) {
+
+			/* Calculate path length */
+			uripath = container_of ( path, URI_DEVICE_PATH,
+						 Header );
+			len = ( ( ( path->Length[1] << 8 ) | path->Length[0] )
+				- offsetof ( typeof ( *uripath ), Uri ) );
+
+			/* Parse URI */
+			uristring = zalloc ( len + 1 /* NUL */ );
+			if ( ! uristring )
+				return NULL;
+			memcpy ( uristring, uripath->Uri, len );
+			uri = parse_uri ( uristring );
+			free ( uristring );
+
+			return uri;
+		}
+	}
+
+	/* No URI path found */
+	return NULL;
 }
 
 /**
@@ -550,3 +693,208 @@ EFI_DEVICE_PATH_PROTOCOL * efi_describe ( struct interface *intf ) {
 	intf_put ( dest );
 	return path;
 }
+
+/**
+ * Fetch an EFI device path fixed-size setting
+ *
+ * @v pathset		Path setting
+ * @v path		Device path
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int efi_path_fetch_fixed ( struct efi_path_setting *pathset,
+				  EFI_DEVICE_PATH_PROTOCOL *path,
+				  void *data, size_t len ) {
+
+	/* Copy data */
+	if ( len > pathset->len )
+		len = pathset->len;
+	memcpy ( data, ( ( ( void * ) path ) + pathset->offset ), len );
+
+	return pathset->len;
+}
+
+/**
+ * Fetch an EFI device path DNS setting
+ *
+ * @v pathset		Path setting
+ * @v path		Device path
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int efi_path_fetch_dns ( struct efi_path_setting *pathset,
+				EFI_DEVICE_PATH_PROTOCOL *path,
+				void *data, size_t len ) {
+	DNS_DEVICE_PATH *dns = container_of ( path, DNS_DEVICE_PATH, Header );
+	unsigned int count;
+	unsigned int i;
+	size_t frag_len;
+
+	/* Check applicability */
+	if ( ( !! dns->IsIPv6 ) !=
+	     ( pathset->setting->type == &setting_type_ipv6 ) )
+		return -ENOENT;
+
+	/* Calculate number of addresses */
+	count = ( ( ( ( path->Length[1] << 8 ) | path->Length[0] ) -
+		    pathset->offset ) / sizeof ( dns->DnsServerIp[0] ) );
+
+	/* Copy data */
+	for ( i = 0 ; i < count ; i++ ) {
+		frag_len = len;
+		if ( frag_len > pathset->len )
+			frag_len = pathset->len;
+		memcpy ( data, &dns->DnsServerIp[i], frag_len );
+		data += frag_len;
+		len -= frag_len;
+	}
+
+	return ( count * pathset->len );
+}
+
+/** EFI device path settings */
+static struct efi_path_setting efi_path_settings[] = {
+	{ &ip_setting, efi_path_fetch_fixed, MESSAGING_DEVICE_PATH,
+	  MSG_IPv4_DP, offsetof ( IPv4_DEVICE_PATH, LocalIpAddress ),
+	  sizeof ( struct in_addr ) },
+	{ &netmask_setting, efi_path_fetch_fixed, MESSAGING_DEVICE_PATH,
+	  MSG_IPv4_DP, offsetof ( IPv4_DEVICE_PATH, SubnetMask ),
+	  sizeof ( struct in_addr ) },
+	{ &gateway_setting, efi_path_fetch_fixed, MESSAGING_DEVICE_PATH,
+	  MSG_IPv4_DP, offsetof ( IPv4_DEVICE_PATH, GatewayIpAddress ),
+	  sizeof ( struct in_addr ) },
+	{ &ip6_setting, efi_path_fetch_fixed, MESSAGING_DEVICE_PATH,
+	  MSG_IPv6_DP, offsetof ( IPv6_DEVICE_PATH, LocalIpAddress ),
+	  sizeof ( struct in6_addr ) },
+	{ &len6_setting, efi_path_fetch_fixed, MESSAGING_DEVICE_PATH,
+	  MSG_IPv6_DP, offsetof ( IPv6_DEVICE_PATH, PrefixLength ),
+	  sizeof ( uint8_t ) },
+	{ &gateway6_setting, efi_path_fetch_fixed, MESSAGING_DEVICE_PATH,
+	  MSG_IPv6_DP, offsetof ( IPv6_DEVICE_PATH, GatewayIpAddress ),
+	  sizeof ( struct in6_addr ) },
+	{ &dns_setting, efi_path_fetch_dns, MESSAGING_DEVICE_PATH,
+	  MSG_DNS_DP, offsetof ( DNS_DEVICE_PATH, DnsServerIp ),
+	  sizeof ( struct in_addr ) },
+	{ &dns6_setting, efi_path_fetch_dns, MESSAGING_DEVICE_PATH,
+	  MSG_DNS_DP, offsetof ( DNS_DEVICE_PATH, DnsServerIp ),
+	  sizeof ( struct in6_addr ) },
+};
+
+/**
+ * Fetch value of EFI device path setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to fetch
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int efi_path_fetch ( struct settings *settings, struct setting *setting,
+			    void *data, size_t len ) {
+	struct efi_path_settings *pathsets =
+		container_of ( settings, struct efi_path_settings, settings );
+	EFI_DEVICE_PATH_PROTOCOL *path = pathsets->path;
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	struct efi_path_setting *pathset;
+	unsigned int i;
+	int ret;
+
+	/* Find matching path setting, if any */
+	for ( i = 0 ; i < ( sizeof ( efi_path_settings ) /
+			    sizeof ( efi_path_settings[0] ) ) ; i++ ) {
+
+		/* Check for a matching setting */
+		pathset = &efi_path_settings[i];
+		if ( setting_cmp ( setting, pathset->setting ) != 0 )
+			continue;
+
+		/* Find matching device path element, if any */
+		for ( ; ( next = efi_path_next ( path ) ) ; path = next ) {
+
+			/* Check for a matching path type */
+			if ( ( path->Type != pathset->type ) ||
+			     ( path->SubType != pathset->subtype ) )
+				continue;
+
+			/* Fetch value */
+			if ( ( ret = pathset->fetch ( pathset, path,
+						      data, len ) ) < 0 )
+				return ret;
+
+			/* Apply default type, if not already set */
+			if ( ! setting->type )
+				setting->type = pathset->setting->type;
+
+			return ret;
+		}
+		break;
+	}
+
+	return -ENOENT;
+}
+
+/** EFI device path settings operations */
+static struct settings_operations efi_path_settings_operations = {
+	.fetch = efi_path_fetch,
+};
+
+/**
+ * Create per-netdevice EFI path settings
+ *
+ * @v netdev		Network device
+ * @v priv		Private data
+ * @ret rc		Return status code
+ */
+static int efi_path_net_probe ( struct net_device *netdev, void *priv ) {
+	struct efi_path_settings *pathsets = priv;
+	struct settings *settings = &pathsets->settings;
+	EFI_DEVICE_PATH_PROTOCOL *path = efi_loaded_image_path;
+	unsigned int vlan;
+	void *mac;
+	int rc;
+
+	/* Check applicability */
+	pathsets->path = path;
+	mac = efi_path_mac ( path );
+	vlan = efi_path_vlan ( path );
+	if ( ( mac == NULL ) ||
+	     ( memcmp ( mac, netdev->ll_addr,
+			netdev->ll_protocol->ll_addr_len ) != 0 ) ||
+	     ( vlan != vlan_tag ( netdev ) ) ) {
+		DBGC ( settings, "EFI path %s does not apply to %s\n",
+		       efi_devpath_text ( path ), netdev->name );
+		return 0;
+	}
+
+	/* Never override a real DHCP settings block */
+	if ( find_child_settings ( netdev_settings ( netdev ),
+				   DHCP_SETTINGS_NAME ) ) {
+		DBGC ( settings, "EFI path %s not overriding %s DHCP "
+		       "settings\n", efi_devpath_text ( path ), netdev->name );
+		return 0;
+	}
+
+	/* Initialise and register settings */
+	settings_init ( settings, &efi_path_settings_operations,
+			&netdev->refcnt, NULL );
+	if ( ( rc = register_settings ( settings, netdev_settings ( netdev ),
+					DHCP_SETTINGS_NAME ) ) != 0 ) {
+		DBGC ( settings, "EFI path %s could not register for %s: %s\n",
+		       efi_devpath_text ( path ), netdev->name,
+		       strerror ( rc ) );
+		return rc;
+	}
+	DBGC ( settings, "EFI path %s registered for %s\n",
+	       efi_devpath_text ( path ), netdev->name );
+
+	return 0;
+}
+
+/** EFI path settings per-netdevice driver */
+struct net_driver efi_path_net_driver __net_driver = {
+	.name = "EFI path",
+	.priv_len = sizeof ( struct efi_path_settings ),
+	.probe = efi_path_net_probe,
+};

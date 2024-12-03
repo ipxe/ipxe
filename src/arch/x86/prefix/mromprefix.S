@@ -42,9 +42,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #include "pciromprefix.S"
 
 	.section ".note.GNU-stack", "", @progbits
-	.text
-	.arch i386
 	.code16
+	.arch i386
 
 /* Obtain access to payload by exposing the expansion ROM BAR at the
  * address currently used by a suitably large memory BAR on the same

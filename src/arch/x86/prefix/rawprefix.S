@@ -9,10 +9,9 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 	.section ".note.GNU-stack", "", @progbits
-	.text
+	.code16
 	.arch i386
 	.org 0
-	.code16
 
 #include <librm.h>
 

@@ -68,7 +68,7 @@ sub try_import_file {
 	chomp;
 	# Update include lines, and record included files
 	if ( s/^(\s*\#include\s+)[<\"](\S+)[>\"]/$1<ipxe\/efi\/$2>/ ) {
-	  push @dependencies, $1;
+	  push @dependencies, $2;
 	}
 	# Check for BSD licence statement
 	if ( /^\s*SPDX-License-Identifier: BSD-2-Clause-Patent$/ ) {

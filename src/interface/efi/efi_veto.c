@@ -494,6 +494,32 @@ efi_veto_vmware_uefipxebc ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 	return 1;
 }
 
+/**
+ * Veto Dhcp6Dxe driver
+ *
+ * @v binding		Driver binding protocol
+ * @v loaded		Loaded image protocol
+ * @v wtf		Component name protocol, if present
+ * @v manufacturer	Manufacturer name, if present
+ * @v name		Driver name, if present
+ * @ret vetoed		Driver is to be vetoed
+ */
+static int efi_veto_dhcp6 ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
+			    EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
+			    EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
+			    const char *manufacturer __unused,
+			    const CHAR16 *name ) {
+	static const CHAR16 dhcp6[] = L"DHCP6 Protocol Driver";
+
+	/* Check driver name */
+	if ( ! name )
+		return 0;
+	if ( memcmp ( name, dhcp6, sizeof ( dhcp6 ) ) != 0 )
+		return 0;
+
+	return 1;
+}
+
 /** Driver vetoes */
 static struct efi_veto_candidate efi_vetoes[] = {
 	{
@@ -507,6 +533,10 @@ static struct efi_veto_candidate efi_vetoes[] = {
 	{
 		.name = "VMware UefiPxeBc",
 		.veto = efi_veto_vmware_uefipxebc,
+	},
+	{
+		.name = "Dhcp6",
+		.veto = efi_veto_dhcp6,
 	},
 };
 

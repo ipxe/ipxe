@@ -1221,7 +1221,7 @@ ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 	/* Start DHCPv6 if required */
 	if ( radv->flags & ( NDP_ROUTER_MANAGED | NDP_ROUTER_OTHER ) ) {
 		stateful = ( radv->flags & NDP_ROUTER_MANAGED );
-		if ( ( rc = start_dhcpv6 ( &ipv6conf->dhcp, netdev,
+		if ( ( rc = start_dhcpv6 ( &ipv6conf->dhcp, netdev, router,
 					   stateful ) ) != 0 ) {
 			DBGC ( netdev, "NDP %s could not start state%s DHCPv6: "
 			       "%s\n", netdev->name,

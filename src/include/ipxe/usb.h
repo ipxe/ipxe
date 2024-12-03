@@ -54,6 +54,20 @@ enum usb_speed {
 	USB_SPEED_SUPER = USB_SPEED ( 5, 3 ),
 };
 
+/** Define a USB bus:device address
+ *
+ * @v bus		Bus address
+ * @v dev		Device address
+ * @ret busdev		Bus:device address
+ */
+#define USB_BUSDEV( bus, dev ) ( ( (bus) << 8 ) | (dev) )
+
+/** Extract USB bus address */
+#define USB_BUS( busdev ) ( (busdev) >> 8 )
+
+/** Extract USB device address */
+#define USB_DEV( busdev ) ( (busdev) & 0xff )
+
 /** USB packet IDs */
 enum usb_pid {
 	/** IN PID */
@@ -956,6 +970,12 @@ struct usb_bus {
 	/** Host controller operations set */
 	struct usb_host_operations *op;
 
+	/** Bus address
+	 *
+	 * This is an internal index used only to allow a USB device
+	 * to be identified via a nominal bus:device address.
+	 */
+	unsigned int address;
 	/** Largest transfer allowed on the bus */
 	size_t mtu;
 	/** Address in-use mask
@@ -1269,6 +1289,9 @@ extern struct usb_endpoint_companion_descriptor *
 usb_endpoint_companion_descriptor ( struct usb_configuration_descriptor *config,
 				    struct usb_endpoint_descriptor *desc );
 
+extern struct usb_device * find_usb ( struct usb_bus *bus,
+				      unsigned int address );
+
 extern struct usb_hub * alloc_usb_hub ( struct usb_bus *bus,
 					struct usb_device *usb,
 					unsigned int ports,
@@ -1285,11 +1308,13 @@ extern struct usb_bus * alloc_usb_bus ( struct device *dev,
 extern int register_usb_bus ( struct usb_bus *bus );
 extern void unregister_usb_bus ( struct usb_bus *bus );
 extern void free_usb_bus ( struct usb_bus *bus );
+extern struct usb_bus * find_usb_bus ( unsigned int address );
 extern struct usb_bus * find_usb_bus_by_location ( unsigned int bus_type,
 						   unsigned int location );
 
 extern int usb_alloc_address ( struct usb_bus *bus );
 extern void usb_free_address ( struct usb_bus *bus, unsigned int address );
+extern int usb_find_next ( struct usb_device **usb, uint16_t *busdev );
 extern unsigned int usb_route_string ( struct usb_device *usb );
 extern struct usb_port * usb_root_hub_port ( struct usb_device *usb );
 extern struct usb_port * usb_transaction_translator ( struct usb_device *usb );

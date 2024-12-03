@@ -52,6 +52,10 @@ union dma_addr64_t {
 #define BNXT_FLAG_NPAR_MODE                     0x0010
 #define BNXT_FLAG_ATOMICS_ENABLE                0x0020
 #define BNXT_FLAG_PCI_VF                        0x0040
+#define BNXT_FLAG_LINK_SPEEDS2                  0x0080
+#define BNXT_FLAG_IS_CHIP_P5                    0x0100
+#define BNXT_FLAG_IS_CHIP_P5_PLUS               0x0200
+#define BNXT_FLAG_IS_CHIP_P7                    0x0400
 /*******************************************************************************
  * Status codes.
  ******************************************************************************/
@@ -106,6 +110,12 @@ union dma_addr64_t {
 #define MEDIUM_SPEED_50GBPS                     0x0a00L
 #define MEDIUM_SPEED_100GBPS                    0x0b00L
 #define MEDIUM_SPEED_200GBPS                    0x0c00L
+#define MEDIUM_SPEED_50PAM4GBPS                 0x0d00L
+#define MEDIUM_SPEED_100PAM4GBPS                0x0e00L
+#define MEDIUM_SPEED_100PAM4_112GBPS            0x0f00L
+#define MEDIUM_SPEED_200PAM4_112GBPS            0x1000L
+#define MEDIUM_SPEED_400PAM4GBPS                0x2000L
+#define MEDIUM_SPEED_400PAM4_112GBPS            0x3000L
 #define MEDIUM_SPEED_AUTONEG_1G_FALLBACK        0x8000L /* Serdes */
 #define MEDIUM_SPEED_AUTONEG_2_5G_FALLBACK      0x8100L /* Serdes */
 #define MEDIUM_SPEED_HARDWARE_DEFAULT           0xff00L /* Serdes nvram def.*/
@@ -168,9 +178,9 @@ union dma_addr64_t {
 	RX_MASK_ACCEPT_MULTICAST)
 #define MAX_NQ_DESC_CNT                         64
 #define NQ_RING_BUFFER_SIZE (MAX_NQ_DESC_CNT * sizeof(struct cmpl_base))
-#define TX_RING_QID (bp->thor ? (u16)bp->queue_id : ((u16)bp->port_idx * 10))
-#define RX_RING_QID (bp->thor ? bp->queue_id : 0)
-#define STAT_CTX_ID ((bp->vf || bp->thor) ? bp->stat_ctx_id : 0)
+#define TX_RING_QID (FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS) ? (u16)bp->queue_id : ((u16)bp->port_idx * 10))
+#define RX_RING_QID (FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS) ? bp->queue_id : 0)
+#define STAT_CTX_ID ((bp->vf || FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS)) ? bp->stat_ctx_id : 0)
 #define TX_AVAIL(r)                      (r - 1)
 #define TX_IN_USE(a, b, c) ((a - b) & (c - 1))
 #define NO_MORE_NQ_BD_TO_SERVICE         1
@@ -189,13 +199,19 @@ union dma_addr64_t {
 	((idx) << DBC_DBC_INDEX_SFT) & DBC_DBC_INDEX_MASK)
 #define DBC_MSG_XID(xid, flg)  (\
 	(((xid) << DBC_DBC_XID_SFT) & DBC_DBC_XID_MASK) | \
-	DBC_DBC_PATH_L2 | (flg))
+	DBC_DBC_PATH_L2 | (FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ? DBC_DBC_VALID : 0) | (flg))
+#define DBC_MSG_EPCH(idx)      (\
+        ((idx) << DBC_DBC_EPOCH_SFT))
+#define DBC_MSG_TOGGLE(idx)    (\
+        ((idx) << DBC_DBC_TOGGLE_SFT) & DBC_DBC_TOGGLE_MASK)
 #define PHY_STATUS         0x0001
 #define PHY_SPEED          0x0002
 #define DETECT_MEDIA       0x0004
 #define SUPPORT_SPEEDS     0x0008
+#define SUPPORT_SPEEDS2    0x0010
 #define QCFG_PHY_ALL   (\
-	SUPPORT_SPEEDS | DETECT_MEDIA | PHY_SPEED | PHY_STATUS)
+	SUPPORT_SPEEDS | SUPPORT_SPEEDS2 | \
+        DETECT_MEDIA | PHY_SPEED | PHY_STATUS)
 #define str_mbps           "Mbps"
 #define str_gbps           "Gbps"
 /*
@@ -287,6 +303,18 @@ union dma_addr64_t {
 #define NS_LINK_SPEED_FW_100G                                   (0x6)
 #define LINK_SPEED_FW_200G                                      (0x7L << 7)
 #define NS_LINK_SPEED_FW_200G                                   (0x7)
+#define LINK_SPEED_FW_50G_PAM4                                  (0x8L << 7)
+#define NS_LINK_SPEED_FW_50G_PAM4                               (0x8)
+#define LINK_SPEED_FW_100G_PAM4                                 (0x9L << 7)
+#define NS_LINK_SPEED_FW_100G_PAM4                              (0x9)
+#define LINK_SPEED_FW_100G_PAM4_112                             (0xAL << 7)
+#define NS_LINK_SPEED_FW_100G_PAM4_112                          (0xA)
+#define LINK_SPEED_FW_200G_PAM4_112                             (0xBL << 7)
+#define NS_LINK_SPEED_FW_200G_PAM4_112                          (0xB)
+#define LINK_SPEED_FW_400G_PAM4                                 (0xCL << 7)
+#define NS_LINK_SPEED_FW_400G_PAM4                              (0xC)
+#define LINK_SPEED_FW_400G_PAM4_112                             (0xDL << 7)
+#define NS_LINK_SPEED_FW_400G_PAM4_112                          (0xD)
 #define LINK_SPEED_FW_2_5G                                      (0xEL << 7)
 #define NS_LINK_SPEED_FW_2_5G                                   (0xE)
 #define LINK_SPEED_FW_100M                                      (0xFL << 7)
@@ -387,6 +415,10 @@ struct dbc_dbc {
 	__le32  index;
 	#define DBC_DBC_INDEX_MASK          0xffffffUL
 	#define DBC_DBC_INDEX_SFT           0
+	#define DBC_DBC_EPOCH               0x1000000UL
+	#define DBC_DBC_EPOCH_SFT           24
+	#define DBC_DBC_TOGGLE_MASK         0x6000000UL
+	#define DBC_DBC_TOGGLE_SFT          25
 	__le32  type_path_xid;
 	#define DBC_DBC_XID_MASK            0xfffffUL
 	#define DBC_DBC_XID_SFT             0
@@ -396,6 +428,7 @@ struct dbc_dbc {
 	#define DBC_DBC_PATH_L2             (0x1UL << 24)
 	#define DBC_DBC_PATH_ENGINE         (0x2UL << 24)
 	#define DBC_DBC_PATH_LAST           DBC_DBC_PATH_ENGINE
+	#define DBC_DBC_VALID               0x4000000UL
 	#define DBC_DBC_DEBUG_TRACE         0x8000000UL
 	#define DBC_DBC_TYPE_MASK           0xf0000000UL
 	#define DBC_DBC_TYPE_SFT            28
@@ -481,6 +514,8 @@ struct tx_info {
 	u16              ring_cnt;
 	u32              cnt;   /* Tx statistics. */
 	u32              cnt_req;
+	u8               epoch;
+	u8               res[3];
 };
 
 struct cmpl_base {
@@ -492,6 +527,7 @@ struct cmpl_base {
 #define CMPL_BASE_TYPE_RX_AGG            0x12UL
 #define CMPL_BASE_TYPE_RX_TPA_START      0x13UL
 #define CMPL_BASE_TYPE_RX_TPA_END        0x15UL
+#define CMPL_BASE_TYPE_RX_L2_V3          0x17UL
 #define CMPL_BASE_TYPE_STAT_EJECT        0x1aUL
 #define CMPL_BASE_TYPE_HWRM_DONE         0x20UL
 #define CMPL_BASE_TYPE_HWRM_FWD_REQ      0x22UL
@@ -517,7 +553,8 @@ struct cmp_info {
 	u16       cons_id;
 	u16       ring_cnt;
 	u8        completion_bit;
-	u8        res[3];
+	u8        epoch;
+	u8        res[2];
 };
 
 /* Completion Queue Notification */
@@ -533,6 +570,8 @@ struct nq_base {
  */
 #define NQ_CN_TYPE_MASK           0x3fUL
 #define NQ_CN_TYPE_SFT            0
+#define NQ_CN_TOGGLE_MASK         0xc0UL
+#define NQ_CN_TOGGLE_SFT          6
 /* CQ Notification */
 	    #define NQ_CN_TYPE_CQ_NOTIFICATION  0x30UL
 	    #define NQ_CN_TYPE_LAST            NQ_CN_TYPE_CQ_NOTIFICATION
@@ -561,7 +600,9 @@ struct nq_info {
 	u16       cons_id;
 	u16       ring_cnt;
 	u8        completion_bit;
-	u8        res[3];
+	u8        epoch;
+	u8        toggle;
+	u8        res[1];
 };
 
 struct rx_pkt_cmpl {
@@ -675,6 +716,156 @@ struct rx_pkt_cmpl_hi {
 #define RX_PKT_CMPL_REORDER_SFT  0
 };
 
+struct rx_pkt_v3_cmpl {
+	u16	flags_type;
+	#define RX_PKT_V3_CMPL_TYPE_MASK                      0x3fUL
+	#define RX_PKT_V3_CMPL_TYPE_SFT                       0
+	/*
+	 * RX L2 V3 completion:
+	 * Completion of and L2 RX packet. Length = 32B
+	 * This is the new version of the RX_L2 completion used in Thor2
+	 * and later chips.
+	 */
+	#define RX_PKT_V3_CMPL_TYPE_RX_L2_V3                    0x17UL
+	#define RX_PKT_V3_CMPL_TYPE_LAST                       RX_PKT_V3_CMPL_TYPE_RX_L2_V3
+	#define RX_PKT_V3_CMPL_FLAGS_MASK                     0xffc0UL
+	#define RX_PKT_V3_CMPL_FLAGS_SFT                      6
+	#define RX_PKT_V3_CMPL_FLAGS_ERROR                     0x40UL
+	#define RX_PKT_V3_CMPL_FLAGS_PLACEMENT_MASK            0x380UL
+	#define RX_PKT_V3_CMPL_FLAGS_PLACEMENT_SFT             7
+	#define RX_PKT_V3_CMPL_FLAGS_PLACEMENT_NORMAL            (0x0UL << 7)
+	#define RX_PKT_V3_CMPL_FLAGS_PLACEMENT_JUMBO             (0x1UL << 7)
+	#define RX_PKT_V3_CMPL_FLAGS_PLACEMENT_HDS               (0x2UL << 7)
+	#define RX_PKT_V3_CMPL_FLAGS_PLACEMENT_TRUNCATION        (0x3UL << 7)
+	#define RX_PKT_V3_CMPL_FLAGS_PLACEMENT_LAST             RX_PKT_V3_CMPL_FLAGS_PLACEMENT_TRUNCATION
+	#define RX_PKT_V3_CMPL_FLAGS_RSS_VALID                 0x400UL
+	#define RX_PKT_V3_CMPL_FLAGS_PKT_METADATA_PRESENT      0x800UL
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_MASK                0xf000UL
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_SFT                 12
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_NOT_KNOWN             (0x0UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_IP                    (0x1UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_TCP                   (0x2UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_UDP                   (0x3UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_FCOE                  (0x4UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_ROCE                  (0x5UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_ICMP                  (0x7UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_PTP_WO_TIMESTAMP      (0x8UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_PTP_W_TIMESTAMP       (0x9UL << 12)
+	#define RX_PKT_V3_CMPL_FLAGS_ITYPE_LAST                 RX_PKT_V3_CMPL_FLAGS_ITYPE_PTP_W_TIMESTAMP
+	u16	len;
+	u32	opaque;
+	u16	rss_hash_type_agg_bufs_v1;
+	#define RX_PKT_V3_CMPL_V1                   0x1UL
+	#define RX_PKT_V3_CMPL_AGG_BUFS_MASK        0x3eUL
+	#define RX_PKT_V3_CMPL_AGG_BUFS_SFT         1
+	#define RX_PKT_V3_CMPL_UNUSED1              0x40UL
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_MASK   0xff80UL
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_SFT    7
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_0   (0x0UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_1   (0x1UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_3   (0x3UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_4   (0x4UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_5   (0x5UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_6   (0x6UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_7   (0x7UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_8   (0x8UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_9   (0x9UL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_10  (0xaUL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_11  (0xbUL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_12  (0xcUL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_13  (0xdUL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_14  (0xeUL << 7)
+	#define RX_PKT_V3_CMPL_RSS_HASH_TYPE_LAST    RX_PKT_V3_CMPL_RSS_HASH_TYPE_ENUM_14
+	u16	metadata1_payload_offset;
+	#define RX_PKT_V3_CMPL_PAYLOAD_OFFSET_MASK        0x1ffUL
+	#define RX_PKT_V3_CMPL_PAYLOAD_OFFSET_SFT         0
+	#define RX_PKT_V3_CMPL_METADATA1_MASK             0xf000UL
+	#define RX_PKT_V3_CMPL_METADATA1_SFT              12
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_MASK     0x7000UL
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_SFT      12
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_TPID88A8   (0x0UL << 12)
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_TPID8100   (0x1UL << 12)
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_TPID9100   (0x2UL << 12)
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_TPID9200   (0x3UL << 12)
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_TPID9300   (0x4UL << 12)
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_TPIDCFG    (0x5UL << 12)
+	#define RX_PKT_V3_CMPL_METADATA1_TPID_SEL_LAST      RX_PKT_V3_CMPL_METADATA1_TPID_SEL_TPIDCFG
+	#define RX_PKT_V3_CMPL_METADATA1_VALID             0x8000UL
+	u32	rss_hash;
+};
+
+struct rx_pkt_v3_cmpl_hi {
+	u32	flags2;
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_IP_CS_CALC                 0x1UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_L4_CS_CALC                 0x2UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_T_IP_CS_CALC               0x4UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_T_L4_CS_CALC               0x8UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_MASK           0xf0UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_SFT            4
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_NONE             (0x0UL << 4)
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_ACT_REC_PTR      (0x1UL << 4)
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_TUNNEL_ID        (0x2UL << 4)
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_CHDR_DATA        (0x3UL << 4)
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_HDR_OFFSET       (0x4UL << 4)
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_LAST            RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_HDR_OFFSET
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_IP_TYPE                    0x100UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_COMPLETE_CHECKSUM_CALC     0x200UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_T_IP_TYPE                  0x400UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_T_IP_TYPE_IPV4               (0x0UL << 10)
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_T_IP_TYPE_IPV6               (0x1UL << 10)
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_T_IP_TYPE_LAST              RX_PKT_V3_CMPL_HI_FLAGS2_T_IP_TYPE_IPV6
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_COMPLETE_CHECKSUM_MASK     0xffff0000UL
+	#define RX_PKT_V3_CMPL_HI_FLAGS2_COMPLETE_CHECKSUM_SFT      16
+	u32	metadata2;
+	u16	errors_v2;
+	#define RX_PKT_V3_CMPL_HI_V2                                       0x1UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_MASK                              0xfffeUL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_SFT                               1
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_MASK                  0xeUL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_SFT                   1
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_NO_BUFFER               (0x0UL << 1)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_DID_NOT_FIT             (0x1UL << 1)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_NOT_ON_CHIP             (0x2UL << 1)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_BAD_FORMAT              (0x3UL << 1)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_FLUSH                   (0x5UL << 1)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_LAST                   RX_PKT_V3_CMPL_HI_ERRORS_BUFFER_ERROR_FLUSH
+	#define RX_PKT_V3_CMPL_HI_ERRORS_IP_CS_ERROR                        0x10UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_L4_CS_ERROR                        0x20UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_IP_CS_ERROR                      0x40UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_L4_CS_ERROR                      0x80UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_CRC_ERROR                          0x100UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_MASK                   0xe00UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_SFT                    9
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_NO_ERROR                 (0x0UL << 9)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_T_L3_BAD_VERSION         (0x1UL << 9)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_T_L3_BAD_HDR_LEN         (0x2UL << 9)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_T_IP_TOTAL_ERROR         (0x3UL << 9)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_T_UDP_TOTAL_ERROR        (0x4UL << 9)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_T_L3_BAD_TTL             (0x5UL << 9)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_T_TOTAL_ERROR            (0x6UL << 9)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_LAST                    RX_PKT_V3_CMPL_HI_ERRORS_T_PKT_ERROR_T_TOTAL_ERROR
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_MASK                     0xf000UL
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_SFT                      12
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_NO_ERROR                   (0x0UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_L3_BAD_VERSION             (0x1UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_L3_BAD_HDR_LEN             (0x2UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_L3_BAD_TTL                 (0x3UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_IP_TOTAL_ERROR             (0x4UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_UDP_TOTAL_ERROR            (0x5UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_L4_BAD_HDR_LEN             (0x6UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_L4_BAD_HDR_LEN_TOO_SMALL   (0x7UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_L4_BAD_OPT_LEN             (0x8UL << 12)
+	#define RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_LAST                      RX_PKT_V3_CMPL_HI_ERRORS_PKT_ERROR_L4_BAD_OPT_LEN
+	u16	metadata0;
+	#define RX_PKT_V3_CMPL_HI_METADATA0_VID_MASK 0xfffUL
+	#define RX_PKT_V3_CMPL_HI_METADATA0_VID_SFT 0
+	#define RX_PKT_V3_CMPL_HI_METADATA0_DE      0x1000UL
+	/* When meta_format=1, this value is the VLAN PRI. */
+	#define RX_PKT_V3_CMPL_HI_METADATA0_PRI_MASK 0xe000UL
+	#define RX_PKT_V3_CMPL_HI_METADATA0_PRI_SFT 13
+	u32	timestamp;
+};
+
 struct rx_prod_pkt_bd {
 	u16  flags_type;
 #define RX_PROD_PKT_BD_TYPE_MASK          0x3fUL
@@ -705,6 +896,8 @@ struct rx_info {
 	u32               drop_err;
 	u32               drop_lb;
 	u32               drop_vlan;
+	u8                epoch;
+	u8                res[3];
 };
 
 #define VALID_DRIVER_REG          0x0001
@@ -750,7 +943,6 @@ struct bnxt {
 	struct nq_info            nq; /* completion info. */
 	u16                       nq_ring_id;
 	u8                        queue_id;
-	u8                        thor;
 	u16                       last_resp_code;
 	u16                       seq_id;
 	u32                       flag_hwrm;
@@ -792,6 +984,7 @@ struct bnxt {
 	u32                       mba_cfg2;
 	u32                       medium;
 	u16                       support_speeds;
+	u16                       auto_link_speeds2_mask;
 	u32                       link_set;
 	u8                        media_detect;
 	u8                        rsvd;
@@ -868,4 +1061,8 @@ struct bnxt {
 	FUNC_VF_CFG_REQ_ENABLES_ASYNC_EVENT_CR | \
 	FUNC_VF_CFG_REQ_ENABLES_DFLT_MAC_ADDR)
 
-#define CHIP_NUM_57500       0x1750
+#define CHIP_NUM_57508       0x1750
+#define CHIP_NUM_57504       0x1751
+#define CHIP_NUM_57502       0x1752
+
+#define CHIP_NUM_57608       0x1760

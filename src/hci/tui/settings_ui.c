@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <curses.h>
@@ -34,6 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/keys.h>
 #include <ipxe/ansicol.h>
 #include <ipxe/jumpscroll.h>
+#include <ipxe/message.h>
 #include <ipxe/settings_ui.h>
 #include <config/branding.h>
 
@@ -58,12 +60,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	char start[0];							\
 	char pad1[1];							\
 	union {								\
-		char settings[ cols - 1 - 1 - 1 - 1 ];			\
+		struct {						\
+			char name[ cols - 1 - 1 - 1 - 1 - 1 ];		\
+			char pad2[1];					\
+		} __attribute__ (( packed )) settings;			\
 		struct {						\
 			char name[15];					\
 			char pad2[1];					\
 			char value[ cols - 1 - 15 - 1 - 1 - 1 - 1 ];	\
-		} setting;						\
+		} __attribute__ (( packed )) setting;			\
 	} u;								\
 	char pad3[1];							\
 	char nul;							\
@@ -92,8 +97,8 @@ struct settings_ui_row {
 	struct edit_box editbox;
 	/** Editing in progress flag */
 	int editing;
-	/** Buffer for setting's value */
-	char value[256]; /* enough size for a DHCP string */
+	/** Dynamically allocated buffer for setting's value */
+	char *buf;
 };
 
 /** A settings user interface */
@@ -121,24 +126,22 @@ static unsigned int select_setting_row ( struct settings_ui *ui,
 	struct setting *previous = NULL;
 	unsigned int count = 0;
 
+	/* Free any previous setting value */
+	free ( ui->row.buf );
+	ui->row.buf = NULL;
+
 	/* Initialise structure */
 	memset ( &ui->row, 0, sizeof ( ui->row ) );
 	ui->row.row = ( SETTINGS_LIST_ROW + index - ui->scroll.first );
 
 	/* Include parent settings block, if applicable */
-	if ( ui->settings->parent && ( count++ == index ) ) {
+	if ( ui->settings->parent && ( count++ == index ) )
 		ui->row.settings = ui->settings->parent;
-		snprintf ( ui->row.value, sizeof ( ui->row.value ),
-			   "../" );
-	}
 
 	/* Include any child settings blocks, if applicable */
 	list_for_each_entry ( settings, &ui->settings->children, siblings ) {
-		if ( count++ == index ) {
+		if ( count++ == index )
 			ui->row.settings = settings;
-			snprintf ( ui->row.value, sizeof ( ui->row.value ),
-				   "%s/", settings->name );
-		}
 	}
 
 	/* Include any applicable settings */
@@ -155,18 +158,18 @@ static unsigned int select_setting_row ( struct settings_ui *ui,
 
 		/* Read current setting value and origin */
 		if ( count++ == index ) {
-			fetchf_setting ( ui->settings, setting, &ui->row.origin,
-					 &ui->row.setting, ui->row.value,
-					 sizeof ( ui->row.value ) );
+			fetchf_setting_copy ( ui->settings, setting,
+					      &ui->row.origin,
+					      &ui->row.setting, &ui->row.buf );
 		}
 	}
 
 	/* Initialise edit box */
-	init_editbox ( &ui->row.editbox, ui->row.value,
-		       sizeof ( ui->row.value ), NULL, ui->row.row,
+	memset ( &ui->row.editbox, 0, sizeof ( ui->row.editbox ) );
+	init_editbox ( &ui->row.editbox, ui->row.row,
 		       ( SETTINGS_LIST_COL +
 			 offsetof ( typeof ( *text ), u.setting.value ) ),
-		       sizeof ( text->u.setting.value ), 0 );
+		       sizeof ( text->u.setting.value ), 0, &ui->row.buf );
 
 	return count;
 }
@@ -197,7 +200,7 @@ static size_t string_copy ( char *dest, const char *src, size_t len ) {
 static void draw_setting_row ( struct settings_ui *ui ) {
 	SETTING_ROW_TEXT ( COLS ) text;
 	unsigned int curs_offset;
-	char *value;
+	const char *value;
 
 	/* Fill row with spaces */
 	memset ( &text, ' ', sizeof ( text ) );
@@ -207,10 +210,12 @@ static void draw_setting_row ( struct settings_ui *ui ) {
 	if ( ui->row.settings ) {
 
 		/* Construct space-padded name */
-		curs_offset = ( offsetof ( typeof ( text ), u.settings ) +
-				string_copy ( text.u.settings,
-					      ui->row.value,
-					      sizeof ( text.u.settings ) ) );
+		value = ( ( ui->row.settings == ui->settings->parent ) ?
+			  ".." : ui->row.settings->name );
+		curs_offset = string_copy ( text.u.settings.name, value,
+					    sizeof ( text.u.settings.name ) );
+		text.u.settings.name[curs_offset] = '/';
+		curs_offset += offsetof ( typeof ( text ), u.settings );
 
 	} else {
 
@@ -221,12 +226,12 @@ static void draw_setting_row ( struct settings_ui *ui ) {
 			      sizeof ( text.u.setting.name ) );
 
 		/* Construct space-padded value */
-		value = ui->row.value;
-		if ( ! *value )
+		value = ui->row.buf;
+		if ( ! ( value && value[0] ) )
 			value = "<not specified>";
-		curs_offset = ( offsetof ( typeof ( text ), u.setting.value ) +
-				string_copy ( text.u.setting.value, value,
-					      sizeof ( text.u.setting.value )));
+		curs_offset = string_copy ( text.u.setting.value, value,
+					    sizeof ( text.u.setting.value ) );
+		curs_offset += offsetof ( typeof ( text ), u.setting.value );
 	}
 
 	/* Print row */
@@ -247,7 +252,7 @@ static void draw_setting_row ( struct settings_ui *ui ) {
 static int edit_setting ( struct settings_ui *ui, int key ) {
 	assert ( ui->row.setting.name != NULL );
 	ui->row.editing = 1;
-	return edit_editbox ( &ui->row.editbox, key );
+	return edit_widget ( &ui->row.editbox.widget, key );
 }
 
 /**
@@ -257,76 +262,7 @@ static int edit_setting ( struct settings_ui *ui, int key ) {
  */
 static int save_setting ( struct settings_ui *ui ) {
 	assert ( ui->row.setting.name != NULL );
-	return storef_setting ( ui->settings, &ui->row.setting, ui->row.value );
-}
-
-/**
- * Print message centred on specified row
- *
- * @v row		Row
- * @v fmt		printf() format string
- * @v args		printf() argument list
- */
-static void vmsg ( unsigned int row, const char *fmt, va_list args ) {
-	char buf[COLS];
-	size_t len;
-
-	len = vsnprintf ( buf, sizeof ( buf ), fmt, args );
-	mvprintw ( row, ( ( COLS - len ) / 2 ), "%s", buf );
-}
-
-/**
- * Print message centred on specified row
- *
- * @v row		Row
- * @v fmt		printf() format string
- * @v ..		printf() arguments
- */
-static void msg ( unsigned int row, const char *fmt, ... ) {
-	va_list args;
-
-	va_start ( args, fmt );
-	vmsg ( row, fmt, args );
-	va_end ( args );
-}
-
-/**
- * Clear message on specified row
- *
- * @v row		Row
- */
-static void clearmsg ( unsigned int row ) {
-	move ( row, 0 );
-	clrtoeol();
-}
-
-/**
- * Print alert message
- *
- * @v fmt		printf() format string
- * @v args		printf() argument list
- */
-static void valert ( const char *fmt, va_list args ) {
-	clearmsg ( ALERT_ROW );
-	color_set ( CPAIR_ALERT, NULL );
-	vmsg ( ALERT_ROW, fmt, args );
-	sleep ( 2 );
-	color_set ( CPAIR_NORMAL, NULL );
-	clearmsg ( ALERT_ROW );
-}
-
-/**
- * Print alert message
- *
- * @v fmt		printf() format string
- * @v ...		printf() arguments
- */
-static void alert ( const char *fmt, ... ) {
-	va_list args;
-
-	va_start ( args, fmt );
-	valert ( fmt, args );
-	va_end ( args );
+	return storef_setting ( ui->settings, &ui->row.setting, ui->row.buf );
 }
 
 /**
@@ -443,8 +379,8 @@ static void select_settings ( struct settings_ui *ui,
 static int main_loop ( struct settings *settings ) {
 	struct settings_ui ui;
 	unsigned int previous;
+	unsigned int move;
 	int redraw = 1;
-	int move;
 	int key;
 	int rc;
 
@@ -474,17 +410,17 @@ static int main_loop ( struct settings *settings ) {
 			assert ( ui.row.setting.name != NULL );
 
 			/* Redraw edit box */
-			color_set ( CPAIR_EDIT, NULL );
-			draw_editbox ( &ui.row.editbox );
-			color_set ( CPAIR_NORMAL, NULL );
+			draw_widget ( &ui.row.editbox.widget );
 
 			/* Process keypress */
 			key = edit_setting ( &ui, getkey ( 0 ) );
 			switch ( key ) {
 			case CR:
 			case LF:
-				if ( ( rc = save_setting ( &ui ) ) != 0 )
-					alert ( " %s ", strerror ( rc ) );
+				if ( ( rc = save_setting ( &ui ) ) != 0 ) {
+					alert ( ALERT_ROW, " %s ",
+						strerror ( rc ) );
+				}
 				/* Fall through */
 			case CTRL_C:
 				select_setting_row ( &ui, ui.scroll.current );
@@ -521,12 +457,13 @@ static int main_loop ( struct settings *settings ) {
 				break;
 			if ( ( rc = delete_setting ( ui.settings,
 						     &ui.row.setting ) ) != 0 ){
-				alert ( " %s ", strerror ( rc ) );
+				alert ( ALERT_ROW, " %s ", strerror ( rc ) );
 			}
 			select_setting_row ( &ui, ui.scroll.current );
 			redraw = 1;
 			break;
 		case CTRL_X:
+			select_setting_row ( &ui, -1U );
 			return 0;
 		case CR:
 		case LF:

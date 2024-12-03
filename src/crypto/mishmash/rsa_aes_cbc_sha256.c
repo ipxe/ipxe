@@ -29,39 +29,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/sha256.h>
 #include <ipxe/tls.h>
 
-/** TLS_DHE_RSA_WITH_AES_128_CBC_SHA256 cipher suite */
-struct tls_cipher_suite
-tls_dhe_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite ( 03 ) = {
-	.code = htons ( TLS_DHE_RSA_WITH_AES_128_CBC_SHA256 ),
-	.key_len = ( 128 / 8 ),
-	.fixed_iv_len = 0,
-	.record_iv_len = AES_BLOCKSIZE,
-	.mac_len = SHA256_DIGEST_SIZE,
-	.exchange = &tls_dhe_exchange_algorithm,
-	.pubkey = &rsa_algorithm,
-	.cipher = &aes_cbc_algorithm,
-	.digest = &sha256_algorithm,
-	.handshake = &sha256_algorithm,
-};
-
-/** TLS_DHE_RSA_WITH_AES_256_CBC_SHA256 cipher suite */
-struct tls_cipher_suite
-tls_dhe_rsa_with_aes_256_cbc_sha256 __tls_cipher_suite ( 04 ) = {
-	.code = htons ( TLS_DHE_RSA_WITH_AES_256_CBC_SHA256 ),
-	.key_len = ( 256 / 8 ),
-	.fixed_iv_len = 0,
-	.record_iv_len = AES_BLOCKSIZE,
-	.mac_len = SHA256_DIGEST_SIZE,
-	.exchange = &tls_dhe_exchange_algorithm,
-	.pubkey = &rsa_algorithm,
-	.cipher = &aes_cbc_algorithm,
-	.digest = &sha256_algorithm,
-	.handshake = &sha256_algorithm,
-};
-
 /** TLS_RSA_WITH_AES_128_CBC_SHA256 cipher suite */
 struct tls_cipher_suite
-tls_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite ( 13 ) = {
+tls_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite ( 23 ) = {
 	.code = htons ( TLS_RSA_WITH_AES_128_CBC_SHA256 ),
 	.key_len = ( 128 / 8 ),
 	.fixed_iv_len = 0,
@@ -76,7 +46,7 @@ tls_rsa_with_aes_128_cbc_sha256 __tls_cipher_suite ( 13 ) = {
 
 /** TLS_RSA_WITH_AES_256_CBC_SHA256 cipher suite */
 struct tls_cipher_suite
-tls_rsa_with_aes_256_cbc_sha256 __tls_cipher_suite ( 14 ) = {
+tls_rsa_with_aes_256_cbc_sha256 __tls_cipher_suite ( 24 ) = {
 	.code = htons ( TLS_RSA_WITH_AES_256_CBC_SHA256 ),
 	.key_len = ( 256 / 8 ),
 	.fixed_iv_len = 0,

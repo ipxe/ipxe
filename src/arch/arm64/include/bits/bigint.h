@@ -43,8 +43,9 @@ bigint_init_raw ( uint64_t *value0, unsigned int size,
  * @v addend0		Element 0 of big integer to add
  * @v value0		Element 0 of big integer to be added to
  * @v size		Number of elements
+ * @ret carry		Carry out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 		 unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -54,6 +55,7 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 	uint64_t discard_addend_i;
 	uint64_t discard_value_i;
 	unsigned int discard_size;
+	int carry;
 
 	__asm__ __volatile__ ( "cmn xzr, xzr\n\t" /* clear CF */
 			       "\n1:\n\t"
@@ -68,9 +70,11 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 				 "=r" ( discard_size ),
 				 "=r" ( discard_addend_i ),
 				 "=r" ( discard_value_i ),
+				 "=@cccs" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( addend0 ), "1" ( value0 ), "2" ( size )
-			       : "cc" );
+			       : "0" ( addend0 ), "1" ( value0 ),
+				 "2" ( size ) );
+	return carry;
 }
 
 /**
@@ -79,8 +83,9 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
  * @v subtrahend0	Element 0 of big integer to subtract
  * @v value0		Element 0 of big integer to be subtracted from
  * @v size		Number of elements
+ * @ret borrow		Borrow out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
 		      unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -90,6 +95,7 @@ bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
 	uint64_t discard_subtrahend_i;
 	uint64_t discard_value_i;
 	unsigned int discard_size;
+	int borrow;
 
 	__asm__ __volatile__ ( "cmp xzr, xzr\n\t" /* set CF */
 			       "\n1:\n\t"
@@ -104,20 +110,21 @@ bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
 				 "=r" ( discard_size ),
 				 "=r" ( discard_subtrahend_i ),
 				 "=r" ( discard_value_i ),
+				 "=@cccc" ( borrow ),
 				 "+m" ( *value )
 			       : "0" ( subtrahend0 ), "1" ( value0 ),
-				 "2" ( size )
-			       : "cc" );
+				 "2" ( size ) );
+	return borrow;
 }
 
 /**
- * Rotate big integer left
+ * Shift big integer left
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
 static inline __attribute__ (( always_inline )) void
-bigint_rol_raw ( uint64_t *value0, unsigned int size ) {
+bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint64_t *discard_value;
@@ -140,13 +147,13 @@ bigint_rol_raw ( uint64_t *value0, unsigned int size ) {
 }
 
 /**
- * Rotate big integer right
+ * Shift big integer right
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
 static inline __attribute__ (( always_inline )) void
-bigint_ror_raw ( uint64_t *value0, unsigned int size ) {
+bigint_shr_raw ( uint64_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint64_t *discard_value;
@@ -215,25 +222,6 @@ bigint_is_geq_raw ( const uint64_t *value0, const uint64_t *reference0,
 	} while ( --size );
 
 	return ( value_i >= reference_i );
-}
-
-/**
- * Test if bit is set in big integer
- *
- * @v value0		Element 0 of big integer
- * @v size		Number of elements
- * @v bit		Bit to test
- * @ret is_set		Bit is set
- */
-static inline __attribute__ (( always_inline )) int
-bigint_bit_is_set_raw ( const uint64_t *value0, unsigned int size,
-			unsigned int bit ) {
-	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
-		( ( const void * ) value0 );
-	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
-	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
-
-	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
 }
 
 /**
@@ -310,8 +298,36 @@ bigint_done_raw ( const uint64_t *value0, unsigned int size __unused,
 		*(--out_byte) = *(value_byte++);
 }
 
-extern void bigint_multiply_raw ( const uint64_t *multiplicand0,
-				  const uint64_t *multiplier0,
-				  uint64_t *value0, unsigned int size );
+/**
+ * Multiply big integer elements
+ *
+ * @v multiplicand	Multiplicand element
+ * @v multiplier	Multiplier element
+ * @v result		Result element
+ * @v carry		Carry element
+ */
+static inline __attribute__ (( always_inline )) void
+bigint_multiply_one ( const uint64_t multiplicand, const uint64_t multiplier,
+		      uint64_t *result, uint64_t *carry ) {
+	uint64_t discard_low;
+	uint64_t discard_high;
+
+	__asm__ __volatile__ ( /* Perform multiplication */
+			       "mul %0, %4, %5\n\t"
+			       "umulh %1, %4, %5\n\t"
+			       /* Accumulate result */
+			       "adds %2, %2, %0\n\t"
+			       "adc %1, %1, xzr\n\t"
+			       /* Accumulate carry (cannot overflow) */
+			       "adds %2, %2, %3\n\t"
+			       "adc %3, %1, xzr\n\t"
+			       : "=&r" ( discard_low ),
+				 "=r" ( discard_high ),
+				 "+r" ( *result ),
+				 "+r" ( *carry )
+			       : "r" ( multiplicand ),
+				 "r" ( multiplier )
+			       : "cc" );
+}
 
 #endif /* _BITS_BIGINT_H */

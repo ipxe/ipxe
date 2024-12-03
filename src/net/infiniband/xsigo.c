@@ -1829,8 +1829,10 @@ struct ib_driver xsigo_ib_driver __ib_driver = {
  * Handle device or link status change
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void xsigo_net_notify ( struct net_device *netdev ) {
+static void xsigo_net_notify ( struct net_device *netdev,
+			       void *priv __unused ) {
 	struct xsigo_device *xdev;
 	struct ib_device *ibdev;
 	struct xsigo_manager *xcm;

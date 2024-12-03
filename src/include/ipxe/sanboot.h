@@ -19,7 +19,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/process.h>
 #include <ipxe/blockdev.h>
 #include <ipxe/acpi.h>
+#include <ipxe/uuid.h>
 #include <config/sanboot.h>
+
+/**
+ * Default SAN drive number
+ *
+ * The drive number is an externally defined concept only in a BIOS
+ * environment, where it represents the INT13 drive number (0x80 for
+ * the first hard disk).  We retain it in other environments to allow
+ * for a simple way for iPXE commands to refer to SAN drives.
+ */
+#define SAN_DEFAULT_DRIVE 0x80
 
 /** A SAN path */
 struct san_path {
@@ -95,6 +106,18 @@ enum san_device_flags {
 	SAN_NO_DESCRIBE = 0x0001,
 };
 
+/** SAN boot configuration parameters */
+struct san_boot_config {
+	/** Boot filename (or NULL to use default) */
+	const char *filename;
+	/** Required extra filename (or NULL to ignore) */
+	const char *extra;
+	/** Filesystem label (or NULL to ignore volume label) */
+	const char *label;
+	/** UUID (or NULL to ignore UUID) */
+	union uuid *uuid;
+};
+
 /**
  * Calculate static inline sanboot API function name
  *
@@ -155,10 +178,10 @@ void san_unhook ( unsigned int drive );
  * Attempt to boot from a SAN device
  *
  * @v drive		Drive number
- * @v filename		Filename (or NULL to use default)
+ * @v config		Boot configuration parameters
  * @ret rc		Return status code
  */
-int san_boot ( unsigned int drive, const char *filename );
+int san_boot ( unsigned int drive, struct san_boot_config *config );
 
 /**
  * Describe SAN devices for SAN-booted operating system
@@ -234,6 +257,7 @@ static inline int sandev_needs_reopen ( struct san_device *sandev ) {
 }
 
 extern struct san_device * sandev_find ( unsigned int drive );
+extern struct san_device * sandev_next ( unsigned int drive );
 extern int sandev_reopen ( struct san_device *sandev );
 extern int sandev_reset ( struct san_device *sandev );
 extern int sandev_read ( struct san_device *sandev, uint64_t lba,

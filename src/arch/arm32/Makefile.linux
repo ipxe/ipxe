@@ -1,0 +1,25 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# The number of different ABIs for 32-bit ARM is insane.  It is
+# unclear whether or not unaligned accesses ought to work in a 32-bit
+# Linux userspace binary.  When running in QEMU, unaligned accesses
+# result in a SIGBUS.  Since this is likely to be the most common use
+# case (for running self-tests on an x86 build machine), and since we
+# don't particularly care about performance for Linux userspace
+# binaries, force the compiler to never generate an unaligned access.
+#
+CFLAGS += -mno-unaligned-access
+
+# Inhibit the harmless warning about wchar_t size mismatch between the
+# linux_api.o helper object and the rest of iPXE.
+#
+LINUX_CFLAGS += -Wl,--no-wchar-size-warning
+
+# Starting virtual address
+#
+LDFLAGS += -Ttext=0x10000
+
+# Include generic Linux Makefile
+#
+MAKEDEPS += arch/arm/Makefile.linux
+include arch/arm/Makefile.linux

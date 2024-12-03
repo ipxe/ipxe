@@ -3,9 +3,9 @@
 ASM_TCHAR	:= %
 ASM_TCHAR_OPS	:= %%
 
-# Include common ARM headers
+# Include ARM-specific headers
 #
-INCDIRS		+= arch/arm/include
+INCDIRS		:= arch/$(ARCH)/include arch/arm/include $(INCDIRS)
 
 # ARM-specific directories containing source files
 #

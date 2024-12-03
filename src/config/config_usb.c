@@ -22,6 +22,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/usb.h>
+#include <config/settings.h>
 
 /** @file
  *
@@ -62,4 +63,11 @@ REQUIRE_OBJECT ( usbblk );
  */
 #ifdef USB_EFI
 REQUIRE_OBJECT ( efi_usb );
+#endif
+
+/*
+ * Drag in USB settings mechanism
+ */
+#ifdef USB_SETTINGS
+REQUIRE_OBJECT ( usb_settings );
 #endif

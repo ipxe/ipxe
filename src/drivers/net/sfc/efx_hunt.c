@@ -100,7 +100,7 @@ efx_hunt_notify_tx_desc(struct efx_nic *efx)
 int
 efx_hunt_transmit(struct net_device *netdev, struct io_buffer *iob)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	struct efx_tx_queue *txq = &efx->txq;
 	int fill_level, space;
 	efx_tx_desc_t *txd;
@@ -155,7 +155,7 @@ efx_hunt_transmit_done(struct efx_nic *efx, int id)
 
 int efx_hunt_tx_init(struct net_device *netdev, dma_addr_t *dma_addr)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	struct efx_tx_queue *txq = &efx->txq;
 	size_t bytes;
 
@@ -270,7 +270,7 @@ efx_hunt_receive(struct efx_nic *efx, unsigned int id, int len, int drop)
 
 int efx_hunt_rx_init(struct net_device *netdev, dma_addr_t *dma_addr)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	struct efx_rx_queue *rxq = &efx->rxq;
 	size_t bytes;
 
@@ -294,7 +294,7 @@ int efx_hunt_rx_init(struct net_device *netdev, dma_addr_t *dma_addr)
  ******************************************************************************/
 int efx_hunt_ev_init(struct net_device *netdev, dma_addr_t *dma_addr)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	struct efx_ev_queue *evq = &efx->evq;
 	size_t bytes;
 
@@ -404,7 +404,7 @@ efx_hunt_handle_event(struct efx_nic *efx, efx_event_t *evt)
 
 void efx_hunt_poll(struct net_device *netdev)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	struct efx_ev_queue *evq = &efx->evq;
 	efx_event_t *evt;
 	int budget = 10;
@@ -443,7 +443,7 @@ void efx_hunt_poll(struct net_device *netdev)
 
 void efx_hunt_irq(struct net_device *netdev, int enable)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 
 	efx->int_en = enable;
 
@@ -465,7 +465,7 @@ void efx_hunt_irq(struct net_device *netdev, int enable)
  ******************************************************************************/
 int efx_hunt_open(struct net_device *netdev)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	efx_dword_t cmd;
 
 	/* Set interrupt moderation to 0*/
@@ -486,7 +486,7 @@ int efx_hunt_open(struct net_device *netdev)
 
 void efx_hunt_close(struct net_device *netdev)
 {
-	struct efx_nic *efx = netdev_priv(netdev);
+	struct efx_nic *efx = netdev->priv;
 	struct efx_rx_queue *rxq = &efx->rxq;
 	struct efx_tx_queue *txq = &efx->txq;
 	int i;

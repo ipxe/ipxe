@@ -43,6 +43,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /* Include all architecture-independent I/O API headers */
 #include <ipxe/null_nap.h>
+#include <ipxe/efi/efi_nap.h>
 #include <ipxe/linux/linux_nap.h>
 
 /* Include all architecture-dependent I/O API headers */
@@ -50,6 +51,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /**
  * Sleep until next CPU interrupt
+ *
+ */
+void cpu_halt ( void );
+
+/**
+ * Sleep with interrupts enabled until next CPU interrupt
  *
  */
 void cpu_nap ( void );

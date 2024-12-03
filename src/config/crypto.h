@@ -12,6 +12,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Minimum TLS version */
 #define TLS_VERSION_MIN TLS_VERSION_TLS_1_1
 
+/** Public-key exchange algorithm */
+#define CRYPTO_EXCHANGE_PUBKEY
+
+/** DHE key exchange algorithm */
+#define CRYPTO_EXCHANGE_DHE
+
+/** ECDHE key exchange algorithm */
+#define CRYPTO_EXCHANGE_ECDHE
+
 /** RSA public-key algorithm */
 #define CRYPTO_PUBKEY_RSA
 
@@ -47,6 +56,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** SHA-512/256 digest algorithm */
 //#define CRYPTO_DIGEST_SHA512_256
+
+/** X25519 elliptic curve */
+#define CRYPTO_CURVE_X25519
 
 /** Margin of error (in seconds) allowed in signed timestamps
  *

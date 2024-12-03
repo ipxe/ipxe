@@ -89,7 +89,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_EIO, 0x05, "HTTP 5xx Server Error" )
 #define ENOENT_404 __einfo_error ( EINFO_ENOENT_404 )
 #define EINFO_ENOENT_404 \
-	__einfo_uniqify ( EINFO_ENOENT, 0x01, "HTTP 404 Not Found" )
+	__einfo_uniqify ( EINFO_ENOENT, 0x01, "Not found" )
 #define ENOTSUP_CONNECTION __einfo_error ( EINFO_ENOTSUP_CONNECTION )
 #define EINFO_ENOTSUP_CONNECTION \
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Unsupported connection header" )
@@ -114,6 +114,7 @@ static struct profiler http_xfer_profiler __profiler = { .name = "http.xfer" };
 
 /** Human-readable error messages */
 struct errortab http_errors[] __errortab = {
+	__einfo_errortab ( EINFO_ENOENT_404 ),
 	__einfo_errortab ( EINFO_EIO_4XX ),
 	__einfo_errortab ( EINFO_EIO_5XX ),
 };

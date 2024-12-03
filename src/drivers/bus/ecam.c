@@ -127,7 +127,7 @@ static int ecam_access ( struct pci_device *pci ) {
 
 	/* Reuse mapping if possible */
 	if ( ( pci->busdevfn - ecam.range.start ) < ecam.range.count )
-		return 0;
+		return ecam.rc;
 
 	/* Clear any existing mapping */
 	if ( ecam.regs ) {
@@ -145,12 +145,22 @@ static int ecam_access ( struct pci_device *pci ) {
 	if ( ecam.range.start > pci->busdevfn ) {
 		DBGC ( &ecam, "ECAM found no allocation for " PCI_FMT "\n",
 		       PCI_ARGS ( pci ) );
+		rc = -ENOENT;
 		goto err_find;
 	}
 
 	/* Map configuration space for this allocation */
 	base = le64_to_cpu ( ecam.alloc.base );
+	base += ( ecam.alloc.start * ECAM_SIZE * PCI_BUSDEVFN ( 0, 1, 0, 0 ) );
 	len = ( ecam.range.count * ECAM_SIZE );
+	if ( base != ( ( unsigned long ) base ) ) {
+		DBGC ( &ecam, "ECAM %04x:[%02x-%02x] could not map "
+		       "[%08llx,%08llx) outside CPU range\n",
+		       le16_to_cpu ( ecam.alloc.segment ), ecam.alloc.start,
+		       ecam.alloc.end, base, ( base + len ) );
+		rc = -ERANGE;
+		goto err_range;
+	}
 	ecam.regs = ioremap ( base, len );
 	if ( ! ecam.regs ) {
 		DBGC ( &ecam, "ECAM %04x:[%02x-%02x] could not map "
@@ -164,12 +174,14 @@ static int ecam_access ( struct pci_device *pci ) {
 	DBGC ( &ecam, "ECAM %04x:[%02x-%02x] mapped [%08llx,%08llx) -> %p\n",
 	       le16_to_cpu ( ecam.alloc.segment ), ecam.alloc.start,
 	       ecam.alloc.end, base, ( base + len ), ecam.regs );
+	ecam.rc = 0;
 	return 0;
 
 	iounmap ( ecam.regs );
  err_ioremap:
+ err_range:
  err_find:
-	ecam.range.count = 0;
+	ecam.rc = rc;
 	return rc;
 }
 
@@ -235,7 +247,7 @@ int ecam_write ( struct pci_device *pci, unsigned int location,
 	if ( ( rc = ecam_access ( pci ) ) != 0 )
 		return rc;
 
-	/* Read from address */
+	/* Write to address */
 	index = ( pci->busdevfn - ecam.range.start );
 	addr = ( ecam.regs + ( index * ECAM_SIZE ) + where );
 	switch ( len ) {
@@ -252,9 +264,19 @@ int ecam_write ( struct pci_device *pci, unsigned int location,
 		assert ( 0 );
 	}
 
+	/* Read from address, to guarantee completion of the write
+	 *
+	 * PCIe configuration space registers may not have read side
+	 * effects.  Reading back is therefore always safe to do, and
+	 * guarantees that the write has reached the device.
+	 */
+	mb();
+	ecam_read ( pci, location, &value );
+
 	return 0;
 }
 
+PROVIDE_PCIAPI_INLINE ( ecam, pci_can_probe );
 PROVIDE_PCIAPI ( ecam, pci_discover, ecam_discover );
 PROVIDE_PCIAPI_INLINE ( ecam, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( ecam, pci_read_config_word );

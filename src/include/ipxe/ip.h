@@ -64,9 +64,27 @@ struct ipv4_miniroute {
 
 	/** IPv4 address */
 	struct in_addr address;
-	/** Subnet mask */
+	/** Subnet mask
+	 *
+	 * An address with all of these bits in common with our IPv4
+	 * address is in the local subnet.
+	 */
 	struct in_addr netmask;
-	/** Gateway address */
+	/** Host mask
+	 *
+	 * An address in the local subnet with all of these bits set
+	 * to zero represents the network address, and an address in
+	 * the local subnet with all of these bits set to one
+	 * represents the directed broadcast address.  All other
+	 * addresses in the local subnet are valid host addresses.
+	 *
+	 * For most subnets, this is the inverse of the subnet mask.
+	 * In a small subnet (/31 or /32) there is no network address
+	 * or directed broadcast address, and all addresses in the
+	 * subnet are valid host addresses.
+	 */
+	struct in_addr hostmask;
+	/** Gateway address, or zero for no gateway */
 	struct in_addr gateway;
 };
 

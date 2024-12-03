@@ -43,8 +43,9 @@ bigint_init_raw ( uint64_t *value0, unsigned int size,
  * @v addend0		Element 0 of big integer to add
  * @v value0		Element 0 of big integer to be added to
  * @v size		Number of elements
+ * @ret carry		Carry out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 		 unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
@@ -53,34 +54,38 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
 	uint64_t *discard_value;
 	uint64_t discard_addend_i;
 	uint64_t discard_value_i;
+	uint64_t discard_temp;
 	unsigned int discard_size;
-	__asm__ __volatile__ ( "move   $t0, $zero\n"
-			       "1:\n\t"
-			       "ld.d   %3, %0, 0\n\t"
+	uint64_t carry;
+
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Load addend[i] and value[i] */
+			       "ld.d %3, %0, 0\n\t"
+			       "ld.d %4, %1, 0\n\t"
+			       /* Add carry flag and addend */
+			       "add.d %4, %4, %6\n\t"
+			       "sltu %5, %4, %6\n\t"
+			       "add.d %4, %4, %3\n\t"
+			       "sltu %6, %4, %3\n\t"
+			       "or %6, %5, %6\n\t"
+			       /* Store value[i] */
+			       "st.d %4, %1, 0\n\t"
+			       /* Loop */
 			       "addi.d %0, %0, 8\n\t"
-			       "ld.d   %4, %1, 0\n\t"
-
-			       "add.d  %4, %4, $t0\n\t"
-			       "sltu   $t0, %4, $t0\n\t"
-
-			       "add.d  %4, %4, %3\n\t"
-			       "sltu   $t1, %4, %3\n\t"
-
-			       "or     $t0, $t0, $t1\n\t"
-			       "st.d   %4,  %1, 0\n\t"
 			       "addi.d %1, %1, 8\n\t"
 			       "addi.w %2, %2, -1\n\t"
-			       "bnez   %2, 1b"
+			       "bnez %2, 1b\n\t"
 			       : "=r" ( discard_addend ),
 				 "=r" ( discard_value ),
 				 "=r" ( discard_size ),
 				 "=r" ( discard_addend_i ),
 				 "=r" ( discard_value_i ),
+				 "=r" ( discard_temp ),
+				 "=r" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( addend0 ),
-				 "1" ( value0 ),
-				 "2" ( size )
-			       : "t0", "t1" );
+			       : "0" ( addend0 ), "1" ( value0 ),
+				 "2" ( size ), "6" ( 0 ) );
+	return carry;
 }
 
 /**
@@ -89,104 +94,131 @@ bigint_add_raw ( const uint64_t *addend0, uint64_t *value0,
  * @v subtrahend0	Element 0 of big integer to subtract
  * @v value0		Element 0 of big integer to be subtracted from
  * @v size		Number of elements
+ * @ret borrow		Borrow out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
 		      unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
 	uint64_t *discard_subtrahend;
 	uint64_t *discard_value;
 	uint64_t discard_subtrahend_i;
 	uint64_t discard_value_i;
+	uint64_t discard_temp;
 	unsigned int discard_size;
-	unsigned int flag = 0;
+	uint64_t borrow;
 
-	discard_subtrahend = (uint64_t*) subtrahend0;
-	discard_value = value0;
-	discard_size = size;
-
-	do {
-		discard_subtrahend_i = *discard_subtrahend;
-		discard_subtrahend++;
-		discard_value_i = *discard_value;
-
-		discard_value_i = discard_value_i - discard_subtrahend_i - flag;
-
-		if ( *discard_value < (discard_subtrahend_i + flag)) {
-			flag = 1;
-		} else {
-			flag = 0;
-		}
-
-		*discard_value = discard_value_i;
-
-		discard_value++;
-		discard_size -= 1;
-	} while (discard_size != 0);
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Load subtrahend[i] and value[i] */
+			       "ld.d %3, %0, 0\n\t"
+			       "ld.d %4, %1, 0\n\t"
+			       /* Subtract carry flag and subtrahend */
+			       "sltu %5, %4, %6\n\t"
+			       "sub.d %4, %4, %6\n\t"
+			       "sltu %6, %4, %3\n\t"
+			       "sub.d %4, %4, %3\n\t"
+			       "or %6, %5, %6\n\t"
+			       /* Store value[i] */
+			       "st.d %4, %1, 0\n\t"
+			       /* Loop */
+			       "addi.d %0, %0, 8\n\t"
+			       "addi.d %1, %1, 8\n\t"
+			       "addi.w %2, %2, -1\n\t"
+			       "bnez %2, 1b\n\t"
+			       : "=r" ( discard_subtrahend ),
+				 "=r" ( discard_value ),
+				 "=r" ( discard_size ),
+				 "=r" ( discard_subtrahend_i ),
+				 "=r" ( discard_value_i ),
+				 "=r" ( discard_temp ),
+				 "=r" ( borrow ),
+				 "+m" ( *value )
+			       : "0" ( subtrahend0 ), "1" ( value0 ),
+				 "2" ( size ), "6" ( 0 ) );
+	return borrow;
 }
 
 /**
- * Rotate big integer left
+ * Shift big integer left
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
 static inline __attribute__ (( always_inline )) void
-bigint_rol_raw ( uint64_t *value0, unsigned int size ) {
+bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
 	uint64_t *discard_value;
 	uint64_t discard_value_i;
+	uint64_t discard_carry;
+	uint64_t discard_temp;
 	unsigned int discard_size;
-	uint64_t current_value_i;
-	unsigned int flag = 0;
 
-	discard_value = value0;
-	discard_size = size;
-	do {
-		discard_value_i = *discard_value;
-		current_value_i = discard_value_i;
-
-		discard_value_i += discard_value_i + flag;
-
-		if (discard_value_i < current_value_i) {
-			flag = 1;
-		} else {
-			flag = 0;
-		}
-
-		*discard_value = discard_value_i;
-		discard_value++;
-		discard_size -= 1;
-	} while ( discard_size != 0 );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Load value[i] */
+			       "ld.d %2, %0, 0\n\t"
+			       /* Shift left */
+			       "rotri.d %2, %2, 63\n\t"
+			       "andi %4, %2, 1\n\t"
+			       "xor %2, %2, %4\n\t"
+			       "or %2, %2, %3\n\t"
+			       "move %3, %4\n\t"
+			       /* Store value[i] */
+			       "st.d %2, %0, 0\n\t"
+			       /* Loop  */
+			       "addi.d %0, %0, 8\n\t"
+			       "addi.w %1, %1, -1\n\t"
+			       "bnez %1, 1b\n\t"
+			       : "=r" ( discard_value ),
+				 "=r" ( discard_size ),
+				 "=r" ( discard_value_i ),
+				 "=r" ( discard_carry ),
+				 "=r" ( discard_temp ),
+				 "+m" ( *value )
+			       : "0" ( value0 ), "1" ( size ), "3" ( 0 )
+			       : "cc" );
 }
 
 /**
- * Rotate big integer right
+ * Shift big integer right
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
  */
 static inline __attribute__ (( always_inline )) void
-bigint_ror_raw ( uint64_t *value0, unsigned int size ) {
+bigint_shr_raw ( uint64_t *value0, unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
 	uint64_t *discard_value;
 	uint64_t discard_value_i;
-	uint64_t discard_value_j;
+	uint64_t discard_carry;
+	uint64_t discard_temp;
 	unsigned int discard_size;
 
-	discard_value = value0;
-	discard_size = size;
-
-	discard_value_j = 0;
-
-	do {
-		discard_size -= 1;
-
-		discard_value_i = *(discard_value + discard_size);
-
-		discard_value_j = (discard_value_j << 63) | (discard_value_i >> 1);
-
-		*(discard_value + discard_size) = discard_value_j;
-
-		discard_value_j = discard_value_i;
-	} while ( discard_size > 0 );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Load value[i] */
+			       "ld.d %2, %0, -8\n\t"
+			       /* Shift right */
+			       "andi %4, %2, 1\n\t"
+			       "xor %2, %2, %4\n\t"
+			       "or %2, %2, %3\n\t"
+			       "move %3, %4\n\t"
+			       "rotri.d %2, %2, 1\n\t"
+			       /* Store value[i] */
+			       "st.d %2, %0, -8\n\t"
+			       /* Loop  */
+			       "addi.d %0, %0, -8\n\t"
+			       "addi.w %1, %1, -1\n\t"
+			       "bnez %1, 1b\n\t"
+			       : "=r" ( discard_value ),
+				 "=r" ( discard_size ),
+				 "=r" ( discard_value_i ),
+				 "=r" ( discard_carry ),
+				 "=r" ( discard_temp ),
+				 "+m" ( *value )
+			       : "0" ( value0 + size ), "1" ( size ), "3" ( 0 )
+			       : "cc" );
 }
 
 /**
@@ -234,25 +266,6 @@ bigint_is_geq_raw ( const uint64_t *value0, const uint64_t *reference0,
 	} while ( --size );
 
 	return ( value_i >= reference_i );
-}
-
-/**
- * Test if bit is set in big integer
- *
- * @v value0		Element 0 of big integer
- * @v size		Number of elements
- * @v bit		Bit to test
- * @ret is_set		Bit is set
- */
-static inline __attribute__ (( always_inline )) int
-bigint_bit_is_set_raw ( const uint64_t *value0, unsigned int size,
-			unsigned int bit ) {
-	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
-		( ( const void * ) value0 );
-	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
-	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
-
-	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
 }
 
 /**
@@ -329,8 +342,39 @@ bigint_done_raw ( const uint64_t *value0, unsigned int size __unused,
 		*(--out_byte) = *(value_byte++);
 }
 
-extern void bigint_multiply_raw ( const uint64_t *multiplicand0,
-				  const uint64_t *multiplier0,
-				  uint64_t *value0, unsigned int size );
+/**
+ * Multiply big integer elements
+ *
+ * @v multiplicand	Multiplicand element
+ * @v multiplier	Multiplier element
+ * @v result		Result element
+ * @v carry		Carry element
+ */
+static inline __attribute__ (( always_inline )) void
+bigint_multiply_one ( const uint64_t multiplicand, const uint64_t multiplier,
+		      uint64_t *result, uint64_t *carry ) {
+	uint64_t discard_low;
+	uint64_t discard_high;
+	uint64_t discard_carry;
+
+	__asm__ __volatile__ ( /* Perform multiplication */
+			       "mul.d %0, %5, %6\n\t"
+			       "mulh.du %1, %5, %6\n\t"
+			       /* Accumulate low half */
+			       "add.d %3, %3, %0\n\t"
+			       "sltu %2, %3, %0\n\t"
+			       "add.d %1, %1, %2\n\t"
+			       /* Accumulate carry (cannot overflow) */
+			       "add.d %3, %3, %4\n\t"
+			       "sltu %2, %3, %4\n\t"
+			       "add.d %4, %1, %2\n\t"
+			       : "=&r" ( discard_low ),
+				 "=r" ( discard_high ),
+				 "=r" ( discard_carry ),
+				 "+r" ( *result ),
+				 "+r" ( *carry )
+			       : "r" ( multiplicand ),
+				 "r" ( multiplier ) );
+}
 
 #endif /* _BITS_BIGINT_H */

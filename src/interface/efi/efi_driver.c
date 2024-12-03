@@ -62,18 +62,85 @@ static LIST_HEAD ( efi_devices );
 static int efi_driver_disconnecting;
 
 /**
- * Find EFI device
+ * Allocate new EFI device
  *
  * @v device		EFI device handle
+ * @ret efidev		EFI device, or NULL on error
+ */
+struct efi_device * efidev_alloc ( EFI_HANDLE device ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_device *efidev = NULL;
+	union {
+		EFI_DEVICE_PATH_PROTOCOL *path;
+		void *interface;
+	} path;
+	EFI_DEVICE_PATH_PROTOCOL *path_end;
+	size_t path_len;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Open device path */
+	if ( ( efirc = bs->OpenProtocol ( device,
+					  &efi_device_path_protocol_guid,
+					  &path.interface, efi_image_handle,
+					  device,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
+		rc = -EEFI ( efirc );
+		DBGC ( device, "EFIDRV %s could not open device path: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		goto err_open_path;
+	}
+	path_len = ( efi_path_len ( path.path ) + sizeof ( *path_end ) );
+
+	/* Allocate and initialise structure */
+	efidev = zalloc ( sizeof ( *efidev ) + path_len );
+	if ( ! efidev )
+		goto err_alloc;
+	efidev->device = device;
+	efidev->dev.desc.bus_type = BUS_TYPE_EFI;
+	efidev->path = ( ( ( void * ) efidev ) + sizeof ( *efidev ) );
+	memcpy ( efidev->path, path.path, path_len );
+	INIT_LIST_HEAD ( &efidev->dev.children );
+	list_add ( &efidev->dev.siblings, &efi_devices );
+
+ err_alloc:
+	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
+			    efi_image_handle, device );
+ err_open_path:
+	return efidev;
+}
+
+/**
+ * Free EFI device
+ *
+ * @v efidev		EFI device
+ */
+void efidev_free ( struct efi_device *efidev ) {
+
+	assert ( list_empty ( &efidev->dev.children ) );
+	list_del ( &efidev->dev.siblings );
+	free ( efidev );
+}
+
+/**
+ * Find EFI device
+ *
+ * @v device		EFI device handle (or child handle)
  * @ret efidev		EFI device, or NULL if not found
  */
 static struct efi_device * efidev_find ( EFI_HANDLE device ) {
 	struct efi_device *efidev;
 
+	/* Avoid false positive matches against NULL children */
+	if ( ! device )
+		return NULL;
+
 	/* Look for an existing EFI device */
 	list_for_each_entry ( efidev, &efi_devices, dev.siblings ) {
-		if ( efidev->device == device )
+		if ( ( device == efidev->device ) ||
+		     ( device == efidev->child ) ) {
 			return efidev;
+		}
 	}
 
 	return NULL;
@@ -153,16 +220,9 @@ efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 static EFI_STATUS EFIAPI
 efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		   EFI_HANDLE device, EFI_DEVICE_PATH_PROTOCOL *child ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_driver *efidrv;
 	struct efi_device *efidev;
 	struct efi_saved_tpl tpl;
-	union {
-		EFI_DEVICE_PATH_PROTOCOL *path;
-		void *interface;
-	} path;
-	EFI_DEVICE_PATH_PROTOCOL *path_end;
-	size_t path_len;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -191,36 +251,12 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		goto err_disconnecting;
 	}
 
-	/* Open device path */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_device_path_protocol_guid,
-					  &path.interface, efi_image_handle,
-					  device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIDRV %s could not open device path: %s\n",
-		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_open_path;
-	}
-	path_len = ( efi_path_len ( path.path ) + sizeof ( *path_end ) );
-
-	/* Allocate and initialise structure */
-	efidev = zalloc ( sizeof ( *efidev ) + path_len );
+	/* Add new device */
+	efidev = efidev_alloc ( device );
 	if ( ! efidev ) {
 		efirc = EFI_OUT_OF_RESOURCES;
 		goto err_alloc;
 	}
-	efidev->device = device;
-	efidev->dev.desc.bus_type = BUS_TYPE_EFI;
-	efidev->path = ( ( ( void * ) efidev ) + sizeof ( *efidev ) );
-	memcpy ( efidev->path, path.path, path_len );
-	INIT_LIST_HEAD ( &efidev->dev.children );
-	list_add ( &efidev->dev.siblings, &efi_devices );
-
-	/* Close device path */
-	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-			    efi_image_handle, device );
-	path.path = NULL;
 
 	/* Try to start this device */
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
@@ -245,14 +281,8 @@ efi_driver_start ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	}
 	efirc = EFI_UNSUPPORTED;
 
-	list_del ( &efidev->dev.siblings );
-	free ( efidev );
+	efidev_free ( efidev );
  err_alloc:
-	if ( path.path ) {
-		bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-				    efi_image_handle, device );
-	}
- err_open_path:
  err_disconnecting:
 	efi_restore_tpl ( &tpl );
  err_already_started:
@@ -300,8 +330,7 @@ efi_driver_stop ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 	efidrv = efidev->driver;
 	assert ( efidrv != NULL );
 	efidrv->stop ( efidev );
-	list_del ( &efidev->dev.siblings );
-	free ( efidev );
+	efidev_free ( efidev );
 
 	efi_restore_tpl ( &tpl );
 	return 0;

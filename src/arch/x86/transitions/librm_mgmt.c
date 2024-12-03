@@ -45,6 +45,9 @@ struct idtr64 idtr64 = {
 	.limit = ( sizeof ( idt64 ) - 1 ),
 };
 
+/** Startup IPI register state */
+struct i386_regs sipi_regs;
+
 /** Length of stack dump */
 #define STACK_DUMP_LEN 128
 
@@ -400,6 +403,29 @@ __asmcall void check_fxsr ( struct i386_all_regs *regs ) {
 		regs->flags |= CF;
 	DBGC ( &features, "FXSAVE/FXRSTOR is%s supported\n",
 	       ( ( regs->flags & CF ) ? " not" : "" ) );
+}
+
+/**
+ * Set up startup IPI handler
+ *
+ * @v vector		Startup IPI vector
+ * @v handler		Protected-mode startup IPI handler physical address
+ * @v regs		Initial register state
+ */
+void setup_sipi ( unsigned int vector, uint32_t handler,
+		  struct i386_regs *regs ) {
+
+	/* Record protected-mode handler */
+	sipi_handler = handler;
+
+	/* Update copy of rm_ds */
+	sipi_ds = rm_ds;
+
+	/* Save register state */
+	memcpy ( &sipi_regs, regs, sizeof ( sipi_regs ) );
+
+	/* Copy real-mode handler */
+	copy_to_real ( ( vector << 8 ), 0, sipi, ( ( size_t ) sipi_len ) );
 }
 
 PROVIDE_UACCESS_INLINE ( librm, phys_to_user );

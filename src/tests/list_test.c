@@ -440,6 +440,22 @@ static void list_test_exec ( void ) {
 	ok ( list_is_first_entry ( &list_tests[3], list, list ) );
 	ok ( list_is_last_entry ( &list_tests[3], list, list ) );
 
+	/* Test list_is_head_entry() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[1].list, list );
+	list_add_tail ( &list_tests[6].list, list );
+	list_add_tail ( &list_tests[8].list, list );
+	ok ( list_is_head_entry ( list_entry ( list, typeof ( *pos ), list ),
+				  list, list ) );
+	ok ( ! list_is_head_entry ( &list_tests[1], list, list ) );
+	ok ( ! list_is_head_entry ( &list_tests[6], list, list ) );
+	ok ( ! list_is_head_entry ( &list_tests[8], list, list ) );
+	list_for_each_entry ( pos, list, list ) {
+		ok ( list_contains_entry ( pos, list, list ) );
+		ok ( ! list_is_head_entry ( pos, list, list ) );
+	}
+	ok ( list_is_head_entry ( pos, list, list ) );
+
 	/* Test list_for_each() */
 	INIT_LIST_HEAD ( list );
 	list_add_tail ( &list_tests[6].list, list );
@@ -501,6 +517,38 @@ static void list_test_exec ( void ) {
 	pos = &list_tests[4];
 	list_iterate_entry_ok ( list_for_each_entry_continue_reverse, "",
 				pos, list, list );
+
+	/* Test list_for_each_entry_safe_continue() */
+	INIT_LIST_HEAD ( list );
+	list_add_tail ( &list_tests[9].list, list );
+	list_add_tail ( &list_tests[4].list, list );
+	list_add_tail ( &list_tests[2].list, list );
+	list_add_tail ( &list_tests[5].list, list );
+	list_add_tail ( &list_tests[7].list, list );
+	{
+		char *expecteds[] = { "94257", "9457", "947", "94" };
+		char **expected = expecteds;
+		pos = &list_tests[4];
+		list_for_each_entry_safe_continue ( pos, tmp, list, list ) {
+			list_contents_ok ( list, *expected );
+			list_del ( &pos->list );
+			expected++;
+			list_contents_ok ( list, *expected );
+		}
+	}
+	list_contents_ok ( list, "94" );
+	{
+		char *expecteds[] = { "94", "4", "" };
+		char **expected = expecteds;
+		ok ( pos == list_entry ( list, struct list_test, list ) );
+		list_for_each_entry_safe_continue ( pos, tmp, list, list ) {
+			list_contents_ok ( list, *expected );
+			list_del ( &pos->list );
+			expected++;
+			list_contents_ok ( list, *expected );
+		}
+	}
+	ok ( list_empty ( list ) );
 
 	/* Test list_contains() and list_contains_entry() */
 	INIT_LIST_HEAD ( list );

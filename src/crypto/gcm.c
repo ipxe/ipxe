@@ -109,6 +109,9 @@ static union gcm_block gcm_cached_mult[256];
  */
 static uint16_t gcm_cached_reduce[256];
 
+/** Offset of a field within GCM context */
+#define gcm_offset( field ) offsetof ( struct gcm_context, field )
+
 /**
  * Reverse bits in a byte
  *
@@ -469,16 +472,14 @@ int gcm_setkey ( struct gcm_context *context, const void *key, size_t keylen,
  * @v ivlen		Initialisation vector length
  */
 void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
-	union gcm_block *check = ( ( void * ) context );
-
-	/* Sanity checks */
-	linker_assert ( &context->hash == check, gcm_bad_layout );
-	linker_assert ( &context->len == check + 1, gcm_bad_layout );
-	linker_assert ( &context->ctr == check + 2, gcm_bad_layout );
-	linker_assert ( &context->key == check + 3, gcm_bad_layout );
 
 	/* Reset non-key state */
-	memset ( context, 0, offsetof ( typeof ( *context ), key ) );
+	memset ( context, 0, gcm_offset ( key ) );
+	build_assert ( gcm_offset ( key ) > gcm_offset ( hash ) );
+	build_assert ( gcm_offset ( key ) > gcm_offset ( len ) );
+	build_assert ( gcm_offset ( key ) > gcm_offset ( ctr ) );
+	build_assert ( gcm_offset ( key ) < gcm_offset ( raw_cipher ) );
+	build_assert ( gcm_offset ( key ) < gcm_offset ( raw_ctx ) );
 
 	/* Reset counter */
 	context->ctr.ctr.value = cpu_to_be32 ( 1 );
@@ -497,7 +498,12 @@ void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
 		assert ( context->len.len.add == 0 );
 
 		/* Reset non-key, non-counter state */
-		memset ( context, 0, offsetof ( typeof ( *context ), ctr ) );
+		memset ( context, 0, gcm_offset ( ctr ) );
+		build_assert ( gcm_offset ( ctr ) > gcm_offset ( hash ) );
+		build_assert ( gcm_offset ( ctr ) > gcm_offset ( len ) );
+		build_assert ( gcm_offset ( ctr ) < gcm_offset ( key ) );
+		build_assert ( gcm_offset ( ctr ) < gcm_offset ( raw_cipher ) );
+		build_assert ( gcm_offset ( ctr ) < gcm_offset ( raw_ctx ) );
 	}
 
 	DBGC2 ( context, "GCM %p Y[0]:\n", context );

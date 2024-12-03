@@ -5,6 +5,20 @@
 
 ###############################################################################
 #
+# Make syntax does not allow use of comma or space in certain places.
+# This ugly workaround is suggested in the manual.
+#
+COMMA	:= ,
+EMPTY	:=
+SPACE	:= $(EMPTY) $(EMPTY)
+HASH	:= \#
+define NEWLINE
+
+
+endef
+
+###############################################################################
+#
 # Find a usable "echo -e" substitute.
 #
 TAB 			:= $(shell $(PRINTF) '\t')
@@ -70,56 +84,6 @@ hostos :
 
 ###############################################################################
 #
-# Determine compiler
-
-CCDEFS		:= $(shell $(CC) -E -x c -c /dev/null -dM | cut -d" " -f2)
-ccdefs:
-	@$(ECHO) $(CCDEFS)
-
-ifeq ($(filter __GNUC__,$(CCDEFS)),__GNUC__)
-CCTYPE		:= gcc
-endif
-cctype:
-	@$(ECHO) $(CCTYPE)
-
-###############################################################################
-#
-# Check for tools that can cause failed builds
-#
-
-ifeq ($(CCTYPE),gcc)
-GCC_2_96_BANNER := $(shell $(CC) -v 2>&1 | grep -is 'gcc version 2\.96')
-ifneq ($(GCC_2_96_BANNER),)
-$(warning gcc 2.96 is unsuitable for compiling iPXE)
-$(warning Use gcc 2.95 or a newer version instead)
-$(error Unsuitable build environment found)
-endif
-endif
-
-PERL_UNICODE_CHECK := $(shell $(PERL) -e 'use bytes; print chr(255)' | wc -c)
-ifeq ($(PERL_UNICODE_CHECK),2)
-$(warning Your Perl version has a Unicode handling bug)
-$(warning Execute this command before building iPXE:)
-$(warning export LANG=$${LANG%.UTF-8})
-$(error Unsuitable build environment found)
-endif
-
-LD_GOLD_BANNER := $(shell $(LD) -v 2>&1 | grep 'GNU gold')
-ifneq ($(LD_GOLD_BANNER),)
-$(warning GNU gold is unsuitable for building iPXE)
-$(warning Use GNU ld instead)
-$(error Unsuitable build environment found)
-endif
-
-OBJCOPY_ETC_BANNER := $(shell $(OBJCOPY) --version | grep 'elftoolchain')
-ifneq ($(OBJCOPY_ETC_BANNER),)
-$(warning The elftoolchain objcopy is unsuitable for building iPXE)
-$(warning Use binutils objcopy instead)
-$(error Unsuitable build environment found)
-endif
-
-###############################################################################
-#
 # Check if $(eval ...) is available to use
 #
 
@@ -129,74 +93,6 @@ $(eval HAVE_EVAL := yes)
 endif
 eval :
 	@$(ECHO) $(HAVE_EVAL)
-
-###############################################################################
-#
-# Check for various tool workarounds
-#
-
-WORKAROUND_CFLAGS :=
-WORKAROUND_ASFLAGS :=
-WORKAROUND_LDFLAGS :=
-
-# Make syntax does not allow use of comma or space in certain places.
-# This ugly workaround is suggested in the manual.
-#
-COMMA	:= ,
-EMPTY	:=
-SPACE	:= $(EMPTY) $(EMPTY)
-HASH	:= \#
-define NEWLINE
-
-
-endef
-
-# gcc 4.4 generates .eh_frame sections by default, which distort the
-# output of "size".  Inhibit this.
-#
-ifeq ($(CCTYPE),gcc)
-CFI_TEST = $(CC) -fno-dwarf2-cfi-asm -fno-exceptions -fno-unwind-tables \
-		 -fno-asynchronous-unwind-tables -x c -c /dev/null \
-		 -o /dev/null >/dev/null 2>&1
-CFI_FLAGS := $(shell $(CFI_TEST) && \
-	       $(ECHO) '-fno-dwarf2-cfi-asm -fno-exceptions ' \
-		       '-fno-unwind-tables -fno-asynchronous-unwind-tables')
-WORKAROUND_CFLAGS += $(CFI_FLAGS)
-endif
-
-# gcc 4.6 generates spurious warnings if -Waddress is in force.
-# Inhibit this.
-#
-ifeq ($(CCTYPE),gcc)
-WNA_TEST = $(CC) -Waddress -x c -c /dev/null -o /dev/null >/dev/null 2>&1
-WNA_FLAGS := $(shell $(WNA_TEST) && $(ECHO) '-Wno-address')
-WORKAROUND_CFLAGS += $(WNA_FLAGS)
-
-# gcc 8.0 generates warnings for certain suspect string operations. Our
-# sources have been vetted for correct usage.  Turn off these warnings.
-#
-WNST_TEST = $(CC) -Wstringop-truncation -x c -c /dev/null -o /dev/null \
-		  >/dev/null 2>&1
-WNST_FLAGS := $(shell $(WNST_TEST) && $(ECHO) '-Wno-stringop-truncation')
-WORKAROUND_CFLAGS += $(WNST_FLAGS)
-
-# gcc 9.1 generates warnings for taking address of packed member which
-# may result in an unaligned pointer value.  Inhibit the warnings.
-#
-WNAPM_TEST = $(CC) -Wno-address-of-packed-member -x c -c /dev/null \
-		   -o /dev/null >/dev/null 2>&1
-WNAPM_FLAGS := $(shell $(WNAPM_TEST) && \
-		 $(ECHO) '-Wno-address-of-packed-member')
-WORKAROUND_CFLAGS += $(WNAPM_FLAGS)
-endif
-
-# Some versions of gas choke on division operators, treating them as
-# comment markers.  Specifying --divide will work around this problem,
-# but isn't available on older gas versions.
-#
-DIVIDE_TEST = $(AS) --divide /dev/null -o /dev/null 2>/dev/null
-DIVIDE_FLAGS := $(shell $(DIVIDE_TEST) && $(ECHO) '--divide')
-WORKAROUND_ASFLAGS += $(DIVIDE_FLAGS)
 
 ###############################################################################
 #
@@ -284,7 +180,7 @@ ifeq ($(wildcard $(BIN)),)
 $(shell $(MKDIR) -p $(BIN))
 endif
 
-# Target to allow e.g. "make bin-efi arch"
+# Target to allow e.g. "make bin-x86_64-efi arch"
 #
 $(BIN) :
 	@# Do nothing, silently
@@ -333,8 +229,13 @@ else
 BIN_AP		:= $(BIN_APS)
 BIN_SECUREBOOT	:= 0
 endif
-BIN_PLATFORM	:= $(lastword $(BIN_AP))
-BIN_ARCH	:= $(wordlist 2,$(words $(BIN_AP)),discard $(BIN_AP))
+ifeq ($(BIN_AP),efi)
+BIN_ARCH	:= i386
+BIN_PLATFORM	:= efi
+else
+BIN_ARCH	:= $(word 1,$(BIN_AP))
+BIN_PLATFORM	:= $(word 2,$(BIN_AP))
+endif
 
 # Determine build architecture
 DEFAULT_ARCH	:= i386
@@ -345,8 +246,12 @@ arch :
 .PHONY : arch
 
 # Determine build platform
-DEFAULT_PLATFORM := pcbios
-PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM))
+DEFAULT_PLATFORM_i386 := pcbios
+DEFAULT_PLATFORM_x86_64 := pcbios
+DEFAULT_PLATFORM_riscv32 := sbi
+DEFAULT_PLATFORM_riscv64 := sbi
+DEFAULT_PLATFORM := $(DEFAULT_PLATFORM_$(ARCH))
+PLATFORM	:= $(firstword $(BIN_PLATFORM) $(DEFAULT_PLATFORM) none)
 CFLAGS		+= -DPLATFORM=$(PLATFORM) -DPLATFORM_$(PLATFORM)
 platform :
 	@$(ECHO) $(PLATFORM)
@@ -358,17 +263,127 @@ CFLAGS		+= -DSECUREBOOT=$(SECUREBOOT)
 secureboot :
 	@$(ECHO) $(SECUREBOOT)
 
+# Set cross-compilation prefix automatically if not specified
+ifeq ($(CROSS_COMPILE),)
+CROSS_COMPILE	:= $(CROSS_COMPILE_$(ARCH))
+endif
+
 endif # defined(BIN)
 
+###############################################################################
+#
+# Determine compiler
+
+CCDEFS		:= $(shell $(CC) -E -x c -c /dev/null -dM | cut -d" " -f2)
+ccdefs:
+	@$(ECHO) $(CCDEFS)
+
+ifeq ($(filter __GNUC__,$(CCDEFS)),__GNUC__)
+CCTYPE		:= gcc
+endif
+cctype:
+	@$(ECHO) $(CCTYPE)
+
+###############################################################################
+#
+# Check for tools that can cause failed builds
+#
+
+ifeq ($(CCTYPE),gcc)
+GCC_2_96_BANNER := $(shell $(CC) -v 2>&1 | grep -is 'gcc version 2\.96')
+ifneq ($(GCC_2_96_BANNER),)
+$(warning gcc 2.96 is unsuitable for compiling iPXE)
+$(warning Use gcc 2.95 or a newer version instead)
+$(error Unsuitable build environment found)
+endif
+endif
+
+PERL_UNICODE_CHECK := $(shell $(PERL) -e 'use bytes; print chr(255)' | wc -c)
+ifeq ($(PERL_UNICODE_CHECK),2)
+$(warning Your Perl version has a Unicode handling bug)
+$(warning Execute this command before building iPXE:)
+$(warning export LANG=$${LANG%.UTF-8})
+$(error Unsuitable build environment found)
+endif
+
+LD_GOLD_BANNER := $(shell $(LD) -v 2>&1 | grep 'GNU gold')
+ifneq ($(LD_GOLD_BANNER),)
+$(warning GNU gold is unsuitable for building iPXE)
+$(warning Use GNU ld instead)
+$(error Unsuitable build environment found)
+endif
+
+OBJCOPY_ETC_BANNER := $(shell $(OBJCOPY) --version | grep 'elftoolchain')
+ifneq ($(OBJCOPY_ETC_BANNER),)
+$(warning The elftoolchain objcopy is unsuitable for building iPXE)
+$(warning Use binutils objcopy instead)
+$(error Unsuitable build environment found)
+endif
+
+###############################################################################
+#
+# Check for various tool workarounds
+#
+
+WORKAROUND_CFLAGS :=
+WORKAROUND_ASFLAGS :=
+WORKAROUND_LDFLAGS :=
+
+# gcc 4.4 generates .eh_frame sections by default, which distort the
+# output of "size".  Inhibit this.
+#
+ifeq ($(CCTYPE),gcc)
+CFI_TEST = $(CC) -fno-dwarf2-cfi-asm -fno-exceptions -fno-unwind-tables \
+		 -fno-asynchronous-unwind-tables -x c -c /dev/null \
+		 -o /dev/null >/dev/null 2>&1
+CFI_FLAGS := $(shell $(CFI_TEST) && \
+	       $(ECHO) '-fno-dwarf2-cfi-asm -fno-exceptions ' \
+		       '-fno-unwind-tables -fno-asynchronous-unwind-tables')
+WORKAROUND_CFLAGS += $(CFI_FLAGS)
+endif
+
+# gcc 4.6 generates spurious warnings if -Waddress is in force.
+# Inhibit this.
+#
+ifeq ($(CCTYPE),gcc)
+WNA_TEST = $(CC) -Waddress -x c -c /dev/null -o /dev/null >/dev/null 2>&1
+WNA_FLAGS := $(shell $(WNA_TEST) && $(ECHO) '-Wno-address')
+WORKAROUND_CFLAGS += $(WNA_FLAGS)
+
+# gcc 8.0 generates warnings for certain suspect string operations. Our
+# sources have been vetted for correct usage.  Turn off these warnings.
+#
+WNST_TEST = $(CC) -Wstringop-truncation -x c -c /dev/null -o /dev/null \
+		  >/dev/null 2>&1
+WNST_FLAGS := $(shell $(WNST_TEST) && $(ECHO) '-Wno-stringop-truncation')
+WORKAROUND_CFLAGS += $(WNST_FLAGS)
+
+# gcc 9.1 generates warnings for taking address of packed member which
+# may result in an unaligned pointer value.  Inhibit the warnings.
+#
+WNAPM_TEST = $(CC) -Wno-address-of-packed-member -x c -c /dev/null \
+		   -o /dev/null >/dev/null 2>&1
+WNAPM_FLAGS := $(shell $(WNAPM_TEST) && \
+		 $(ECHO) '-Wno-address-of-packed-member')
+WORKAROUND_CFLAGS += $(WNAPM_FLAGS)
+endif
+
+# Some versions of gas choke on division operators, treating them as
+# comment markers.  Specifying --divide will work around this problem,
+# but isn't available on older gas versions.
+#
+DIVIDE_TEST = $(AS) --divide /dev/null -o /dev/null 2>/dev/null
+DIVIDE_FLAGS := $(shell $(DIVIDE_TEST) && $(ECHO) '--divide')
+WORKAROUND_ASFLAGS += $(DIVIDE_FLAGS)
+
+###############################################################################
+#
 # Include architecture-specific Makefile
+#
+
 ifdef ARCH
 MAKEDEPS	+= arch/$(ARCH)/Makefile
 include arch/$(ARCH)/Makefile
-endif
-
-# Include architecture-specific include path
-ifdef ARCH
-INCDIRS		+= arch/$(ARCH)/include
 endif
 
 ###############################################################################

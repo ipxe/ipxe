@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 	.section ".note.GNU-stack", "", @progbits
-	.text
+	.code32
 	.arch i486
 	.section ".prefix.lib", "ax", @progbits
 

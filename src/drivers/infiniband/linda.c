@@ -721,7 +721,7 @@ static int linda_init_recv ( struct linda *linda ) {
 		eager_array_size_other = LINDA_EAGER_ARRAY_SIZE_17CTX_OTHER;
 		break;
 	default:
-		linker_assert ( 0, invalid_LINDA_NUM_CONTEXTS );
+		build_assert ( 0 );
 		return -EINVAL;
 	}
 
@@ -1108,7 +1108,7 @@ static int linda_post_recv ( struct ib_device *ibdev,
 	case 16384: bufsize = LINDA_EAGER_BUFFER_16K; break;
 	case 32768: bufsize = LINDA_EAGER_BUFFER_32K; break;
 	case 65536: bufsize = LINDA_EAGER_BUFFER_64K; break;
-	default:    linker_assert ( 0, invalid_rx_payload_size );
+	default:    build_assert ( 0 );
 		    bufsize = LINDA_EAGER_BUFFER_NONE;
 	}
 

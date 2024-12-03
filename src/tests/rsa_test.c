@@ -43,171 +43,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/test.h>
 #include "pubkey_test.h"
 
-/** Define inline private key data */
-#define PRIVATE(...) { __VA_ARGS__ }
-
-/** Define inline public key data */
-#define PUBLIC(...) { __VA_ARGS__ }
-
-/** Define inline plaintext data */
-#define PLAINTEXT(...) { __VA_ARGS__ }
-
-/** Define inline ciphertext data */
-#define CIPHERTEXT(...) { __VA_ARGS__ }
-
-/** Define inline signature data */
-#define SIGNATURE(...) { __VA_ARGS__ }
-
-/** An RSA encryption and decryption self-test */
-struct rsa_encrypt_decrypt_test {
-	/** Private key */
-	const void *private;
-	/** Private key length */
-	size_t private_len;
-	/** Public key */
-	const void *public;
-	/** Public key length */
-	size_t public_len;
-	/** Plaintext */
-	const void *plaintext;
-	/** Plaintext length */
-	size_t plaintext_len;
-	/** Ciphertext
-	 *
-	 * Note that the encryption process includes some random
-	 * padding, so a given plaintext will encrypt to multiple
-	 * different ciphertexts.
-	 */
-	const void *ciphertext;
-	/** Ciphertext length */
-	size_t ciphertext_len;
-};
-
-/**
- * Define an RSA encryption and decryption test
- *
- * @v name		Test name
- * @v PRIVATE		Private key
- * @v PUBLIC		Public key
- * @v PLAINTEXT		Plaintext
- * @v CIPHERTEXT	Ciphertext
- * @ret test		Encryption and decryption test
- */
-#define RSA_ENCRYPT_DECRYPT_TEST( name, PRIVATE, PUBLIC, PLAINTEXT,	\
-				  CIPHERTEXT )				\
-	static const uint8_t name ## _private[] = PRIVATE;		\
-	static const uint8_t name ## _public[] = PUBLIC;		\
-	static const uint8_t name ## _plaintext[] = PLAINTEXT;		\
-	static const uint8_t name ## _ciphertext[] = CIPHERTEXT;	\
-	static struct rsa_encrypt_decrypt_test name = {			\
-		.private = name ## _private,				\
-		.private_len = sizeof ( name ## _private ),		\
-		.public = name ## _public,				\
-		.public_len = sizeof ( name ## _public ),		\
-		.plaintext = name ## _plaintext,			\
-		.plaintext_len = sizeof ( name ## _plaintext ),		\
-		.ciphertext = name ## _ciphertext,			\
-		.ciphertext_len = sizeof ( name ## _ciphertext ),	\
-	}
-
-/** An RSA signature self-test */
-struct rsa_signature_test {
-	/** Private key */
-	const void *private;
-	/** Private key length */
-	size_t private_len;
-	/** Public key */
-	const void *public;
-	/** Public key length */
-	size_t public_len;
-	/** Plaintext */
-	const void *plaintext;
-	/** Plaintext length */
-	size_t plaintext_len;
-	/** Signature algorithm */
-	struct asn1_algorithm *algorithm;
-	/** Signature */
-	const void *signature;
-	/** Signature length */
-	size_t signature_len;
-};
-
-/**
- * Define an RSA signature test
- *
- * @v name		Test name
- * @v PRIVATE		Private key
- * @v PUBLIC		Public key
- * @v PLAINTEXT		Plaintext
- * @v ALGORITHM		Signature algorithm
- * @v SIGNATURE		Signature
- * @ret test		Signature test
- */
-#define RSA_SIGNATURE_TEST( name, PRIVATE, PUBLIC, PLAINTEXT,		\
-			    ALGORITHM, SIGNATURE )			\
-	static const uint8_t name ## _private[] = PRIVATE;		\
-	static const uint8_t name ## _public[] = PUBLIC;		\
-	static const uint8_t name ## _plaintext[] = PLAINTEXT;		\
-	static const uint8_t name ## _signature[] = SIGNATURE;		\
-	static struct rsa_signature_test name = {			\
-		.private = name ## _private,				\
-		.private_len = sizeof ( name ## _private ),		\
-		.public = name ## _public,				\
-		.public_len = sizeof ( name ## _public ),		\
-		.plaintext = name ## _plaintext,			\
-		.plaintext_len = sizeof ( name ## _plaintext ),		\
-		.algorithm = ALGORITHM,					\
-		.signature = name ## _signature,			\
-		.signature_len = sizeof ( name ## _signature ),		\
-	}
-
-/**
- * Report RSA encryption and decryption test result
- *
- * @v test		RSA encryption and decryption test
- */
-#define rsa_encrypt_decrypt_ok( test ) do {				\
-	pubkey_decrypt_ok ( &rsa_algorithm, (test)->private,		\
-			    (test)->private_len, (test)->ciphertext,	\
-			    (test)->ciphertext_len, (test)->plaintext,	\
-			    (test)->plaintext_len );			\
-	pubkey_encrypt_ok ( &rsa_algorithm, (test)->private,		\
-			    (test)->private_len, (test)->public,	\
-			    (test)->public_len, (test)->plaintext,	\
-			    (test)->plaintext_len );			\
-	pubkey_encrypt_ok ( &rsa_algorithm, (test)->public,		\
-			    (test)->public_len, (test)->private,	\
-			    (test)->private_len, (test)->plaintext,	\
-			    (test)->plaintext_len );			\
-	} while ( 0 )
-
-
-/**
- * Report RSA signature test result
- *
- * @v test		RSA signature test
- */
-#define rsa_signature_ok( test ) do {					\
-	struct digest_algorithm *digest = (test)->algorithm->digest;	\
-	uint8_t bad_signature[ (test)->signature_len ];			\
-	pubkey_sign_ok ( &rsa_algorithm, (test)->private,		\
-			 (test)->private_len, digest,			\
-			 (test)->plaintext, (test)->plaintext_len,	\
-			 (test)->signature, (test)->signature_len );	\
-	pubkey_verify_ok ( &rsa_algorithm, (test)->public,		\
-			   (test)->public_len, digest,			\
-			   (test)->plaintext, (test)->plaintext_len,	\
-			   (test)->signature, (test)->signature_len );	\
-	memset ( bad_signature, 0, sizeof ( bad_signature ) );		\
-	pubkey_verify_fail_ok ( &rsa_algorithm, (test)->public,		\
-				(test)->public_len, digest,		\
-				(test)->plaintext,			\
-				(test)->plaintext_len, bad_signature,	\
-				sizeof ( bad_signature ) );		\
-	} while ( 0 )
-
 /** "Hello world" encryption and decryption test (traditional PKCS#1 key) */
-RSA_ENCRYPT_DECRYPT_TEST ( hw_test,
+PUBKEY_TEST ( hw_test, &rsa_algorithm,
 	PRIVATE ( 0x30, 0x82, 0x01, 0x3b, 0x02, 0x01, 0x00, 0x02, 0x41, 0x00,
 		  0xd2, 0xf1, 0x04, 0x67, 0xf6, 0x2c, 0x96, 0x07, 0xa6, 0xbd,
 		  0x85, 0xac, 0xc1, 0x17, 0x5d, 0xe8, 0xf0, 0x93, 0x94, 0x0c,
@@ -261,7 +98,7 @@ RSA_ENCRYPT_DECRYPT_TEST ( hw_test,
 		     0x38, 0x43, 0xf9, 0x41 ) );
 
 /** "Hello world" encryption and decryption test (PKCS#8 key) */
-RSA_ENCRYPT_DECRYPT_TEST ( hw_test_pkcs8,
+PUBKEY_TEST ( hw_test_pkcs8, &rsa_algorithm,
 	PRIVATE ( 0x30, 0x82, 0x01, 0x55, 0x02, 0x01, 0x00, 0x30, 0x0d, 0x06,
 		  0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
 		  0x05, 0x00, 0x04, 0x82, 0x01, 0x3f, 0x30, 0x82, 0x01, 0x3b,
@@ -318,7 +155,7 @@ RSA_ENCRYPT_DECRYPT_TEST ( hw_test_pkcs8,
 		     0x38, 0x43, 0xf9, 0x41 ) );
 
 /** Random message MD5 signature test */
-RSA_SIGNATURE_TEST ( md5_test,
+PUBKEY_SIGN_TEST ( md5_test, &rsa_algorithm,
 	PRIVATE ( 0x30, 0x82, 0x01, 0x3b, 0x02, 0x01, 0x00, 0x02, 0x41, 0x00,
 		  0xf9, 0x3f, 0x78, 0x44, 0xe2, 0x0e, 0x25, 0xf1, 0x0e, 0x94,
 		  0xcd, 0xca, 0x6f, 0x9e, 0xea, 0x6d, 0xdf, 0xcd, 0xa0, 0x7c,
@@ -381,7 +218,7 @@ RSA_SIGNATURE_TEST ( md5_test,
 		    0xf2, 0x8d, 0xfc, 0xfc, 0x37, 0xf7, 0xc7, 0x6d, 0x6c, 0xd8,
 		    0x24, 0x0c, 0x6a, 0xec, 0x82, 0x5c, 0x72, 0xf1, 0xfc, 0x05,
 		    0xed, 0x8e, 0xe8, 0xd9, 0x8b, 0x8b, 0x67, 0x02, 0x95 ),
-	&md5_with_rsa_encryption_algorithm,
+	&md5_algorithm,
 	SIGNATURE ( 0xdb, 0x56, 0x3d, 0xea, 0xae, 0x81, 0x4b, 0x3b, 0x2e, 0x8e,
 		    0xb8, 0xee, 0x13, 0x61, 0xc6, 0xe7, 0xd7, 0x50, 0xcd, 0x0d,
 		    0x34, 0x3a, 0xfe, 0x9a, 0x8d, 0xf8, 0xfb, 0xd6, 0x7e, 0xbd,
@@ -391,7 +228,7 @@ RSA_SIGNATURE_TEST ( md5_test,
 		    0xac, 0x45, 0x00, 0xa8 ) );
 
 /** Random message SHA-1 signature test */
-RSA_SIGNATURE_TEST ( sha1_test,
+PUBKEY_SIGN_TEST ( sha1_test, &rsa_algorithm,
 	PRIVATE ( 0x30, 0x82, 0x01, 0x3b, 0x02, 0x01, 0x00, 0x02, 0x41, 0x00,
 		  0xe0, 0x3a, 0x8d, 0x35, 0xe1, 0x92, 0x2f, 0xea, 0x0d, 0x82,
 		  0x60, 0x2e, 0xb6, 0x0b, 0x02, 0xd3, 0xf4, 0x39, 0xfb, 0x06,
@@ -454,7 +291,7 @@ RSA_SIGNATURE_TEST ( sha1_test,
 		    0x30, 0x91, 0x1c, 0xaa, 0x6c, 0x24, 0x42, 0x1b, 0x1a, 0xba,
 		    0x30, 0x40, 0x49, 0x83, 0xd9, 0xd7, 0x66, 0x7e, 0x5c, 0x1a,
 		    0x4b, 0x7f, 0xa6, 0x8e, 0x8a, 0xd6, 0x0c, 0x65, 0x75 ),
-	&sha1_with_rsa_encryption_algorithm,
+	&sha1_algorithm,
 	SIGNATURE ( 0xa5, 0x5a, 0x8a, 0x67, 0x81, 0x76, 0x7e, 0xad, 0x99, 0x22,
 		    0xf1, 0x47, 0x64, 0xd2, 0xfb, 0x81, 0x45, 0xeb, 0x85, 0x56,
 		    0xf8, 0x7d, 0xb8, 0xec, 0x41, 0x17, 0x84, 0xf7, 0x2b, 0xbb,
@@ -464,7 +301,7 @@ RSA_SIGNATURE_TEST ( sha1_test,
 		    0x0e, 0x3d, 0x80, 0x80 ) );
 
 /** Random message SHA-256 signature test */
-RSA_SIGNATURE_TEST ( sha256_test,
+PUBKEY_SIGN_TEST ( sha256_test, &rsa_algorithm,
 	PRIVATE ( 0x30, 0x82, 0x01, 0x3a, 0x02, 0x01, 0x00, 0x02, 0x41, 0x00,
 		  0xa5, 0xe9, 0xdb, 0xa9, 0x1a, 0x6e, 0xd6, 0x4c, 0x25, 0x50,
 		  0xfe, 0x61, 0x77, 0x08, 0x7a, 0x80, 0x36, 0xcb, 0x88, 0x49,
@@ -527,7 +364,7 @@ RSA_SIGNATURE_TEST ( sha256_test,
 		    0x91, 0x71, 0xd6, 0x2d, 0xa1, 0xae, 0x81, 0x0c, 0xed, 0x54,
 		    0x48, 0x79, 0x8a, 0x78, 0x05, 0x74, 0x4d, 0x4f, 0xf0, 0xe0,
 		    0x3c, 0x41, 0x5c, 0x04, 0x0b, 0x68, 0x57, 0xc5, 0xd6 ),
-	&sha256_with_rsa_encryption_algorithm,
+	&sha256_algorithm,
 	SIGNATURE ( 0x02, 0x2e, 0xc5, 0x2a, 0x2b, 0x7f, 0xb4, 0x80, 0xca, 0x9d,
 		    0x96, 0x5b, 0xaf, 0x1f, 0x72, 0x5b, 0x6e, 0xf1, 0x69, 0x7f,
 		    0x4d, 0x41, 0xd5, 0x9f, 0x00, 0xdc, 0x47, 0xf4, 0x68, 0x8f,
@@ -542,11 +379,11 @@ RSA_SIGNATURE_TEST ( sha256_test,
  */
 static void rsa_test_exec ( void ) {
 
-	rsa_encrypt_decrypt_ok ( &hw_test );
-	rsa_encrypt_decrypt_ok ( &hw_test_pkcs8 );
-	rsa_signature_ok ( &md5_test );
-	rsa_signature_ok ( &sha1_test );
-	rsa_signature_ok ( &sha256_test );
+	pubkey_ok ( &hw_test );
+	pubkey_ok ( &hw_test_pkcs8 );
+	pubkey_sign_ok ( &md5_test );
+	pubkey_sign_ok ( &sha1_test );
+	pubkey_sign_ok ( &sha256_test );
 }
 
 /** RSA self-test */
@@ -554,3 +391,9 @@ struct self_test rsa_test __self_test = {
 	.name = "rsa",
 	.exec = rsa_test_exec,
 };
+
+/* Drag in required ASN.1 OID-identified algorithms */
+REQUIRING_SYMBOL ( rsa_test );
+REQUIRE_OBJECT ( rsa_md5 );
+REQUIRE_OBJECT ( rsa_sha1 );
+REQUIRE_OBJECT ( rsa_sha256 );

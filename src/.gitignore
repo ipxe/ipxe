@@ -1,4 +1,4 @@
 .toolcheck
 .echocheck
 TAGS*
-bin*
+bin-*

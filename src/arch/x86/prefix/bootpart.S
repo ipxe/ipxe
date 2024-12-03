@@ -6,10 +6,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define STACK_SIZE	0x2000
 	
 	.section ".note.GNU-stack", "", @progbits
-	.text
+	.code16
 	.arch i386
 	.section ".prefix", "awx", @progbits
-	.code16
 
 /*
  * Find active partition
