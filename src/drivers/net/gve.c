@@ -1543,7 +1543,8 @@ static int gve_probe ( struct pci_device *pci ) {
 	gve->netdev = netdev;
 	gve->tx.type = &gve_tx_type;
 	gve->rx.type = &gve_rx_type;
-	process_init ( &gve->startup, &gve_startup_desc, &netdev->refcnt );
+	process_init_stopped ( &gve->startup, &gve_startup_desc,
+			       &netdev->refcnt );
 	timer_init ( &gve->watchdog, gve_watchdog, &netdev->refcnt );
 
 	/* Fix up PCI device */
