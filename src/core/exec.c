@@ -549,6 +549,42 @@ struct command iseq_command __command = {
 	.exec = iseq_exec,
 };
 
+/** "isin" options */
+struct isin_options {};
+
+/** "isin" option list */
+static struct option_descriptor isin_opts[] = {};
+
+/** "isin" command descriptor */
+static struct command_descriptor isin_cmd =
+	COMMAND_DESC ( struct isin_options, isin_opts, 2, 2,
+					 "<string> <substring>");
+
+/**
+ * "isin" command
+ *
+ * @v argc    Argument count
+ * @v argv    Argument list
+ * @ret rc    Return status code
+ */
+static int isin_exec (int argc, char **argv ) {
+	struct isin_options opts;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &isin_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Return success if first string contains second string */
+	return ( ( strstr ( argv[optind], argv[ optind +1 ] ) != NULL ) ?
+		0: -ERANGE );
+}
+
+struct command isin_command __command = {
+	.name = "isin",
+	.exec = isin_exec,
+};
+
 /** "sleep" options */
 struct sleep_options {};
 
