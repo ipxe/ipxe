@@ -207,20 +207,17 @@ void bigint_mod_invert_sample ( const bigint_element_t *invertend0,
 }
 
 void bigint_montgomery_sample ( const bigint_element_t *modulus0,
-				const bigint_element_t *modinv0,
 				bigint_element_t *mont0,
 				bigint_element_t *result0,
 				unsigned int size ) {
 	const bigint_t ( size ) __attribute__ (( may_alias ))
 		*modulus = ( ( const void * ) modulus0 );
-	const bigint_t ( 1 ) __attribute__ (( may_alias ))
-		*modinv = ( ( const void * ) modinv0 );
 	bigint_t ( 2 * size ) __attribute__ (( may_alias ))
 		*mont = ( ( void * ) mont0 );
 	bigint_t ( size ) __attribute__ (( may_alias ))
 		*result = ( ( void * ) result0 );
 
-	bigint_montgomery ( modulus, modinv, mont, result );
+	bigint_montgomery ( modulus, mont, result );
 }
 
 void bigint_mod_exp_sample ( const bigint_element_t *base0,
@@ -631,7 +628,6 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	unsigned int size =						\
 		bigint_required_size ( sizeof ( modulus_raw ) );	\
 	bigint_t ( size ) modulus_temp;					\
-	bigint_t ( 1 ) modinv_temp;					\
 	bigint_t ( 2 * size ) mont_temp;				\
 	bigint_t ( size ) result_temp;					\
 	{} /* Fix emacs alignment */					\
@@ -641,13 +637,10 @@ void bigint_mod_exp_sample ( const bigint_element_t *base0,
 	bigint_init ( &modulus_temp, modulus_raw,			\
 		      sizeof ( modulus_raw ) );				\
 	bigint_init ( &mont_temp, mont_raw, sizeof ( mont_raw ) );	\
-	bigint_mod_invert ( &modulus_temp, &modinv_temp );		\
 	DBG ( "Montgomery:\n" );					\
 	DBG_HDA ( 0, &modulus_temp, sizeof ( modulus_temp ) );		\
-	DBG_HDA ( 0, &modinv_temp, sizeof ( modinv_temp ) );		\
 	DBG_HDA ( 0, &mont_temp, sizeof ( mont_temp ) );		\
-	bigint_montgomery ( &modulus_temp, &modinv_temp, &mont_temp,	\
-			    &result_temp );				\
+	bigint_montgomery ( &modulus_temp, &mont_temp, &result_temp );	\
 	DBG_HDA ( 0, &result_temp, sizeof ( result_temp ) );		\
 	bigint_done ( &result_temp, result_raw,				\
 		      sizeof ( result_raw ) );				\

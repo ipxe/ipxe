@@ -354,23 +354,17 @@ void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
  * Perform Montgomery reduction (REDC) of a big integer product
  *
  * @v modulus0		Element 0 of big integer modulus
- * @v modinv0		Element 0 of the inverse of the modulus modulo 2^k
  * @v mont0		Element 0 of big integer Montgomery product
  * @v result0		Element 0 of big integer to hold result
  * @v size		Number of elements in modulus and result
  *
- * Note that only the least significant element of the inverse modulo
- * 2^k is required, and that the Montgomery product will be
- * overwritten.
+ * Note that the Montgomery product will be overwritten.
  */
 void bigint_montgomery_raw ( const bigint_element_t *modulus0,
-			     const bigint_element_t *modinv0,
 			     bigint_element_t *mont0,
 			     bigint_element_t *result0, unsigned int size ) {
 	const bigint_t ( size ) __attribute__ (( may_alias ))
 		*modulus = ( ( const void * ) modulus0 );
-	const bigint_t ( 1 ) __attribute__ (( may_alias ))
-		*modinv = ( ( const void * ) modinv0 );
 	union {
 		bigint_t ( size * 2 ) full;
 		struct {
@@ -380,7 +374,8 @@ void bigint_montgomery_raw ( const bigint_element_t *modulus0,
 	} __attribute__ (( may_alias )) *mont = ( ( void * ) mont0 );
 	bigint_t ( size ) __attribute__ (( may_alias ))
 		*result = ( ( void * ) result0 );
-	bigint_element_t negmodinv = -modinv->element[0];
+	static bigint_t ( 1 ) cached;
+	static bigint_t ( 1 ) negmodinv;
 	bigint_element_t multiple;
 	bigint_element_t carry;
 	unsigned int i;
@@ -391,11 +386,18 @@ void bigint_montgomery_raw ( const bigint_element_t *modulus0,
 	/* Sanity checks */
 	assert ( bigint_bit_is_set ( modulus, 0 ) );
 
+	/* Calculate inverse (or use cached version) */
+	if ( cached.element[0] != modulus->element[0] ) {
+		bigint_mod_invert ( modulus, &negmodinv );
+		negmodinv.element[0] = -negmodinv.element[0];
+		cached.element[0] = modulus->element[0];
+	}
+
 	/* Perform multiprecision Montgomery reduction */
 	for ( i = 0 ; i < size ; i++ ) {
 
 		/* Determine scalar multiple for this round */
-		multiple = ( mont->low.element[i] * negmodinv );
+		multiple = ( mont->low.element[i] * negmodinv.element[0] );
 
 		/* Multiply value to make it divisible by 2^(width*i) */
 		carry = 0;
@@ -467,7 +469,6 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 		} product;
 	} *temp = tmp;
 	const uint8_t one[1] = { 1 };
-	bigint_t ( 1 ) modinv;
 	bigint_element_t submask;
 	unsigned int subsize;
 	unsigned int scale;
@@ -494,9 +495,6 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 	if ( ! submask )
 		submask = ~submask;
 
-	/* Calculate inverse of (scaled) modulus N modulo element size */
-	bigint_mod_invert ( &temp->modulus, &modinv );
-
 	/* Calculate (R^2 mod N) via direct reduction of (R^2 - N) */
 	memset ( &temp->product.full, 0, sizeof ( temp->product.full ) );
 	bigint_subtract ( &temp->padded_modulus, &temp->product.full );
@@ -504,12 +502,11 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 	bigint_copy ( &temp->product.low, &temp->stash );
 
 	/* Initialise result = Montgomery(1, R^2 mod N) */
-	bigint_montgomery ( &temp->modulus, &modinv,
-			    &temp->product.full, result );
+	bigint_montgomery ( &temp->modulus, &temp->product.full, result );
 
 	/* Convert base into Montgomery form */
 	bigint_multiply ( base, &temp->stash, &temp->product.full );
-	bigint_montgomery ( &temp->modulus, &modinv, &temp->product.full,
+	bigint_montgomery ( &temp->modulus, &temp->product.full,
 			    &temp->stash );
 
 	/* Calculate x1 = base^exponent modulo N */
@@ -518,13 +515,13 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 
 		/* Square (and reduce) */
 		bigint_multiply ( result, result, &temp->product.full );
-		bigint_montgomery ( &temp->modulus, &modinv,
-				    &temp->product.full, result );
+		bigint_montgomery ( &temp->modulus, &temp->product.full,
+				    result );
 
 		/* Multiply (and reduce) */
 		bigint_multiply ( &temp->stash, result, &temp->product.full );
-		bigint_montgomery ( &temp->modulus, &modinv,
-				    &temp->product.full, &temp->product.low );
+		bigint_montgomery ( &temp->modulus, &temp->product.full,
+				    &temp->product.low );
 
 		/* Conditionally swap the multiplied result */
 		bigint_swap ( result, &temp->product.low,
@@ -533,8 +530,7 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 
 	/* Convert back out of Montgomery form */
 	bigint_grow ( result, &temp->product.full );
-	bigint_montgomery ( &temp->modulus, &modinv, &temp->product.full,
-			    result );
+	bigint_montgomery ( &temp->modulus, &temp->product.full, result );
 
 	/* Handle even moduli via Garner's algorithm */
 	if ( subsize ) {

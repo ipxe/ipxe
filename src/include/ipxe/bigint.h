@@ -257,16 +257,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Perform Montgomery reduction (REDC) of a big integer product
  *
  * @v modulus		Big integer modulus
- * @v modinv		Big integer inverse of the modulus modulo 2^k
  * @v mont		Big integer Montgomery product
  * @v result		Big integer to hold result
  *
  * Note that the Montgomery product will be overwritten.
  */
-#define bigint_montgomery( modulus, modinv, mont, result ) do {		\
+#define bigint_montgomery( modulus, mont, result ) do {			\
 	unsigned int size = bigint_size (modulus);			\
-	bigint_montgomery_raw ( (modulus)->element, (modinv)->element,	\
-				(mont)->element, (result)->element,	\
+	bigint_montgomery_raw ( (modulus)->element, (mont)->element,	\
+				(result)->element,			\
 				size );					\
 	} while ( 0 )
 
@@ -377,7 +376,6 @@ void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
 void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 			     bigint_element_t *inverse0, unsigned int size );
 void bigint_montgomery_raw ( const bigint_element_t *modulus0,
-			     const bigint_element_t *modinv0,
 			     bigint_element_t *mont0,
 			     bigint_element_t *result0, unsigned int size );
 void bigint_mod_exp_raw ( const bigint_element_t *base0,
