@@ -5,7 +5,7 @@ Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
-  These elements are defined in UEFI Platform Initialization Specification 1.2.
+  These elements are defined in UEFI Platform Initialization Specification 1.8.A
 
 **/
 
@@ -21,6 +21,13 @@ FILE_LICENCE ( BSD2_PATENT );
 #include <ipxe/efi/Pi/PiDependency.h>
 #include <ipxe/efi/Pi/PiStatusCode.h>
 #include <ipxe/efi/Pi/PiS3BootScript.h>
+
+//
+// PI Specification Version Information
+//
+#define PI_SPECIFICATION_MAJOR_REVISION  1
+#define PI_SPECIFICATION_MINOR_REVISION  80
+#define PI_SPECIFICATION_VERSION         ((PI_SPECIFICATION_MAJOR_REVISION << 16) | (PI_SPECIFICATION_MINOR_REVISION))
 
 /**
   Produces an error code in the range reserved for use by the Platform Initialization

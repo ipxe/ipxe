@@ -5,7 +5,7 @@ Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
-  PI Version 1.7
+  PI Version 1.8.A
 
 **/
 
@@ -58,14 +58,11 @@ typedef enum {
   /// system. If all memory has the same reliability, then this bit is not used.
   ///
   EfiGcdMemoryTypeMoreReliable,
-  // ///
-  // /// A memory region that describes system memory that has not been accepted
-  // /// by a corresponding call to the underlying isolation architecture.
-  // ///
-  // /// Please be noted:
-  // /// EfiGcdMemoryTypeUnaccepted is defined in PrePiDxeCis.h because it has not been
-  // /// defined in PI spec.
-  // EfiGcdMemoryTypeUnaccepted,
+  ///
+  /// A memory region that describes system memory that has not been accepted
+  /// by a corresponding call to the underlying isolation architecture.
+  ///
+  EfiGcdMemoryTypeUnaccepted,
   EfiGcdMemoryTypeMaximum = 7
 } EFI_GCD_MEMORY_TYPE;
 
@@ -696,8 +693,8 @@ EFI_STATUS
 // DXE Services Table
 //
 #define DXE_SERVICES_SIGNATURE            0x565245535f455844ULL
-#define DXE_SPECIFICATION_MAJOR_REVISION  1
-#define DXE_SPECIFICATION_MINOR_REVISION  70
+#define DXE_SPECIFICATION_MAJOR_REVISION  PI_SPECIFICATION_MAJOR_REVISION
+#define DXE_SPECIFICATION_MINOR_REVISION  PI_SPECIFICATION_MINOR_REVISION
 #define DXE_SERVICES_REVISION             ((DXE_SPECIFICATION_MAJOR_REVISION<<16) | (DXE_SPECIFICATION_MINOR_REVISION))
 
 typedef struct {

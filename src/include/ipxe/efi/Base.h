@@ -61,7 +61,7 @@ FILE_LICENCE ( BSD2_PATENT );
 /// up to the compiler to remove any code past that point.
 ///
 #define UNREACHABLE()  __builtin_unreachable ()
-  #elif defined (__has_feature)
+  #elif defined (__has_builtin) && defined (__has_feature)
     #if __has_builtin (__builtin_unreachable)
 ///
 /// Signal compilers and analyzers that this call is not reachable.  It is
@@ -1060,7 +1060,7 @@ typedef UINTN RETURN_STATUS;
   @retval FALSE         The high bit of StatusCode is clear.
 
 **/
-#define RETURN_ERROR(StatusCode)  (((INTN)(RETURN_STATUS)(StatusCode)) < 0)
+#define RETURN_ERROR(StatusCode)  (((RETURN_STATUS)(StatusCode)) >= MAX_BIT)
 
 ///
 /// The operation completed successfully.
