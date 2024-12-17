@@ -70,6 +70,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SimpleTextInEx.h>
 #include <ipxe/efi/Protocol/SimpleTextOut.h>
 #include <ipxe/efi/Protocol/TcgService.h>
+#include <ipxe/efi/Protocol/Tcg2Protocol.h>
 #include <ipxe/efi/Protocol/Tcp4.h>
 #include <ipxe/efi/Protocol/Tcp6.h>
 #include <ipxe/efi/Protocol/Udp4.h>
@@ -325,6 +326,10 @@ EFI_GUID efi_simple_text_output_protocol_guid
 /** TCG protocol GUID */
 EFI_GUID efi_tcg_protocol_guid
 	= EFI_TCG_PROTOCOL_GUID;
+
+/** TCG2 protocol GUID */
+EFI_GUID efi_tcg2_protocol_guid
+	= EFI_TCG2_PROTOCOL_GUID;
 
 /** TCPv4 protocol GUID */
 EFI_GUID efi_tcp4_protocol_guid

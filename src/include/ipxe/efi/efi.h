@@ -228,6 +228,7 @@ extern EFI_GUID efi_simple_text_input_protocol_guid;
 extern EFI_GUID efi_simple_text_input_ex_protocol_guid;
 extern EFI_GUID efi_simple_text_output_protocol_guid;
 extern EFI_GUID efi_tcg_protocol_guid;
+extern EFI_GUID efi_tcg2_protocol_guid;
 extern EFI_GUID efi_tcp4_protocol_guid;
 extern EFI_GUID efi_tcp4_service_binding_protocol_guid;
 extern EFI_GUID efi_tcp6_protocol_guid;

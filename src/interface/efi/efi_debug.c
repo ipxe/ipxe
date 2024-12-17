@@ -209,6 +209,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "SimpleTextOutput" },
 	{ &efi_tcg_protocol_guid,
 	  "Tcg" },
+	{ &efi_tcg2_protocol_guid,
+	  "Tcg2" },
 	{ &efi_tcp4_protocol_guid,
 	  "Tcp4" },
 	{ &efi_tcp4_service_binding_protocol_guid,
