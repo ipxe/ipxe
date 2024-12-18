@@ -235,7 +235,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v modulus		Big integer modulus
  * @v value		Big integer to be reduced
  */
-#define bigint_reduce( modulus, value ) do {	\
+#define bigint_reduce( modulus, value ) do {				\
 		unsigned int size = bigint_size (modulus);		\
 		bigint_reduce_raw ( (modulus)->element,			\
 				    (value)->element, size );		\
@@ -254,19 +254,31 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} while ( 0 )
 
 /**
- * Perform Montgomery reduction (REDC) of a big integer product
+ * Perform relaxed Montgomery reduction (REDC) of a big integer
  *
- * @v modulus		Big integer modulus
- * @v mont		Big integer Montgomery product
+ * @v modulus		Big integer odd modulus
+ * @v value		Big integer to be reduced
  * @v result		Big integer to hold result
- *
- * Note that the Montgomery product will be overwritten.
+ * @ret carry		Carry out
  */
-#define bigint_montgomery( modulus, mont, result ) do {			\
+#define bigint_montgomery_relaxed( modulus, value, result ) ( {		\
 	unsigned int size = bigint_size (modulus);			\
-	bigint_montgomery_raw ( (modulus)->element, (mont)->element,	\
-				(result)->element,			\
-				size );					\
+	bigint_montgomery_relaxed_raw ( (modulus)->element,		\
+					(value)->element,		\
+					(result)->element, size );	\
+	} )
+
+/**
+ * Perform classic Montgomery reduction (REDC) of a big integer
+ *
+ * @v modulus		Big integer odd modulus
+ * @v value		Big integer to be reduced
+ * @v result		Big integer to hold result
+ */
+#define bigint_montgomery( modulus, value, result ) do {		\
+	unsigned int size = bigint_size (modulus);			\
+	bigint_montgomery_raw ( (modulus)->element, (value)->element,	\
+				(result)->element, size );		\
 	} while ( 0 )
 
 /**
@@ -375,8 +387,12 @@ void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
 			 unsigned int size );
 void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 			     bigint_element_t *inverse0, unsigned int size );
+int bigint_montgomery_relaxed_raw ( const bigint_element_t *modulus0,
+				    bigint_element_t *value0,
+				    bigint_element_t *result0,
+				    unsigned int size );
 void bigint_montgomery_raw ( const bigint_element_t *modulus0,
-			     bigint_element_t *mont0,
+			     bigint_element_t *value0,
 			     bigint_element_t *result0, unsigned int size );
 void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			  const bigint_element_t *modulus0,

@@ -207,17 +207,17 @@ void bigint_mod_invert_sample ( const bigint_element_t *invertend0,
 }
 
 void bigint_montgomery_sample ( const bigint_element_t *modulus0,
-				bigint_element_t *mont0,
+				bigint_element_t *value0,
 				bigint_element_t *result0,
 				unsigned int size ) {
 	const bigint_t ( size ) __attribute__ (( may_alias ))
 		*modulus = ( ( const void * ) modulus0 );
 	bigint_t ( 2 * size ) __attribute__ (( may_alias ))
-		*mont = ( ( void * ) mont0 );
+		*value = ( ( void * ) value0 );
 	bigint_t ( size ) __attribute__ (( may_alias ))
 		*result = ( ( void * ) result0 );
 
-	bigint_montgomery ( modulus, mont, result );
+	bigint_montgomery ( modulus, value, result );
 }
 
 void bigint_mod_exp_sample ( const bigint_element_t *base0,
