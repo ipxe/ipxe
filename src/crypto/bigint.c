@@ -278,6 +278,30 @@ void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
 }
 
 /**
+ * Reduce supremum of big integer representation
+ *
+ * @v modulus0		Element 0 of big integer modulus
+ * @v result0		Element 0 of big integer to hold result
+ * @v size		Number of elements in modulus and value
+ *
+ * Reduce the value 2^k (where k is the bit width of the big integer
+ * representation) modulo the specified modulus.
+ */
+void bigint_reduce_supremum_raw ( bigint_element_t *modulus0,
+				  bigint_element_t *result0,
+				  unsigned int size ) {
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( void * ) modulus0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+
+	/* Calculate (2^k) mod N via direct reduction of (2^k - N) mod N */
+	memset ( result, 0, sizeof ( *result ) );
+	bigint_subtract ( modulus, result );
+	bigint_reduce ( modulus, result );
+}
+
+/**
  * Compute inverse of odd big integer modulo any power of two
  *
  * @v invertend0	Element 0 of odd big integer to be inverted
@@ -629,10 +653,8 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 	if ( ! submask )
 		submask = ~submask;
 
-	/* Calculate (R^2 mod N) via direct reduction of (R^2 - N) */
-	memset ( &temp->product.full, 0, sizeof ( temp->product.full ) );
-	bigint_subtract ( &temp->padded_modulus, &temp->product.full );
-	bigint_reduce ( &temp->padded_modulus, &temp->product.full );
+	/* Calculate (R^2 mod N) */
+	bigint_reduce_supremum ( &temp->padded_modulus, &temp->product.full );
 	bigint_copy ( &temp->product.low, &temp->stash );
 
 	/* Initialise result = Montgomery(1, R^2 mod N) */

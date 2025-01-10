@@ -236,9 +236,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v value		Big integer to be reduced
  */
 #define bigint_reduce( modulus, value ) do {				\
-		unsigned int size = bigint_size (modulus);		\
-		bigint_reduce_raw ( (modulus)->element,			\
-				    (value)->element, size );		\
+	unsigned int size = bigint_size (modulus);			\
+	bigint_reduce_raw ( (modulus)->element, (value)->element,	\
+			    size );					\
+	} while ( 0 )
+
+/**
+ * Reduce supremum of big integer representation
+ *
+ * @v modulus0		Big integer modulus
+ * @v result0		Big integer to hold result
+ */
+#define bigint_reduce_supremum( modulus, result ) do {			\
+	unsigned int size = bigint_size (modulus);			\
+	bigint_reduce_supremum_raw ( (modulus)->element,		\
+				     (result)->element, size );		\
 	} while ( 0 )
 
 /**
@@ -385,6 +397,9 @@ void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 			   bigint_element_t *result0 );
 void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
 			 unsigned int size );
+void bigint_reduce_supremum_raw ( bigint_element_t *modulus0,
+				  bigint_element_t *value0,
+				  unsigned int size );
 void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 			     bigint_element_t *inverse0, unsigned int size );
 int bigint_montgomery_relaxed_raw ( const bigint_element_t *modulus0,
