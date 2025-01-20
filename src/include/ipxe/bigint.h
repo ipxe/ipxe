@@ -41,6 +41,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	( sizeof ( *(bigint) ) / sizeof ( (bigint)->element[0] ) )
 
 /**
+ * Transcribe big integer (for debugging)
+ *
+ * @v value		Big integer to be transcribed
+ * @ret string		Big integer in string form (may be abbreviated)
+ */
+#define bigint_ntoa( value ) ( {					\
+	unsigned int size = bigint_size (value);			\
+	bigint_ntoa_raw ( (value)->element, size );			\
+	} )
+
+/**
  * Initialise big integer
  *
  * @v value		Big integer to initialise
@@ -360,6 +371,8 @@ bigint_msb_is_set_raw ( const bigint_element_t *value0, unsigned int size ) {
 	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
 }
 
+const char * bigint_ntoa_raw ( const bigint_element_t *value0,
+			       unsigned int size );
 void bigint_init_raw ( bigint_element_t *value0, unsigned int size,
 		       const void *data, size_t len );
 void bigint_done_raw ( const bigint_element_t *value0, unsigned int size,

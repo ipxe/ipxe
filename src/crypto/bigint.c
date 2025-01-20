@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 #include <ipxe/profile.h>
 #include <ipxe/bigint.h>
 
@@ -37,6 +38,52 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Modular direct reduction profiler */
 static struct profiler bigint_mod_profiler __profiler =
 	{ .name = "bigint_mod" };
+
+/** Minimum number of least significant bytes included in transcription */
+#define BIGINT_NTOA_LSB_MIN 16
+
+/**
+ * Transcribe big integer (for debugging)
+ *
+ * @v value0		Element 0 of big integer to be transcribed
+ * @v size		Number of elements
+ * @ret string		Big integer in string form (may be abbreviated)
+ */
+const char * bigint_ntoa_raw ( const bigint_element_t *value0,
+			       unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*value = ( ( const void * ) value0 );
+	bigint_element_t element;
+	static char buf[256];
+	unsigned int count;
+	int threshold;
+	uint8_t byte;
+	char *tmp;
+	int i;
+
+	/* Calculate abbreviation threshold, if any */
+	count = ( size * sizeof ( element ) );
+	threshold = count;
+	if ( count >= ( ( sizeof ( buf ) - 1 /* NUL */ ) / 2 /* "xx" */ ) ) {
+		threshold -= ( ( sizeof ( buf ) - 3 /* "..." */
+				 - ( BIGINT_NTOA_LSB_MIN * 2 /* "xx" */ )
+				 - 1 /* NUL */ ) / 2 /* "xx" */ );
+	}
+
+	/* Transcribe bytes, abbreviating with "..." if necessary */
+	for ( tmp = buf, i = ( count - 1 ) ; i >= 0 ; i-- ) {
+		element = value->element[ i / sizeof ( element ) ];
+		byte = ( element >> ( 8 * ( i % sizeof ( element ) ) ) );
+		tmp += sprintf ( tmp, "%02x", byte );
+		if ( i == threshold ) {
+			tmp += sprintf ( tmp, "..." );
+			i = BIGINT_NTOA_LSB_MIN;
+		}
+	}
+	assert ( tmp < ( buf + sizeof ( buf ) ) );
+
+	return buf;
+}
 
 /**
  * Conditionally swap big integers (in constant time)
