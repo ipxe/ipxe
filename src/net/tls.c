@@ -50,6 +50,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
 #include <ipxe/dhe.h>
+#include <ipxe/ecdhe.h>
 #include <ipxe/tls.h>
 #include <config/crypto.h>
 
@@ -1733,9 +1734,9 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 		}
 
 		/* Calculate pre-master secret */
-		if ( ( rc = elliptic_multiply ( curve->curve,
-						ecdh->public, private,
-						pre_master_secret ) ) != 0 ) {
+		if ( ( rc = ecdhe_key ( curve->curve, ecdh->public,
+					private, key_xchg.public,
+					pre_master_secret ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not exchange ECDHE key: %s\n",
 			       tls, strerror ( rc ) );
 			return rc;
@@ -1750,12 +1751,6 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			  htonl ( sizeof ( key_xchg ) -
 				  sizeof ( key_xchg.type_length ) ) );
 		key_xchg.public_len = len;
-		if ( ( rc = elliptic_multiply ( curve->curve, NULL, private,
-						key_xchg.public ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not generate ECDHE key: %s\n",
-			       tls, strerror ( rc ) );
-			return rc;
-		}
 
 		/* Transmit Client Key Exchange record */
 		if ( ( rc = tls_send_handshake ( tls, &key_xchg,
