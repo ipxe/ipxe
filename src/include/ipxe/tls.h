@@ -218,12 +218,19 @@ struct tls_cipher_suite {
 /** TLS named curved type */
 #define TLS_NAMED_CURVE_TYPE 3
 
+/** TLS uncompressed curve point format */
+#define TLS_POINT_FORMAT_UNCOMPRESSED 4
+
 /** A TLS named curve */
 struct tls_named_curve {
 	/** Elliptic curve */
 	struct elliptic_curve *curve;
 	/** Numeric code (in network-endian order) */
 	uint16_t code;
+	/** Curve point format byte (if any) */
+	uint8_t format;
+	/** Pre-master secret length */
+	uint8_t pre_master_secret_len;
 };
 
 /** TLS named curve table */
