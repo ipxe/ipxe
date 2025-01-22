@@ -127,6 +127,12 @@ struct asn1_builder_header {
 #define ASN1_OID_TRIPLE( value ) \
 	( 0x80 | ( ( (value) >> 14 ) & 0x7f ) ), ASN1_OID_DOUBLE ( (value) )
 
+/** ASN.1 OID for prime256v1 (1.2.840.10045.3.1.7) */
+#define ASN1_OID_PRIME256V1					\
+	ASN1_OID_INITIAL ( 1, 1 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 3 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 7 )
+
 /** ASN.1 OID for rsaEncryption (1.2.840.113549.1.1.1) */
 #define ASN1_OID_RSAENCRYPTION					\
 	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
