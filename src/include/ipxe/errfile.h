@@ -426,6 +426,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_form_ui		      ( ERRFILE_OTHER | 0x00630000 )
 #define ERRFILE_usb_cmd		      ( ERRFILE_OTHER | 0x00640000 )
 #define ERRFILE_usb_settings	      ( ERRFILE_OTHER | 0x00650000 )
+#define ERRFILE_weierstrass	      ( ERRFILE_OTHER | 0x00660000 )
 
 /** @} */
 
