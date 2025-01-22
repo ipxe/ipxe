@@ -305,6 +305,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} while ( 0 )
 
 /**
+ * Perform generalised exponentiation via a Montgomery ladder
+ *
+ * @v result		Big integer result (initialised to identity element)
+ * @v multiple		Big integer multiple (initialised to generator)
+ * @v exponent		Big integer exponent
+ * @v op		Montgomery ladder commutative operation
+ * @v ctx		Operation context (if needed)
+ * @v tmp		Temporary working space (if needed)
+ */
+#define bigint_ladder( result, multiple, exponent, op, ctx, tmp ) do {	\
+	unsigned int size = bigint_size (result);			\
+	unsigned int exponent_size = bigint_size (exponent);		\
+	bigint_ladder_raw ( (result)->element, (multiple)->element,	\
+			    size, (exponent)->element, exponent_size,	\
+			    (op), (ctx), (tmp) );			\
+	} while ( 0 )
+
+/**
  * Perform modular exponentiation of big integers
  *
  * @v base		Big integer base
@@ -334,6 +352,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} ); } )
 
 #include <bits/bigint.h>
+
+/**
+ * A big integer Montgomery ladder commutative operation
+ *
+ * @v operand		Element 0 of first input operand (may overlap result)
+ * @v result		Element 0 of second input operand and result
+ * @v size		Number of elements in operands and result
+ * @v ctx		Operation context (if needed)
+ * @v tmp		Temporary working space (if needed)
+ */
+typedef void ( bigint_ladder_op_t ) ( const bigint_element_t *operand0,
+				      bigint_element_t *result0,
+				      unsigned int size, const void *ctx,
+				      void *tmp );
 
 /**
  * Test if bit is set in big integer
@@ -422,6 +454,14 @@ int bigint_montgomery_relaxed_raw ( const bigint_element_t *modulus0,
 void bigint_montgomery_raw ( const bigint_element_t *modulus0,
 			     bigint_element_t *value0,
 			     bigint_element_t *result0, unsigned int size );
+void bigint_ladder_raw ( bigint_element_t *result0,
+			 bigint_element_t *multiple0, unsigned int size,
+			 const bigint_element_t *exponent0,
+			 unsigned int exponent_size, bigint_ladder_op_t *op,
+			 const void *ctx, void *tmp );
+void bigint_mod_exp_ladder ( const bigint_element_t *multiplier0,
+			     bigint_element_t *result0, unsigned int size,
+			     const void *ctx, void *tmp );
 void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			  const bigint_element_t *modulus0,
 			  const bigint_element_t *exponent0,

@@ -635,6 +635,150 @@ void bigint_montgomery_raw ( const bigint_element_t *modulus0,
 }
 
 /**
+ * Perform generalised exponentiation via a Montgomery ladder
+ *
+ * @v result0		Element 0 of result (initialised to identity element)
+ * @v multiple0		Element 0 of multiple (initialised to generator)
+ * @v size		Number of elements in result and multiple
+ * @v exponent0		Element 0 of exponent
+ * @v exponent_size	Number of elements in exponent
+ * @v op		Montgomery ladder commutative operation
+ * @v ctx		Operation context (if needed)
+ * @v tmp		Temporary working space (if needed)
+ *
+ * The Montgomery ladder may be used to perform any operation that is
+ * isomorphic to exponentiation, i.e. to compute the result
+ *
+ *    r = g^e = g * g * g * g * .... * g
+ *
+ * for an arbitrary commutative operation "*", generator "g" and
+ * exponent "e".
+ *
+ * The result "r" is computed in constant time (assuming that the
+ * underlying operation is constant time) in k steps, where k is the
+ * number of bits in the big integer representation of the exponent.
+ *
+ * The result "r" must be initialised to the operation's identity
+ * element, and the multiple must be initialised to the generator "g".
+ * On exit, the multiple will contain
+ *
+ *    m = r * g = g^(e+1)
+ *
+ * Note that the terminology used here refers to exponentiation
+ * defined as repeated multiplication, but that the ladder may equally
+ * well be used to perform any isomorphic operation (such as
+ * multiplication defined as repeated addition).
+ */
+void bigint_ladder_raw ( bigint_element_t *result0,
+			 bigint_element_t *multiple0, unsigned int size,
+			 const bigint_element_t *exponent0,
+			 unsigned int exponent_size, bigint_ladder_op_t *op,
+			 const void *ctx, void *tmp ) {
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*multiple = ( ( void * ) multiple0 );
+	const bigint_t ( exponent_size ) __attribute__ (( may_alias ))
+		*exponent = ( ( const void * ) exponent0 );
+	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
+	unsigned int bit = ( exponent_size * width );
+	int toggle = 0;
+	int previous;
+
+	/* We have two physical storage locations: Rres (the "result"
+	 * register) and Rmul (the "multiple" register).
+	 *
+	 * On entry we have:
+	 *
+	 *   Rres = g^0 = 1  (the identity element)
+	 *   Rmul = g        (the generator)
+	 *
+	 * For calculation purposes, define two virtual registers R[0]
+	 * and R[1], mapped to the underlying physical storage
+	 * locations via a boolean toggle state "t":
+	 *
+	 *   R[t]  -> Rres
+	 *   R[~t] -> Rmul
+	 *
+	 * Define the initial toggle state to be t=0, so that we have:
+	 *
+	 *   R[0] = g^0 = 1  (the identity element)
+	 *   R[1] = g        (the generator)
+	 *
+	 * The Montgomery ladder then iterates over each bit "b" of
+	 * the exponent "e" (from MSB down to LSB), computing:
+	 *
+	 *   R[1]  := R[0] * R[1],    R[0]  := R[0] * R[0]    (if b=0)
+	 *   R[0]  := R[1] * R[0],    R[1]  := R[1] * R[1]    (if b=1)
+	 *
+	 * i.e.
+	 *
+	 *   R[~b] := R[b] * R[~b],   R[b]  := R[b] * R[b]
+	 *
+	 * To avoid data-dependent memory access patterns, we
+	 * implement this as:
+	 *
+	 *   Rmul := Rres * Rmul
+	 *   Rres := Rres * Rres
+	 *
+	 * and update the toggle state "t" (via constant-time
+	 * conditional swaps) as needed to ensure that R[b] always
+	 * maps to Rres and R[~b] always maps to Rmul.
+	 */
+	while ( bit-- ) {
+
+		/* Update toggle state t := b
+		 *
+		 * If the new toggle state is not equal to the old
+		 * toggle state, then we must swap R[0] and R[1] (in
+		 * constant time).
+		 */
+		previous = toggle;
+		toggle = bigint_bit_is_set ( exponent, bit );
+		bigint_swap ( result, multiple, ( toggle ^ previous ) );
+
+		/* Calculate Rmul = R[~b] := R[b] * R[~b] = Rres * Rmul */
+		op ( result->element, multiple->element, size, ctx, tmp );
+
+		/* Calculate Rres = R[b]  := R[b] * R[b]  = Rres * Rres */
+		op ( result->element, result->element, size, ctx, tmp );
+	}
+
+	/* Reset toggle state to zero */
+	bigint_swap ( result, multiple, toggle );
+}
+
+/**
+ * Perform modular multiplication as part of a Montgomery ladder
+ *
+ * @v operand		Element 0 of first input operand (may overlap result)
+ * @v result		Element 0 of second input operand and result
+ * @v size		Number of elements in operands and result
+ * @v ctx		Operation context (odd modulus, or NULL)
+ * @v tmp		Temporary working space
+ */
+void bigint_mod_exp_ladder ( const bigint_element_t *multiplier0,
+			     bigint_element_t *result0, unsigned int size,
+			     const void *ctx, void *tmp ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*multiplier = ( ( const void * ) multiplier0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( const void * ) ctx );
+	bigint_t ( size * 2 ) __attribute__ (( may_alias ))
+		*product = ( ( void * ) tmp );
+
+	/* Multiply and reduce */
+	bigint_multiply ( result, multiplier, product );
+	if ( modulus ) {
+		bigint_montgomery ( modulus, product, result );
+	} else {
+		bigint_shrink ( product, result );
+	}
+}
+
+/**
  * Perform modular exponentiation of big integers
  *
  * @v base0		Element 0 of big integer base
@@ -677,8 +821,7 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 	bigint_element_t submask;
 	unsigned int subsize;
 	unsigned int scale;
-	unsigned int max;
-	unsigned int bit;
+	unsigned int i;
 
 	/* Sanity check */
 	assert ( sizeof ( *temp ) == bigint_mod_exp_tmp_len ( modulus ) );
@@ -713,23 +856,8 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			    &temp->stash );
 
 	/* Calculate x1 = base^exponent modulo N */
-	max = bigint_max_set_bit ( exponent );
-	for ( bit = 1 ; bit <= max ; bit++ ) {
-
-		/* Square (and reduce) */
-		bigint_multiply ( result, result, &temp->product.full );
-		bigint_montgomery ( &temp->modulus, &temp->product.full,
-				    result );
-
-		/* Multiply (and reduce) */
-		bigint_multiply ( &temp->stash, result, &temp->product.full );
-		bigint_montgomery ( &temp->modulus, &temp->product.full,
-				    &temp->product.low );
-
-		/* Conditionally swap the multiplied result */
-		bigint_swap ( result, &temp->product.low,
-			      bigint_bit_is_set ( exponent, ( max - bit ) ) );
-	}
+	bigint_ladder ( result, &temp->stash, exponent, bigint_mod_exp_ladder,
+			&temp->modulus, &temp->product );
 
 	/* Convert back out of Montgomery form */
 	bigint_grow ( result, &temp->product.full );
@@ -754,22 +882,14 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 
 		/* Calculate x2 = base^exponent modulo 2^k */
 		bigint_init ( substash, one, sizeof ( one ) );
-		for ( bit = 1 ; bit <= max ; bit++ ) {
+		bigint_copy ( subbase, submodulus );
+		bigint_ladder ( substash, submodulus, exponent,
+				bigint_mod_exp_ladder, NULL, subproduct );
 
-			/* Square (and reduce) */
-			bigint_multiply ( substash, substash,
-					  &subproduct->full );
-			bigint_copy ( &subproduct->low, substash );
-
-			/* Multiply (and reduce) */
-			bigint_multiply ( subbase, substash,
-					  &subproduct->full );
-
-			/* Conditionally swap the multiplied result */
-			bigint_swap ( substash, &subproduct->low,
-				      bigint_bit_is_set ( exponent,
-							  ( max - bit ) ) );
-		}
+		/* Reconstruct N */
+		bigint_copy ( modulus, &temp->modulus );
+		for ( i = 0 ; i < scale ; i++ )
+			bigint_shr ( &temp->modulus );
 
 		/* Calculate N^-1 modulo 2^k */
 		bigint_mod_invert ( submodulus, &subproduct->low );
