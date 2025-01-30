@@ -198,6 +198,11 @@ struct asn1_builder_header {
 	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 101 ),	\
 	ASN1_OID_SINGLE ( 110 )
 
+/** ASN.1 OID for secp384r1 (1.3.132.0.34) */
+#define ASN1_OID_SECP384R1					\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_DOUBLE ( 132 ),	\
+	ASN1_OID_SINGLE ( 0 ), ASN1_OID_SINGLE ( 34 )
+
 /** ASN.1 OID for id-aes128-cbc (2.16.840.1.101.3.4.1.2) */
 #define ASN1_OID_AES128_CBC					\
 	ASN1_OID_INITIAL ( 2, 16 ), ASN1_OID_DOUBLE ( 840 ),	\

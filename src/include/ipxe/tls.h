@@ -128,6 +128,7 @@ struct tls_header {
 /* TLS named curve extension */
 #define TLS_NAMED_CURVE 10
 #define TLS_NAMED_CURVE_SECP256R1 23
+#define TLS_NAMED_CURVE_SECP384R1 24
 #define TLS_NAMED_CURVE_X25519 29
 
 /* TLS signature algorithms extension */
