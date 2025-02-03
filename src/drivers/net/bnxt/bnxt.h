@@ -178,7 +178,6 @@ union dma_addr64_t {
 	RX_MASK_ACCEPT_MULTICAST)
 #define MAX_NQ_DESC_CNT                         64
 #define NQ_RING_BUFFER_SIZE (MAX_NQ_DESC_CNT * sizeof(struct cmpl_base))
-#define TX_RING_QID (FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS) ? (u16)bp->queue_id : ((u16)bp->port_idx * 10))
 #define RX_RING_QID (FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS) ? bp->queue_id : 0)
 #define STAT_CTX_ID ((bp->vf || FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS)) ? bp->stat_ctx_id : 0)
 #define TX_AVAIL(r)                      (r - 1)
