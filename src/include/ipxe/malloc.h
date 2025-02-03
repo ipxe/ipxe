@@ -28,7 +28,6 @@ extern size_t maxusedmem;
 extern void * __malloc alloc_memblock ( size_t size, size_t align,
 					size_t offset );
 extern void free_memblock ( void *ptr, size_t size );
-extern void mpopulate ( void *start, size_t len );
 extern void mdumpfree ( void );
 
 /**

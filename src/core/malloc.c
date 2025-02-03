@@ -59,7 +59,8 @@ struct memory_block {
 	struct list_head list;
 };
 
-#define MIN_MEMBLOCK_SIZE \
+/** Physical address alignment maintained for free blocks of memory */
+#define MEMBLOCK_ALIGN \
 	( ( size_t ) ( 1 << ( fls ( sizeof ( struct memory_block ) - 1 ) ) ) )
 
 /** A block of allocated memory complete with size information */
@@ -107,7 +108,7 @@ size_t maxusedmem;
 #define HEAP_SIZE ( 512 * 1024 )
 
 /** The heap itself */
-static char heap[HEAP_SIZE] __attribute__ (( aligned ( __alignof__(void *) )));
+static char heap[HEAP_SIZE];
 
 /**
  * Mark all blocks in free list as defined
@@ -211,12 +212,16 @@ static inline void check_blocks ( void ) {
 
 	list_for_each_entry ( block, &free_blocks, list ) {
 
+		/* Check alignment */
+		assert ( ( virt_to_phys ( block ) &
+			   ( MEMBLOCK_ALIGN - 1 ) ) == 0 );
+
 		/* Check that list structure is intact */
 		list_check ( &block->list );
 
 		/* Check that block size is not too small */
 		assert ( block->size >= sizeof ( *block ) );
-		assert ( block->size >= MIN_MEMBLOCK_SIZE );
+		assert ( block->size >= MEMBLOCK_ALIGN );
 
 		/* Check that block does not wrap beyond end of address space */
 		assert ( ( ( void * ) block + block->size ) >
@@ -278,6 +283,7 @@ static void discard_all_cache ( void ) {
  */
 void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	struct memory_block *block;
+	size_t actual_offset;
 	size_t align_mask;
 	size_t actual_size;
 	size_t pre_size;
@@ -293,11 +299,13 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	valgrind_make_blocks_defined();
 	check_blocks();
 
-	/* Round up size to multiple of MIN_MEMBLOCK_SIZE and
-	 * calculate alignment mask.
-	 */
-	actual_size = ( ( size + MIN_MEMBLOCK_SIZE - 1 ) &
-			~( MIN_MEMBLOCK_SIZE - 1 ) );
+	/* Calculate offset of memory block */
+	actual_offset = ( offset & ~( MEMBLOCK_ALIGN - 1 ) );
+	assert ( actual_offset <= offset );
+
+	/* Calculate size of memory block */
+	actual_size = ( ( size + offset - actual_offset + MEMBLOCK_ALIGN - 1 )
+			& ~( MEMBLOCK_ALIGN - 1 ) );
 	if ( ! actual_size ) {
 		/* The requested size is not permitted to be zero.  A
 		 * zero result at this point indicates that either the
@@ -308,14 +316,16 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 		goto done;
 	}
 	assert ( actual_size >= size );
-	align_mask = ( ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 ) );
+
+	/* Calculate alignment mask */
+	align_mask = ( ( align - 1 ) | ( MEMBLOCK_ALIGN - 1 ) );
 
 	DBGC2 ( &heap, "HEAP allocating %#zx (aligned %#zx+%zx)\n",
 		size, align, offset );
 	while ( 1 ) {
 		/* Search through blocks for the first one with enough space */
 		list_for_each_entry ( block, &free_blocks, list ) {
-			pre_size = ( ( offset - virt_to_phys ( block ) )
+			pre_size = ( ( actual_offset - virt_to_phys ( block ) )
 				     & align_mask );
 			if ( ( block->size < pre_size ) ||
 			     ( ( block->size - pre_size ) < actual_size ) )
@@ -334,11 +344,10 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 				( ( ( void * ) pre ) + pre->size ), pre, block,
 				post, ( ( ( void * ) pre ) + pre->size ) );
 			/* If there is a "post" block, add it in to
-			 * the free list.  Leak it if it is too small
-			 * (which can happen only at the very end of
-			 * the heap).
+			 * the free list.
 			 */
-			if ( post_size >= MIN_MEMBLOCK_SIZE ) {
+			if ( post_size ) {
+				assert ( post_size >= MEMBLOCK_ALIGN );
 				VALGRIND_MAKE_MEM_UNDEFINED ( post,
 							      sizeof ( *post ));
 				post->size = post_size;
@@ -350,14 +359,14 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 			 */
 			pre->size = pre_size;
 			/* If there is no "pre" block, remove it from
-			 * the list.  Also remove it (i.e. leak it) if
-			 * it is too small, which can happen only at
-			 * the very start of the heap.
+			 * the list.
 			 */
-			if ( pre_size < MIN_MEMBLOCK_SIZE ) {
+			if ( ! pre_size ) {
 				list_del ( &pre->list );
 				VALGRIND_MAKE_MEM_NOACCESS ( pre,
 							     sizeof ( *pre ) );
+			} else {
+				assert ( pre_size >= MEMBLOCK_ALIGN );
 			}
 			/* Update memory usage statistics */
 			freemem -= actual_size;
@@ -365,9 +374,10 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 			if ( usedmem > maxusedmem )
 				maxusedmem = usedmem;
 			/* Return allocated block */
-			DBGC2 ( &heap, "HEAP allocated [%p,%p)\n", block,
-				( ( ( void * ) block ) + size ) );
-			ptr = block;
+			ptr = ( ( ( void * ) block ) + offset - actual_offset );
+			DBGC2 ( &heap, "HEAP allocated [%p,%p) within "
+				"[%p,%p)\n", ptr, ( ptr + size ), block,
+				( ( ( void * ) block ) + actual_size ) );
 			VALGRIND_MAKE_MEM_UNDEFINED ( ptr, size );
 			goto done;
 		}
@@ -407,6 +417,7 @@ void free_memblock ( void *ptr, size_t size ) {
 	struct memory_block *freeing;
 	struct memory_block *block;
 	struct memory_block *tmp;
+	size_t sub_offset;
 	size_t actual_size;
 	ssize_t gap_before;
 	ssize_t gap_after = -1;
@@ -420,16 +431,18 @@ void free_memblock ( void *ptr, size_t size ) {
 	valgrind_make_blocks_defined();
 	check_blocks();
 
-	/* Round up size to match actual size that alloc_memblock()
-	 * would have used.
+	/* Round up to match actual block that alloc_memblock() would
+	 * have allocated.
 	 */
 	assert ( size != 0 );
-	actual_size = ( ( size + MIN_MEMBLOCK_SIZE - 1 ) &
-			~( MIN_MEMBLOCK_SIZE - 1 ) );
-	freeing = ptr;
+	sub_offset = ( virt_to_phys ( ptr ) & ( MEMBLOCK_ALIGN - 1) );
+	freeing = ( ptr - sub_offset );
+	actual_size = ( ( size + sub_offset + MEMBLOCK_ALIGN - 1 ) &
+			~( MEMBLOCK_ALIGN - 1 ) );
+	DBGC2 ( &heap, "HEAP freeing [%p,%p) within [%p,%p)\n",
+		ptr, ( ptr + size ), freeing,
+		( ( ( void * ) freeing ) + actual_size ) );
 	VALGRIND_MAKE_MEM_UNDEFINED ( freeing, sizeof ( *freeing ) );
-	DBGC2 ( &heap, "HEAP freeing [%p,%p)\n",
-		freeing, ( ( ( void * ) freeing ) + size ) );
 
 	/* Check that this block does not overlap the free list */
 	if ( ASSERTING ) {
@@ -546,7 +559,7 @@ void * realloc ( void *old_ptr, size_t new_size ) {
 		new_ptr = &new_block->data;
 		VALGRIND_MALLOCLIKE_BLOCK ( new_ptr, new_size, 0, 0 );
 	}
-	
+
 	/* Copy across relevant part of the old data region (if any),
 	 * then free it.  Note that at this point either (a) new_ptr
 	 * is valid, or (b) new_size is 0; either way, the memcpy() is
@@ -641,19 +654,25 @@ void * zalloc ( size_t size ) {
  * Add memory to allocation pool
  *
  * @v start		Start address
- * @v end		End address
+ * @v len		Length of memory
  *
- * Adds a block of memory [start,end) to the allocation pool.  This is
- * a one-way operation; there is no way to reclaim this memory.
- *
- * @c start must be aligned to at least a multiple of sizeof(void*).
+ * Adds a block of memory to the allocation pool.  This is a one-way
+ * operation; there is no way to reclaim this memory.
  */
-void mpopulate ( void *start, size_t len ) {
+static void mpopulate ( void *start, size_t len ) {
+	size_t skip;
 
-	/* Prevent free_memblock() from rounding up len beyond the end
-	 * of what we were actually given...
-	 */
-	len &= ~( MIN_MEMBLOCK_SIZE - 1 );
+	/* Align start of block */
+	skip = ( ( -virt_to_phys ( start ) ) & ( MEMBLOCK_ALIGN - 1 ) );
+	if ( skip > len )
+		return;
+	start += skip;
+	len -= skip;
+
+	/* Align end of block */
+	len &= ~( MEMBLOCK_ALIGN - 1 );
+	if ( ! len )
+		return;
 
 	/* Add to allocation pool */
 	free_memblock ( start, len );
