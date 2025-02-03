@@ -310,7 +310,7 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 	assert ( actual_size >= size );
 	align_mask = ( ( align - 1 ) | ( MIN_MEMBLOCK_SIZE - 1 ) );
 
-	DBGC2 ( &heap, "Allocating %#zx (aligned %#zx+%zx)\n",
+	DBGC2 ( &heap, "HEAP allocating %#zx (aligned %#zx+%zx)\n",
 		size, align, offset );
 	while ( 1 ) {
 		/* Search through blocks for the first one with enough space */
@@ -329,7 +329,8 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 			pre   = block;
 			block = ( ( ( void * ) pre   ) + pre_size );
 			post  = ( ( ( void * ) block ) + actual_size );
-			DBGC2 ( &heap, "[%p,%p) -> [%p,%p) + [%p,%p)\n", pre,
+			DBGC2 ( &heap, "HEAP splitting [%p,%p) -> [%p,%p) "
+				"+ [%p,%p)\n", pre,
 				( ( ( void * ) pre ) + pre->size ), pre, block,
 				post, ( ( ( void * ) pre ) + pre->size ) );
 			/* If there is a "post" block, add it in to
@@ -364,7 +365,7 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 			if ( usedmem > maxusedmem )
 				maxusedmem = usedmem;
 			/* Return allocated block */
-			DBGC2 ( &heap, "Allocated [%p,%p)\n", block,
+			DBGC2 ( &heap, "HEAP allocated [%p,%p)\n", block,
 				( ( ( void * ) block ) + size ) );
 			ptr = block;
 			VALGRIND_MAKE_MEM_UNDEFINED ( ptr, size );
@@ -372,15 +373,16 @@ void * alloc_memblock ( size_t size, size_t align, size_t offset ) {
 		}
 
 		/* Try discarding some cached data to free up memory */
-		DBGC ( &heap, "Attempting discard for %#zx (aligned %#zx+%zx), "
-		       "used %zdkB\n", size, align, offset, ( usedmem >> 10 ) );
+		DBGC ( &heap, "HEAP attempting discard for %#zx (aligned "
+		       "%#zx+%zx), used %zdkB\n", size, align, offset,
+		       ( usedmem >> 10 ) );
 		valgrind_make_blocks_noaccess();
 		discarded = discard_cache();
 		valgrind_make_blocks_defined();
 		check_blocks();
 		if ( ! discarded ) {
 			/* Nothing available to discard */
-			DBGC ( &heap, "Failed to allocate %#zx (aligned "
+			DBGC ( &heap, "HEAP failed to allocate %#zx (aligned "
 			       "%#zx)\n", size, align );
 			ptr = NULL;
 			goto done;
@@ -426,7 +428,7 @@ void free_memblock ( void *ptr, size_t size ) {
 			~( MIN_MEMBLOCK_SIZE - 1 ) );
 	freeing = ptr;
 	VALGRIND_MAKE_MEM_UNDEFINED ( freeing, sizeof ( *freeing ) );
-	DBGC2 ( &heap, "Freeing [%p,%p)\n",
+	DBGC2 ( &heap, "HEAP freeing [%p,%p)\n",
 		freeing, ( ( ( void * ) freeing ) + size ) );
 
 	/* Check that this block does not overlap the free list */
@@ -437,7 +439,7 @@ void free_memblock ( void *ptr, size_t size ) {
 			     ( ( void * ) freeing <
 			       ( ( void * ) block + block->size ) ) ) {
 				assert ( 0 );
-				DBGC ( &heap, "Double free of [%p,%p) "
+				DBGC ( &heap, "HEAP double free of [%p,%p) "
 				       "overlapping [%p,%p) detected from %p\n",
 				       freeing,
 				       ( ( ( void * ) freeing ) + size ), block,
@@ -457,7 +459,8 @@ void free_memblock ( void *ptr, size_t size ) {
 			      ( ( ( void * ) freeing ) + freeing->size ) );
 		/* Merge with immediately preceding block, if possible */
 		if ( gap_before == 0 ) {
-			DBGC2 ( &heap, "[%p,%p) + [%p,%p) -> [%p,%p)\n", block,
+			DBGC2 ( &heap, "HEAP merging [%p,%p) + [%p,%p) -> "
+				"[%p,%p)\n", block,
 				( ( ( void * ) block ) + block->size ), freeing,
 				( ( ( void * ) freeing ) + freeing->size ),
 				block,
@@ -477,13 +480,13 @@ void free_memblock ( void *ptr, size_t size ) {
 	 * possible, merge the following block into the "freeing"
 	 * block.
 	 */
-	DBGC2 ( &heap, "[%p,%p)\n",
+	DBGC2 ( &heap, "HEAP freed [%p,%p)\n",
 		freeing, ( ( ( void * ) freeing ) + freeing->size ) );
 	list_add_tail ( &freeing->list, &block->list );
 	if ( gap_after == 0 ) {
-		DBGC2 ( &heap, "[%p,%p) + [%p,%p) -> [%p,%p)\n", freeing,
-			( ( ( void * ) freeing ) + freeing->size ), block,
-			( ( ( void * ) block ) + block->size ), freeing,
+		DBGC2 ( &heap, "HEAP merging [%p,%p) + [%p,%p) -> [%p,%p)\n",
+			freeing, ( ( ( void * ) freeing ) + freeing->size ),
+			block, ( ( ( void * ) block ) + block->size ), freeing,
 			( ( ( void * ) block ) + block->size ) );
 		freeing->size += block->size;
 		list_del ( &block->list );
@@ -565,8 +568,8 @@ void * realloc ( void *old_ptr, size_t new_size ) {
 	}
 
 	if ( ASSERTED ) {
-		DBGC ( &heap, "Possible memory corruption detected from %p\n",
-		       __builtin_return_address ( 0 ) );
+		DBGC ( &heap, "HEAP detected possible memory corruption "
+		       "from %p\n", __builtin_return_address ( 0 ) );
 	}
 	return new_ptr;
 }
@@ -585,8 +588,8 @@ void * malloc ( size_t size ) {
 
 	ptr = realloc ( NULL, size );
 	if ( ASSERTED ) {
-		DBGC ( &heap, "Possible memory corruption detected from %p\n",
-		       __builtin_return_address ( 0 ) );
+		DBGC ( &heap, "HEAP detected possible memory corruption "
+		       "from %p\n", __builtin_return_address ( 0 ) );
 	}
 	return ptr;
 }
@@ -605,8 +608,8 @@ void free ( void *ptr ) {
 
 	realloc ( ptr, 0 );
 	if ( ASSERTED ) {
-		DBGC ( &heap, "Possible memory corruption detected from %p\n",
-		       __builtin_return_address ( 0 ) );
+		DBGC ( &heap, "HEAP detected possible memory corruption "
+		       "from %p\n", __builtin_return_address ( 0 ) );
 	}
 }
 
@@ -628,8 +631,8 @@ void * zalloc ( size_t size ) {
 	if ( data )
 		memset ( data, 0, size );
 	if ( ASSERTED ) {
-		DBGC ( &heap, "Possible memory corruption detected from %p\n",
-		       __builtin_return_address ( 0 ) );
+		DBGC ( &heap, "HEAP detected possible memory corruption "
+		       "from %p\n", __builtin_return_address ( 0 ) );
 	}
 	return data;
 }
@@ -680,7 +683,7 @@ struct init_fn heap_init_fn __init_fn ( INIT_EARLY ) = {
  */
 static void shutdown_cache ( int booting __unused ) {
 	discard_all_cache();
-	DBGC ( &heap, "Maximum heap usage %zdkB\n", ( maxusedmem >> 10 ) );
+	DBGC ( &heap, "HEAP maximum usage %zdkB\n", ( maxusedmem >> 10 ) );
 }
 
 /** Memory allocator shutdown function */
@@ -689,19 +692,17 @@ struct startup_fn heap_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.shutdown = shutdown_cache,
 };
 
-#if 0
-#include <stdio.h>
 /**
- * Dump free block list
+ * Dump free block list (for debugging)
  *
  */
 void mdumpfree ( void ) {
 	struct memory_block *block;
 
-	printf ( "Free block list:\n" );
+	dbg_printf ( "HEAP free block list:\n" );
 	list_for_each_entry ( block, &free_blocks, list ) {
-		printf ( "[%p,%p] (size %#zx)\n", block,
-			 ( ( ( void * ) block ) + block->size ), block->size );
+		dbg_printf ( "...[%p,%p] (size %#zx)\n", block,
+			     ( ( ( void * ) block ) + block->size ),
+			     block->size );
 	}
 }
-#endif
