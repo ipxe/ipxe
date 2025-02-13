@@ -188,10 +188,6 @@ static void weierstrass_init ( struct weierstrass_curve *curve ) {
 		( ( void * ) curve->mont[0] );
 	bigint_t ( size ) __attribute__ (( may_alias )) *temp =
 		( ( void * ) curve->prime[1] );
-	bigint_t ( size * 2 ) __attribute__ (( may_alias )) *prime_double =
-		( ( void * ) prime );
-	bigint_t ( size * 2 ) __attribute__ (( may_alias )) *square_double =
-		( ( void * ) square );
 	bigint_t ( size * 2 ) __attribute__ (( may_alias )) *product =
 		( ( void * ) temp );
 	bigint_t ( size ) __attribute__ (( may_alias )) *two =
@@ -206,15 +202,8 @@ static void weierstrass_init ( struct weierstrass_curve *curve ) {
 	DBGC ( curve, "WEIERSTRASS %s   N = %s\n",
 	       curve->name, bigint_ntoa ( prime ) );
 
-	/* Calculate Montgomery constant R^2 mod N
-	 *
-	 * We rely on the fact that the subsequent big integers in the
-	 * cache (i.e. the first prime multiple, and the constant "1")
-	 * have not yet been written to, and so can be treated as
-	 * being the (zero) upper halves required to hold the
-	 * double-width value R^2.
-	 */
-	bigint_reduce_supremum ( prime_double, square_double );
+	/* Calculate Montgomery constant R^2 mod N */
+	bigint_reduce ( prime, square );
 	DBGC ( curve, "WEIERSTRASS %s R^2 = %s mod N\n",
 	       curve->name, bigint_ntoa ( square ) );
 

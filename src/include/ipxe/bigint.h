@@ -147,6 +147,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 			    size ); } )
 
 /**
+ * Set bit in big integer
+ *
+ * @v value		Big integer
+ * @v bit		Bit to set
+ */
+#define bigint_set_bit( value, bit ) do {				\
+	unsigned int size = bigint_size (value);			\
+	bigint_set_bit_raw ( (value)->element, size, bit );		\
+	} while ( 0 )
+
+/**
+ * Clear bit in big integer
+ *
+ * @v value		Big integer
+ * @v bit		Bit to set
+ */
+#define bigint_clear_bit( value, bit ) do {				\
+	unsigned int size = bigint_size (value);			\
+	bigint_clear_bit_raw ( (value)->element, size, bit );		\
+	} while ( 0 )
+
+/**
  * Test if bit is set in big integer
  *
  * @v value		Big integer
@@ -243,27 +265,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} while ( 0 )
 
 /**
- * Reduce big integer
+ * Reduce big integer R^2 modulo N
  *
  * @v modulus		Big integer modulus
- * @v value		Big integer to be reduced
+ * @v result		Big integer to hold result
  */
-#define bigint_reduce( modulus, value ) do {				\
+#define bigint_reduce( modulus, result ) do {				\
 	unsigned int size = bigint_size (modulus);			\
-	bigint_reduce_raw ( (modulus)->element, (value)->element,	\
+	bigint_reduce_raw ( (modulus)->element, (result)->element,	\
 			    size );					\
-	} while ( 0 )
-
-/**
- * Reduce supremum of big integer representation
- *
- * @v modulus0		Big integer modulus
- * @v result0		Big integer to hold result
- */
-#define bigint_reduce_supremum( modulus, result ) do {			\
-	unsigned int size = bigint_size (modulus);			\
-	bigint_reduce_supremum_raw ( (modulus)->element,		\
-				     (result)->element, size );		\
 	} while ( 0 )
 
 /**
@@ -370,6 +380,42 @@ typedef void ( bigint_ladder_op_t ) ( const bigint_element_t *operand0,
 				      void *tmp );
 
 /**
+ * Set bit in big integer
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @v bit		Bit to set
+ */
+static inline __attribute__ (( always_inline )) void
+bigint_set_bit_raw ( bigint_element_t *value0, unsigned int size,
+		     unsigned int bit ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
+	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
+
+	value->element[index] |= ( 1UL << subindex );
+}
+
+/**
+ * Clear bit in big integer
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @v bit		Bit to clear
+ */
+static inline __attribute__ (( always_inline )) void
+bigint_clear_bit_raw ( bigint_element_t *value0, unsigned int size,
+		       unsigned int bit ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
+	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
+
+	value->element[index] &= ~( 1UL << subindex );
+}
+
+/**
  * Test if bit is set in big integer
  *
  * @v value0		Element 0 of big integer
@@ -442,11 +488,8 @@ void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 			   const bigint_element_t *multiplier0,
 			   unsigned int multiplier_size,
 			   bigint_element_t *result0 );
-void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
-			 unsigned int size );
-void bigint_reduce_supremum_raw ( bigint_element_t *modulus0,
-				  bigint_element_t *value0,
-				  unsigned int size );
+void bigint_reduce_raw ( const bigint_element_t *modulus0,
+			 bigint_element_t *result0, unsigned int size );
 void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 			     bigint_element_t *inverse0, unsigned int size );
 int bigint_montgomery_relaxed_raw ( const bigint_element_t *modulus0,
