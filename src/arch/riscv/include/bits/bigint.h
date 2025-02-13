@@ -143,38 +143,40 @@ bigint_subtract_raw ( const unsigned long *subtrahend0, unsigned long *value0,
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shl_raw ( unsigned long *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	unsigned long *valueN = ( value0 + size );
 	unsigned long *discard_value;
 	unsigned long discard_value_i;
-	unsigned long discard_carry;
 	unsigned long discard_temp;
+	unsigned long carry;
 
 	__asm__ __volatile__ ( "\n1:\n\t"
 			       /* Load value[i] */
 			       LOADN " %1, (%0)\n\t"
 			       /* Shift left */
-			       "slli %3, %1, 1\n\t"
-			       "or %3, %3, %2\n\t"
-			       "srli %2, %1, %7\n\t"
+			       "slli %2, %1, 1\n\t"
+			       "or %2, %2, %3\n\t"
+			       "srli %3, %1, %7\n\t"
 			       /* Store value[i] */
-			       STOREN " %3, (%0)\n\t"
+			       STOREN " %2, (%0)\n\t"
 			       /* Loop  */
 			       "addi %0, %0, %6\n\t"
 			       "bne %0, %5, 1b\n\t"
 			       : "=&r" ( discard_value ),
 				 "=&r" ( discard_value_i ),
-				 "=&r" ( discard_carry ),
 				 "=&r" ( discard_temp ),
+				 "=&r" ( carry ),
 				 "+m" ( *value )
 			       : "r" ( valueN ),
 				 "i" ( sizeof ( unsigned long ) ),
 				 "i" ( ( 8 * sizeof ( unsigned long ) - 1 ) ),
-				 "0" ( value0 ), "2" ( 0 ) );
+				 "0" ( value0 ), "3" ( 0 ) );
+	return carry;
 }
 
 /**
@@ -182,38 +184,40 @@ bigint_shl_raw ( unsigned long *value0, unsigned int size ) {
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shr_raw ( unsigned long *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	unsigned long *valueN = ( value0 + size );
 	unsigned long *discard_value;
 	unsigned long discard_value_i;
-	unsigned long discard_carry;
 	unsigned long discard_temp;
+	unsigned long carry;
 
 	__asm__ __volatile__ ( "\n1:\n\t"
 			       /* Load value[i] */
 			       LOADN " %1, %6(%0)\n\t"
 			       /* Shift right */
-			       "srli %3, %1, 1\n\t"
-			       "or %3, %3, %2\n\t"
-			       "slli %2, %1, %7\n\t"
+			       "srli %2, %1, 1\n\t"
+			       "or %2, %2, %3\n\t"
+			       "slli %3, %1, %7\n\t"
 			       /* Store value[i] */
-			       STOREN " %3, %6(%0)\n\t"
+			       STOREN " %2, %6(%0)\n\t"
 			       /* Loop  */
 			       "addi %0, %0, %6\n\t"
 			       "bne %0, %5, 1b\n\t"
 			       : "=&r" ( discard_value ),
 				 "=&r" ( discard_value_i ),
-				 "=&r" ( discard_carry ),
 				 "=&r" ( discard_temp ),
+				 "=&r" ( carry ),
 				 "+m" ( *value )
 			       : "r" ( value0 ),
 				 "i" ( -( sizeof ( unsigned long ) ) ),
 				 "i" ( ( 8 * sizeof ( unsigned long ) - 1 ) ),
-				 "0" ( valueN ), "2" ( 0 ) );
+				 "0" ( valueN ), "3" ( 0 ) );
+	return ( !! carry );
 }
 
 /**

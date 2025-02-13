@@ -105,21 +105,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Shift big integer left
  *
  * @v value		Big integer
+ * @ret out		Bit shifted out
  */
-#define bigint_shl( value ) do {					\
+#define bigint_shl( value ) ( {						\
 	unsigned int size = bigint_size (value);			\
 	bigint_shl_raw ( (value)->element, size );			\
-	} while ( 0 )
+	} )
 
 /**
  * Shift big integer right
  *
  * @v value		Big integer
+ * @ret out		Bit shifted out
  */
-#define bigint_shr( value ) do {					\
+#define bigint_shr( value ) ( {						\
 	unsigned int size = bigint_size (value);			\
 	bigint_shr_raw ( (value)->element, size );			\
-	} while ( 0 )
+	} )
 
 /**
  * Test if big integer is equal to zero
@@ -413,8 +415,8 @@ int bigint_add_raw ( const bigint_element_t *addend0,
 		     bigint_element_t *value0, unsigned int size );
 int bigint_subtract_raw ( const bigint_element_t *subtrahend0,
 			  bigint_element_t *value0, unsigned int size );
-void bigint_shl_raw ( bigint_element_t *value0, unsigned int size );
-void bigint_shr_raw ( bigint_element_t *value0, unsigned int size );
+int bigint_shl_raw ( bigint_element_t *value0, unsigned int size );
+int bigint_shr_raw ( bigint_element_t *value0, unsigned int size );
 int bigint_is_zero_raw ( const bigint_element_t *value0, unsigned int size );
 int bigint_is_geq_raw ( const bigint_element_t *value0,
 			const bigint_element_t *reference0,

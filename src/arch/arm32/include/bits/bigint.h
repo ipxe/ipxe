@@ -123,16 +123,18 @@ bigint_subtract_raw ( const uint32_t *subtrahend0, uint32_t *value0,
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shl_raw ( uint32_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint32_t *discard_value;
 	uint32_t *discard_end;
 	uint32_t discard_value_i;
+	int carry;
 
-	__asm__ __volatile__ ( "adds %1, %0, %5, lsl #2\n\t" /* clear CF */
+	__asm__ __volatile__ ( "adds %1, %0, %1, lsl #2\n\t" /* clear CF */
 			       "\n1:\n\t"
 			       "ldr %2, [%0]\n\t"
 			       "adcs %2, %2\n\t"
@@ -142,9 +144,10 @@ bigint_shl_raw ( uint32_t *value0, unsigned int size ) {
 			       : "=l" ( discard_value ),
 				 "=l" ( discard_end ),
 				 "=l" ( discard_value_i ),
+				 "=@cccs" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( value0 ), "1" ( size )
-			       : "cc" );
+			       : "0" ( value0 ), "1" ( size ) );
+	return carry;
 }
 
 /**
@@ -152,16 +155,18 @@ bigint_shl_raw ( uint32_t *value0, unsigned int size ) {
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shr_raw ( uint32_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint32_t *discard_value;
 	uint32_t *discard_end;
 	uint32_t discard_value_i;
+	int carry;
 
-	__asm__ __volatile__ ( "adds %1, %0, %5, lsl #2\n\t" /* clear CF */
+	__asm__ __volatile__ ( "adds %1, %0, %1, lsl #2\n\t" /* clear CF */
 			       "\n1:\n\t"
 			       "ldmdb %1!, {%2}\n\t"
 			       "rrxs %2, %2\n\t"
@@ -171,9 +176,10 @@ bigint_shr_raw ( uint32_t *value0, unsigned int size ) {
 			       : "=l" ( discard_value ),
 				 "=l" ( discard_end ),
 				 "=l" ( discard_value_i ),
+				 "=@cccs" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( value0 ), "1" ( size )
-			       : "cc" );
+			       : "0" ( value0 ), "1" ( size ) );
+	return carry;
 }
 
 /**

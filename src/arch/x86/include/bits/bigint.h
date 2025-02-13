@@ -116,22 +116,25 @@ bigint_subtract_raw ( const uint32_t *subtrahend0, uint32_t *value0,
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shl_raw ( uint32_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	long index;
 	long discard_c;
+	int out;
 
 	__asm__ __volatile__ ( "xor %0, %0\n\t" /* Zero %0 and clear CF */
 			       "\n1:\n\t"
-			       "rcll $1, (%3,%0,4)\n\t"
+			       "rcll $1, (%4,%0,4)\n\t"
 			       "inc %0\n\t" /* Does not affect CF */
 			       "loop 1b\n\t"
 			       : "=&r" ( index ), "=&c" ( discard_c ),
-				 "+m" ( *value )
+				 "=@ccc" ( out ), "+m" ( *value )
 			       : "r" ( value0 ), "1" ( size ) );
+	return out;
 }
 
 /**
@@ -139,19 +142,23 @@ bigint_shl_raw ( uint32_t *value0, unsigned int size ) {
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shr_raw ( uint32_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	long discard_c;
+	int out;
 
 	__asm__ __volatile__ ( "clc\n\t"
 			       "\n1:\n\t"
-			       "rcrl $1, -4(%2,%0,4)\n\t"
+			       "rcrl $1, -4(%3,%0,4)\n\t"
 			       "loop 1b\n\t"
-			       : "=&c" ( discard_c ), "+m" ( *value )
+			       : "=&c" ( discard_c ), "=@ccc" ( out ),
+				 "+m" ( *value )
 			       : "r" ( value0 ), "0" ( size ) );
+	return out;
 }
 
 /**

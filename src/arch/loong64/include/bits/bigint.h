@@ -144,26 +144,27 @@ bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint64_t *discard_value;
 	uint64_t discard_value_i;
-	uint64_t discard_carry;
 	uint64_t discard_temp;
 	unsigned int discard_size;
+	uint64_t carry;
 
 	__asm__ __volatile__ ( "\n1:\n\t"
 			       /* Load value[i] */
 			       "ld.d %2, %0, 0\n\t"
 			       /* Shift left */
 			       "rotri.d %2, %2, 63\n\t"
-			       "andi %4, %2, 1\n\t"
-			       "xor %2, %2, %4\n\t"
-			       "or %2, %2, %3\n\t"
-			       "move %3, %4\n\t"
+			       "andi %3, %2, 1\n\t"
+			       "xor %2, %2, %3\n\t"
+			       "or %2, %2, %4\n\t"
+			       "move %4, %3\n\t"
 			       /* Store value[i] */
 			       "st.d %2, %0, 0\n\t"
 			       /* Loop  */
@@ -173,11 +174,12 @@ bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
 			       : "=r" ( discard_value ),
 				 "=r" ( discard_size ),
 				 "=r" ( discard_value_i ),
-				 "=r" ( discard_carry ),
 				 "=r" ( discard_temp ),
+				 "=r" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( value0 ), "1" ( size ), "3" ( 0 )
+			       : "0" ( value0 ), "1" ( size ), "4" ( 0 )
 			       : "cc" );
+	return ( carry & 1 );
 }
 
 /**
@@ -185,25 +187,26 @@ bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shr_raw ( uint64_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint64_t *discard_value;
 	uint64_t discard_value_i;
-	uint64_t discard_carry;
 	uint64_t discard_temp;
 	unsigned int discard_size;
+	uint64_t carry;
 
 	__asm__ __volatile__ ( "\n1:\n\t"
 			       /* Load value[i] */
 			       "ld.d %2, %0, -8\n\t"
 			       /* Shift right */
-			       "andi %4, %2, 1\n\t"
-			       "xor %2, %2, %4\n\t"
-			       "or %2, %2, %3\n\t"
-			       "move %3, %4\n\t"
+			       "andi %3, %2, 1\n\t"
+			       "xor %2, %2, %3\n\t"
+			       "or %2, %2, %4\n\t"
+			       "move %4, %3\n\t"
 			       "rotri.d %2, %2, 1\n\t"
 			       /* Store value[i] */
 			       "st.d %2, %0, -8\n\t"
@@ -214,11 +217,12 @@ bigint_shr_raw ( uint64_t *value0, unsigned int size ) {
 			       : "=r" ( discard_value ),
 				 "=r" ( discard_size ),
 				 "=r" ( discard_value_i ),
-				 "=r" ( discard_carry ),
 				 "=r" ( discard_temp ),
+				 "=r" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( value0 + size ), "1" ( size ), "3" ( 0 )
+			       : "0" ( value0 + size ), "1" ( size ), "4" ( 0 )
 			       : "cc" );
+	return ( carry & 1 );
 }
 
 /**
