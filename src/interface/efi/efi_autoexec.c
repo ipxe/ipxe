@@ -43,7 +43,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** Timeout for autoexec script downloads */
-#define EFI_AUTOEXEC_TIMEOUT ( 2 * TICKS_PER_SEC )
+#define EFI_AUTOEXEC_TIMEOUT ( 30 * TICKS_PER_SEC )
+
+/** Timeout for autoexec pending operation completion */
+#define EFI_AUTOEXEC_SYNC_TIMEOUT ( 1 * TICKS_PER_SEC )
 
 /** Autoexec script image name */
 #define EFI_AUTOEXEC_NAME "autoexec.ipxe"
@@ -136,7 +139,7 @@ static int efi_autoexec_network ( EFI_HANDLE handle, struct image **image ) {
 	}
 
 	/* Ensure network exchanges have completed */
-	sync ( EFI_AUTOEXEC_TIMEOUT );
+	sync ( EFI_AUTOEXEC_SYNC_TIMEOUT );
 
  err_open:
  err_cwuri:
