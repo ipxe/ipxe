@@ -353,24 +353,35 @@ static size_t bzimage_load_initrd ( struct image *image,
 	const char *filename = cpio_name ( initrd );
 	struct cpio_header cpio;
 	size_t offset;
+	size_t cpio_len;
 	size_t pad_len;
+	size_t len;
+	unsigned int i;
 
 	/* Skip hidden images */
 	if ( initrd->flags & IMAGE_HIDDEN )
 		return 0;
 
-	/* Create cpio header for non-prebuilt images */
-	offset = cpio_header ( initrd, &cpio );
+	/* Determine length of cpio headers for non-prebuilt images */
+	len = 0;
+	for ( i = 0 ; ( cpio_len = cpio_header ( initrd, i, &cpio ) ) ; i++ )
+		len += ( cpio_len + cpio_pad_len ( cpio_len ) );
 
-	/* Copy in initrd image body (and cpio header if applicable) */
+	/* Copy in initrd image body and construct any cpio headers */
 	if ( address ) {
-		memmove_user ( address, offset, initrd->data, 0, initrd->len );
-		if ( offset ) {
-			memset_user ( address, 0, 0, offset );
-			copy_to_user ( address, 0, &cpio, sizeof ( cpio ) );
-			copy_to_user ( address, sizeof ( cpio ), filename,
-				       cpio_name_len ( initrd ) );
+		memmove_user ( address, len, initrd->data, 0, initrd->len );
+		memset_user ( address, 0, 0, len );
+		offset = 0;
+		for ( i = 0 ; ( cpio_len = cpio_header ( initrd, i, &cpio ) ) ;
+		      i++ ) {
+			copy_to_user ( address, offset, &cpio,
+				       sizeof ( cpio ) );
+			copy_to_user ( address, ( offset + sizeof ( cpio ) ),
+				       filename,
+				       ( cpio_len - sizeof ( cpio ) ) );
+			offset += ( cpio_len + cpio_pad_len ( cpio_len ) );
 		}
+		assert ( offset == len );
 		DBGC ( image, "bzImage %p initrd %p [%#08lx,%#08lx,%#08lx)"
 		       "%s%s\n", image, initrd, user_to_phys ( address, 0 ),
 		       user_to_phys ( address, offset ),
@@ -379,14 +390,14 @@ static size_t bzimage_load_initrd ( struct image *image,
 		DBGC2_MD5A ( image, user_to_phys ( address, offset ),
 			     user_to_virt ( address, offset ), initrd->len );
 	}
-	offset += initrd->len;
+	len += initrd->len;
 
 	/* Zero-pad to next INITRD_ALIGN boundary */
-	pad_len = ( ( -offset ) & ( INITRD_ALIGN - 1 ) );
+	pad_len = ( ( -len ) & ( INITRD_ALIGN - 1 ) );
 	if ( address )
-		memset_user ( address, offset, 0, pad_len );
+		memset_user ( address, len, 0, pad_len );
 
-	return offset;
+	return len;
 }
 
 /**
