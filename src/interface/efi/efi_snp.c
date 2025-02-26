@@ -75,12 +75,17 @@ static struct efi_saved_tpl efi_snp_saved_tpl;
  * can be described and opaquely labels both menu entries as just "EFI
  * Network".
  */
+
+PROVIDE_REQUIRING_SYMBOL();
+
 #ifdef EFI_DOWNGRADE_UX
 static EFI_GUID dummy_load_file_protocol_guid = {
 	0x6f6c7323, 0x2077, 0x7523,
 	{ 0x6e, 0x68, 0x65, 0x6c, 0x70, 0x66, 0x75, 0x6c }
 };
 #define efi_load_file_protocol_guid dummy_load_file_protocol_guid
+#else
+REQUIRE_OBJECT ( config_efi_console );
 #endif
 
 /**
