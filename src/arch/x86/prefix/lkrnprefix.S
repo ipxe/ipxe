@@ -54,7 +54,7 @@ jump:
 	/* Manually specify a two-byte jmp instruction here rather
 	 * than leaving it up to the assembler.
 	 */
-	.byte	0xeb, ( setup - header )
+	.byte	0xeb, ( _setup - header )
 header:
 	.byte	'H', 'd', 'r', 'S'
 version:
@@ -103,6 +103,9 @@ hardware_subarch:
 	.long	0
 hardware_subarch_data:
 	.byte	0, 0, 0, 0, 0, 0, 0, 0
+
+_setup:
+	jmp	setup
 
 version_string:
 	.asciz	VERSION
