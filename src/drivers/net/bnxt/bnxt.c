@@ -8,6 +8,7 @@ FILE_LICENCE ( GPL2_ONLY );
 #include <byteswap.h>
 #include <ipxe/pci.h>
 #include <ipxe/iobuf.h>
+#include <ipxe/dma.h>
 #include <ipxe/timer.h>
 #include <ipxe/malloc.h>
 #include <ipxe/if_ether.h>
@@ -382,7 +383,7 @@ int bnxt_free_rx_iob ( struct bnxt *bp )
 
 	for ( i = 0; i < bp->rx.buf_cnt; i++ ) {
 		if ( bp->rx.iob[i] ) {
-			free_iob ( bp->rx.iob[i] );
+			free_rx_iob ( bp->rx.iob[i] );
 			bp->rx.iob[i] = NULL;
 		}
 	}
@@ -402,14 +403,14 @@ static void bnxt_set_rx_desc ( u8 *buf, struct io_buffer *iob,
 	desc->flags_type = RX_PROD_PKT_BD_TYPE_RX_PROD_PKT;
 	desc->len   	 = MAX_ETHERNET_PACKET_BUFFER_SIZE;
 	desc->opaque	 = idx;
-	desc->dma.addr   = virt_to_bus ( iob->data );
+	desc->dma.addr   = iob_dma ( iob );
 }
 
 static int bnxt_alloc_rx_iob ( struct bnxt *bp, u16 cons_id, u16 iob_idx )
 {
 	struct io_buffer *iob;
 
-	iob = alloc_iob ( BNXT_RX_STD_DMA_SZ );
+	iob = alloc_rx_iob ( BNXT_RX_STD_DMA_SZ, bp->dma );
 	if ( !iob ) {
 		DBGP ( "- %s (  ): alloc_iob Failed\n", __func__ );
 		return -ENOMEM;
@@ -548,7 +549,7 @@ static int bnxt_rx_complete ( struct net_device *dev,
 	u8  cmpl_bit = bp->cq.completion_bit;
 
 	if ( bp->cq.cons_id == ( bp->cq.ring_cnt - 1 ) ) {
-		rx_cmp_hi = ( struct rx_pkt_cmpl_hi * )bp->cq.bd_virt;
+		rx_cmp_hi = ( struct rx_pkt_cmpl_hi * )bp->cq_addr_mapping;
 		cmpl_bit ^= 0x1; /* Ring has wrapped. */
 	} else
 		rx_cmp_hi = ( struct rx_pkt_cmpl_hi * ) ( rx_cmp+1 );
@@ -566,9 +567,20 @@ void bnxt_mm_init ( struct bnxt *bp, const char *func )
 	memset ( bp->hwrm_addr_req,  0, REQ_BUFFER_SIZE );
 	memset ( bp->hwrm_addr_resp, 0, RESP_BUFFER_SIZE );
 	memset ( bp->hwrm_addr_dma,  0, DMA_BUFFER_SIZE );
-	bp->req_addr_mapping  = virt_to_bus ( bp->hwrm_addr_req );
-	bp->resp_addr_mapping = virt_to_bus ( bp->hwrm_addr_resp );
-	bp->dma_addr_mapping  = virt_to_bus ( bp->hwrm_addr_dma );
+	memset ( bp->tx.bd_virt,  0, TX_RING_BUFFER_SIZE );
+	memset ( bp->rx.bd_virt,  0, RX_RING_BUFFER_SIZE );
+	memset ( bp->cq.bd_virt,  0, CQ_RING_BUFFER_SIZE );
+	memset ( bp->nq.bd_virt,  0, NQ_RING_BUFFER_SIZE );
+
+	bp->req_addr_mapping  = dma ( &bp->req_mapping, bp->hwrm_addr_req );
+	bp->resp_addr_mapping = dma ( &bp->resp_mapping, bp->hwrm_addr_resp );
+	bp->dma_addr_mapping  = dma ( &bp->dma_mapped, bp->hwrm_addr_dma );
+
+        bp->tx_addr_mapping = dma ( &bp->tx_mapping, bp->tx.bd_virt );
+        bp->rx_addr_mapping = dma ( &bp->rx_mapping, bp->rx.bd_virt );
+        bp->cq_addr_mapping = dma ( &bp->cq_mapping, bp->cq.bd_virt );
+        bp->nq_addr_mapping = dma ( &bp->nq_mapping, bp->nq.bd_virt );
+
 	bp->link_status = STATUS_LINK_DOWN;
 	bp->wait_link_timeout = LINK_DEFAULT_TIMEOUT;
 	bp->mtu = MAX_ETHERNET_PACKET_BUFFER_SIZE;
@@ -617,39 +629,39 @@ void bnxt_free_mem ( struct bnxt *bp )
 {
 	DBGP ( "%s\n", __func__ );
 	if ( bp->nq.bd_virt ) {
-		free_phys ( bp->nq.bd_virt, NQ_RING_BUFFER_SIZE );
+		dma_free ( &bp->nq_mapping, bp->nq.bd_virt, NQ_RING_BUFFER_SIZE );
 		bp->nq.bd_virt = NULL;
 	}
 
 	if ( bp->cq.bd_virt ) {
-		free_phys ( bp->cq.bd_virt, CQ_RING_BUFFER_SIZE );
+		dma_free ( &bp->cq_mapping, bp->cq.bd_virt, CQ_RING_BUFFER_SIZE );
 		bp->cq.bd_virt = NULL;
 	}
 
 	if ( bp->rx.bd_virt ) {
-		free_phys ( bp->rx.bd_virt, RX_RING_BUFFER_SIZE );
+		dma_free ( &bp->rx_mapping, bp->rx.bd_virt, RX_RING_BUFFER_SIZE );
 		bp->rx.bd_virt = NULL;
 	}
 
 	if ( bp->tx.bd_virt ) {
-		free_phys ( bp->tx.bd_virt, TX_RING_BUFFER_SIZE );
+		dma_free ( &bp->tx_mapping, bp->tx.bd_virt, TX_RING_BUFFER_SIZE );
 		bp->tx.bd_virt = NULL;
 	}
 
 	if ( bp->hwrm_addr_dma ) {
-		free_phys ( bp->hwrm_addr_dma, DMA_BUFFER_SIZE );
+		dma_free ( &bp->dma_mapped, bp->hwrm_addr_dma, DMA_BUFFER_SIZE );
 		bp->dma_addr_mapping = 0;
 		bp->hwrm_addr_dma = NULL;
 	}
 
 	if ( bp->hwrm_addr_resp ) {
-		free_phys ( bp->hwrm_addr_resp, RESP_BUFFER_SIZE );
+		dma_free ( &bp->resp_mapping, bp->hwrm_addr_resp, RESP_BUFFER_SIZE );
 		bp->resp_addr_mapping = 0;
 		bp->hwrm_addr_resp = NULL;
 	}
 
 	if ( bp->hwrm_addr_req ) {
-		free_phys ( bp->hwrm_addr_req, REQ_BUFFER_SIZE );
+		dma_free ( &bp->req_mapping, bp->hwrm_addr_req, REQ_BUFFER_SIZE );
 		bp->req_addr_mapping = 0;
 		bp->hwrm_addr_req = NULL;
 	}
@@ -659,14 +671,20 @@ void bnxt_free_mem ( struct bnxt *bp )
 int bnxt_alloc_mem ( struct bnxt *bp )
 {
 	DBGP ( "%s\n", __func__ );
-	bp->hwrm_addr_req  = malloc_phys ( REQ_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	bp->hwrm_addr_resp = malloc_phys ( RESP_BUFFER_SIZE,
-					   BNXT_DMA_ALIGNMENT );
-	bp->hwrm_addr_dma  = malloc_phys ( DMA_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	bp->tx.bd_virt = malloc_phys ( TX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
-	bp->rx.bd_virt = malloc_phys ( RX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
-	bp->cq.bd_virt = malloc_phys ( CQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	bp->nq.bd_virt = malloc_phys ( NQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
+	bp->hwrm_addr_req  = dma_alloc ( bp->dma, &bp->req_mapping,
+					 REQ_BUFFER_SIZE, REQ_BUFFER_SIZE );
+	bp->hwrm_addr_resp = dma_alloc ( bp->dma, &bp->resp_mapping,
+					 RESP_BUFFER_SIZE, RESP_BUFFER_SIZE );
+	bp->hwrm_addr_dma  = dma_alloc ( bp->dma, &bp->dma_mapped,
+					 DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
+	bp->tx.bd_virt = dma_alloc ( bp->dma, &bp->tx_mapping,
+				     TX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
+	bp->rx.bd_virt = dma_alloc ( bp->dma, &bp->rx_mapping,
+				     RX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
+	bp->cq.bd_virt = dma_alloc ( bp->dma, &bp->cq_mapping,
+				     CQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
+	bp->nq.bd_virt = dma_alloc ( bp->dma, &bp->nq_mapping,
+				     NQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
 	test_if ( bp->hwrm_addr_req &&
 		bp->hwrm_addr_resp &&
 		bp->hwrm_addr_dma &&
@@ -709,7 +727,7 @@ static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len )
 	struct hwrm_short_input sreq;
 
 	memset ( &sreq, 0, sizeof ( struct hwrm_short_input ) );
-	sreq.req_type  = ( u16 ) ( ( struct input * )bp->hwrm_addr_req )->req_type;
+	sreq.req_type  = ( u16 ) ( ( struct input * )bp->req_addr_mapping )->req_type;
 	sreq.signature = SHORT_REQ_SIGNATURE_SHORT_CMD;
 	sreq.size      = len;
 	sreq.req_addr  = bp->req_addr_mapping;
@@ -721,8 +739,8 @@ static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len )
 
 static int wait_resp ( struct bnxt *bp, u32 tmo, u16 len, const char *func )
 {
-	struct input *req = ( struct input * )bp->hwrm_addr_req;
-	struct output *resp = ( struct output * )bp->hwrm_addr_resp;
+	struct input *req = ( struct input * )bp->req_addr_mapping;
+	struct output *resp = ( struct output * )bp->resp_addr_mapping;
 	u8  *ptr = ( u8 * )resp;
 	u32 idx;
 	u32 wait_cnt = HWRM_CMD_DEFAULT_MULTIPLAYER ( ( u32 )tmo );
@@ -757,8 +775,8 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_ver_get_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_ver_get_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_ver_get_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_ver_get_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_VER_GET, cmd_len );
 	req->hwrm_intf_maj = HWRM_VERSION_MAJOR;
 	req->hwrm_intf_min = HWRM_VERSION_MINOR;
@@ -808,8 +826,8 @@ static int bnxt_hwrm_func_resource_qcaps ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_func_resource_qcaps_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_func_resource_qcaps_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_func_resource_qcaps_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_func_resource_qcaps_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_RESOURCE_QCAPS,
 		cmd_len );
 	req->fid = ( u16 )HWRM_NA_SIGNATURE;
@@ -907,7 +925,7 @@ static void bnxt_hwrm_assign_resources ( struct bnxt *bp )
 	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_RESOURCE_QCAPS_SUPPORT ) )
 		enables = bnxt_set_ring_info ( bp );
 
-	req = ( struct hwrm_func_cfg_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_func_cfg_input * )bp->req_addr_mapping;
 	req->num_cmpl_rings   = bp->num_cmpl_rings;
 	req->num_tx_rings     = bp->num_tx_rings;
 	req->num_rx_rings     = bp->num_rx_rings;
@@ -927,8 +945,8 @@ static int bnxt_hwrm_func_qcaps_req ( struct bnxt *bp )
 	if ( bp->vf )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_func_qcaps_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_func_qcaps_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_func_qcaps_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_func_qcaps_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_QCAPS, cmd_len );
 	req->fid = ( u16 )HWRM_NA_SIGNATURE;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -954,8 +972,8 @@ static int bnxt_hwrm_func_qcfg_req ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_func_qcfg_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_func_qcfg_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_func_qcfg_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_func_qcfg_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_QCFG, cmd_len );
 	req->fid = ( u16 )HWRM_NA_SIGNATURE;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -996,8 +1014,8 @@ static int bnxt_hwrm_port_phy_qcaps_req ( struct bnxt *bp )
 
 	DBGP ( "%s\n", __func__ );
 
-	req = ( struct hwrm_port_phy_qcaps_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_port_phy_qcaps_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_port_phy_qcaps_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_port_phy_qcaps_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_PORT_PHY_QCAPS, cmd_len );
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 	if ( rc ) {
@@ -1017,7 +1035,7 @@ static int bnxt_hwrm_func_reset_req ( struct bnxt *bp )
 	struct hwrm_func_reset_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_func_reset_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_func_reset_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_RESET, cmd_len );
 	if ( !bp->vf )
 		req->func_reset_level = FUNC_RESET_REQ_FUNC_RESET_LEVEL_RESETME;
@@ -1034,7 +1052,7 @@ static int bnxt_hwrm_func_cfg_req ( struct bnxt *bp )
 	if ( bp->vf )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_func_cfg_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_func_cfg_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_CFG, cmd_len );
 	req->fid = ( u16 )HWRM_NA_SIGNATURE;
 	bnxt_hwrm_assign_resources ( bp );
@@ -1056,7 +1074,7 @@ static int bnxt_hwrm_func_drv_rgtr ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_func_drv_rgtr_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_func_drv_rgtr_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_DRV_RGTR, cmd_len );
 
 	/* Register with HWRM */
@@ -1088,7 +1106,7 @@ static int bnxt_hwrm_func_drv_unrgtr ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flag_hwrm, VALID_DRIVER_REG ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_func_drv_unrgtr_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_func_drv_unrgtr_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_DRV_UNRGTR, cmd_len );
 	req->flags = FUNC_DRV_UNRGTR_REQ_FLAGS_PREPARE_FOR_SHUTDOWN;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -1113,7 +1131,7 @@ static int bnxt_hwrm_set_async_event ( struct bnxt *bp )
 		u16 cmd_len = ( u16 )sizeof ( struct hwrm_func_vf_cfg_input );
 		struct hwrm_func_vf_cfg_input *req;
 
-		req = ( struct hwrm_func_vf_cfg_input * )bp->hwrm_addr_req;
+		req = ( struct hwrm_func_vf_cfg_input * )bp->req_addr_mapping;
 		hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_VF_CFG,
 			cmd_len );
 		req->enables = VF_CFG_ENABLE_FLAGS;
@@ -1127,7 +1145,7 @@ static int bnxt_hwrm_set_async_event ( struct bnxt *bp )
 		u16 cmd_len = ( u16 )sizeof ( struct hwrm_func_cfg_input );
 		struct hwrm_func_cfg_input *req;
 
-		req = ( struct hwrm_func_cfg_input * )bp->hwrm_addr_req;
+		req = ( struct hwrm_func_cfg_input * )bp->req_addr_mapping;
 		hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_CFG, cmd_len );
 		req->fid = ( u16 )HWRM_NA_SIGNATURE;
 		req->enables = FUNC_CFG_REQ_ENABLES_ASYNC_EVENT_CR;
@@ -1147,8 +1165,8 @@ static int bnxt_hwrm_cfa_l2_filter_alloc ( struct bnxt *bp )
 	u32 enables;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_cfa_l2_filter_alloc_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_cfa_l2_filter_alloc_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_cfa_l2_filter_alloc_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_cfa_l2_filter_alloc_output * )bp->resp_addr_mapping;
 	if ( bp->vf )
 		flags |= CFA_L2_FILTER_ALLOC_REQ_FLAGS_OUTERMOST;
 	enables = CFA_L2_FILTER_ALLOC_REQ_ENABLES_DST_ID |
@@ -1188,7 +1206,7 @@ static int bnxt_hwrm_cfa_l2_filter_free ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flag_hwrm, VALID_L2_FILTER ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_cfa_l2_filter_free_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_cfa_l2_filter_free_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_CFA_L2_FILTER_FREE,
 		cmd_len );
 	req->l2_filter_id = bp->l2_filter_id;
@@ -1227,7 +1245,7 @@ static int bnxt_hwrm_set_rx_mask ( struct bnxt *bp, u32 rx_mask )
 	struct hwrm_cfa_l2_set_rx_mask_input *req;
 	u32 mask = set_rx_mask ( rx_mask );
 
-	req = ( struct hwrm_cfa_l2_set_rx_mask_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_cfa_l2_set_rx_mask_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_CFA_L2_SET_RX_MASK,
 		cmd_len );
 	req->vnic_id = bp->vnic_id;
@@ -1244,8 +1262,8 @@ static int bnxt_hwrm_port_phy_qcfg ( struct bnxt *bp, u16 idx )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_port_phy_qcfg_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_port_phy_qcfg_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_port_phy_qcfg_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_port_phy_qcfg_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_PORT_PHY_QCFG, cmd_len );
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 	if ( rc ) {
@@ -1282,7 +1300,7 @@ static int bnxt_hwrm_nvm_get_variable_req ( struct bnxt *bp,
 	struct hwrm_nvm_get_variable_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_nvm_get_variable_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_nvm_get_variable_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_NVM_GET_VARIABLE, cmd_len );
 	req->dest_data_addr = bp->dma_addr_mapping;
 	req->data_len   	= data_len;
@@ -1296,7 +1314,7 @@ static int bnxt_hwrm_nvm_get_variable_req ( struct bnxt *bp,
 
 static int bnxt_get_link_speed ( struct bnxt *bp )
 {
-	u32 *ptr32 = ( u32 * )bp->hwrm_addr_dma;
+	u32 *ptr32 = ( u32 * )bp->dma_addr_mapping;
 
 	DBGP ( "%s\n", __func__ );
 	if ( ! ( FLAG_TEST (bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ) ) {
@@ -1381,7 +1399,7 @@ static int bnxt_get_link_speed ( struct bnxt *bp )
 
 static int bnxt_get_vlan ( struct bnxt *bp )
 {
-	u32 *ptr32 = ( u32 * )bp->hwrm_addr_dma;
+	u32 *ptr32 = ( u32 * )bp->dma_addr_mapping;
 
 	/* If VF is set to TRUE, Do not issue this command */
 	if ( bp->vf )
@@ -1422,7 +1440,7 @@ static int bnxt_hwrm_backing_store_qcfg ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_func_backing_store_qcfg_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_func_backing_store_qcfg_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_BACKING_STORE_QCFG,
 		cmd_len );
 	return wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -1437,7 +1455,7 @@ static int bnxt_hwrm_backing_store_cfg ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_func_backing_store_cfg_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_func_backing_store_cfg_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_FUNC_BACKING_STORE_CFG,
 		cmd_len );
 	req->flags   = FUNC_BACKING_STORE_CFG_REQ_FLAGS_PREBOOT_MODE;
@@ -1456,8 +1474,8 @@ static int bnxt_hwrm_queue_qportcfg ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_queue_qportcfg_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_queue_qportcfg_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_queue_qportcfg_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_queue_qportcfg_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_QUEUE_QPORTCFG, cmd_len );
 	req->flags   = 0;
 	req->port_id = 0;
@@ -1480,7 +1498,7 @@ static int bnxt_hwrm_port_mac_cfg ( struct bnxt *bp )
 	if ( bp->vf )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_port_mac_cfg_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_port_mac_cfg_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_PORT_MAC_CFG, cmd_len );
 	req->lpbk = PORT_MAC_CFG_REQ_LPBK_NONE;
 	return wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -1502,7 +1520,7 @@ static int bnxt_hwrm_port_phy_cfg ( struct bnxt *bp )
 	u8  auto_duplex = 0;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_port_phy_cfg_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_port_phy_cfg_input * )bp->req_addr_mapping;
 	flags = PORT_PHY_CFG_REQ_FLAGS_FORCE |
 		PORT_PHY_CFG_REQ_FLAGS_RESET_PHY;
 
@@ -1701,8 +1719,8 @@ static int bnxt_hwrm_stat_ctx_alloc ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_stat_ctx_alloc_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_stat_ctx_alloc_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_stat_ctx_alloc_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_stat_ctx_alloc_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_STAT_CTX_ALLOC, cmd_len );
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 	if ( rc ) {
@@ -1725,7 +1743,7 @@ static int bnxt_hwrm_stat_ctx_free ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flag_hwrm, VALID_STAT_CTX ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_stat_ctx_free_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_stat_ctx_free_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_STAT_CTX_FREE, cmd_len );
 	req->stat_ctx_id = ( u32 )bp->stat_ctx_id;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -1748,7 +1766,7 @@ static int bnxt_hwrm_ring_free_grp ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flag_hwrm, VALID_RING_GRP ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_ring_grp_free_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_ring_grp_free_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_RING_GRP_FREE, cmd_len );
 	req->ring_group_id = ( u32 )bp->ring_grp_id;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -1772,8 +1790,8 @@ static int bnxt_hwrm_ring_alloc_grp ( struct bnxt *bp )
 	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_ring_grp_alloc_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_ring_grp_alloc_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_ring_grp_alloc_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_ring_grp_alloc_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_RING_GRP_ALLOC, cmd_len );
 	req->cr = bp->cq_ring_id;
 	req->rr = bp->rx_ring_id;
@@ -1798,7 +1816,7 @@ int bnxt_hwrm_ring_free ( struct bnxt *bp, u16 ring_id, u8 ring_type )
 	struct hwrm_ring_free_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_ring_free_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_ring_free_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_RING_FREE, cmd_len );
 	req->ring_type = ring_type;
 	req->ring_id   = ring_id;
@@ -1813,8 +1831,8 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_ring_alloc_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_ring_alloc_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_ring_alloc_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_ring_alloc_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_RING_ALLOC, cmd_len );
 	req->ring_type = type;
 	switch ( type ) {
@@ -1823,13 +1841,13 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 		req->int_mode   = BNXT_CQ_INTR_MODE ( ( (FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7) ) || bp->vf ) );
 		req->length 	= ( u32 )bp->nq.ring_cnt;
 		req->logical_id = 0xFFFF; // Required value for Thor FW?
-		req->page_tbl_addr = virt_to_bus ( bp->nq.bd_virt );
+		req->page_tbl_addr = ( unsigned long ) ( bp->nq.bd_virt );
 		break;
 	case RING_ALLOC_REQ_RING_TYPE_L2_CMPL:
 		req->page_size = LM_PAGE_BITS ( 8 );
 		req->int_mode  = BNXT_CQ_INTR_MODE ( bp->vf );
 		req->length    = ( u32 )bp->cq.ring_cnt;
-		req->page_tbl_addr = virt_to_bus ( bp->cq.bd_virt );
+		req->page_tbl_addr = ( unsigned long ) ( bp->cq.bd_virt );
 	        if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 			break;
 		req->enables = RING_ALLOC_REQ_ENABLES_NQ_RING_ID_VALID;
@@ -1843,7 +1861,7 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 		req->queue_id    = ( u16 )bp->queue_id;
 		req->stat_ctx_id = ( u32 )bp->stat_ctx_id;
 		req->cmpl_ring_id  = bp->cq_ring_id;
-		req->page_tbl_addr = virt_to_bus ( bp->tx.bd_virt );
+		req->page_tbl_addr = ( unsigned long ) ( bp->tx.bd_virt );
 		break;
 	case RING_ALLOC_REQ_RING_TYPE_RX:
 		req->page_size   = LM_PAGE_BITS ( 8 );
@@ -1851,7 +1869,7 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 		req->length 	 = ( u32 )bp->rx.ring_cnt;
 		req->stat_ctx_id = ( u32 )STAT_CTX_ID;
 		req->cmpl_ring_id  = bp->cq_ring_id;
-		req->page_tbl_addr = virt_to_bus ( bp->rx.bd_virt );
+		req->page_tbl_addr = ( unsigned long ) ( bp->rx.bd_virt );
 	        if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 			break;
 		req->queue_id    = ( u16 )RX_RING_QID;
@@ -1979,8 +1997,8 @@ static int bnxt_hwrm_vnic_alloc ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_vnic_alloc_input * )bp->hwrm_addr_req;
-	resp = ( struct hwrm_vnic_alloc_output * )bp->hwrm_addr_resp;
+	req = ( struct hwrm_vnic_alloc_input * )bp->req_addr_mapping;
+	resp = ( struct hwrm_vnic_alloc_output * )bp->resp_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_VNIC_ALLOC, cmd_len );
 	req->flags = VNIC_ALLOC_REQ_FLAGS_DEFAULT;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -2004,7 +2022,7 @@ static int bnxt_hwrm_vnic_free ( struct bnxt *bp )
 	if ( ! ( FLAG_TEST ( bp->flag_hwrm, VALID_VNIC_ID ) ) )
 		return STATUS_SUCCESS;
 
-	req = ( struct hwrm_vnic_free_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_vnic_free_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_VNIC_FREE, cmd_len );
 	req->vnic_id = bp->vnic_id;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
@@ -2023,7 +2041,7 @@ static int bnxt_hwrm_vnic_cfg ( struct bnxt *bp )
 	struct hwrm_vnic_cfg_input *req;
 
 	DBGP ( "%s\n", __func__ );
-	req = ( struct hwrm_vnic_cfg_input * )bp->hwrm_addr_req;
+	req = ( struct hwrm_vnic_cfg_input * )bp->req_addr_mapping;
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_VNIC_CFG, cmd_len );
 	req->enables = VNIC_CFG_REQ_ENABLES_MRU;
 	req->mru	 = bp->mtu;
@@ -2116,8 +2134,8 @@ int bnxt_hwrm_run ( hwrm_func_t cmds[], struct bnxt *bp )
 	int ret;
 
 	for ( ptr = cmds; *ptr; ++ptr ) {
-		memset ( bp->hwrm_addr_req,  0, REQ_BUFFER_SIZE );
-		memset ( bp->hwrm_addr_resp, 0, RESP_BUFFER_SIZE );
+		memset ( ( void * )bp->req_addr_mapping,  0, REQ_BUFFER_SIZE );
+		memset ( ( void * )bp->resp_addr_mapping, 0, RESP_BUFFER_SIZE );
 		ret = ( *ptr ) ( bp );
 		if ( ret ) {
 			DBGP ( "- %s (  ): Failed\n", __func__ );
@@ -2152,9 +2170,6 @@ static void bnxt_tx_adjust_pkt ( struct bnxt *bp, struct io_buffer *iob )
 	dbg_tx_vlan ( bp, ( char * )iob->data, prev_len, iob_len ( iob ) );
 	if ( iob_len ( iob ) != prev_len )
 		prev_len = iob_len ( iob );
-
-	iob_pad ( iob, ETH_ZLEN );
-	dbg_tx_pad ( prev_len, iob_len ( iob ) );
 }
 
 static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
@@ -2170,7 +2185,7 @@ static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
 
 	bnxt_tx_adjust_pkt ( bp, iob );
 	entry = bp->tx.prod_id;
-	mapping = virt_to_bus ( iob->data );
+	mapping = iob_dma ( iob );
 	len = iob_len ( iob );
 	bp->tx.iob[entry] = iob;
 	bnxt_set_txq ( bp, entry, mapping, len );
@@ -2228,7 +2243,7 @@ static void bnxt_service_cq ( struct net_device *dev )
 	u32 cq_type;
 
 	while ( done == SERVICE_NEXT_CQ_BD ) {
-		cmp = ( struct cmpl_base * )BD_NOW ( bp->cq.bd_virt,
+		cmp = ( struct cmpl_base * )BD_NOW ( bp->cq_addr_mapping,
 						bp->cq.cons_id,
 						sizeof ( struct cmpl_base ) );
 
@@ -2279,7 +2294,7 @@ static void bnxt_service_nq ( struct net_device *dev )
 		return;
 
 	while ( done == SERVICE_NEXT_NQ_BD ) {
-		nqp = ( struct nq_base * )BD_NOW ( bp->nq.bd_virt,
+		nqp = ( struct nq_base * )BD_NOW ( bp->nq_addr_mapping,
 			bp->nq.cons_id, sizeof ( struct nq_base ) );
 		if ( ( nqp->v & NQ_CN_V ) ^ bp->nq.completion_bit )
 			break;
@@ -2366,6 +2381,10 @@ static int bnxt_init_one ( struct pci_device *pci )
 	bp->pdev = pci;
 	bp->dev  = netdev;
 	netdev->dev = &pci->dev;
+
+	/* Configure DMA */
+	bp->dma = &pci->dma;
+	netdev->dma = bp->dma;
 
 	/* Enable PCI device */
 	adjust_pci_device ( pci );
