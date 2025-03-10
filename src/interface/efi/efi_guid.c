@@ -83,6 +83,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/VlanConfig.h>
 #include <ipxe/efi/Guid/FileInfo.h>
 #include <ipxe/efi/Guid/FileSystemInfo.h>
+#include <ipxe/efi/Guid/ImageAuthentication.h>
 
 /** @file
  *
@@ -390,6 +391,9 @@ EFI_GUID efi_usb_io_protocol_guid
 /** VLAN configuration protocol GUID */
 EFI_GUID efi_vlan_config_protocol_guid
 	= EFI_VLAN_CONFIG_PROTOCOL_GUID;
+
+/** X.509 certificate GUID */
+EFI_GUID efi_cert_x509_guid = EFI_CERT_X509_GUID;
 
 /** File information GUID */
 EFI_GUID efi_file_info_id = EFI_FILE_INFO_ID;

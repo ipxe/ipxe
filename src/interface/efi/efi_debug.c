@@ -103,6 +103,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "BlockIo2" },
 	{ &efi_bus_specific_driver_override_protocol_guid,
 	  "BusSpecificDriverOverride" },
+	{ &efi_cert_x509_guid,
+	  "CertX509" },
 	{ &efi_component_name_protocol_guid,
 	  "ComponentName" },
 	{ &efi_component_name2_protocol_guid,
