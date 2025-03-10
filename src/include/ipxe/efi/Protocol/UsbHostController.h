@@ -1,3 +1,6 @@
+#ifndef _IPXE_EFI_USBHOSTCONTROLLER_H
+#define _IPXE_EFI_USBHOSTCONTROLLER_H
+
 /** @file
   EFI_USB_HC_PROTOCOL as defined in EFI 1.10.
 
@@ -501,3 +504,5 @@ struct _EFI_USB_HC_PROTOCOL {
 extern EFI_GUID  gEfiUsbHcProtocolGuid;
 
 #endif
+
+#endif /* _IPXE_EFI_USBHOSTCONTROLLER_H */
