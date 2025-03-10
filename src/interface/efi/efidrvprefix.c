@@ -89,3 +89,6 @@ struct root_device efi_root_device __root_device = {
 	.dev = { .name = "EFI" },
 	.driver = &efi_root_driver,
 };
+
+PROVIDE_REQUIRING_SYMBOL();
+REQUIRE_SYMBOL ( efi_snp_driver );
