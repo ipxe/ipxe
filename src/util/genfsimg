@@ -293,6 +293,7 @@ if [ -n "${ISOIMG}" ] ; then
     MKISOFS=
     MKISOFS_MISSING=
     MKISOFS_NOTSUP=
+    NOISOHYBRID=
     for CMD in genisoimage mkisofs xorrisofs ; do
 	if ! "${CMD}" --version >/dev/null 2>&1 ; then
 	    MKISOFS_MISSING="${MKISOFS_MISSING} ${CMD}"
@@ -315,11 +316,15 @@ if [ -n "${ISOIMG}" ] ; then
 	echo "${0}: cannot find a suitable mkisofs or equivalent" >&2
 	exit 1
     fi
+    if [ "${MKISOFS}" = "xorrisofs" ] ; then
+        ISOARGS="${ISOARGS} -isohybrid-gpt-basdat"
+        NOISOHYBRID=1
+    fi
     "${MKISOFS}" -quiet -volid "iPXE" -preparer "iPXE build system" \
 	    -appid "iPXE - Open Source Network Boot Firmware" \
 	    -publisher "ipxe.org" -sysid "iPXE" -o "${ISOIMG}" \
 	    ${ISOARGS} "${ISODIR}"
-    if isohybrid --version >/dev/null 2>&1 ; then
+    if [ -z "${NOISOHYBRID}" ] && isohybrid --version >/dev/null 2>&1 ; then
 	ISOHYBRIDARGS=
 	if [ -n "${EFI}" ] ; then
 	    ISOHYBRIDARGS="${ISOHYBRIDARGS} --uefi"
