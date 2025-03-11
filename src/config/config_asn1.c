@@ -37,3 +37,6 @@ REQUIRE_OBJECT ( der );
 #ifdef IMAGE_PEM
 REQUIRE_OBJECT ( pem );
 #endif
+#ifdef IMAGE_EFISIG
+REQUIRE_OBJECT ( efi_siglist );
+#endif
