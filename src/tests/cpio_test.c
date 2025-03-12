@@ -221,6 +221,20 @@ CPIO_TEST ( path_mkdir_all, 0x341, "/usr/share/oem/config.ign mkdir=-1", 4,
 	    CPIO_HEADER ( "000081a4", "00000341", "0000001a",
 			  "/usr/share/oem/config.ign" PAD1 ) );
 
+/* Simple directory */
+CPIO_TEST ( dir, 0, "/opt/", 1,
+	    CPIO_HEADER ( "000041ed", "00000000", "00000005",
+			  "/opt" PAD2 ) );
+
+/* Directory tree */
+CPIO_TEST ( tree, 0, "/opt/oem/scripts/ mkdir=-1", 3,
+	    CPIO_HEADER ( "000041ed", "00000000", "00000005",
+			  "/opt" PAD2 )
+	    CPIO_HEADER ( "000041ed", "00000000", "00000009",
+			  "/opt/oem" PAD2 )
+	    CPIO_HEADER ( "000041ed", "00000000", "00000011",
+			  "/opt/oem/scripts" PAD2 ) );
+
 /* Custom mode */
 CPIO_TEST ( mode, 39, "/sbin/init mode=755", 1,
 	    CPIO_HEADER ( "000081ed", "00000027", "0000000b",
@@ -252,6 +266,8 @@ static void cpio_test_exec ( void ) {
 	cpio_ok ( &path_mkdir_1 );
 	cpio_ok ( &path_mkdir_2 );
 	cpio_ok ( &path_mkdir_all );
+	cpio_ok ( &dir );
+	cpio_ok ( &tree );
 	cpio_ok ( &mode );
 	cpio_ok ( &chaos );
 }

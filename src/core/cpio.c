@@ -179,16 +179,15 @@ size_t cpio_header ( struct image *image, unsigned int index,
 	/* Get filename length */
 	name_len = cpio_name_len ( image, depth );
 
-	/* Calculate mode and length */
-	if ( depth < max ) {
-		/* Directory */
+	/* Set directory mode or file mode as appropriate */
+	if ( name[name_len] == '/' ) {
 		mode = ( CPIO_MODE_DIR | CPIO_DEFAULT_DIR_MODE );
-		len = 0;
 	} else {
-		/* File */
 		mode |= CPIO_MODE_FILE;
-		len = image->len;
 	}
+
+	/* Set length on final header */
+	len = ( ( depth < max ) ? 0 : image->len );
 
 	/* Construct CPIO header */
 	memset ( cpio, '0', sizeof ( *cpio ) );
