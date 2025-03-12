@@ -63,14 +63,15 @@ static unsigned int cpio_max ( struct image *image ) {
 	const char *name = cpio_name ( image );
 	unsigned int max = 0;
 	char c;
+	char p;
 
 	/* Check for existence of CPIO filename */
 	if ( ! name )
 		return 0;
 
-	/* Count number of path separators */
-	while ( ( ( c = *(name++) ) ) && ( c != ' ' ) ) {
-		if ( c == '/' )
+	/* Count number of path components */
+	for ( p = '/' ; ( ( ( c = *(name++) ) ) && ( c != ' ' ) ) ; p = c ) {
+		if ( ( p == '/' ) && ( c != '/' ) )
 			max++;
 	}
 
@@ -88,13 +89,16 @@ static size_t cpio_name_len ( struct image *image, unsigned int depth ) {
 	const char *name = cpio_name ( image );
 	size_t len;
 	char c;
+	char p;
 
-	/* Sanity check */
+	/* Sanity checks */
 	assert ( name != NULL );
+	assert ( depth > 0 );
 
 	/* Calculate length up to specified path depth */
-	for ( len = 0 ; ( ( ( c = name[len] ) ) && ( c != ' ' ) ) ; len++ ) {
-		if ( ( c == '/' ) && ( depth-- == 0 ) )
+	for ( len = 0, p = '/' ; ( ( ( c = name[len] ) ) && ( c != ' ' ) ) ;
+	      len++, p = c ) {
+		if ( ( c == '/' ) && ( p != '/' ) && ( --depth == 0 ) )
 			break;
 	}
 
