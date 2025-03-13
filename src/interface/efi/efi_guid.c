@@ -85,6 +85,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/VlanConfig.h>
 #include <ipxe/efi/Guid/FileInfo.h>
 #include <ipxe/efi/Guid/FileSystemInfo.h>
+#include <ipxe/efi/Guid/GlobalVariable.h>
 #include <ipxe/efi/Guid/ImageAuthentication.h>
 
 /** @file
@@ -403,6 +404,9 @@ EFI_GUID efi_file_info_id = EFI_FILE_INFO_ID;
 /** File system information GUID */
 EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;
 
+/** Global variable GUID */
+EFI_GUID efi_global_variable = EFI_GLOBAL_VARIABLE;
+
 /** HttpBootDxe module GUID */
 static EFI_GUID efi_http_boot_dxe_guid = {
 	0xecebcb00, 0xd9c8, 0x11e4,
@@ -489,6 +493,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Dns6" },
 	{ &efi_dns6_service_binding_protocol_guid,
 	  "Dns6Sb" },
+	{ &efi_global_variable,
+	  "GlobalVar" },
 	{ &efi_graphics_output_protocol_guid,
 	  "GraphicsOutput" },
 	{ &efi_hii_config_access_protocol_guid,
