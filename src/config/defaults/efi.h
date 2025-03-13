@@ -53,6 +53,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define EFI_SETTINGS		/* EFI variable settings */
 
+#define CERTS_EFI		/* EFI certificate sources */
+
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define ENTROPY_RDRAND

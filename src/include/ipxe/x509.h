@@ -421,6 +421,9 @@ extern int x509_certificate ( const void *data, size_t len,
 			      struct x509_certificate **cert );
 extern int x509_is_valid ( struct x509_certificate *cert,
 			   struct x509_root *root );
+extern void x509_set_valid ( struct x509_certificate *cert,
+			     struct x509_certificate *issuer,
+			     struct x509_root *root );
 extern int x509_validate ( struct x509_certificate *cert,
 			   struct x509_certificate *issuer,
 			   time_t time, struct x509_root *root );

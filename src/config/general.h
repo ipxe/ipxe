@@ -175,6 +175,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define USB_CMD		/* USB commands */
 
 /*
+ * Certificate sources
+ *
+ */
+//#undef CERTS_EFI		/* EFI certificate sources */
+
+/*
  * ROM-specific options
  *
  */

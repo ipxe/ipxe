@@ -58,6 +58,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	0xed, 0x1a,
 #endif
 
+/** Flag indicating if root of trust may be overridden at runtime */
+const int allow_trust_override = ALLOW_TRUST_OVERRIDE;
+
 /** Root certificate fingerprints */
 static const uint8_t fingerprints[] = { TRUSTED };
 

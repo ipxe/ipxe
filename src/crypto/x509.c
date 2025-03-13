@@ -1323,9 +1323,9 @@ int x509_is_valid ( struct x509_certificate *cert, struct x509_root *root ) {
  * @v issuer		Issuing X.509 certificate (or NULL)
  * @v root		Root certificate list
  */
-static void x509_set_valid ( struct x509_certificate *cert,
-			     struct x509_certificate *issuer,
-			     struct x509_root *root ) {
+void x509_set_valid ( struct x509_certificate *cert,
+		      struct x509_certificate *issuer,
+		      struct x509_root *root ) {
 	unsigned int max_path_remaining;
 
 	/* Sanity checks */

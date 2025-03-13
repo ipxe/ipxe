@@ -266,3 +266,9 @@ static int certstore_apply_settings ( void ) {
 struct settings_applicator certstore_applicator __settings_applicator = {
 	.apply = certstore_apply_settings,
 };
+
+/* Drag in objects via certificate store */
+REQUIRING_SYMBOL ( certstore );
+
+/* Drag in alternative certificate sources */
+REQUIRE_OBJECT ( config_certs );
