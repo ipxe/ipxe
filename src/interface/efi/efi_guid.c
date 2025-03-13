@@ -87,6 +87,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/Guid/GlobalVariable.h>
 #include <ipxe/efi/Guid/ImageAuthentication.h>
+#include <ipxe/efi/Guid/TlsAuthentication.h>
 
 /** @file
  *
@@ -407,6 +408,9 @@ EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;
 /** Global variable GUID */
 EFI_GUID efi_global_variable = EFI_GLOBAL_VARIABLE;
 
+/** TLS CA certificate variable GUID */
+EFI_GUID efi_tls_ca_certificate_guid = EFI_TLS_CA_CERTIFICATE_GUID;
+
 /** HttpBootDxe module GUID */
 static EFI_GUID efi_http_boot_dxe_guid = {
 	0xecebcb00, 0xd9c8, 0x11e4,
@@ -583,6 +587,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Tcp6" },
 	{ &efi_tcp6_service_binding_protocol_guid,
 	  "Tcp6Sb" },
+	{ &efi_tls_ca_certificate_guid,
+	  "TlsCaCert" },
 	{ &efi_tree_protocol_guid,
 	  "TrEE" },
 	{ &efi_udp4_protocol_guid,
