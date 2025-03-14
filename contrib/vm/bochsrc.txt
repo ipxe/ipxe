@@ -25,12 +25,12 @@ plugin_ctrl: unmapped=1, biosdev=1, speaker=1, e1000=1, parallel=1, serial=1
 # allows you to change all the settings that control Bochs's behavior.
 # Depending on the platform there are up to 3 choices of configuration
 # interface: a text mode version called "textconfig" and two graphical versions
-# called "win32config" and "wx".  The text mode version uses stdin/stdout and
-# is always compiled in, unless Bochs is compiled for wx only. The choice
-# "win32config" is only available on win32 and it is the default there.
-# The choice "wx" is only available when you use "--with-wx" on the configure
-# command.  If you do not write a config_interface line, Bochs will
-# choose a default for you.
+# called "win32config" and "wx".  The text mode version uses stdin/stdout or
+# gui console (if available / runtime config) and is always compiled in, unless
+# Bochs is compiled for wx only. The choice "win32config" is only available on
+# win32/win64 and it is the default on these platforms. The choice "wx" is only
+# available when Bochs is compiled with wxWidgets support.  If you do not write
+# a config_interface line, Bochs will choose a default for you.
 #
 # NOTE: if you use the "wx" configuration interface, you must also use
 # the "wx" display library.
@@ -73,12 +73,14 @@ plugin_ctrl: unmapped=1, biosdev=1, speaker=1, e1000=1, parallel=1, serial=1
 # "cmdmode"     - call a headerbar button handler after pressing F7 (sdl, sdl2,
 #                 win32, x)
 # "fullscreen"  - startup in fullscreen mode (sdl, sdl2)
-# "gui_debug"   - use GTK debugger gui (sdl, sdl2, x) / Win32 debugger gui (sdl,
-#                 sdl2, win32)
 # "hideIPS"     - disable IPS output in status bar (rfb, sdl, sdl2, term, vncsrv,
 #                 win32, wx, x)
 # "nokeyrepeat" - turn off host keyboard repeat (sdl, sdl2, win32, x)
+# "no_gui_console" - use system console instead of builtin gui console
+#                    (rfb, sdl, sdl2, vncsrv, x)
 # "timeout"     - time (in seconds) to wait for client (rfb, vncsrv)
+# "gui_debug"   - This option is DEPRECATED, use command line option '-dbg_gui'
+#                 instead. It also supports the 'globalini' extension
 #
 # See the examples below for other currently supported options.
 # Setting up options without specifying display library is also supported.
@@ -113,9 +115,12 @@ plugin_ctrl: unmapped=1, biosdev=1, speaker=1, e1000=1, parallel=1, serial=1
 #
 #  CPU configurations that can be selected:
 # -----------------------------------------------------------------
+#  i386                       Intel 386SX
+#  i486dx4                    Intel 486DX4
 #  pentium                    Intel Pentium (P54C)
 #  pentium_mmx                Intel Pentium MMX
 #  amd_k6_2_chomper           AMD-K6(tm) 3D processor (Chomper)
+#  athlon_xp                  AMD Athlon(tm) XP Processor
 #  p2_klamath                 Intel Pentium II (Klamath)
 #  p3_katmai                  Intel Pentium III (Katmai)
 #  p4_willamette              Intel(R) Pentium(R) 4 (Willamette)
@@ -136,6 +141,26 @@ plugin_ctrl: unmapped=1, biosdev=1, speaker=1, e1000=1, parallel=1, serial=1
 #  corei7_ivy_bridge_3770k    Intel(R) Core(TM) i7-3770K CPU (Ivy Bridge)
 #  corei7_haswell_4770        Intel(R) Core(TM) i7-4770 CPU (Haswell)
 #  broadwell_ult              Intel(R) Processor 5Y70 CPU (Broadwell)
+#  corei7_skylake_x           Intel(R) Core(TM) i7-7800X CPU (Skylake)
+#  corei3_cnl                 Intel(R) Core(TM) i3-8121U CPU (Cannonlake)
+#  corei7_icelake_u           QuadCore Intel Core i7-1065G7 (IceLake)
+#  tigerlake                  11th Gen Intel(R) Core(TM) i5-1135G7 (TigerLake)
+#  sapphire_rapids            Intel(R) Xeon(R) w9-3475X (Sappire Rapids)
+#  arrow_lake                 15th Gen Intel(R) Core(TM) Ultra 5 245K (ArrowLake)
+#
+#  ADD_FEATURES:
+#    Enable one of more CPU feature in the CPU configuration selected by MODEL.
+#    Could be useful for testing CPU with newer imaginary configurations by
+#    adding a specific feature or set of features to existing MODEL. The list
+#    of features to add supplied through space or comma separated string.
+#
+#  EXCLUDE_FEATURES:
+#    Disable one of more CPU feature from CPU configuration selected by MODEL.
+#    Could be useful for testing CPU without a specific feature or set of
+#    features. When experiening issues booting a modern OS it could be useful
+#    to disable CPU features(s) to see if they responsible for the failures.
+#    The list of features to exclude supplied through space or comma separated
+#    string.
 #
 #  COUNT:
 #    Set the number of processors:cores per processor:threads per core when
@@ -197,151 +222,6 @@ cpu: model=core2_penryn_t9600, count=1, ips=50000000, reset_on_triple_fault=1, i
 cpu: cpuid_limit_winnt=0
 
 #=======================================================================
-# CPUID:
-#
-# This defines features and functionality supported by Bochs emulated CPU.
-# The option has no offect if CPU model was selected in CPU option.
-#
-#  MMX:
-#    Select MMX instruction set support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 5.
-#
-#  APIC:
-#    Select APIC configuration (LEGACY/XAPIC/XAPIC_EXT/X2APIC).
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 5.
-#
-#  SEP:
-#    Select SYSENTER/SYSEXIT instruction set support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  SIMD:
-#    Select SIMD instructions support.
-#    Any of NONE/SSE/SSE2/SSE3/SSSE3/SSE4_1/SSE4_2/AVX/AVX2/AVX512
-#    could be selected.
-#
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#    The AVX choises exists only if Bochs compiled with --enable-avx option.
-#
-#  SSE4A:
-#    Select AMD SSE4A instructions support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  MISALIGNED_SSE:
-#    Select AMD Misaligned SSE mode support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  AES:
-#    Select AES instruction set support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  SHA:
-#    Select SHA instruction set support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  MOVBE:
-#    Select MOVBE Intel(R) Atom instruction support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  ADX:
-#    Select ADCX/ADOX instructions support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  XSAVE:
-#    Select XSAVE extensions support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  XSAVEOPT:
-#    Select XSAVEOPT instruction support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  AVX_F16C:
-#    Select AVX float16 convert instructions support.
-#    This option exists only if Bochs compiled with --enable-avx option.
-#
-#  AVX_FMA:
-#    Select AVX fused multiply add (FMA) instructions support.
-#    This option exists only if Bochs compiled with --enable-avx option.
-#
-#  BMI:
-#    Select BMI1/BMI2 instructions support.
-#    This option exists only if Bochs compiled with --enable-avx option.
-#
-#  XOP:
-#    Select AMD XOP instructions support.
-#    This option exists only if Bochs compiled with --enable-avx option.
-#
-#  FMA4:
-#    Select AMD four operand FMA instructions support.
-#    This option exists only if Bochs compiled with --enable-avx option.
-#
-#  TBM:
-#    Select AMD Trailing Bit Manipulation (TBM) instructions support.
-#    This option exists only if Bochs compiled with --enable-avx option.
-#
-#  X86-64:
-#    Enable x86-64 and long mode support.
-#    This option exists only if Bochs compiled with x86-64 support.
-#
-#  1G_PAGES:
-#    Enable 1G page size support in long mode.
-#    This option exists only if Bochs compiled with x86-64 support.
-#
-#  PCID:
-#    Enable Process-Context Identifiers (PCID) support in long mode.
-#    This option exists only if Bochs compiled with x86-64 support.
-#
-#  FSGSBASE:
-#    Enable GS/GS BASE access instructions support in long mode.
-#    This option exists only if Bochs compiled with x86-64 support.
-#
-#  SMEP:
-#    Enable Supervisor Mode Execution Protection (SMEP) support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  SMAP:
-#    Enable Supervisor Mode Access Prevention (SMAP) support.
-#    This option exists only if Bochs compiled with BX_CPU_LEVEL >= 6.
-#
-#  MWAIT:
-#    Select MONITOR/MWAIT instructions support.
-#    This option exists only if Bochs compiled with --enable-monitor-mwait.
-#
-#  VMX:
-#    Select VMX extensions emulation support.
-#    This option exists only if Bochs compiled with --enable-vmx option.
-#
-#  SVM:
-#    Select AMD SVM (Secure Virtual Machine) extensions emulation support.
-#    This option exists only if Bochs compiled with --enable-svm option.
-#
-#  VENDOR_STRING:
-#    Set the CPUID vendor string returned by CPUID(0x0). This should be a
-#    twelve-character ASCII string.
-#
-#  BRAND_STRING:
-#    Set the CPUID vendor string returned by CPUID(0x80000002 .. 0x80000004).
-#    This should be at most a forty-eight-character ASCII string.
-#
-#  LEVEL:
-#    Set emulated CPU level information returned by CPUID. Default value is
-#    determined by configure option --enable-cpu-level. Currently supported
-#    values are 5 (for Pentium and similar processors) and 6 (for P6 and
-#    later processors).
-#
-#  FAMILY:
-#    Set model information returned by CPUID. Default family value determined
-#    by configure option --enable-cpu-level.
-#
-#  MODEL:
-#    Set model information returned by CPUID. Default model value is 3.
-#
-#  STEPPING:
-#    Set stepping information returned by CPUID. Default stepping value is 3.
-#=======================================================================
-#cpuid: x86_64=1, mmx=1, sep=1, simd=sse4_2, apic=xapic, aes=1, movbe=1, xsave=1
-#cpuid: family=6, model=0x1a, stepping=5
-
-#=======================================================================
 # MEMORY
 # Set the amount of physical memory you want to emulate.
 #
@@ -357,8 +237,14 @@ cpu: cpuid_limit_winnt=0
 # memory pool. You will be warned (by FATAL PANIC) in case guest already
 # used all allocated host memory and wants more.
 #
+# BLOCK_SIZE:
+# Memory block size select granularity of host memory allocation. Very
+# large memory configurations might requre larger memory blocks which
+# configurations with small memory might want memory block smaller.
+# Default memory block size is 128K.
+#
 #=======================================================================
-memory: guest=512, host=256
+memory: guest=512, host=256, block_size=512
 
 #=======================================================================
 # ROMIMAGE:
@@ -368,28 +254,50 @@ memory: guest=512, host=256
 # starting at address 0xfffe0000, and it is exactly 128k long. The legacy
 # version of the Bochs BIOS is usually loaded starting at address 0xffff0000,
 # and it is exactly 64k long.
-# You can use the environment variable $BXSHARE to specify the location
-# of the BIOS.
 # The usage of external large BIOS images (up to 512k) at memory top is
 # now supported, but we still recommend to use the BIOS distributed with Bochs.
-# The start address is optional, since it can be calculated from image size.
-# The Bochs BIOS currently supports only the option "fastboot" to skip the
-# boot menu delay.
+#
+#  FILE
+#    Name of the BIOS image file. You can use the environment variable $BXSHARE
+#    to specify the location of the BIOS.
+#
+#  ADDRESS
+#    The start address is optional, since it can be calculated from image size.
+#
+#  OPTIONS
+#    The Bochs BIOS currently only supports the option "fastboot" to skip the
+#    boot menu delay.
+#
+#  FLASH_DATA
+#    This parameter defines the file name for the flash BIOS config space loaded
+#    at startup if existing and saved on exit if modified. The Bochs BIOS doesn't
+#    use this feature yet.
+#
+# Please note that if you use the BIOS-bochs-legacy romimage BIOS option,
+# you cannot use a PCI enabled VGA ROM BIOS.
+# Please note that if you use a SeaBIOS binary in romimage BIOS option,
+# you must use a PCI enabled VGA ROM BIOS.
 #=======================================================================
 #romimage: file=$BXSHARE/BIOS-bochs-latest, options=fastboot
+#romimage: file=$BXSHARE/BIOS-bochs-legacy
 #romimage: file=$BXSHARE/bios.bin-1.13.0 # http://www.seabios.org/SeaBIOS
+#romimage: file=$BXSHARE/i440fx.bin, flash_data=escd.bin
+#romimage: file=asus_p6np5.bin, flash_data=escd.bin
 #romimage: file=mybios.bin, address=0xfff80000 # 512k at memory top
 romimage: file=bochs/bios/BIOS-bochs-latest
 
 #=======================================================================
 # VGAROMIMAGE
 # You now need to load a VGA ROM BIOS into C0000.
+# Please note that if you use the BIOS-bochs-legacy romimage BIOS option,
+# you cannot use a PCI enabled VGA ROM BIOS option such as the cirrus
+# option shown below.
 #=======================================================================
-#vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest
-#vgaromimage: file=bios/VGABIOS-lgpl-latest-cirrus
+#vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest.bin
+#vgaromimage: file=bios/VGABIOS-lgpl-latest-cirrus.bin
 #vgaromimage: file=$BXSHARE/vgabios-cirrus.bin-1.13.0 # http://www.seabios.org/SeaVGABIOS
 #vgaromimage: file=bios/VGABIOS-elpin-2.40
-vgaromimage: file=bochs/bios/VGABIOS-lgpl-latest
+vgaromimage: file=bochs/bios/VGABIOS-lgpl-latest.bin
 
 #=======================================================================
 # OPTROMIMAGE[1-4]:
@@ -406,7 +314,7 @@ vgaromimage: file=bochs/bios/VGABIOS-lgpl-latest
 #optromimage2: file=optionalrom.bin, address=0xd1000
 #optromimage3: file=optionalrom.bin, address=0xd2000
 #optromimage4: file=optionalrom.bin, address=0xd3000
-optromimage1: file=../../src/bin/intel.rom, address=0xcb000
+optromimage1: file=../../src/bin/intel.rom, address=0xc8000
 
 #optramimage1: file=/path/file1.img, address=0x0010000
 #optramimage2: file=/path/file2.img, address=0x0020000
@@ -426,7 +334,9 @@ optromimage1: file=../../src/bin/intel.rom, address=0xcb000
 #   UPDATE_FREQ
 #     This parameter specifies the number of display updates per second.
 #     The VGA update timer by default uses the realtime engine with a value
-#     of 5. This parameter can be changed at runtime.
+#     of 10 (valid: 1 to 75). This parameter can be changed at runtime.
+#     The special value 0 enables support for using the frame rate of the
+#     emulated graphics device.
 #
 #   REALTIME
 #     If set to 1 (default), the VGA timer is based on realtime, otherwise it
@@ -440,6 +350,10 @@ optromimage1: file=../../src/bin/intel.rom, address=0xcb000
 #     the monitor EDID data. By default the 'builtin' values for 'Bochs Screen'
 #     are used. Other choices are 'disabled' (no DDC emulation) and 'file'
 #     (read monitor EDID from file / path name separated with a colon).
+#
+#   VBE_MEMSIZE
+#     With this parameter the size of the memory for the Bochs VBE extension
+#     can be defined. Valid values are 4, 8, 16 and 32 MB (default is 16 MB).
 # Examples:
 #   vga: extension=cirrus, update_freq=10, ddc=builtin
 #=======================================================================
@@ -488,6 +402,8 @@ optromimage1: file=../../src/bin/intel.rom, address=0xcb000
 #   KEYMAP:
 #     This enables a remap of a physical localized keyboard to a
 #     virtualized us keyboard, as the PC architecture expects.
+#     Using a language specifier instead of a file name is also supported.
+#     A keymap is also required by the paste feature.
 #
 #   USER_SHORTCUT:
 #     This defines the keyboard shortcut to be sent when you press the "user"
@@ -504,7 +420,7 @@ optromimage1: file=../../src/bin/intel.rom, address=0xcb000
 #   keyboard: keymap=gui/keymaps/x11-pc-de.map
 #   keyboard: user_shortcut=ctrl-alt-del
 #=======================================================================
-#keyboard: type=mf, serial_delay=250
+#keyboard: type=mf, serial_delay=150
 
 #=======================================================================
 # MOUSE:
@@ -529,8 +445,8 @@ optromimage1: file=../../src/bin/intel.rom, address=0xcb000
 #  TOGGLE:
 #  The default method to toggle the mouse capture at runtime is to press the
 #  CTRL key and the middle mouse button ('ctrl+mbutton'). This option allows
-#  to change the method to 'ctrl+f10' (like DOSBox), 'ctrl+alt' (like QEMU)
-#  or 'f12'.
+#  to change the method to 'ctrl+f10' (like DOSBox), 'ctrl+alt' (legacy QEMU),
+#  'ctrl+alt+g' (QEMU current) or 'f12'.
 #
 # Examples:
 #   mouse: enabled=1
@@ -567,7 +483,8 @@ mouse: enabled=0
 #  PCI chipset. These options can be specified as comma-separated values.
 #  By default the "Bochs i440FX" chipset enables the ACPI and HPET devices, but
 #  original i440FX doesn't support them. The options 'noacpi' and 'nohpet' make
-#  it possible to disable them.
+#  it possible to disable them. The option 'noagp' disables the incomplete AGP
+#  subsystem of the i440BX chipset.
 #
 # Example:
 #   pci: enabled=1, chipset=i440fx, slot1=pcivga, slot2=ne2k, advopts=noacpi
@@ -772,10 +689,11 @@ ata3: enabled=0, ioaddr1=0x168, ioaddr2=0x360, irq=9
 # This defines the boot sequence. Now you can specify up to 3 boot drives,
 # which can be 'floppy', 'disk', 'cdrom' or 'network' (boot ROM).
 # Legacy 'a' and 'c' are also supported.
+# The new boot choice 'usb' is only supported by the i440fx.bin BIOS.
 # Examples:
 #   boot: floppy
 #   boot: cdrom, disk
-#   boot: network, disk
+#   boot: network, usb, disk
 #   boot: cdrom, floppy, disk
 #=======================================================================
 #boot: floppy
@@ -929,15 +847,15 @@ parport1: enabled=1, file="parport.out"
 # waveoutdrv:
 #      This defines the driver to be used for the waveout feature.
 #      Possible values are 'file' (all wave data sent to file), 'dummy' (no
-#      output) and the platform-dependant drivers 'alsa', 'oss', 'osx', 'sdl'
-#      and 'win'.
+#      output), 'pulse', 'sdl' (both cross-platform) and the platform-dependant
+#      drivers 'alsa', 'oss', 'osx' and 'win'.
 # waveout:
 #      This defines the device to be used for wave output (if necessary) or
 #      the output file for the 'file' driver.
 # waveindrv:
 #      This defines the driver to be used for the wavein feature.
-#      Possible values are 'dummy' (recording silence) and platform-dependent
-#      drivers 'alsa', 'oss', 'sdl' and 'win'.
+#      Possible values are 'dummy' (recording silence), 'pulse', 'sdl' (both
+#      cross-platform) and platform-dependent drivers 'alsa', 'oss' and 'win'.
 # wavein:
 #      This defines the device to be used for wave input (if necessary).
 # midioutdrv:
@@ -967,6 +885,7 @@ parport1: enabled=1, file="parport.out"
 # the Beep() function. The 'gui' mode forwards the beep to the related
 # gui methods (currently only used by the Carbon gui).
 #=======================================================================
+#speaker: enabled=1, mode=sound, volume=15
 speaker: enabled=1, mode=system
 
 #=======================================================================
@@ -1000,14 +919,15 @@ speaker: enabled=1, mode=system
 # log:  The file to write the sb16 emulator messages to.
 # dmatimer:
 #      microseconds per second for a DMA cycle.  Make it smaller to fix
-#      non-continuous sound.  750000 is usually a good value.  This needs a
-#      reasonably correct setting for the IPS parameter of the CPU option.
+#      non-continuous sound. 1000000 is usually a good value.  This needs a
+#      reasonably correct setting for the IPS parameter of the CPU option
+#      and also depends on the clock sync setting.
 #
 # Examples for output modes:
 #   sb16: midimode=2, midifile="output.mid", wavemode=1 # MIDI to file
 #   sb16: midimode=1, wavemode=3, wavefile="output.wav" # wave to file and device
 #=======================================================================
-#sb16: midimode=1, wavemode=1, loglevel=2, log=sb16.log, dmatimer=600000
+#sb16: midimode=1, wavemode=1, loglevel=2, log=sb16.log, dmatimer=900000
 
 #=======================================================================
 # ES1370:
@@ -1069,7 +989,8 @@ speaker: enabled=1, mode=system
 #
 # BOOTROM: The bootrom value is optional, and is the name of the ROM image
 # to load. Note that this feature is only implemented for the PCI version of
-# the NE2000.
+# the NE2000. For the ISA version using one of the 'optromimage[1-4]' options
+# must be used instead of this one.
 #
 # If you don't want to make connections to any physical networks,
 # you can use the following 'ethmod's to simulate a virtual network.
@@ -1137,34 +1058,40 @@ e1000: enabled=1, mac=52:54:00:12:34:56, ethmod=tuntap, ethdev=/dev/net/tun:tap0
 # the numeric keypad to the USB device instead of the PS/2 keyboard. If the
 # keyboard is selected, all key events are sent to the USB device.
 #
-# To connect a 'flat' mode image as a USB hardisk you can use the 'disk' device
-# with the path to the image separated with a colon. To use other disk image modes
-# similar to ATA disks the syntax 'disk:mode:filename' must be used (see below).
+# To connect a disk image as a USB hardisk you can use the 'disk' device. Use
+# the 'path' option in the optionsX parameter to specify the path to the image
+# separated with a colon. To use other disk image modes similar to ATA disks
+# the syntax 'path:mode:filename' must be used (see below).
 #
-# To emulate a USB cdrom you can use the 'cdrom' device name and the path to
-# an ISO image or raw device name also separated with a colon. An option to
-# insert/eject media is available in the runtime configuration.
+# To emulate a USB cdrom you can use the 'cdrom' device and the path to an
+# ISO image or raw device name can be set with the 'path' option in the
+# optionsX parameter also separated with a colon. An option to insert/eject
+# media is available in the runtime configuration.
 #
-# To emulate a USB floppy you can use the 'floppy' device with the path to the
-# image separated with a colon. To use the VVFAT image mode similar to the
-# legacy floppy the syntax 'floppy:vvfat:directory' must be used (see below).
+# To emulate a USB floppy you can use the 'floppy' device and the path to a
+# floppy image can be set with the 'path' option in the optionsX parameter
+# separated with a colon. To use the VVFAT image mode similar to the legacy
+# floppy the syntax 'path:vvfat:directory' must be used (see below).
 # An option to insert/eject media is available in the runtime configuration.
 #
 # The device name 'hub' connects an external hub with max. 8 ports (default: 4)
-# to the root hub. To specify the number of ports you have to add the value
-# separated with a colon. Connecting devices to the external hub ports is only
-# available in the runtime configuration.
+# to the root hub. To specify the number of ports you have to use the 'ports'
+# option in the optionsX parameter with the value separated with a colon.
+# Connecting devices to the external hub ports is only available in the runtime
+# configuration.
 #
 # The device 'printer' emulates the HP Deskjet 920C printer. The PCL data is
-# sent to a file specified in bochsrc.txt. The current code appends the PCL
-# code to the file if the file already existed. The output file can be
-# changed at runtime.
+# sent to a file specified in the 'file' option with the optionsX parameter.
+# The current code appends the PCL code to the file if the file already existed.
+# The output file can be changed at runtime.
 #
 # The optionsX parameter can be used to assign specific options to the device
-# connected to the corresponding USB port. Currently this feature is used to
-# set the speed reported by device ('low', 'full', 'high' or 'super'). The
-# available speed choices depend on both HC and device. The option 'debug' turns
-# on debug output for the device at connection time.
+# connected to the corresponding USB port. The option 'speed' can be used to set
+# the speed reported by device ('low', 'full', 'high' or 'super'). The available
+# speed choices depend on both HC and device. The option 'debug' turns on debug
+# output for the device at connection time. The option 'pcap' turns on packet
+# logging in PCAP format.
+#
 # For the USB 'disk' device the optionsX parameter can be used to specify an
 # alternative redolog file (journal) of some image modes. For 'vvfat' mode USB
 # disks the optionsX parameter can be used to specify the disk size (range
@@ -1174,15 +1101,23 @@ e1000: enabled=1, mac=52:54:00:12:34:56, ethmod=tuntap, ethdev=/dev/net/tun:tap0
 # supported (can fix hw detection in some guest OS). The USB floppy also
 # accepts the parameter "write_protected" with valid values 0 and 1 to select
 # the access mode (default is 0).
+#
+# For a high- or super-speed USB 'disk' device the optionsX parameter can include
+# the 'proto:bbb' or 'proto:uasp' parameter specifying to use either the bulk-only
+# Protocol (default) or the USB Attached SCSI Protocol. If no such parameter
+# is given, the 'bbb' protocol is used. A Guest that doesn't support UASP
+# should revert to bbb even if the 'uasp' attribute is given. See the usb_ehci:
+# or usb_xhci: section below for an example. (Only 1 LUN is available at this time)
 #=======================================================================
 #usb_uhci: enabled=1
-#usb_uhci: enabled=1, port1=mouse, port2=disk:usbstick.img
-#usb_uhci: enabled=1, port1=hub:7, port2=disk:growing:usbdisk.img
-#usb_uhci: enabled=1, port2=disk:undoable:usbdisk.img, options2=journal:redo.log
-#usb_uhci: enabled=1, port2=disk:usbdisk2.img, options2=sect_size:1024
-#usb_uhci: enabled=1, port2=disk:vvfat:vvfat, options2="debug,speed:full"
-#usb_uhci: enabled=1, port1=printer:printdata.bin, port2=cdrom:image.iso
-#usb_uhci: enabled=1, port2=floppy:vvfat:diskette, options2="model:teac"
+#usb_uhci: port1=mouse, port2=disk, options2="path:usbstick.img"
+#usb_uhci: port1=hub, options1="ports:6, pcap:outfile.pcap"
+#usb_uhci: port2=disk, options2="path:undoable:usbdisk.img, journal:u.redolog"
+#usb_uhci: port2=disk, options2=""path:usbdisk2.img, sect_size:1024"
+#usb_uhci: port2=disk, options2="path:vvfat:vvfat, debug, speed:full"
+#usb_uhci: port2=cdrom, options2="path:image.iso"
+#usb_uhci: port1=printer, options1="file:printdata.bin"
+#usb_uhci: port2=floppy, options2="path:vvfat:diskette, model:teac"
 
 #=======================================================================
 # USB_OHCI:
@@ -1200,19 +1135,61 @@ e1000: enabled=1, mac=52:54:00:12:34:56, ethmod=tuntap, ethdev=/dev/net/tun:tap0
 # 6-port hub. The portX parameter accepts the same device types with the
 # same syntax as the UHCI controller (see above). The optionsX parameter is
 # also available on EHCI.
+# The HC will default to three UHCI companion controllers, but you can specify
+# either UHCI or OHCI. Each companion controller will be evenly divided
+# with 2 ports each, the first 2 on the first companion, and so on.
 #=======================================================================
 #usb_ehci: enabled=1
+#usb_ehci: enabled=1, companion=uhci
+#usb_ehci: enabled=1, companion=ohci
+#usb_ehci: port1=disk, options1="speed:high, path:hdd.img, proto:bbb"
+#usb_ehci: port1=disk, options1="speed:high, path:hdd.img, proto:uasp"
 
 #=======================================================================
 # USB_XHCI:
 # This option controls the presence of the USB xHCI host controller with a
-# 4-port hub. The portX parameter accepts the same device types with the
-# same syntax as the UHCI controller (see above). The optionsX parameter is
-# also available on xHCI. NOTE: port 1 and 2 are USB3 and only support
-# super-speed devices, but port 3 and 4 are USB2 and support speed settings
-# low, full and high.
+# default 4-port hub. The portX parameter accepts the same device types
+# with the same syntax as the UHCI controller (see above). The optionsX
+# parameter is also available on xHCI.
+#
+# The xHCI emulation allows you to set the number of ports used with a range
+# of 2 to 10, requiring an even numbered count.
+#
+# NOTE: The first half of the ports, (ports 1 and 2 on a 4-port hub) are
+# USB3 only and support super-speed devices. The second half ports (ports
+# 3 and 4) are USB2 and support speed settings of low, full, or high.
+# The xHCI also allows for different host controllers using the model=
+# parameter. Currently, the two allowed options are "uPD720202" and
+# "uPD720201". The first defaults to 2 sockets (4 ports) and the later
+# defaults to 4 sockets (8 ports).
 #=======================================================================
-#usb_xhci: enabled=1
+#usb_xhci: enabled=1               # defaults to the uPD720202 w/4 ports
+#usb_xhci: enabled=1, n_ports=6    # defaults to the uPD720202 w/6 ports
+#usb_xhci: enabled=1, model=uPD720202             # defaults to 4 ports
+#usb_xhci: enabled=1, model=uPD720202, n_ports=6  # change to 6 ports
+#usb_xhci: enabled=1, model=uPD720201             # defaults to 8 ports
+#usb_xhci: enabled=1, model=uPD720201, n_ports=10 # change to 10 ports
+#usb_xhci: port1=disk, options1="speed:super, path:hdd.img, proto:bbb"
+#usb_xhci: port1=disk, options1="speed:super, path:hdd.img, proto:uasp"
+#usb_xhci: port3=disk, options3="speed:high, path:hdd.img, proto:uasp"
+
+#=======================================================================
+# USB Debugger:
+# This is the experimental USB Debugger for the Windows Platform.
+# Specify a type (none, uhci, ohci, ehci, xhci) and one or more triggers.
+# (Currently, only xhci is supported, with some uhci in the process)
+# Triggers:
+#   reset:       will break and load the debugger on a port reset
+#   enable:      will break and load the debugger on a port enable
+#   doorbell:    will break and load the debugger a xHCI Command Ring addition
+#   event:       will break and load the debugger on a xHCI Event Ring addition
+#   data:        will break and load the debugger on a xHCI Data Ring addition
+#   start_frame: will break and load the debugger on start of frame
+#                  (this is different for each controller type)
+#   non_exist:   will break and load the debugger on a non-existant port access
+# (experimental and is under development)
+#=======================================================================
+#usb_debug: type=xhci, reset=1, enable=1, start_frame=1, doorbell=1, event=1, data=1, non_exist=1
 
 #=======================================================================
 # PCIDEV:
@@ -1232,11 +1209,20 @@ e1000: enabled=1, mac=52:54:00:12:34:56, ethmod=tuntap, ethdev=/dev/net/tun:tap0
 #=======================================================================
 # MAGIC_BREAK:
 # This enables the "magic breakpoint" feature when using the debugger.
-# The useless cpu instruction XCHG BX, BX causes Bochs to enter the
+# The useless cpu instructions XCHG %REGW, %REGW causes Bochs to enter the
 # debugger mode. This might be useful for software development.
 #
-# Example:
+# You can specify multiple at once:
+#
+# cx dx bx sp bp si di
+#
+# Example for breaking on "XCHGW %DI, %DI" or "XCHG %SP, %SP" execution
+#   magic_break: enabled=1 di sp
+#
+# If nothing is specified, the default will be used: XCHGW %BX, %BX
 #   magic_break: enabled=1
+#
+# Note: Windows XP ntldr can cause problems with XCHGW %BX, %BX
 #=======================================================================
 magic_break: enabled=1
 
@@ -1262,12 +1248,27 @@ magic_break: enabled=1
 # very early when writing BIOS or OS code for example, without having to
 # bother with setting up a serial port or etc. Reading from port 0xE9 will
 # will return 0xe9 to let you know if the feature is available.
-# Leave this 0 unless you have a reason to use it.
+# Leave this 0 unless you have a reason to use it. By enabling the
+# 'all_rings' option, you can utilize the port e9 hack from ring3.
 #
 # Example:
 #   port_e9_hack: enabled=1
+#   port_e9_hack: enabled=1, all_rings=1
 #=======================================================================
-port_e9_hack: enabled=1
+port_e9_hack: enabled=1, all_rings=1
+
+#=======================================================================
+# IODEBUG:
+# I/O Interface to Bochs Debugger plugin allows the code running inside
+# Bochs to monitor memory ranges, trace individual instructions, and
+# observe register values during execution. By enabling the 'all_rings'
+# option, you can utilize the iodebug ports from ring3. For more
+# information, refer to "Advanced debugger usage" documentation.
+#
+# Example:
+#   iodebug: all_rings=1
+#=======================================================================
+#iodebug: all_rings=1
 
 #=======================================================================
 # fullscreen: ONLY IMPLEMENTED ON AMIGA
