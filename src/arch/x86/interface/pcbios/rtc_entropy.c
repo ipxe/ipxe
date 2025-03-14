@@ -53,6 +53,12 @@ extern void rtc_isr ( void );
 /** Previous RTC interrupt handler */
 static struct segoff rtc_old_handler;
 
+/** Previous RTC interrupt enabled state */
+static uint8_t rtc_irq_enabled;
+
+/** Previous RTC periodic interrupt enabled state */
+static uint8_t rtc_int_enabled;
+
 /** Flag set by RTC interrupt handler */
 extern volatile uint8_t __text16 ( rtc_flag );
 #define rtc_flag __use_text16 ( rtc_flag )
@@ -107,8 +113,9 @@ static void rtc_unhook_isr ( void ) {
 /**
  * Enable RTC interrupts
  *
+ * @ret enabled		Periodic interrupt was previously enabled
  */
-static void rtc_enable_int ( void ) {
+static int rtc_enable_int ( void ) {
 	uint8_t status_b;
 
 	/* Clear any stale pending interrupts via status register C */
@@ -124,6 +131,9 @@ static void rtc_enable_int ( void ) {
 	/* Re-enable NMI and reset to default address */
 	outb ( CMOS_DEFAULT_ADDRESS, CMOS_ADDRESS );
 	inb ( CMOS_DATA ); /* Discard; may be needed on some platforms */
+
+	/* Return previous state */
+	return ( status_b & RTC_STATUS_B_PIE );
 }
 
 /**
@@ -198,8 +208,11 @@ static int rtc_entropy_enable ( void ) {
 
 	/* Hook ISR and enable RTC interrupts */
 	rtc_hook_isr();
-	enable_irq ( RTC_IRQ );
-	rtc_enable_int();
+	rtc_irq_enabled = enable_irq ( RTC_IRQ );
+	rtc_int_enabled = rtc_enable_int();
+	DBGC ( &rtc_flag, "RTC had IRQ%d %sabled, interrupt %sabled\n",
+	       RTC_IRQ, ( rtc_irq_enabled ? "en" : "dis" ),
+	       ( rtc_int_enabled ? "en" : "dis" ) );
 
 	/* Check that RTC interrupts are working */
 	if ( ( rc = rtc_entropy_check() ) != 0 )
@@ -223,8 +236,10 @@ static int rtc_entropy_enable ( void ) {
 	return 0;
 
  err_check:
-	rtc_disable_int();
-	disable_irq ( RTC_IRQ );
+	if ( ! rtc_int_enabled )
+		rtc_disable_int();
+	if ( ! rtc_irq_enabled )
+		disable_irq ( RTC_IRQ );
 	rtc_unhook_isr();
  err_no_tsc:
 	return rc;
@@ -236,9 +251,11 @@ static int rtc_entropy_enable ( void ) {
  */
 static void rtc_entropy_disable ( void ) {
 
-	/* Disable RTC interrupts and unhook ISR */
-	rtc_disable_int();
-	disable_irq ( RTC_IRQ );
+	/* Restore RTC interrupt state and unhook ISR */
+	if ( ! rtc_int_enabled )
+		rtc_disable_int();
+	if ( ! rtc_irq_enabled )
+		disable_irq ( RTC_IRQ );
 	rtc_unhook_isr();
 }
 
