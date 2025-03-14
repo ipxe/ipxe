@@ -47,9 +47,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Macros to enable/disable IRQs */
 #define IMR_REG(x) ( (x) < IRQ_PIC_CUTOFF ? PIC1_IMR : PIC2_IMR )
 #define IMR_BIT(x) ( 1 << ( (x) % IRQ_PIC_CUTOFF ) )
-#define irq_enabled(x) ( ( inb ( IMR_REG(x) ) & IMR_BIT(x) ) == 0 )
-#define enable_irq(x) outb ( inb( IMR_REG(x) ) & ~IMR_BIT(x), IMR_REG(x) )
-#define disable_irq(x) outb ( inb( IMR_REG(x) ) | IMR_BIT(x), IMR_REG(x) )
 
 /* Macros for acknowledging IRQs */
 #define ICR_REG( irq ) ( (irq) < IRQ_PIC_CUTOFF ? PIC1_ICR : PIC2_ICR )
@@ -62,6 +59,50 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Other constants */
 #define IRQ_MAX 15
 #define IRQ_NONE -1U
+
+/**
+ * Check if interrupt is enabled
+ *
+ * @v irq		Interrupt number
+ * @ret enabled		Interrupt is currently enabled
+ */
+static inline __attribute__ (( always_inline )) int
+irq_enabled ( unsigned int irq ) {
+	int imr = inb ( IMR_REG ( irq ) );
+	int mask = IMR_BIT ( irq );
+
+	return ( ( imr & mask ) == 0 );
+}
+
+/**
+ * Enable interrupt
+ *
+ * @v irq		Interrupt number
+ * @ret enabled		Interrupt was previously enabled
+ */
+static inline __attribute__ (( always_inline )) int
+enable_irq ( unsigned int irq ) {
+	int imr = inb ( IMR_REG ( irq ) );
+	int mask = IMR_BIT ( irq );
+
+	outb ( ( imr & ~mask ), IMR_REG ( irq ) );
+	return ( ( imr & mask ) == 0 );
+}
+
+/**
+ * Disable interrupt
+ *
+ * @v irq		Interrupt number
+ * @ret enabled		Interrupt was previously enabled
+ */
+static inline __attribute__ (( always_inline )) int
+disable_irq ( unsigned int irq ) {
+	int imr = inb ( IMR_REG ( irq ) );
+	int mask = IMR_BIT ( irq );
+
+	outb ( ( imr | mask ), IMR_REG ( irq ) );
+	return ( ( imr & mask ) == 0 );
+}
 
 /* Function prototypes
  */
