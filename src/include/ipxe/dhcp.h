@@ -422,6 +422,10 @@ struct dhcp_client_uuid {
 /** Cross-signed certificate source */
 #define DHCP_EB_CROSS_CERT DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x5d )
 
+/** Serial port configuration */
+#define DHCP_EB_SERIAL_PORT DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x60 )
+#define DHCP_EB_SERIAL_OPTIONS DHCP_ENCAP_OPT ( DHCP_EB_ENCAP, 0x61 )
+
 /** Skip PXE DHCP protocol extensions such as ProxyDHCP
  *
  * If set to a non-zero value, iPXE will not wait for ProxyDHCP offers
