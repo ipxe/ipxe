@@ -40,6 +40,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Colour for debug messages */
 #define colour &efi_systab
 
+/** Number of lines to prescroll when needed */
+#define EFI_WRAP_PRESCROLL 16
+
 /**
  * Convert EFI status code to text
  *
@@ -193,6 +196,38 @@ static const char * efi_timer_delay ( EFI_TIMER_DELAY type ) {
 		snprintf ( buf, sizeof ( buf ), "%#x", type );
 		return buf;
 	}
+}
+
+/**
+ * Pre-scroll display to create space for output lines
+ *
+ * @v lines		Number of lines required
+ * @ret efirc		EFI status code
+ */
+static int efi_prescroll ( unsigned int lines ) {
+	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *conout = efi_systab->ConOut;
+	UINTN columns;
+	UINTN rows;
+	UINTN space;
+	EFI_STATUS efirc;
+
+	/* Get number of rows and columns */
+	if ( ( efirc = conout->QueryMode ( conout, conout->Mode->Mode,
+					   &columns, &rows ) ) != 0 )
+		return efirc;
+
+	/* Calculate available space */
+	space = ( rows - conout->Mode->CursorRow - 1 );
+
+	/* Scroll to create space */
+	while ( space++ < lines )
+		conout->OutputString ( conout, L"\n" );
+
+	/* Move cursor to start of space */
+	conout->SetCursorPosition ( conout, 0,
+				    ( conout->Mode->CursorRow - lines ) );
+
+	return 0;
 }
 
 /**
@@ -783,6 +818,15 @@ efi_exit_boot_services_wrapper ( EFI_HANDLE image_handle, UINTN map_key ) {
 	if ( efirc != 0 ) {
 		DBGC ( colour, "ExitBootServices ( ... ) = %s -> %p\n",
 		       efi_status ( efirc ), retaddr );
+		/* On some systems, scrolling the output will cause
+		 * the system memory map to change (and so cause
+		 * ExitBootServices() to fail).
+		 *
+		 * After the first failed attempt, prescroll the
+		 * screen to maximise the chance of the subsequent
+		 * attempt succeeding.
+		 */
+		efi_prescroll ( EFI_WRAP_PRESCROLL );
 	}
 	return efirc;
 }
