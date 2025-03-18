@@ -63,6 +63,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/PciIo.h>
 #include <ipxe/efi/Protocol/PciRootBridgeIo.h>
 #include <ipxe/efi/Protocol/PxeBaseCode.h>
+#include <ipxe/efi/Protocol/Rng.h>
 #include <ipxe/efi/Protocol/SerialIo.h>
 #include <ipxe/efi/Protocol/ShimLock.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
@@ -295,6 +296,10 @@ EFI_GUID efi_pci_root_bridge_io_protocol_guid
 /** PXE base code protocol GUID */
 EFI_GUID efi_pxe_base_code_protocol_guid
 	= EFI_PXE_BASE_CODE_PROTOCOL_GUID;
+
+/** Random number generator protocol GUID */
+EFI_GUID efi_rng_protocol_guid
+	= EFI_RNG_PROTOCOL_GUID;
 
 /** Serial I/O protocol GUID */
 EFI_GUID efi_serial_io_protocol_guid
@@ -559,6 +564,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "PciRootBridgeIo" },
 	{ &efi_pxe_base_code_protocol_guid,
 	  "PxeBaseCode" },
+	{ &efi_rng_protocol_guid,
+	  "Rng" },
 	{ &efi_serial_io_protocol_guid,
 	  "SerialIo" },
 	{ &efi_shim_lock_protocol_guid,
