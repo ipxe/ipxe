@@ -388,8 +388,12 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 		name++;
 	}
 
+	/* Strip redundant path separator characters */
+	while ( ( *name == '\\' ) || ( *name == '.' ) )
+		name++;
+
 	/* Allow root directory itself to be opened */
-	if ( ( name[0] == '\0' ) || ( name[0] == '.' ) )
+	if ( ! *name )
 		return efi_file_open_fixed ( &efi_file_root, wname, new );
 
 	/* Fail unless opening from the root */
