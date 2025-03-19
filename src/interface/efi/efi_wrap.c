@@ -513,7 +513,7 @@ efi_close_event_wrapper ( EFI_EVENT event ) {
 	EFI_STATUS efirc;
 
 	DBGC ( colour, "CloseEvent ( %p ) ", event );
-	efirc = bs->SignalEvent ( event );
+	efirc = bs->CloseEvent ( event );
 	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
 	return efirc;
 }
@@ -528,7 +528,7 @@ efi_check_event_wrapper ( EFI_EVENT event ) {
 	EFI_STATUS efirc;
 
 	DBGCP ( colour, "CheckEvent ( %p ) ", event );
-	efirc = bs->SignalEvent ( event );
+	efirc = bs->CheckEvent ( event );
 	DBGCP ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
 	return efirc;
 }
