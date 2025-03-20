@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
 #include <ipxe/efi/Protocol/ComponentName2.h>
+#include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/DevicePathToText.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 
@@ -321,6 +322,90 @@ static const char * efi_driver_name2 ( EFI_COMPONENT_NAME2_PROTOCOL *wtf ) {
 }
 
 /**
+ * Get driver binding name
+ *
+ * @v binding		Driver binding protocol
+ * @ret name		Driver name, or NULL
+ */
+static const char * efi_binding_name ( EFI_DRIVER_BINDING_PROTOCOL *binding ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	union {
+		EFI_COMPONENT_NAME_PROTOCOL *name;
+		void *interface;
+	} u;
+	EFI_HANDLE image;
+	const char *name;
+	EFI_STATUS efirc;
+
+	/* Sanity check */
+	if ( ! binding ) {
+		DBG ( "[NULL DriverBinding]" );
+		return NULL;
+	}
+
+	/* Try to open component name protocol on image handle */
+	image = binding->ImageHandle;
+	if ( ( efirc = bs->OpenProtocol ( image,
+					  &efi_component_name_protocol_guid,
+					  &u.interface, efi_image_handle, image,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL)) !=0){
+		DBG ( "[DriverBinding no ComponentName]" );
+		return NULL;
+	}
+
+	/* Try to get name from component name protocol */
+	name = efi_driver_name ( u.name );
+
+	/* Close component name protocol */
+	bs->CloseProtocol ( image, &efi_component_name_protocol_guid,
+			    efi_image_handle, image );
+
+	return name;
+}
+
+/**
+ * Get driver binding name
+ *
+ * @v binding		Driver binding protocol
+ * @ret name		Driver name, or NULL
+ */
+static const char * efi_binding_name2 ( EFI_DRIVER_BINDING_PROTOCOL *binding ){
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_HANDLE image;
+	union {
+		EFI_COMPONENT_NAME2_PROTOCOL *name2;
+		void *interface;
+	} u;
+	const char *name;
+	EFI_STATUS efirc;
+
+	/* Sanity check */
+	if ( ! binding ) {
+		DBG ( "[NULL DriverBinding]" );
+		return NULL;
+	}
+
+	/* Try to open component name protocol on image handle */
+	image = binding->ImageHandle;
+	if ( ( efirc = bs->OpenProtocol ( image,
+					  &efi_component_name2_protocol_guid,
+					  &u.interface, efi_image_handle, image,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL)) !=0){
+		DBG ( "[DriverBinding no ComponentName2]" );
+		return NULL;
+	}
+
+	/* Try to get name from component name protocol */
+	name = efi_driver_name2 ( u.name2 );
+
+	/* Close component name protocol */
+	bs->CloseProtocol ( image, &efi_component_name2_protocol_guid,
+			    efi_image_handle, image );
+
+	return name;
+}
+
+/**
  * Get PE/COFF debug filename
  *
  * @v loaded		Loaded image
@@ -547,6 +632,12 @@ static struct efi_handle_name_type efi_handle_name_types[] = {
 	/* Driver name (via obsolete original ComponentName protocol) */
 	EFI_HANDLE_NAME_TYPE ( &efi_component_name_protocol_guid,
 			       efi_driver_name ),
+	/* Driver name (for driver binding handles) */
+	EFI_HANDLE_NAME_TYPE ( &efi_driver_binding_protocol_guid,
+			       efi_binding_name2 ),
+	/* Driver name (via obsolete original ComponentName protocol) */
+	EFI_HANDLE_NAME_TYPE ( &efi_driver_binding_protocol_guid,
+			       efi_binding_name ),
 	/* PE/COFF debug filename (for image handles) */
 	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_protocol_guid,
 			       efi_pecoff_debug_name ),
