@@ -623,9 +623,6 @@ struct efi_handle_name_type {
 
 /** EFI handle name types */
 static struct efi_handle_name_type efi_handle_name_types[] = {
-	/* Device path */
-	EFI_HANDLE_NAME_TYPE ( &efi_device_path_protocol_guid,
-			       efi_devpath_text ),
 	/* Driver name (for driver image handles) */
 	EFI_HANDLE_NAME_TYPE ( &efi_component_name2_protocol_guid,
 			       efi_driver_name2 ),
@@ -650,6 +647,9 @@ static struct efi_handle_name_type efi_handle_name_types[] = {
 	/* Handle's loaded image file path (for image handles) */
 	EFI_HANDLE_NAME_TYPE ( &efi_loaded_image_protocol_guid,
 			       efi_loaded_image_filepath_name ),
+	/* Device path */
+	EFI_HANDLE_NAME_TYPE ( &efi_device_path_protocol_guid,
+			       efi_devpath_text ),
 	/* Our standard input file handle */
 	EFI_HANDLE_NAME_TYPE ( &efi_simple_text_input_protocol_guid,
 			       efi_conin_name ),
