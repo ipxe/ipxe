@@ -598,10 +598,10 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 		goto err_loaded;
 	}
 
-	/* Open component name protocol, if present*/
+	/* Open component name protocol, if present */
 	if ( ( efirc = bs->OpenProtocol (
-			driver, &efi_component_name_protocol_guid,
-			&wtf.interface, efi_image_handle, driver,
+			image, &efi_component_name_protocol_guid,
+			&wtf.interface, efi_image_handle, image,
 			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
 		/* Ignore failure; is not required to be present */
 		wtf.interface = NULL;
@@ -641,8 +641,8 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 
 	/* Close protocols */
 	if ( wtf.wtf ) {
-		bs->CloseProtocol ( driver, &efi_component_name_protocol_guid,
-				    efi_image_handle, driver );
+		bs->CloseProtocol ( image, &efi_component_name_protocol_guid,
+				    efi_image_handle, image );
 	}
 	bs->CloseProtocol ( image, &efi_loaded_image_protocol_guid,
 			    efi_image_handle, image );
