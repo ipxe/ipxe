@@ -569,9 +569,6 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 	EFI_STATUS efirc;
 	int rc;
 
-	DBGC2 ( &efi_vetoes, "EFIVETO checking %s\n",
-		efi_handle_name ( driver ) );
-
 	/* Mark as not vetoed */
 	memset ( veto, 0, sizeof ( *veto ) );
 
@@ -621,6 +618,9 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 	}
 
 	/* Check vetoes */
+	DBGC2 ( &efi_vetoes, "EFIVETO checking %s [%p,%p)\n",
+		efi_handle_name ( driver ), loaded.loaded->ImageBase,
+		( loaded.loaded->ImageBase + loaded.loaded->ImageSize ) );
 	for ( i = 0 ; i < ( sizeof ( efi_vetoes ) /
 			    sizeof ( efi_vetoes[0] ) ) ; i++ ) {
 		if ( efi_vetoes[i].veto ( binding.binding, loaded.loaded,
