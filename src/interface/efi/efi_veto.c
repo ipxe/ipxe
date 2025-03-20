@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/DriverBinding.h>
 #include <ipxe/efi/Protocol/LoadedImage.h>
 #include <ipxe/efi/Protocol/ComponentName.h>
+#include <ipxe/efi/Protocol/ComponentName2.h>
 #include <ipxe/efi/efi_veto.h>
 
 /** @file
@@ -46,14 +47,12 @@ struct efi_veto_candidate {
 	 *
 	 * @v binding		Driver binding protocol
 	 * @v loaded		Loaded image protocol
-	 * @v wtf		Component name protocol, if present
 	 * @v manufacturer	Manufacturer name, if present
-	 * @v name		Driver name (in "eng" language), if present
+	 * @v name		Driver name, if present
 	 * @ret vetoed		Driver is to be vetoed
 	 */
 	int ( * veto ) ( EFI_DRIVER_BINDING_PROTOCOL *binding,
 			 EFI_LOADED_IMAGE_PROTOCOL *loaded,
-			 EFI_COMPONENT_NAME_PROTOCOL *wtf,
 			 const char *manufacturer, const CHAR16 *name );
 };
 
@@ -394,7 +393,6 @@ static int efi_veto_driver ( struct efi_veto *veto ) {
  *
  * @v binding		Driver binding protocol
  * @v loaded		Loaded image protocol
- * @v wtf		Component name protocol, if present
  * @v manufacturer	Manufacturer name, if present
  * @v name		Driver name, if present
  * @ret vetoed		Driver is to be vetoed
@@ -402,7 +400,6 @@ static int efi_veto_driver ( struct efi_veto *veto ) {
 static int
 efi_veto_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 		     EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
-		     EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
 		     const char *manufacturer, const CHAR16 *name ) {
 	static const CHAR16 ip4cfg[] = L"IP4 CONFIG Network Service Driver";
 	static const char *dell = "Dell Inc.";
@@ -427,7 +424,6 @@ efi_veto_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
  *
  * @v binding		Driver binding protocol
  * @v loaded		Loaded image protocol
- * @v wtf		Component name protocol, if present
  * @v manufacturer	Manufacturer name, if present
  * @v name		Driver name, if present
  * @ret vetoed		Driver is to be vetoed
@@ -435,7 +431,6 @@ efi_veto_ip4config ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 static int
 efi_veto_hp_xhci ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 		   EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
-		   EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
 		   const char *manufacturer, const CHAR16 *name ) {
 	static const CHAR16 xhci[] = L"Usb Xhci Driver";
 	static const char *hp = "HP";
@@ -468,7 +463,6 @@ efi_veto_hp_xhci ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
  *
  * @v binding		Driver binding protocol
  * @v loaded		Loaded image protocol
- * @v wtf		Component name protocol, if present
  * @v manufacturer	Manufacturer name, if present
  * @v name		Driver name, if present
  * @ret vetoed		Driver is to be vetoed
@@ -476,7 +470,6 @@ efi_veto_hp_xhci ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 static int
 efi_veto_vmware_uefipxebc ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 			    EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
-			    EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
 			    const char *manufacturer, const CHAR16 *name ) {
 	static const CHAR16 uefipxebc[] = L"UEFI PXE Base Code Driver";
 	static const char *vmware = "VMware, Inc.";
@@ -499,14 +492,12 @@ efi_veto_vmware_uefipxebc ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
  *
  * @v binding		Driver binding protocol
  * @v loaded		Loaded image protocol
- * @v wtf		Component name protocol, if present
  * @v manufacturer	Manufacturer name, if present
  * @v name		Driver name, if present
  * @ret vetoed		Driver is to be vetoed
  */
 static int efi_veto_dhcp6 ( EFI_DRIVER_BINDING_PROTOCOL *binding __unused,
 			    EFI_LOADED_IMAGE_PROTOCOL *loaded __unused,
-			    EFI_COMPONENT_NAME_PROTOCOL *wtf __unused,
 			    const char *manufacturer __unused,
 			    const CHAR16 *name ) {
 	static const CHAR16 dhcp6[] = L"DHCP6 Protocol Driver";
@@ -560,6 +551,10 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 		void *interface;
 	} loaded;
 	union {
+		EFI_COMPONENT_NAME2_PROTOCOL *wtf2;
+		void *interface;
+	} wtf2;
+	union {
 		EFI_COMPONENT_NAME_PROTOCOL *wtf;
 		void *interface;
 	} wtf;
@@ -600,6 +595,15 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 
 	/* Open component name protocol, if present */
 	if ( ( efirc = bs->OpenProtocol (
+			image, &efi_component_name2_protocol_guid,
+			&wtf2.interface, efi_image_handle, image,
+			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+		/* Ignore failure; is not required to be present */
+		wtf2.interface = NULL;
+	}
+
+	/* Open obsolete component name protocol, if present */
+	if ( ( efirc = bs->OpenProtocol (
 			image, &efi_component_name_protocol_guid,
 			&wtf.interface, efi_image_handle, image,
 			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
@@ -608,9 +612,12 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 	}
 
 	/* Get driver name, if available */
-	if ( wtf.wtf &&
-	     ( ( efirc = wtf.wtf->GetDriverName ( wtf.wtf, "eng",
-						  &name ) == 0 ) ) ) {
+	if ( ( wtf2.wtf2 &&
+	       ( ( efirc = wtf2.wtf2->GetDriverName ( wtf2.wtf2, "en",
+						      &name ) == 0 ) ) ) ||
+	     ( wtf.wtf &&
+	       ( ( efirc = wtf.wtf->GetDriverName ( wtf.wtf, "eng",
+						    &name ) == 0 ) ) ) ) {
 		/* Driver has a name */
 	} else {
 		/* Ignore failure; name is not required to be present */
@@ -624,7 +631,7 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 	for ( i = 0 ; i < ( sizeof ( efi_vetoes ) /
 			    sizeof ( efi_vetoes[0] ) ) ; i++ ) {
 		if ( efi_vetoes[i].veto ( binding.binding, loaded.loaded,
-					  wtf.wtf, manufacturer, name ) ) {
+					  manufacturer, name ) ) {
 			DBGC ( driver, "EFIVETO %s is vetoed (%s)\n",
 			       efi_handle_name ( driver ),
 			       efi_vetoes[i].name );
@@ -642,6 +649,10 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 	/* Close protocols */
 	if ( wtf.wtf ) {
 		bs->CloseProtocol ( image, &efi_component_name_protocol_guid,
+				    efi_image_handle, image );
+	}
+	if ( wtf2.wtf2 ) {
+		bs->CloseProtocol ( image, &efi_component_name2_protocol_guid,
 				    efi_image_handle, image );
 	}
 	bs->CloseProtocol ( image, &efi_loaded_image_protocol_guid,
