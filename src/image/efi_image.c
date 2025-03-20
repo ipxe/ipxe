@@ -268,7 +268,7 @@ static int efi_image_exec ( struct image *image ) {
 	efi_snp_release();
 
 	/* Wrap calls made by the loaded image (for debugging) */
-	efi_wrap ( handle );
+	efi_wrap_image ( handle );
 
 	/* Reset console since image will probably use it */
 	console_reset();
@@ -291,6 +291,7 @@ static int efi_image_exec ( struct image *image ) {
 	rc = 0;
 
  err_start_image:
+	efi_unwrap();
 	efi_snp_claim();
  err_open_protocol:
 	/* If there was no error, then the image must have been
