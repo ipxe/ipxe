@@ -623,12 +623,6 @@ struct efi_handle_name_type {
 
 /** EFI handle name types */
 static struct efi_handle_name_type efi_handle_name_types[] = {
-	/* Driver name (for driver image handles) */
-	EFI_HANDLE_NAME_TYPE ( &efi_component_name2_protocol_guid,
-			       efi_driver_name2 ),
-	/* Driver name (via obsolete original ComponentName protocol) */
-	EFI_HANDLE_NAME_TYPE ( &efi_component_name_protocol_guid,
-			       efi_driver_name ),
 	/* Driver name (for driver binding handles) */
 	EFI_HANDLE_NAME_TYPE ( &efi_driver_binding_protocol_guid,
 			       efi_binding_name2 ),
