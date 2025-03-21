@@ -323,6 +323,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_archive		      ( ERRFILE_IMAGE | 0x000a0000 )
 #define ERRFILE_zlib		      ( ERRFILE_IMAGE | 0x000b0000 )
 #define ERRFILE_gzip		      ( ERRFILE_IMAGE | 0x000c0000 )
+#define ERRFILE_efi_siglist	      ( ERRFILE_IMAGE | 0x000d0000 )
 
 #define ERRFILE_asn1		      ( ERRFILE_OTHER | 0x00000000 )
 #define ERRFILE_chap		      ( ERRFILE_OTHER | 0x00010000 )
@@ -426,7 +427,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_form_ui		      ( ERRFILE_OTHER | 0x00630000 )
 #define ERRFILE_usb_cmd		      ( ERRFILE_OTHER | 0x00640000 )
 #define ERRFILE_usb_settings	      ( ERRFILE_OTHER | 0x00650000 )
-#define ERRFILE_tpm		      ( ERRFILE_OTHER | 0x00660000 )
+#define ERRFILE_weierstrass	      ( ERRFILE_OTHER | 0x00660000 )
+#define ERRFILE_efi_cacert	      ( ERRFILE_OTHER | 0x00670000 )
+#define ERRFILE_tpm		      ( ERRFILE_OTHER | 0x00680000 )
 
 /** @} */
 

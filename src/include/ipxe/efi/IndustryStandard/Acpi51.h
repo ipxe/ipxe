@@ -5,6 +5,7 @@
   Copyright (c) 2014 - 2022, Intel Corporation. All rights reserved.<BR>
   (C) Copyright 2015 Hewlett Packard Enterprise Development LP<BR>
   Copyright (c) 2020, ARM Ltd. All rights reserved.<BR>
+  Copyright (C) 2024, Advanced Micro Devices, Inc. All rights reserved.
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
@@ -14,6 +15,16 @@
 FILE_LICENCE ( BSD2_PATENT );
 
 #include <ipxe/efi/IndustryStandard/Acpi50.h>
+
+///
+/// _CSD Revision for ACPI 5.1
+///
+#define EFI_ACPI_5_1_AML_CSD_REVISION  0
+
+///
+/// _CSD NumEntries for ACPI 5.1
+///
+#define EFI_ACPI_5_1_AML_CSD_NUM_ENTRIES  6
 
 ///
 /// _PSD Revision for ACPI 5.1
@@ -1762,6 +1773,7 @@ typedef struct {
 #define EFI_ACPI_5_1_EINJ_EXECUTE_OPERATION               0x05
 #define EFI_ACPI_5_1_EINJ_CHECK_BUSY_STATUS               0x06
 #define EFI_ACPI_5_1_EINJ_GET_COMMAND_STATUS              0x07
+#define EFI_ACPI_5_1_EINJ_SET_ERROR_TYPE_WITH_ADDRESS     0x08
 #define EFI_ACPI_5_1_EINJ_TRIGGER_ERROR                   0xFF
 
 ///

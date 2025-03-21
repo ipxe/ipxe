@@ -104,6 +104,7 @@ hardware_subarch:
 hardware_subarch_data:
 	.byte	0, 0, 0, 0, 0, 0, 0, 0
 
+	.section ".prefix.data", "aw", @progbits
 version_string:
 	.asciz	VERSION
 
@@ -113,6 +114,7 @@ version_string:
  *
  */
 
+	.section ".prefix", "ax", @progbits
 setup:
 	/* Fix up code segment */
 	pushw	%ds

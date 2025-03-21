@@ -86,3 +86,7 @@ REQUIRE_OBJECT ( des_test );
 REQUIRE_OBJECT ( mschapv2_test );
 REQUIRE_OBJECT ( uuid_test );
 REQUIRE_OBJECT ( editstring_test );
+REQUIRE_OBJECT ( p256_test );
+REQUIRE_OBJECT ( p384_test );
+REQUIRE_OBJECT ( efi_siglist_test );
+REQUIRE_OBJECT ( cpio_test );

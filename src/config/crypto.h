@@ -60,6 +60,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** X25519 elliptic curve */
 #define CRYPTO_CURVE_X25519
 
+/** P-256 elliptic curve */
+#define CRYPTO_CURVE_P256
+
+/** P-384 elliptic curve */
+#define CRYPTO_CURVE_P384
+
 /** Margin of error (in seconds) allowed in signed timestamps
  *
  * We default to allowing a reasonable margin of error: 12 hours to

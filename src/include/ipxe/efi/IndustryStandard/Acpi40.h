@@ -2,6 +2,7 @@
   ACPI 4.0 definitions from the ACPI Specification Revision 4.0a April 5, 2010
 
   Copyright (c) 2010 - 2022, Intel Corporation. All rights reserved.<BR>
+  Copyright (C) 2025, Advanced Micro Devices, Inc. All rights reserved.
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
@@ -11,6 +12,16 @@
 FILE_LICENCE ( BSD2_PATENT );
 
 #include <ipxe/efi/IndustryStandard/Acpi30.h>
+
+///
+/// _CSD Revision for ACPI 4.0
+///
+#define EFI_ACPI_4_0_AML_CSD_REVISION  0
+
+///
+/// _CSD NumEntries for ACPI 4.0
+///
+#define EFI_ACPI_4_0_AML_CSD_NUM_ENTRIES  6
 
 ///
 /// _PSD Revision for ACPI 4.0

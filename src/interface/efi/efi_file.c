@@ -245,6 +245,7 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 	size_t cpio_len;
 	size_t name_len;
 	size_t len;
+	unsigned int i;
 
 	/* Read from file */
 	len = 0;
@@ -263,15 +264,16 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 		}
 		len += efi_file_read_chunk ( reader, UNULL, pad_len );
 
-		/* Read CPIO header, if applicable */
-		cpio_len = cpio_header ( image, &cpio );
-		if ( cpio_len ) {
-			name = cpio_name ( image );
-			name_len = cpio_name_len ( image );
-			pad_len = ( cpio_len - sizeof ( cpio ) - name_len );
+		/* Read CPIO header(s), if applicable */
+		name = cpio_name ( image );
+		for ( i = 0 ; ( cpio_len = cpio_header ( image, i, &cpio ) );
+		      i++ ) {
+			name_len = ( cpio_len - sizeof ( cpio ) );
+			pad_len = cpio_pad_len ( cpio_len );
 			DBGC ( file, "EFIFILE %s [%#08zx,%#08zx) %s header\n",
 			       efi_file_name ( file ), reader->pos,
-			       ( reader->pos + cpio_len ), image->name );
+			       ( reader->pos + cpio_len + pad_len ),
+			       image->name );
 			len += efi_file_read_chunk ( reader,
 						     virt_to_user ( &cpio ),
 						     sizeof ( cpio ) );
@@ -386,8 +388,12 @@ efi_file_open ( EFI_FILE_PROTOCOL *this, EFI_FILE_PROTOCOL **new,
 		name++;
 	}
 
+	/* Strip redundant path separator characters */
+	while ( ( *name == '\\' ) || ( *name == '.' ) )
+		name++;
+
 	/* Allow root directory itself to be opened */
-	if ( ( name[0] == '\0' ) || ( name[0] == '.' ) )
+	if ( ! *name )
 		return efi_file_open_fixed ( &efi_file_root, wname, new );
 
 	/* Fail unless opening from the root */

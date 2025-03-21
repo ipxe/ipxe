@@ -88,6 +88,16 @@ REQUIRE_OBJECT ( oid_sha512_256 );
 REQUIRE_OBJECT ( oid_x25519 );
 #endif
 
+/* P-256 */
+#if defined ( CRYPTO_CURVE_P256 )
+REQUIRE_OBJECT ( oid_p256 );
+#endif
+
+/* P-384 */
+#if defined ( CRYPTO_CURVE_P384 )
+REQUIRE_OBJECT ( oid_p384 );
+#endif
+
 /* AES-CBC */
 #if defined ( CRYPTO_CIPHER_AES_CBC )
 REQUIRE_OBJECT ( oid_aes_cbc );

@@ -47,22 +47,21 @@ datastack = [
 ]
 stack = []
 while stack or not decoder.eof():
-    if decoder.eof():
+    tag = decoder.peek()
+    if tag is None:
         encoder.leave()
         decoder.leave()
         stack.pop()
+    elif tag.typ == asn1.Types.Constructed:
+        encoder.enter(nr=tag.nr, cls=tag.cls)
+        decoder.enter()
+        stack.append(tag.nr)
     else:
-        tag = decoder.peek()
-        if tag.typ == asn1.Types.Constructed:
-            encoder.enter(nr=tag.nr, cls=tag.cls)
-            decoder.enter()
-            stack.append(tag.nr)
+        (tag, value) = decoder.read()
+        if stack == datastack and tag.nr == 0:
+            data = value
         else:
-            (tag, value) = decoder.read()
-            if stack == datastack and tag.nr == 0:
-                data = value
-            else:
-                encoder.write(value, nr=tag.nr, cls=tag.cls)
+            encoder.write(value, nr=tag.nr, cls=tag.cls)
 envelope = encoder.output()
 if data is None:
     parser.error("Input file does not contain any encrypted data")

@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
-#include <ipxe/profile.h>
+#include <stdio.h>
 #include <ipxe/bigint.h>
 
 /** @file
@@ -34,9 +34,51 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Big integer support
  */
 
-/** Modular direct reduction profiler */
-static struct profiler bigint_mod_profiler __profiler =
-	{ .name = "bigint_mod" };
+/** Minimum number of least significant bytes included in transcription */
+#define BIGINT_NTOA_LSB_MIN 16
+
+/**
+ * Transcribe big integer (for debugging)
+ *
+ * @v value0		Element 0 of big integer to be transcribed
+ * @v size		Number of elements
+ * @ret string		Big integer in string form (may be abbreviated)
+ */
+const char * bigint_ntoa_raw ( const bigint_element_t *value0,
+			       unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*value = ( ( const void * ) value0 );
+	bigint_element_t element;
+	static char buf[256];
+	unsigned int count;
+	int threshold;
+	uint8_t byte;
+	char *tmp;
+	int i;
+
+	/* Calculate abbreviation threshold, if any */
+	count = ( size * sizeof ( element ) );
+	threshold = count;
+	if ( count >= ( ( sizeof ( buf ) - 1 /* NUL */ ) / 2 /* "xx" */ ) ) {
+		threshold -= ( ( sizeof ( buf ) - 3 /* "..." */
+				 - ( BIGINT_NTOA_LSB_MIN * 2 /* "xx" */ )
+				 - 1 /* NUL */ ) / 2 /* "xx" */ );
+	}
+
+	/* Transcribe bytes, abbreviating with "..." if necessary */
+	for ( tmp = buf, i = ( count - 1 ) ; i >= 0 ; i-- ) {
+		element = value->element[ i / sizeof ( element ) ];
+		byte = ( element >> ( 8 * ( i % sizeof ( element ) ) ) );
+		tmp += sprintf ( tmp, "%02x", byte );
+		if ( i == threshold ) {
+			tmp += sprintf ( tmp, "..." );
+			i = BIGINT_NTOA_LSB_MIN;
+		}
+	}
+	assert ( tmp < ( buf + sizeof ( buf ) ) );
+
+	return buf;
+}
 
 /**
  * Conditionally swap big integers (in constant time)
@@ -133,148 +175,136 @@ void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 }
 
 /**
- * Reduce big integer
+ * Reduce big integer R^2 modulo N
  *
  * @v modulus0		Element 0 of big integer modulus
- * @v value0		Element 0 of big integer to be reduced
- * @v size		Number of elements in modulus and value
+ * @v result0		Element 0 of big integer to hold result
+ * @v size		Number of elements in modulus and result
+ *
+ * Reduce the value R^2 modulo N, where R=2^n and n is the number of
+ * bits in the representation of the modulus N, including any leading
+ * zero bits.
  */
-void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
-			 unsigned int size ) {
+void bigint_reduce_raw ( const bigint_element_t *modulus0,
+			 bigint_element_t *result0, unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( const void * ) modulus0 );
 	bigint_t ( size ) __attribute__ (( may_alias ))
-		*modulus = ( ( void * ) modulus0 );
-	bigint_t ( size ) __attribute__ (( may_alias ))
-		*value = ( ( void * ) value0 );
+		*result = ( ( void * ) result0 );
 	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
-	bigint_element_t *element;
-	unsigned int modulus_max;
-	unsigned int value_max;
-	unsigned int subshift;
-	int offset;
-	int shift;
+	unsigned int shift;
+	int max;
+	int sign;
 	int msb;
-	int i;
+	int carry;
 
-	/* Start profiling */
-	profile_start ( &bigint_mod_profiler );
-
-	/* Normalise the modulus
+	/* We have the constants:
 	 *
-	 * Scale the modulus by shifting left such that both modulus
-	 * "m" and value "x" have the same most significant set bit.
-	 * (If this is not possible, then the value is already less
-	 * than the modulus, and we may therefore skip reduction
-	 * completely.)
+	 *    N = modulus
+	 *
+	 *    n = number of bits in the modulus (including any leading zeros)
+	 *
+	 *    R = 2^n
+	 *
+	 * Let r be the extension of the n-bit result register by a
+	 * separate two's complement sign bit, such that -R <= r < R,
+	 * and define:
+	 *
+	 *    x = r * 2^k
+	 *
+	 * as the value being reduced modulo N, where k is a
+	 * non-negative integer bit shift.
+	 *
+	 * We want to reduce the initial value R^2=2^(2n), which we
+	 * may trivially represent using r=1 and k=2n.
+	 *
+	 * We then iterate over decrementing k, maintaining the loop
+	 * invariant:
+	 *
+	 *    -N <= r < N
+	 *
+	 * On each iteration we must first double r, to compensate for
+	 * having decremented k:
+	 *
+	 *    k' = k - 1
+	 *
+	 *    r' = 2r
+	 *
+	 *    x = r * 2^k = 2r * 2^(k-1) = r' * 2^k'
+	 *
+	 * Note that doubling the n-bit result register will create a
+	 * value of n+1 bits: this extra bit needs to be handled
+	 * separately during the calculation.
+	 *
+	 * We then subtract N (if r is currently non-negative) or add
+	 * N (if r is currently negative) to restore the loop
+	 * invariant:
+	 *
+	 *      0 <= r < N    =>   r" = 2r - N    =>   -N <= r" < N
+	 *     -N <= r < 0    =>   r" = 2r + N    =>   -N <= r" < N
+	 *
+	 * Note that since N may use all n bits, the most significant
+	 * bit of the n-bit result register is not a valid two's
+	 * complement sign bit for r: the extra sign bit therefore
+	 * also needs to be handled separately.
+	 *
+	 * Once we reach k=0, we have x=r and therefore:
+	 *
+	 *    -N <= x < N
+	 *
+	 * After this last loop iteration (with k=0), we may need to
+	 * add a single multiple of N to ensure that x is positive,
+	 * i.e. lies within the range 0 <= x < N.
+	 *
+	 * Since neither the modulus nor the value R^2 are secret, we
+	 * may elide approximately half of the total number of
+	 * iterations by constructing the initial representation of
+	 * R^2 as r=2^m and k=2n-m (for some m such that 2^m < N).
 	 */
-	value_max = bigint_max_set_bit ( value );
-	modulus_max = bigint_max_set_bit ( modulus );
-	shift = ( value_max - modulus_max );
-	if ( shift < 0 )
-		goto skip;
-	subshift = ( shift & ( width - 1 ) );
-	offset = ( shift / width );
-	element = modulus->element;
-	for ( i = ( ( value_max - 1 ) / width ) ; ; i-- ) {
-		element[i] = ( element[ i - offset ] << subshift );
-		if ( i <= offset )
-			break;
-		if ( subshift ) {
-			element[i] |= ( element[ i - offset - 1 ]
-					>> ( width - subshift ) );
-		}
+
+	/* Initialise x=R^2 */
+	memset ( result, 0, sizeof ( *result ) );
+	max = ( bigint_max_set_bit ( modulus ) - 2 );
+	if ( max < 0 ) {
+		/* Degenerate case of N=0 or N=1: return a zero result */
+		return;
 	}
-	for ( i-- ; i >= 0 ; i-- )
-		element[i] = 0;
+	bigint_set_bit ( result, max );
+	shift = ( ( 2 * size * width ) - max );
+	sign = 0;
 
-	/* Reduce the value "x" by iteratively adding or subtracting
-	 * the scaled modulus "m".
-	 *
-	 * On each loop iteration, we maintain the invariant:
-	 *
-	 *    -2m <= x < 2m
-	 *
-	 * If x is positive, we obtain the new value x' by
-	 * subtracting m, otherwise we add m:
-	 *
-	 *      0 <= x < 2m   =>   x' := x - m   =>   -m <= x' < m
-	 *    -2m <= x < 0    =>   x' := x + m   =>   -m <= x' < m
-	 *
-	 * and then halve the modulus (by shifting right):
-	 *
-	 *      m' = m/2
-	 *
-	 * We therefore end up with:
-	 *
-	 *     -m <= x' < m   =>   -2m' <= x' < 2m'
-	 *
-	 * i.e. we have preseved the invariant while reducing the
-	 * bounds on x' by one power of two.
-	 *
-	 * The issue remains of how to determine on each iteration
-	 * whether or not x is currently positive, given that both
-	 * input values are unsigned big integers that may use all
-	 * available bits (including the MSB).
-	 *
-	 * On the first loop iteration, we may simply assume that x is
-	 * positive, since it is unmodified from the input value and
-	 * so is positive by definition (even if the MSB is set).  We
-	 * therefore unconditionally perform a subtraction on the
-	 * first loop iteration.
-	 *
-	 * Let k be the MSB after normalisation.  We then have:
-	 *
-	 *    2^k <= m < 2^(k+1)
-	 *    2^k <= x < 2^(k+1)
-	 *
-	 * On the first loop iteration, we therefore have:
-	 *
-	 *     x' = (x - m)
-	 *        < 2^(k+1) - 2^k
-	 *        < 2^k
-	 *
-	 * Any positive value of x' therefore has its MSB set to zero,
-	 * and so we may validly treat the MSB of x' as a sign bit at
-	 * the end of the first loop iteration.
-	 *
-	 * On all subsequent loop iterations, the starting value m is
-	 * guaranteed to have its MSB set to zero (since it has
-	 * already been shifted right at least once).  Since we know
-	 * from above that we preserve the loop invariant:
-	 *
-	 *     -m <= x' < m
-	 *
-	 * we immediately know that any positive value of x' also has
-	 * its MSB set to zero, and so we may validly treat the MSB of
-	 * x' as a sign bit at the end of all subsequent loop
-	 * iterations.
-	 *
-	 * After the last loop iteration (when m' has been shifted
-	 * back down to the original value of the modulus), we may
-	 * need to add a single multiple of m' to ensure that x' is
-	 * positive, i.e. lies within the range 0 <= x' < m'.  To
-	 * allow for reusing the (inlined) expansion of
-	 * bigint_subtract(), we achieve this via a potential
-	 * additional loop iteration that performs the addition and is
-	 * then guaranteed to terminate (since the result will be
-	 * positive).
-	 */
-	for ( msb = 0 ; ( msb || ( shift >= 0 ) ) ; shift-- ) {
-		if ( msb ) {
-			bigint_add ( modulus, value );
+	/* Iterate as described above */
+	while ( shift-- ) {
+
+		/* Calculate 2r, storing extra bit separately */
+		msb = bigint_shl ( result );
+
+		/* Add or subtract N according to current sign */
+		if ( sign ) {
+			carry = bigint_add ( modulus, result );
 		} else {
-			bigint_subtract ( modulus, value );
+			carry = bigint_subtract ( modulus, result );
 		}
-		msb = bigint_msb_is_set ( value );
-		if ( shift > 0 )
-			bigint_shr ( modulus );
+
+		/* Calculate new sign of result
+		 *
+		 * We know the result lies in the range -N <= r < N
+		 * and so the tuple (old sign, msb, carry) cannot ever
+		 * take the values (0, 1, 0) or (1, 0, 0).  We can
+		 * therefore treat these as don't-care inputs, which
+		 * allows us to simplify the boolean expression by
+		 * ignoring the old sign completely.
+		 */
+		assert ( ( sign == msb ) || carry );
+		sign = ( msb ^ carry );
 	}
 
- skip:
-	/* Sanity check */
-	assert ( ! bigint_is_geq ( value, modulus ) );
+	/* Add N to make result positive if necessary */
+	if ( sign )
+		bigint_add ( modulus, result );
 
-	/* Stop profiling */
-	profile_stop ( &bigint_mod_profiler );
+	/* Sanity check */
+	assert ( ! bigint_is_geq ( result, modulus ) );
 }
 
 /**
@@ -351,80 +381,360 @@ void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 }
 
 /**
- * Perform Montgomery reduction (REDC) of a big integer product
+ * Perform relaxed Montgomery reduction (REDC) of a big integer
  *
- * @v modulus0		Element 0 of big integer modulus
- * @v modinv0		Element 0 of the inverse of the modulus modulo 2^k
- * @v mont0		Element 0 of big integer Montgomery product
+ * @v modulus0		Element 0 of big integer odd modulus
+ * @v value0		Element 0 of big integer to be reduced
  * @v result0		Element 0 of big integer to hold result
  * @v size		Number of elements in modulus and result
+ * @ret carry		Carry out
  *
- * Note that only the least significant element of the inverse modulo
- * 2^k is required, and that the Montgomery product will be
- * overwritten.
+ * The value to be reduced will be made divisible by the size of the
+ * modulus while retaining its residue class (i.e. multiples of the
+ * modulus will be added until the low half of the value is zero).
+ *
+ * The result may be expressed as
+ *
+ *    tR = x + mN
+ *
+ * where x is the input value, N is the modulus, R=2^n (where n is the
+ * number of bits in the representation of the modulus, including any
+ * leading zero bits), and m is the number of multiples of the modulus
+ * added to make the result tR divisible by R.
+ *
+ * The maximum addend is mN <= (R-1)*N (and such an m can be proven to
+ * exist since N is limited to being odd and therefore coprime to R).
+ *
+ * Since the result of this addition is one bit larger than the input
+ * value, a carry out bit is also returned.  The caller may be able to
+ * prove that the carry out is always zero, in which case it may be
+ * safely ignored.
+ *
+ * The upper half of the output value (i.e. t) will also be copied to
+ * the result pointer.  It is permissible for the result pointer to
+ * overlap the lower half of the input value.
+ *
+ * External knowledge of constraints on the modulus and the input
+ * value may be used to prove constraints on the result.  The
+ * constraint on the modulus may be generally expressed as
+ *
+ *    R > kN
+ *
+ * for some positive integer k.  The value k=1 is allowed, and simply
+ * expresses that the modulus fits within the number of bits in its
+ * own representation.
+ *
+ * For classic Montgomery reduction, we have k=1, i.e. R > N and a
+ * separate constraint that the input value is in the range x < RN.
+ * This gives the result constraint
+ *
+ *    tR < RN + (R-1)N
+ *       < 2RN - N
+ *       < 2RN
+ *     t < 2N
+ *
+ * A single subtraction of the modulus may therefore be required to
+ * bring it into the range t < N.
+ *
+ * When the input value is known to be a product of two integers A and
+ * B, with A < aN and B < bN, we get the result constraint
+ *
+ *    tR < abN^2 + (R-1)N
+ *       < (ab/k)RN + RN - N
+ *       < (1 + ab/k)RN
+ *     t < (1 + ab/k)N
+ *
+ * If we have k=a=b=1, i.e. R > N with A < N and B < N, then the
+ * result is in the range t < 2N and may require a single subtraction
+ * of the modulus to bring it into the range t < N so that it may be
+ * used as an input on a subsequent iteration.
+ *
+ * If we have k=4 and a=b=2, i.e. R > 4N with A < 2N and B < 2N, then
+ * the result is in the range t < 2N and may immediately be used as an
+ * input on a subsequent iteration, without requiring a subtraction.
+ *
+ * Larger values of k may be used to allow for larger values of a and
+ * b, which can be useful to elide intermediate reductions in a
+ * calculation chain that involves additions and subtractions between
+ * multiplications (as used in elliptic curve point addition, for
+ * example).  As a general rule: each intermediate addition or
+ * subtraction will require k to be doubled.
+ *
+ * When the input value is known to be a single integer A, with A < aN
+ * (as used when converting out of Montgomery form), we get the result
+ * constraint
+ *
+ *    tR < aN + (R-1)N
+ *       < RN + (a-1)N
+ *
+ * If we have a=1, i.e. A < N, then the constraint becomes
+ *
+ *    tR < RN
+ *     t < N
+ *
+ * and so the result is immediately in the range t < N with no
+ * subtraction of the modulus required.
+ *
+ * For any larger value of a, the result value t=N becomes possible.
+ * Additional external knowledge may potentially be used to prove that
+ * t=N cannot occur.  For example: if the caller is performing modular
+ * exponentiation with a prime modulus (or, more generally, a modulus
+ * that is coprime to the base), then there is no way for a non-zero
+ * base value to end up producing an exact multiple of the modulus.
+ * If t=N cannot be disproved, then conversion out of Montgomery form
+ * may require an additional subtraction of the modulus.
  */
-void bigint_montgomery_raw ( const bigint_element_t *modulus0,
-			     const bigint_element_t *modinv0,
-			     bigint_element_t *mont0,
-			     bigint_element_t *result0, unsigned int size ) {
+int bigint_montgomery_relaxed_raw ( const bigint_element_t *modulus0,
+				    bigint_element_t *value0,
+				    bigint_element_t *result0,
+				    unsigned int size ) {
 	const bigint_t ( size ) __attribute__ (( may_alias ))
 		*modulus = ( ( const void * ) modulus0 );
-	const bigint_t ( 1 ) __attribute__ (( may_alias ))
-		*modinv = ( ( const void * ) modinv0 );
 	union {
 		bigint_t ( size * 2 ) full;
 		struct {
 			bigint_t ( size ) low;
 			bigint_t ( size ) high;
 		} __attribute__ (( packed ));
-	} __attribute__ (( may_alias )) *mont = ( ( void * ) mont0 );
+	} __attribute__ (( may_alias )) *value = ( ( void * ) value0 );
 	bigint_t ( size ) __attribute__ (( may_alias ))
 		*result = ( ( void * ) result0 );
-	bigint_element_t negmodinv = -modinv->element[0];
+	static bigint_t ( 1 ) cached;
+	static bigint_t ( 1 ) negmodinv;
 	bigint_element_t multiple;
 	bigint_element_t carry;
 	unsigned int i;
 	unsigned int j;
 	int overflow;
-	int underflow;
 
 	/* Sanity checks */
 	assert ( bigint_bit_is_set ( modulus, 0 ) );
+
+	/* Calculate inverse (or use cached version) */
+	if ( cached.element[0] != modulus->element[0] ) {
+		bigint_mod_invert ( modulus, &negmodinv );
+		negmodinv.element[0] = -negmodinv.element[0];
+		cached.element[0] = modulus->element[0];
+	}
 
 	/* Perform multiprecision Montgomery reduction */
 	for ( i = 0 ; i < size ; i++ ) {
 
 		/* Determine scalar multiple for this round */
-		multiple = ( mont->low.element[i] * negmodinv );
+		multiple = ( value->low.element[i] * negmodinv.element[0] );
 
 		/* Multiply value to make it divisible by 2^(width*i) */
 		carry = 0;
 		for ( j = 0 ; j < size ; j++ ) {
 			bigint_multiply_one ( multiple, modulus->element[j],
-					      &mont->full.element[ i + j ],
+					      &value->full.element[ i + j ],
 					      &carry );
 		}
 
 		/* Since value is now divisible by 2^(width*i), we
 		 * know that the current low element must have been
-		 * zeroed.  We can store the multiplication carry out
-		 * in this element, avoiding the need to immediately
-		 * propagate the carry through the remaining elements.
+		 * zeroed.
 		 */
-		assert ( mont->low.element[i] == 0 );
-		mont->low.element[i] = carry;
+		assert ( value->low.element[i] == 0 );
+
+		/* Store the multiplication carry out in the result,
+		 * avoiding the need to immediately propagate the
+		 * carry through the remaining elements.
+		 */
+		result->element[i] = carry;
 	}
 
 	/* Add the accumulated carries */
-	overflow = bigint_add ( &mont->low, &mont->high );
+	overflow = bigint_add ( result, &value->high );
+
+	/* Copy to result buffer */
+	bigint_copy ( &value->high, result );
+
+	return overflow;
+}
+
+/**
+ * Perform classic Montgomery reduction (REDC) of a big integer
+ *
+ * @v modulus0		Element 0 of big integer odd modulus
+ * @v value0		Element 0 of big integer to be reduced
+ * @v result0		Element 0 of big integer to hold result
+ * @v size		Number of elements in modulus and result
+ */
+void bigint_montgomery_raw ( const bigint_element_t *modulus0,
+			     bigint_element_t *value0,
+			     bigint_element_t *result0,
+			     unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( const void * ) modulus0 );
+	union {
+		bigint_t ( size * 2 ) full;
+		struct {
+			bigint_t ( size ) low;
+			bigint_t ( size ) high;
+		} __attribute__ (( packed ));
+	} __attribute__ (( may_alias )) *value = ( ( void * ) value0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	int overflow;
+	int underflow;
+
+	/* Sanity check */
+	assert ( ! bigint_is_geq ( &value->high, modulus ) );
+
+	/* Perform relaxed Montgomery reduction */
+	overflow = bigint_montgomery_relaxed ( modulus, &value->full, result );
 
 	/* Conditionally subtract the modulus once */
-	memcpy ( result, &mont->high, sizeof ( *result ) );
 	underflow = bigint_subtract ( modulus, result );
-	bigint_swap ( result, &mont->high, ( underflow & ~overflow ) );
+	bigint_swap ( result, &value->high, ( underflow & ~overflow ) );
 
 	/* Sanity check */
 	assert ( ! bigint_is_geq ( result, modulus ) );
+}
+
+/**
+ * Perform generalised exponentiation via a Montgomery ladder
+ *
+ * @v result0		Element 0 of result (initialised to identity element)
+ * @v multiple0		Element 0 of multiple (initialised to generator)
+ * @v size		Number of elements in result and multiple
+ * @v exponent0		Element 0 of exponent
+ * @v exponent_size	Number of elements in exponent
+ * @v op		Montgomery ladder commutative operation
+ * @v ctx		Operation context (if needed)
+ * @v tmp		Temporary working space (if needed)
+ *
+ * The Montgomery ladder may be used to perform any operation that is
+ * isomorphic to exponentiation, i.e. to compute the result
+ *
+ *    r = g^e = g * g * g * g * .... * g
+ *
+ * for an arbitrary commutative operation "*", generator "g" and
+ * exponent "e".
+ *
+ * The result "r" is computed in constant time (assuming that the
+ * underlying operation is constant time) in k steps, where k is the
+ * number of bits in the big integer representation of the exponent.
+ *
+ * The result "r" must be initialised to the operation's identity
+ * element, and the multiple must be initialised to the generator "g".
+ * On exit, the multiple will contain
+ *
+ *    m = r * g = g^(e+1)
+ *
+ * Note that the terminology used here refers to exponentiation
+ * defined as repeated multiplication, but that the ladder may equally
+ * well be used to perform any isomorphic operation (such as
+ * multiplication defined as repeated addition).
+ */
+void bigint_ladder_raw ( bigint_element_t *result0,
+			 bigint_element_t *multiple0, unsigned int size,
+			 const bigint_element_t *exponent0,
+			 unsigned int exponent_size, bigint_ladder_op_t *op,
+			 const void *ctx, void *tmp ) {
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*multiple = ( ( void * ) multiple0 );
+	const bigint_t ( exponent_size ) __attribute__ (( may_alias ))
+		*exponent = ( ( const void * ) exponent0 );
+	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
+	unsigned int bit = ( exponent_size * width );
+	int toggle = 0;
+	int previous;
+
+	/* We have two physical storage locations: Rres (the "result"
+	 * register) and Rmul (the "multiple" register).
+	 *
+	 * On entry we have:
+	 *
+	 *   Rres = g^0 = 1  (the identity element)
+	 *   Rmul = g        (the generator)
+	 *
+	 * For calculation purposes, define two virtual registers R[0]
+	 * and R[1], mapped to the underlying physical storage
+	 * locations via a boolean toggle state "t":
+	 *
+	 *   R[t]  -> Rres
+	 *   R[~t] -> Rmul
+	 *
+	 * Define the initial toggle state to be t=0, so that we have:
+	 *
+	 *   R[0] = g^0 = 1  (the identity element)
+	 *   R[1] = g        (the generator)
+	 *
+	 * The Montgomery ladder then iterates over each bit "b" of
+	 * the exponent "e" (from MSB down to LSB), computing:
+	 *
+	 *   R[1]  := R[0] * R[1],    R[0]  := R[0] * R[0]    (if b=0)
+	 *   R[0]  := R[1] * R[0],    R[1]  := R[1] * R[1]    (if b=1)
+	 *
+	 * i.e.
+	 *
+	 *   R[~b] := R[b] * R[~b],   R[b]  := R[b] * R[b]
+	 *
+	 * To avoid data-dependent memory access patterns, we
+	 * implement this as:
+	 *
+	 *   Rmul := Rres * Rmul
+	 *   Rres := Rres * Rres
+	 *
+	 * and update the toggle state "t" (via constant-time
+	 * conditional swaps) as needed to ensure that R[b] always
+	 * maps to Rres and R[~b] always maps to Rmul.
+	 */
+	while ( bit-- ) {
+
+		/* Update toggle state t := b
+		 *
+		 * If the new toggle state is not equal to the old
+		 * toggle state, then we must swap R[0] and R[1] (in
+		 * constant time).
+		 */
+		previous = toggle;
+		toggle = bigint_bit_is_set ( exponent, bit );
+		bigint_swap ( result, multiple, ( toggle ^ previous ) );
+
+		/* Calculate Rmul = R[~b] := R[b] * R[~b] = Rres * Rmul */
+		op ( result->element, multiple->element, size, ctx, tmp );
+
+		/* Calculate Rres = R[b]  := R[b] * R[b]  = Rres * Rres */
+		op ( result->element, result->element, size, ctx, tmp );
+	}
+
+	/* Reset toggle state to zero */
+	bigint_swap ( result, multiple, toggle );
+}
+
+/**
+ * Perform modular multiplication as part of a Montgomery ladder
+ *
+ * @v operand		Element 0 of first input operand (may overlap result)
+ * @v result		Element 0 of second input operand and result
+ * @v size		Number of elements in operands and result
+ * @v ctx		Operation context (odd modulus, or NULL)
+ * @v tmp		Temporary working space
+ */
+void bigint_mod_exp_ladder ( const bigint_element_t *multiplier0,
+			     bigint_element_t *result0, unsigned int size,
+			     const void *ctx, void *tmp ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*multiplier = ( ( const void * ) multiplier0 );
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*result = ( ( void * ) result0 );
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*modulus = ( ( const void * ) ctx );
+	bigint_t ( size * 2 ) __attribute__ (( may_alias ))
+		*product = ( ( void * ) tmp );
+
+	/* Multiply and reduce */
+	bigint_multiply ( result, multiplier, product );
+	if ( modulus ) {
+		bigint_montgomery ( modulus, product, result );
+	} else {
+		bigint_shrink ( product, result );
+	}
 }
 
 /**
@@ -454,12 +764,9 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 		( ( void * ) result0 );
 	const unsigned int width = ( 8 * sizeof ( bigint_element_t ) );
 	struct {
-		union {
-			bigint_t ( 2 * size ) padded_modulus;
-			struct {
-				bigint_t ( size ) modulus;
-				bigint_t ( size ) stash;
-			};
+		struct {
+			bigint_t ( size ) modulus;
+			bigint_t ( size ) stash;
 		};
 		union {
 			bigint_t ( 2 * size ) full;
@@ -467,12 +774,10 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 		} product;
 	} *temp = tmp;
 	const uint8_t one[1] = { 1 };
-	bigint_t ( 1 ) modinv;
 	bigint_element_t submask;
 	unsigned int subsize;
 	unsigned int scale;
-	unsigned int max;
-	unsigned int bit;
+	unsigned int i;
 
 	/* Sanity check */
 	assert ( sizeof ( *temp ) == bigint_mod_exp_tmp_len ( modulus ) );
@@ -484,7 +789,7 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 	}
 
 	/* Factor modulus as (N * 2^scale) where N is odd */
-	bigint_grow ( modulus, &temp->padded_modulus );
+	bigint_copy ( modulus, &temp->modulus );
 	for ( scale = 0 ; ( ! bigint_bit_is_set ( &temp->modulus, 0 ) ) ;
 	      scale++ ) {
 		bigint_shr ( &temp->modulus );
@@ -494,47 +799,26 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 	if ( ! submask )
 		submask = ~submask;
 
-	/* Calculate inverse of (scaled) modulus N modulo element size */
-	bigint_mod_invert ( &temp->modulus, &modinv );
-
-	/* Calculate (R^2 mod N) via direct reduction of (R^2 - N) */
-	memset ( &temp->product.full, 0, sizeof ( temp->product.full ) );
-	bigint_subtract ( &temp->padded_modulus, &temp->product.full );
-	bigint_reduce ( &temp->padded_modulus, &temp->product.full );
-	bigint_copy ( &temp->product.low, &temp->stash );
+	/* Calculate (R^2 mod N) */
+	bigint_reduce ( &temp->modulus, &temp->stash );
 
 	/* Initialise result = Montgomery(1, R^2 mod N) */
-	bigint_montgomery ( &temp->modulus, &modinv,
-			    &temp->product.full, result );
+	bigint_grow ( &temp->stash, &temp->product.full );
+	bigint_montgomery ( &temp->modulus, &temp->product.full, result );
 
 	/* Convert base into Montgomery form */
 	bigint_multiply ( base, &temp->stash, &temp->product.full );
-	bigint_montgomery ( &temp->modulus, &modinv, &temp->product.full,
+	bigint_montgomery ( &temp->modulus, &temp->product.full,
 			    &temp->stash );
 
 	/* Calculate x1 = base^exponent modulo N */
-	max = bigint_max_set_bit ( exponent );
-	for ( bit = 1 ; bit <= max ; bit++ ) {
-
-		/* Square (and reduce) */
-		bigint_multiply ( result, result, &temp->product.full );
-		bigint_montgomery ( &temp->modulus, &modinv,
-				    &temp->product.full, result );
-
-		/* Multiply (and reduce) */
-		bigint_multiply ( &temp->stash, result, &temp->product.full );
-		bigint_montgomery ( &temp->modulus, &modinv,
-				    &temp->product.full, &temp->product.low );
-
-		/* Conditionally swap the multiplied result */
-		bigint_swap ( result, &temp->product.low,
-			      bigint_bit_is_set ( exponent, ( max - bit ) ) );
-	}
+	bigint_ladder ( result, &temp->stash, exponent, bigint_mod_exp_ladder,
+			&temp->modulus, &temp->product );
 
 	/* Convert back out of Montgomery form */
 	bigint_grow ( result, &temp->product.full );
-	bigint_montgomery ( &temp->modulus, &modinv, &temp->product.full,
-			    result );
+	bigint_montgomery_relaxed ( &temp->modulus, &temp->product.full,
+				    result );
 
 	/* Handle even moduli via Garner's algorithm */
 	if ( subsize ) {
@@ -554,22 +838,14 @@ void bigint_mod_exp_raw ( const bigint_element_t *base0,
 
 		/* Calculate x2 = base^exponent modulo 2^k */
 		bigint_init ( substash, one, sizeof ( one ) );
-		for ( bit = 1 ; bit <= max ; bit++ ) {
+		bigint_copy ( subbase, submodulus );
+		bigint_ladder ( substash, submodulus, exponent,
+				bigint_mod_exp_ladder, NULL, subproduct );
 
-			/* Square (and reduce) */
-			bigint_multiply ( substash, substash,
-					  &subproduct->full );
-			bigint_copy ( &subproduct->low, substash );
-
-			/* Multiply (and reduce) */
-			bigint_multiply ( subbase, substash,
-					  &subproduct->full );
-
-			/* Conditionally swap the multiplied result */
-			bigint_swap ( substash, &subproduct->low,
-				      bigint_bit_is_set ( exponent,
-							  ( max - bit ) ) );
-		}
+		/* Reconstruct N */
+		bigint_copy ( modulus, &temp->modulus );
+		for ( i = 0 ; i < scale ; i++ )
+			bigint_shr ( &temp->modulus );
 
 		/* Calculate N^-1 modulo 2^k */
 		bigint_mod_invert ( submodulus, &subproduct->low );

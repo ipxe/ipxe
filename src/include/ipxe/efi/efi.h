@@ -219,6 +219,7 @@ extern EFI_GUID efi_nii31_protocol_guid;
 extern EFI_GUID efi_pci_io_protocol_guid;
 extern EFI_GUID efi_pci_root_bridge_io_protocol_guid;
 extern EFI_GUID efi_pxe_base_code_protocol_guid;
+extern EFI_GUID efi_rng_protocol_guid;
 extern EFI_GUID efi_serial_io_protocol_guid;
 extern EFI_GUID efi_shim_lock_protocol_guid;
 extern EFI_GUID efi_simple_file_system_protocol_guid;
@@ -228,6 +229,7 @@ extern EFI_GUID efi_simple_text_input_protocol_guid;
 extern EFI_GUID efi_simple_text_input_ex_protocol_guid;
 extern EFI_GUID efi_simple_text_output_protocol_guid;
 extern EFI_GUID efi_tcg_protocol_guid;
+extern EFI_GUID efi_tcg2_protocol_guid;
 extern EFI_GUID efi_tcp4_protocol_guid;
 extern EFI_GUID efi_tcp4_service_binding_protocol_guid;
 extern EFI_GUID efi_tcp6_protocol_guid;
@@ -244,8 +246,11 @@ extern EFI_GUID efi_usb2_hc_protocol_guid;
 extern EFI_GUID efi_usb_io_protocol_guid;
 extern EFI_GUID efi_vlan_config_protocol_guid;
 
+extern EFI_GUID efi_cert_x509_guid;
 extern EFI_GUID efi_file_info_id;
 extern EFI_GUID efi_file_system_info_id;
+extern EFI_GUID efi_global_variable;
+extern EFI_GUID efi_tls_ca_certificate_guid;
 
 extern EFI_HANDLE efi_image_handle;
 extern EFI_LOADED_IMAGE_PROTOCOL *efi_loaded_image;

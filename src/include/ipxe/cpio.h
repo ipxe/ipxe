@@ -9,6 +9,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <stdint.h>
 #include <ipxe/image.h>
 
 /** A CPIO archive header
@@ -50,6 +51,12 @@ struct cpio_header {
 /** CPIO magic */
 #define CPIO_MAGIC "070701"
 
+/** CPIO type for regular files */
+#define CPIO_MODE_FILE 0100000
+
+/** CPIO type for directories */
+#define CPIO_MODE_DIR 0040000
+
 /** CPIO header length alignment */
 #define CPIO_ALIGN 4
 
@@ -67,8 +74,20 @@ cpio_name ( struct image *image ) {
 	return image->cmdline;
 }
 
-extern void cpio_set_field ( char *field, unsigned long value );
-extern size_t cpio_name_len ( struct image *image );
-extern size_t cpio_header ( struct image *image, struct cpio_header *cpio );
+/**
+ * Get CPIO header zero-padding length
+ *
+ * @v len		Length of CPIO header (including name, excluding NUL)
+ * @ret pad_len		Padding length
+ */
+static inline __attribute__ (( always_inline )) size_t
+cpio_pad_len ( size_t len ) {
+
+	/* Pad by at least one byte (for name's terminating NUL) */
+	return ( CPIO_ALIGN - ( len % CPIO_ALIGN ) );
+}
+
+extern size_t cpio_header ( struct image *image, unsigned int index,
+			    struct cpio_header *cpio );
 
 #endif /* _IPXE_CPIO_H */

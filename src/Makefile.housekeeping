@@ -484,6 +484,7 @@ CFLAGS		+= $(WORKAROUND_CFLAGS) $(EXTRA_CFLAGS)
 ASFLAGS		+= $(WORKAROUND_ASFLAGS) $(EXTRA_ASFLAGS)
 LDFLAGS		+= $(WORKAROUND_LDFLAGS) $(EXTRA_LDFLAGS)
 HOST_CFLAGS	+= -O2 -g
+HOST_EFI_CFLAGS	+= -fshort-wchar
 
 # Inhibit -Werror if NO_WERROR is specified on make command line
 #
@@ -1449,22 +1450,22 @@ CLEANUP += $(ZBIN)
 
 $(ELF2EFI32) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -DEFI_TARGET32 $< -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(HOST_EFI_CFLAGS) -idirafter include -DEFI_TARGET32 $< -o $@
 CLEANUP += $(ELF2EFI32)
 
 $(ELF2EFI64) : util/elf2efi.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -DEFI_TARGET64 $< -o $@
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(HOST_EFI_CFLAGS) -idirafter include -DEFI_TARGET64 $< -o $@
 CLEANUP += $(ELF2EFI64)
 
 $(EFIROM) : util/efirom.c util/eficompress.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(HOST_EFI_CFLAGS) -idirafter include -o $@ $<
 CLEANUP += $(EFIROM)
 
 $(EFIFATBIN) : util/efifatbin.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) -idirafter include -o $@ $<
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $(HOST_EFI_CFLAGS) -idirafter include -o $@ $<
 CLEANUP += $(EFIFATBIN)
 
 ###############################################################################

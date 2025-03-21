@@ -40,6 +40,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Colour for debug messages */
 #define colour &efi_systab
 
+/** Number of lines to prescroll when needed */
+#define EFI_WRAP_PRESCROLL 16
+
+/** Public EFI system table pointer */
+static EFI_SYSTEM_TABLE *efi_systab_pub;
+
+/** Private EFI system table used while wrapping is active */
+static EFI_SYSTEM_TABLE efi_systab_priv;
+
+/** Original EFI boot services table pointer */
+static EFI_BOOT_SERVICES *efi_bs_orig;
+
+/** Backup of original EFI boot services table */
+static EFI_BOOT_SERVICES efi_bs_copy;
+
 /**
  * Convert EFI status code to text
  *
@@ -193,6 +208,38 @@ static const char * efi_timer_delay ( EFI_TIMER_DELAY type ) {
 		snprintf ( buf, sizeof ( buf ), "%#x", type );
 		return buf;
 	}
+}
+
+/**
+ * Pre-scroll display to create space for output lines
+ *
+ * @v lines		Number of lines required
+ * @ret efirc		EFI status code
+ */
+static int efi_prescroll ( unsigned int lines ) {
+	EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *conout = efi_systab->ConOut;
+	UINTN columns;
+	UINTN rows;
+	UINTN space;
+	EFI_STATUS efirc;
+
+	/* Get number of rows and columns */
+	if ( ( efirc = conout->QueryMode ( conout, conout->Mode->Mode,
+					   &columns, &rows ) ) != 0 )
+		return efirc;
+
+	/* Calculate available space */
+	space = ( rows - conout->Mode->CursorRow - 1 );
+
+	/* Scroll to create space */
+	while ( space++ < lines )
+		conout->OutputString ( conout, L"\n" );
+
+	/* Move cursor to start of space */
+	conout->SetCursorPosition ( conout, 0,
+				    ( conout->Mode->CursorRow - lines ) );
+
+	return 0;
 }
 
 /**
@@ -478,7 +525,7 @@ efi_close_event_wrapper ( EFI_EVENT event ) {
 	EFI_STATUS efirc;
 
 	DBGC ( colour, "CloseEvent ( %p ) ", event );
-	efirc = bs->SignalEvent ( event );
+	efirc = bs->CloseEvent ( event );
 	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
 	return efirc;
 }
@@ -493,7 +540,7 @@ efi_check_event_wrapper ( EFI_EVENT event ) {
 	EFI_STATUS efirc;
 
 	DBGCP ( colour, "CheckEvent ( %p ) ", event );
-	efirc = bs->SignalEvent ( event );
+	efirc = bs->CheckEvent ( event );
 	DBGCP ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
 	return efirc;
 }
@@ -783,6 +830,15 @@ efi_exit_boot_services_wrapper ( EFI_HANDLE image_handle, UINTN map_key ) {
 	if ( efirc != 0 ) {
 		DBGC ( colour, "ExitBootServices ( ... ) = %s -> %p\n",
 		       efi_status ( efirc ), retaddr );
+		/* On some systems, scrolling the output will cause
+		 * the system memory map to change (and so cause
+		 * ExitBootServices() to fail).
+		 *
+		 * After the first failed attempt, prescroll the
+		 * screen to maximise the chance of the subsequent
+		 * attempt succeeding.
+		 */
+		efi_prescroll ( EFI_WRAP_PRESCROLL );
 	}
 	return efirc;
 }
@@ -1173,93 +1229,141 @@ efi_create_event_ex_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 }
 
 /**
- * Build boot services table wrapper
+ * Wrap a boot services table
  *
- * @ret bs		Wrapped boot services table
+ * @v wrapper		Boot services table to wrap
  */
-EFI_BOOT_SERVICES * efi_wrap_bs ( void ) {
-	static EFI_BOOT_SERVICES efi_bs_wrapper;
+void efi_wrap_bs ( EFI_BOOT_SERVICES *wrapper ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-
-	/* Build boot services table wrapper */
-	memcpy ( &efi_bs_wrapper, bs, sizeof ( efi_bs_wrapper ) );
-	efi_bs_wrapper.RaiseTPL		= efi_raise_tpl_wrapper;
-	efi_bs_wrapper.RestoreTPL	= efi_restore_tpl_wrapper;
-	efi_bs_wrapper.AllocatePages	= efi_allocate_pages_wrapper;
-	efi_bs_wrapper.FreePages	= efi_free_pages_wrapper;
-	efi_bs_wrapper.GetMemoryMap	= efi_get_memory_map_wrapper;
-	efi_bs_wrapper.AllocatePool	= efi_allocate_pool_wrapper;
-	efi_bs_wrapper.FreePool		= efi_free_pool_wrapper;
-	efi_bs_wrapper.CreateEvent	= efi_create_event_wrapper;
-	efi_bs_wrapper.SetTimer		= efi_set_timer_wrapper;
-	efi_bs_wrapper.WaitForEvent	= efi_wait_for_event_wrapper;
-	efi_bs_wrapper.SignalEvent	= efi_signal_event_wrapper;
-	efi_bs_wrapper.CloseEvent	= efi_close_event_wrapper;
-	efi_bs_wrapper.CheckEvent	= efi_check_event_wrapper;
-	efi_bs_wrapper.InstallProtocolInterface
-		= efi_install_protocol_interface_wrapper;
-	efi_bs_wrapper.ReinstallProtocolInterface
-		= efi_reinstall_protocol_interface_wrapper;
-	efi_bs_wrapper.UninstallProtocolInterface
-		= efi_uninstall_protocol_interface_wrapper;
-	efi_bs_wrapper.HandleProtocol	= efi_handle_protocol_wrapper;
-	efi_bs_wrapper.RegisterProtocolNotify
-		= efi_register_protocol_notify_wrapper;
-	efi_bs_wrapper.LocateHandle	= efi_locate_handle_wrapper;
-	efi_bs_wrapper.LocateDevicePath	= efi_locate_device_path_wrapper;
-	efi_bs_wrapper.InstallConfigurationTable
-		= efi_install_configuration_table_wrapper;
-	efi_bs_wrapper.LoadImage	= efi_load_image_wrapper;
-	efi_bs_wrapper.StartImage	= efi_start_image_wrapper;
-	efi_bs_wrapper.Exit		= efi_exit_wrapper;
-	efi_bs_wrapper.UnloadImage	= efi_unload_image_wrapper;
-	efi_bs_wrapper.ExitBootServices	= efi_exit_boot_services_wrapper;
-	efi_bs_wrapper.GetNextMonotonicCount
-		= efi_get_next_monotonic_count_wrapper;
-	efi_bs_wrapper.Stall		= efi_stall_wrapper;
-	efi_bs_wrapper.SetWatchdogTimer	= efi_set_watchdog_timer_wrapper;
-	efi_bs_wrapper.ConnectController
-		= efi_connect_controller_wrapper;
-	efi_bs_wrapper.DisconnectController
-		= efi_disconnect_controller_wrapper;
-	efi_bs_wrapper.OpenProtocol	= efi_open_protocol_wrapper;
-	efi_bs_wrapper.CloseProtocol	= efi_close_protocol_wrapper;
-	efi_bs_wrapper.OpenProtocolInformation
-		= efi_open_protocol_information_wrapper;
-	efi_bs_wrapper.ProtocolsPerHandle
-		= efi_protocols_per_handle_wrapper;
-	efi_bs_wrapper.LocateHandleBuffer
-		= efi_locate_handle_buffer_wrapper;
-	efi_bs_wrapper.LocateProtocol	= efi_locate_protocol_wrapper;
-	efi_bs_wrapper.InstallMultipleProtocolInterfaces
-		= efi_install_multiple_protocol_interfaces_wrapper;
-	efi_bs_wrapper.UninstallMultipleProtocolInterfaces
-		= efi_uninstall_multiple_protocol_interfaces_wrapper;
-	efi_bs_wrapper.CreateEventEx	= efi_create_event_ex_wrapper;
-
-	return &efi_bs_wrapper;
-}
-
-/**
- * Wrap the calls made by a loaded image
- *
- * @v handle		Image handle
- */
-void efi_wrap ( EFI_HANDLE handle ) {
-	static EFI_SYSTEM_TABLE efi_systab_copy;
 
 	/* Do nothing unless debugging is enabled */
 	if ( ! DBG_LOG )
 		return;
 
-	/* Construct modified system table */
-	if ( efi_systab != &efi_systab_copy ) {
-		memcpy ( &efi_systab_copy, efi_systab,
-			 sizeof ( efi_systab_copy ) );
-		efi_systab->BootServices = efi_wrap_bs();
-		efi_systab = &efi_systab_copy;
+	/* Build boot services table wrapper */
+	memcpy ( wrapper, bs, sizeof ( *wrapper ) );
+	wrapper->RaiseTPL		= efi_raise_tpl_wrapper;
+	wrapper->RestoreTPL		= efi_restore_tpl_wrapper;
+	wrapper->AllocatePages		= efi_allocate_pages_wrapper;
+	wrapper->FreePages		= efi_free_pages_wrapper;
+	wrapper->GetMemoryMap		= efi_get_memory_map_wrapper;
+	wrapper->AllocatePool		= efi_allocate_pool_wrapper;
+	wrapper->FreePool		= efi_free_pool_wrapper;
+	wrapper->CreateEvent		= efi_create_event_wrapper;
+	wrapper->SetTimer		= efi_set_timer_wrapper;
+	wrapper->WaitForEvent		= efi_wait_for_event_wrapper;
+	wrapper->SignalEvent		= efi_signal_event_wrapper;
+	wrapper->CloseEvent		= efi_close_event_wrapper;
+	wrapper->CheckEvent		= efi_check_event_wrapper;
+	wrapper->InstallProtocolInterface
+		= efi_install_protocol_interface_wrapper;
+	wrapper->ReinstallProtocolInterface
+		= efi_reinstall_protocol_interface_wrapper;
+	wrapper->UninstallProtocolInterface
+		= efi_uninstall_protocol_interface_wrapper;
+	wrapper->HandleProtocol		= efi_handle_protocol_wrapper;
+	wrapper->RegisterProtocolNotify	= efi_register_protocol_notify_wrapper;
+	wrapper->LocateHandle		= efi_locate_handle_wrapper;
+	wrapper->LocateDevicePath	= efi_locate_device_path_wrapper;
+	wrapper->InstallConfigurationTable
+		= efi_install_configuration_table_wrapper;
+	wrapper->LoadImage		= efi_load_image_wrapper;
+	wrapper->StartImage		= efi_start_image_wrapper;
+	wrapper->Exit			= efi_exit_wrapper;
+	wrapper->UnloadImage		= efi_unload_image_wrapper;
+	wrapper->ExitBootServices	= efi_exit_boot_services_wrapper;
+	wrapper->GetNextMonotonicCount	= efi_get_next_monotonic_count_wrapper;
+	wrapper->Stall			= efi_stall_wrapper;
+	wrapper->SetWatchdogTimer	= efi_set_watchdog_timer_wrapper;
+	wrapper->ConnectController	= efi_connect_controller_wrapper;
+	wrapper->DisconnectController	= efi_disconnect_controller_wrapper;
+	wrapper->OpenProtocol		= efi_open_protocol_wrapper;
+	wrapper->CloseProtocol		= efi_close_protocol_wrapper;
+	wrapper->OpenProtocolInformation
+		= efi_open_protocol_information_wrapper;
+	wrapper->ProtocolsPerHandle	= efi_protocols_per_handle_wrapper;
+	wrapper->LocateHandleBuffer	= efi_locate_handle_buffer_wrapper;
+	wrapper->LocateProtocol		= efi_locate_protocol_wrapper;
+	wrapper->InstallMultipleProtocolInterfaces
+		= efi_install_multiple_protocol_interfaces_wrapper;
+	wrapper->UninstallMultipleProtocolInterfaces
+		= efi_uninstall_multiple_protocol_interfaces_wrapper;
+	wrapper->CreateEventEx		= efi_create_event_ex_wrapper;
+}
+
+/**
+ * Wrap the public EFI system table
+ *
+ * @v global		Patch global boot services table in-place
+ */
+void efi_wrap_systab ( int global ) {
+	static EFI_BOOT_SERVICES local;
+	EFI_BOOT_SERVICES *wrapper;
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Preserve original system and boot services tables */
+	if ( ! efi_systab_pub ) {
+		efi_systab_pub = efi_systab;
+		efi_bs_orig = efi_systab_pub->BootServices;
+		memcpy ( &efi_bs_copy, efi_bs_orig, sizeof ( efi_bs_copy ) );
 	}
+
+	/* Construct and use private system table */
+	if ( efi_systab != &efi_systab_priv ) {
+		memcpy ( &efi_systab_priv, efi_systab_pub,
+			 sizeof ( efi_systab_priv ) );
+		efi_systab_priv.BootServices = &efi_bs_copy;
+		efi_systab = &efi_systab_priv;
+	}
+
+	/* Wrap global or local boot services table as applicable */
+	wrapper = ( global ? efi_bs_orig : &local );
+	efi_wrap_bs ( wrapper );
+	efi_systab_pub->BootServices = wrapper;
+	DBGC ( colour, "WRAP installed %s wrappers\n",
+	       ( global ? "global" : "local" ) );
+}
+
+/**
+ * Remove boot services table wrapper
+ *
+ */
+void efi_unwrap ( void ) {
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Do nothing if wrapping was never enabled */
+	if ( ! efi_systab_pub )
+		return;
+
+	/* Restore original system and boot services tables */
+	memcpy ( efi_bs_orig, &efi_bs_copy, sizeof ( *efi_bs_orig ) );
+	efi_systab_pub->BootServices = efi_bs_orig;
+
+	/* Switch back to using public system table */
+	efi_systab = efi_systab_pub;
+	DBGC ( colour, "WRAP uninstalled wrappers\n" );
+}
+
+/**
+ * Wrap calls made by a newly loaded image
+ *
+ * @v handle		Image handle
+ */
+void efi_wrap_image ( EFI_HANDLE handle ) {
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
 
 	/* Dump image information */
 	efi_dump_image ( handle );
+
+	/* Patch public system table */
+	efi_wrap_systab ( 0 );
 }

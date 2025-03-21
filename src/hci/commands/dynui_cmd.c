@@ -207,8 +207,10 @@ static int item_exec ( int argc, char **argv ) {
 struct choose_options {
 	/** Dynamic user interface name */
 	char *dynui;
-	/** Timeout */
+	/** Initial timeout */
 	unsigned long timeout;
+	/** Post-activity timeout */
+	unsigned long retimeout;
 	/** Default selection */
 	char *select;
 	/** Keep dynamic user interface */
@@ -223,6 +225,8 @@ static struct option_descriptor choose_opts[] = {
 		      struct choose_options, select, parse_string ),
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct choose_options, timeout, parse_timeout ),
+	OPTION_DESC ( "retimeout", 'r', required_argument,
+		      struct choose_options, retimeout, parse_timeout ),
 	OPTION_DESC ( "keep", 'k', no_argument,
 		      struct choose_options, keep, parse_flag ),
 };
@@ -259,8 +263,8 @@ static int choose_exec ( int argc, char **argv ) {
 		goto err_parse_dynui;
 
 	/* Show as menu */
-	if ( ( rc = show_menu ( dynui, opts.timeout, opts.select,
-				&item ) ) != 0 )
+	if ( ( rc = show_menu ( dynui, opts.timeout, opts.retimeout,
+				opts.select, &item ) ) != 0 )
 		goto err_show_menu;
 
 	/* Apply default type if necessary */

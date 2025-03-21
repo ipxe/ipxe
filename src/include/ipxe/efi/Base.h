@@ -61,7 +61,7 @@ FILE_LICENCE ( BSD2_PATENT );
 /// up to the compiler to remove any code past that point.
 ///
 #define UNREACHABLE()  __builtin_unreachable ()
-  #elif defined (__has_feature)
+  #elif defined (__has_builtin) && defined (__has_feature)
     #if __has_builtin (__builtin_unreachable)
 ///
 /// Signal compilers and analyzers that this call is not reachable.  It is
@@ -802,12 +802,12 @@ typedef UINTN *BASE_LIST;
   @param  Message     Raised compiler diagnostic message when expression is false.
 
 **/
-#ifdef MDE_CPU_EBC
-#define STATIC_ASSERT(Expression, Message)
-#elif defined (_MSC_EXTENSIONS) || defined (__cplusplus)
+#if defined (__cplusplus)
 #define STATIC_ASSERT  static_assert
-#else
+#elif defined (__GNUC__) || defined (__clang__)
 #define STATIC_ASSERT  _Static_assert
+#elif defined (_MSC_EXTENSIONS)
+#define STATIC_ASSERT  static_assert
 #endif
 
 //
@@ -890,7 +890,7 @@ STATIC_ASSERT (ALIGNOF (__VERIFY_INT32_ENUM_SIZE) == sizeof (__VERIFY_INT32_ENUM
   @return  A pointer to the structure from one of it's elements.
 
 **/
-#define BASE_CR(Record, TYPE, Field)  ((TYPE *) ((CHAR8 *) (Record) - OFFSET_OF (TYPE, Field)))
+#define BASE_CR(Record, TYPE, Field)  ((TYPE *) (VOID *) ((CHAR8 *) (Record) - OFFSET_OF (TYPE, Field)))
 
 /**
   Checks whether a value is a power of two.
@@ -1060,7 +1060,7 @@ typedef UINTN RETURN_STATUS;
   @retval FALSE         The high bit of StatusCode is clear.
 
 **/
-#define RETURN_ERROR(StatusCode)  (((INTN)(RETURN_STATUS)(StatusCode)) < 0)
+#define RETURN_ERROR(StatusCode)  (((RETURN_STATUS)(StatusCode)) >= MAX_BIT)
 
 ///
 /// The operation completed successfully.

@@ -53,8 +53,10 @@ struct menu_ui {
 	struct dynamic_ui *dynui;
 	/** Jump scroller */
 	struct jump_scroller scroll;
-	/** Timeout (0=indefinite) */
+	/** Remaining timeout (0=indefinite) */
 	unsigned long timeout;
+	/** Post-activity timeout (0=indefinite) */
+	unsigned long retimeout;
 };
 
 /**
@@ -180,8 +182,8 @@ static int menu_loop ( struct menu_ui *ui, struct dynamic_item **selected ) {
 			if ( ui->timeout == 0 )
 				chosen = 1;
 		} else {
-			/* Cancel any timeout */
-			ui->timeout = 0;
+			/* Reset timeout after activity */
+			ui->timeout = ui->retimeout;
 
 			/* Handle scroll keys */
 			move = jump_scroll_key ( &ui->scroll, key );
@@ -241,12 +243,14 @@ static int menu_loop ( struct menu_ui *ui, struct dynamic_item **selected ) {
  * Show menu
  *
  * @v dynui		Dynamic user interface
- * @v timeout		Timeout period, in ticks (0=indefinite)
+ * @v timeout		Initial timeout period, in ticks (0=indefinite)
+ * @v retimeout		Post-activity timeout period, in ticks (0=indefinite)
  * @ret selected	Selected item
  * @ret rc		Return status code
  */
 int show_menu ( struct dynamic_ui *dynui, unsigned long timeout,
-		const char *select, struct dynamic_item **selected ) {
+		unsigned long retimeout, const char *select,
+		struct dynamic_item **selected ) {
 	struct dynamic_item *item;
 	struct menu_ui ui;
 	char buf[ MENU_COLS + 1 /* NUL */ ];
@@ -258,6 +262,8 @@ int show_menu ( struct dynamic_ui *dynui, unsigned long timeout,
 	ui.dynui = dynui;
 	ui.scroll.rows = MENU_ROWS;
 	ui.timeout = timeout;
+	ui.retimeout = retimeout;
+
 	list_for_each_entry ( item, &dynui->items, list ) {
 		if ( item->name ) {
 			if ( ! named_count )

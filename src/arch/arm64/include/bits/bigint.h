@@ -122,14 +122,16 @@ bigint_subtract_raw ( const uint64_t *subtrahend0, uint64_t *value0,
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint64_t *discard_value;
 	uint64_t discard_value_i;
 	unsigned int discard_size;
+	int carry;
 
 	__asm__ __volatile__ ( "cmn xzr, xzr\n\t" /* clear CF */
 			       "\n1:\n\t"
@@ -141,9 +143,10 @@ bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
 			       : "=r" ( discard_value ),
 				 "=r" ( discard_size ),
 				 "=r" ( discard_value_i ),
+				 "=@cccs" ( carry ),
 				 "+m" ( *value )
-			       : "0" ( value0 ), "1" ( size )
-			       : "cc" );
+			       : "0" ( value0 ), "1" ( size ) );
+	return carry;
 }
 
 /**
@@ -151,30 +154,32 @@ bigint_shl_raw ( uint64_t *value0, unsigned int size ) {
  *
  * @v value0		Element 0 of big integer
  * @v size		Number of elements
+ * @ret out		Bit shifted out
  */
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 bigint_shr_raw ( uint64_t *value0, unsigned int size ) {
 	bigint_t ( size ) __attribute__ (( may_alias )) *value =
 		( ( void * ) value0 );
 	uint64_t *discard_value;
-	uint64_t discard_value_i;
-	uint64_t discard_value_j;
+	uint64_t discard_high;
 	unsigned int discard_size;
+	uint64_t low;
 
-	__asm__ __volatile__ ( "mov %3, #0\n\t"
+	__asm__ __volatile__ ( "mov %2, #0\n\t"
 			       "\n1:\n\t"
 			       "sub %w1, %w1, #1\n\t"
-			       "ldr %2, [%0, %1, lsl #3]\n\t"
-			       "extr %3, %3, %2, #1\n\t"
-			       "str %3, [%0, %1, lsl #3]\n\t"
-			       "mov %3, %2\n\t"
+			       "ldr %3, [%0, %1, lsl #3]\n\t"
+			       "extr %2, %2, %3, #1\n\t"
+			       "str %2, [%0, %1, lsl #3]\n\t"
+			       "mov %2, %3\n\t"
 			       "cbnz %w1, 1b\n\t"
 			       : "=r" ( discard_value ),
 				 "=r" ( discard_size ),
-				 "=r" ( discard_value_i ),
-				 "=r" ( discard_value_j ),
+				 "=r" ( discard_high ),
+				 "=r" ( low ),
 				 "+m" ( *value )
 			       : "0" ( value0 ), "1" ( size ) );
+	return ( low & 1 );
 }
 
 /**

@@ -118,7 +118,8 @@ pod2usage ( 1 ) unless @ARGV == 1;
 my $edktop = shift;
 
 # Identify edk import directories
-my $edkdirs = [ "MdePkg/Include", "MdeModulePkg/Include" ];
+my $edkdirs = [ "MdePkg/Include", "MdeModulePkg/Include",
+		"NetworkPkg/Include" ];
 foreach my $edkdir ( @$edkdirs ) {
   die "Directory \"$edktop\" does not appear to contain the EFI EDK2 "
       ."(missing \"$edkdir\")\n" unless -d catdir ( $edktop, $edkdir );

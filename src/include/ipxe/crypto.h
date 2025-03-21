@@ -184,7 +184,9 @@ struct pubkey_algorithm {
 struct elliptic_curve {
 	/** Curve name */
 	const char *name;
-	/** Key size */
+	/** Point (and public key) size */
+	size_t pointsize;
+	/** Scalar (and private key) size */
 	size_t keysize;
 	/** Multiply scalar by curve point
 	 *

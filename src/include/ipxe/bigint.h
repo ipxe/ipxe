@@ -41,6 +41,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	( sizeof ( *(bigint) ) / sizeof ( (bigint)->element[0] ) )
 
 /**
+ * Transcribe big integer (for debugging)
+ *
+ * @v value		Big integer to be transcribed
+ * @ret string		Big integer in string form (may be abbreviated)
+ */
+#define bigint_ntoa( value ) ( {					\
+	unsigned int size = bigint_size (value);			\
+	bigint_ntoa_raw ( (value)->element, size );			\
+	} )
+
+/**
  * Initialise big integer
  *
  * @v value		Big integer to initialise
@@ -94,21 +105,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Shift big integer left
  *
  * @v value		Big integer
+ * @ret out		Bit shifted out
  */
-#define bigint_shl( value ) do {					\
+#define bigint_shl( value ) ( {						\
 	unsigned int size = bigint_size (value);			\
 	bigint_shl_raw ( (value)->element, size );			\
-	} while ( 0 )
+	} )
 
 /**
  * Shift big integer right
  *
  * @v value		Big integer
+ * @ret out		Bit shifted out
  */
-#define bigint_shr( value ) do {					\
+#define bigint_shr( value ) ( {						\
 	unsigned int size = bigint_size (value);			\
 	bigint_shr_raw ( (value)->element, size );			\
-	} while ( 0 )
+	} )
 
 /**
  * Test if big integer is equal to zero
@@ -132,6 +145,28 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	unsigned int size = bigint_size (value);			\
 	bigint_is_geq_raw ( (value)->element, (reference)->element,	\
 			    size ); } )
+
+/**
+ * Set bit in big integer
+ *
+ * @v value		Big integer
+ * @v bit		Bit to set
+ */
+#define bigint_set_bit( value, bit ) do {				\
+	unsigned int size = bigint_size (value);			\
+	bigint_set_bit_raw ( (value)->element, size, bit );		\
+	} while ( 0 )
+
+/**
+ * Clear bit in big integer
+ *
+ * @v value		Big integer
+ * @v bit		Bit to set
+ */
+#define bigint_clear_bit( value, bit ) do {				\
+	unsigned int size = bigint_size (value);			\
+	bigint_clear_bit_raw ( (value)->element, size, bit );		\
+	} while ( 0 )
 
 /**
  * Test if bit is set in big integer
@@ -230,15 +265,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} while ( 0 )
 
 /**
- * Reduce big integer
+ * Reduce big integer R^2 modulo N
  *
  * @v modulus		Big integer modulus
- * @v value		Big integer to be reduced
+ * @v result		Big integer to hold result
  */
-#define bigint_reduce( modulus, value ) do {	\
-		unsigned int size = bigint_size (modulus);		\
-		bigint_reduce_raw ( (modulus)->element,			\
-				    (value)->element, size );		\
+#define bigint_reduce( modulus, result ) do {				\
+	unsigned int size = bigint_size (modulus);			\
+	bigint_reduce_raw ( (modulus)->element, (result)->element,	\
+			    size );					\
 	} while ( 0 )
 
 /**
@@ -254,20 +289,49 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} while ( 0 )
 
 /**
- * Perform Montgomery reduction (REDC) of a big integer product
+ * Perform relaxed Montgomery reduction (REDC) of a big integer
  *
- * @v modulus		Big integer modulus
- * @v modinv		Big integer inverse of the modulus modulo 2^k
- * @v mont		Big integer Montgomery product
+ * @v modulus		Big integer odd modulus
+ * @v value		Big integer to be reduced
  * @v result		Big integer to hold result
- *
- * Note that the Montgomery product will be overwritten.
+ * @ret carry		Carry out
  */
-#define bigint_montgomery( modulus, modinv, mont, result ) do {		\
+#define bigint_montgomery_relaxed( modulus, value, result ) ( {		\
 	unsigned int size = bigint_size (modulus);			\
-	bigint_montgomery_raw ( (modulus)->element, (modinv)->element,	\
-				(mont)->element, (result)->element,	\
-				size );					\
+	bigint_montgomery_relaxed_raw ( (modulus)->element,		\
+					(value)->element,		\
+					(result)->element, size );	\
+	} )
+
+/**
+ * Perform classic Montgomery reduction (REDC) of a big integer
+ *
+ * @v modulus		Big integer odd modulus
+ * @v value		Big integer to be reduced
+ * @v result		Big integer to hold result
+ */
+#define bigint_montgomery( modulus, value, result ) do {		\
+	unsigned int size = bigint_size (modulus);			\
+	bigint_montgomery_raw ( (modulus)->element, (value)->element,	\
+				(result)->element, size );		\
+	} while ( 0 )
+
+/**
+ * Perform generalised exponentiation via a Montgomery ladder
+ *
+ * @v result		Big integer result (initialised to identity element)
+ * @v multiple		Big integer multiple (initialised to generator)
+ * @v exponent		Big integer exponent
+ * @v op		Montgomery ladder commutative operation
+ * @v ctx		Operation context (if needed)
+ * @v tmp		Temporary working space (if needed)
+ */
+#define bigint_ladder( result, multiple, exponent, op, ctx, tmp ) do {	\
+	unsigned int size = bigint_size (result);			\
+	unsigned int exponent_size = bigint_size (exponent);		\
+	bigint_ladder_raw ( (result)->element, (multiple)->element,	\
+			    size, (exponent)->element, exponent_size,	\
+			    (op), (ctx), (tmp) );			\
 	} while ( 0 )
 
 /**
@@ -300,6 +364,56 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	} ); } )
 
 #include <bits/bigint.h>
+
+/**
+ * A big integer Montgomery ladder commutative operation
+ *
+ * @v operand		Element 0 of first input operand (may overlap result)
+ * @v result		Element 0 of second input operand and result
+ * @v size		Number of elements in operands and result
+ * @v ctx		Operation context (if needed)
+ * @v tmp		Temporary working space (if needed)
+ */
+typedef void ( bigint_ladder_op_t ) ( const bigint_element_t *operand0,
+				      bigint_element_t *result0,
+				      unsigned int size, const void *ctx,
+				      void *tmp );
+
+/**
+ * Set bit in big integer
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @v bit		Bit to set
+ */
+static inline __attribute__ (( always_inline )) void
+bigint_set_bit_raw ( bigint_element_t *value0, unsigned int size,
+		     unsigned int bit ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
+	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
+
+	value->element[index] |= ( 1UL << subindex );
+}
+
+/**
+ * Clear bit in big integer
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @v bit		Bit to clear
+ */
+static inline __attribute__ (( always_inline )) void
+bigint_clear_bit_raw ( bigint_element_t *value0, unsigned int size,
+		       unsigned int bit ) {
+	bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( void * ) value0 );
+	unsigned int index = ( bit / ( 8 * sizeof ( value->element[0] ) ) );
+	unsigned int subindex = ( bit % ( 8 * sizeof ( value->element[0] ) ) );
+
+	value->element[index] &= ~( 1UL << subindex );
+}
 
 /**
  * Test if bit is set in big integer
@@ -337,6 +451,8 @@ bigint_msb_is_set_raw ( const bigint_element_t *value0, unsigned int size ) {
 	return ( !! ( value->element[index] & ( 1UL << subindex ) ) );
 }
 
+const char * bigint_ntoa_raw ( const bigint_element_t *value0,
+			       unsigned int size );
 void bigint_init_raw ( bigint_element_t *value0, unsigned int size,
 		       const void *data, size_t len );
 void bigint_done_raw ( const bigint_element_t *value0, unsigned int size,
@@ -345,8 +461,8 @@ int bigint_add_raw ( const bigint_element_t *addend0,
 		     bigint_element_t *value0, unsigned int size );
 int bigint_subtract_raw ( const bigint_element_t *subtrahend0,
 			  bigint_element_t *value0, unsigned int size );
-void bigint_shl_raw ( bigint_element_t *value0, unsigned int size );
-void bigint_shr_raw ( bigint_element_t *value0, unsigned int size );
+int bigint_shl_raw ( bigint_element_t *value0, unsigned int size );
+int bigint_shr_raw ( bigint_element_t *value0, unsigned int size );
 int bigint_is_zero_raw ( const bigint_element_t *value0, unsigned int size );
 int bigint_is_geq_raw ( const bigint_element_t *value0,
 			const bigint_element_t *reference0,
@@ -372,14 +488,25 @@ void bigint_multiply_raw ( const bigint_element_t *multiplicand0,
 			   const bigint_element_t *multiplier0,
 			   unsigned int multiplier_size,
 			   bigint_element_t *result0 );
-void bigint_reduce_raw ( bigint_element_t *modulus0, bigint_element_t *value0,
-			 unsigned int size );
+void bigint_reduce_raw ( const bigint_element_t *modulus0,
+			 bigint_element_t *result0, unsigned int size );
 void bigint_mod_invert_raw ( const bigint_element_t *invertend0,
 			     bigint_element_t *inverse0, unsigned int size );
+int bigint_montgomery_relaxed_raw ( const bigint_element_t *modulus0,
+				    bigint_element_t *value0,
+				    bigint_element_t *result0,
+				    unsigned int size );
 void bigint_montgomery_raw ( const bigint_element_t *modulus0,
-			     const bigint_element_t *modinv0,
-			     bigint_element_t *mont0,
+			     bigint_element_t *value0,
 			     bigint_element_t *result0, unsigned int size );
+void bigint_ladder_raw ( bigint_element_t *result0,
+			 bigint_element_t *multiple0, unsigned int size,
+			 const bigint_element_t *exponent0,
+			 unsigned int exponent_size, bigint_ladder_op_t *op,
+			 const void *ctx, void *tmp );
+void bigint_mod_exp_ladder ( const bigint_element_t *multiplier0,
+			     bigint_element_t *result0, unsigned int size,
+			     const void *ctx, void *tmp );
 void bigint_mod_exp_raw ( const bigint_element_t *base0,
 			  const bigint_element_t *modulus0,
 			  const bigint_element_t *exponent0,

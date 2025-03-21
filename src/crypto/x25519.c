@@ -839,6 +839,7 @@ static int x25519_curve_multiply ( const void *base, const void *scalar,
 /** X25519 elliptic curve */
 struct elliptic_curve x25519_curve = {
 	.name = "x25519",
+	.pointsize = sizeof ( struct x25519_value ),
 	.keysize = sizeof ( struct x25519_value ),
 	.multiply = x25519_curve_multiply,
 };

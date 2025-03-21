@@ -127,6 +127,12 @@ struct asn1_builder_header {
 #define ASN1_OID_TRIPLE( value ) \
 	( 0x80 | ( ( (value) >> 14 ) & 0x7f ) ), ASN1_OID_DOUBLE ( (value) )
 
+/** ASN.1 OID for prime256v1 (1.2.840.10045.3.1.7) */
+#define ASN1_OID_PRIME256V1					\
+	ASN1_OID_INITIAL ( 1, 1 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 3 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 7 )
+
 /** ASN.1 OID for rsaEncryption (1.2.840.113549.1.1.1) */
 #define ASN1_OID_RSAENCRYPTION					\
 	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
@@ -191,6 +197,11 @@ struct asn1_builder_header {
 #define ASN1_OID_X25519						\
 	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_SINGLE ( 101 ),	\
 	ASN1_OID_SINGLE ( 110 )
+
+/** ASN.1 OID for secp384r1 (1.3.132.0.34) */
+#define ASN1_OID_SECP384R1					\
+	ASN1_OID_INITIAL ( 1, 3 ), ASN1_OID_DOUBLE ( 132 ),	\
+	ASN1_OID_SINGLE ( 0 ), ASN1_OID_SINGLE ( 34 )
 
 /** ASN.1 OID for id-aes128-cbc (2.16.840.1.101.3.4.1.2) */
 #define ASN1_OID_AES128_CBC					\

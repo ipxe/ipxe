@@ -1840,7 +1840,7 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 		req->page_size   = LM_PAGE_BITS ( 8 );
 		req->int_mode    = RING_ALLOC_REQ_INT_MODE_POLL;
 		req->length 	 = ( u32 )bp->tx.ring_cnt;
-		req->queue_id    = TX_RING_QID;
+		req->queue_id    = ( u16 )bp->queue_id;
 		req->stat_ctx_id = ( u32 )bp->stat_ctx_id;
 		req->cmpl_ring_id  = bp->cq_ring_id;
 		req->page_tbl_addr = virt_to_bus ( bp->tx.bd_virt );

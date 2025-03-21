@@ -34,13 +34,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <ipxe/cpio.h>
 
+/** CPIO default file mode */
+#define CPIO_DEFAULT_MODE 0644
+
+/** CPIO directory mode */
+#define CPIO_DEFAULT_DIR_MODE 0755
+
 /**
  * Set field within a CPIO header
  *
  * @v field		Field within CPIO header
  * @v value		Value to set
  */
-void cpio_set_field ( char *field, unsigned long value ) {
+static void cpio_set_field ( char *field, unsigned long value ) {
 	char buf[9];
 
 	snprintf ( buf, sizeof ( buf ), "%08lx", value );
@@ -48,23 +54,53 @@ void cpio_set_field ( char *field, unsigned long value ) {
 }
 
 /**
- * Get CPIO image filename
+ * Get maximum number of CPIO headers (i.e. number of path components)
  *
  * @v image		Image
- * @ret len		CPIO filename length (0 for no filename)
+ * @ret max		Maximum number of CPIO headers
  */
-size_t cpio_name_len ( struct image *image ) {
+static unsigned int cpio_max ( struct image *image ) {
 	const char *name = cpio_name ( image );
-	char *sep;
-	size_t len;
+	unsigned int max = 0;
+	char c;
+	char p;
 
 	/* Check for existence of CPIO filename */
 	if ( ! name )
 		return 0;
 
-	/* Locate separator (if any) */
-	sep = strchr ( name, ' ' );
-	len = ( sep ? ( ( size_t ) ( sep - name ) ) : strlen ( name ) );
+	/* Count number of path components */
+	for ( p = '/' ; ( ( ( c = *(name++) ) ) && ( c != ' ' ) ) ; p = c ) {
+		if ( ( p == '/' ) && ( c != '/' ) )
+			max++;
+	}
+
+	return max;
+}
+
+/**
+ * Get CPIO image filename
+ *
+ * @v image		Image
+ * @v depth		Path depth
+ * @ret len		Filename length
+ */
+static size_t cpio_name_len ( struct image *image, unsigned int depth ) {
+	const char *name = cpio_name ( image );
+	size_t len;
+	char c;
+	char p;
+
+	/* Sanity checks */
+	assert ( name != NULL );
+	assert ( depth > 0 );
+
+	/* Calculate length up to specified path depth */
+	for ( len = 0, p = '/' ; ( ( ( c = name[len] ) ) && ( c != ' ' ) ) ;
+	      len++, p = c ) {
+		if ( ( c == '/' ) && ( p != '/' ) && ( --depth == 0 ) )
+			break;
+	}
 
 	return len;
 }
@@ -73,55 +109,99 @@ size_t cpio_name_len ( struct image *image ) {
  * Parse CPIO image parameters
  *
  * @v image		Image
- * @v cpio		CPIO header to fill in
+ * @v mode		Mode to fill in
+ * @v count		Number of CPIO headers to fill in
  */
-static void cpio_parse_cmdline ( struct image *image,
-				 struct cpio_header *cpio ) {
+static void cpio_parse_cmdline ( struct image *image, unsigned int *mode,
+				 unsigned int *count ) {
 	const char *arg;
 	char *end;
-	unsigned int mode;
 
-	/* Look for "mode=" */
+	/* Set default values */
+	*mode = CPIO_DEFAULT_MODE;
+	*count = 1;
+
+	/* Parse "mode=...", if present */
 	if ( ( arg = image_argument ( image, "mode=" ) ) ) {
-		mode = strtoul ( arg, &end, 8 /* Octal for file mode */ );
+		*mode = strtoul ( arg, &end, 8 /* Octal for file mode */ );
 		if ( *end && ( *end != ' ' ) ) {
 			DBGC ( image, "CPIO %p strange \"mode=\" "
 			       "terminator '%c'\n", image, *end );
 		}
-		cpio_set_field ( cpio->c_mode, ( 0100000 | mode ) );
 	}
+
+	/* Parse "mkdir=...", if present */
+	if ( ( arg = image_argument ( image, "mkdir=" ) ) ) {
+		*count += strtoul ( arg, &end, 10 );
+		if ( *end && ( *end != ' ' ) ) {
+			DBGC ( image, "CPIO %p strange \"mkdir=\" "
+			       "terminator '%c'\n", image, *end );
+		}
+	}
+
+	/* Allow "mkdir=-1" to request creation of full directory tree */
+	if ( ! *count )
+		*count = -1U;
 }
 
 /**
  * Construct CPIO header for image, if applicable
  *
  * @v image		Image
+ * @v index		CPIO header index
  * @v cpio		CPIO header to fill in
- * @ret len		Length of magic CPIO header (including filename)
+ * @ret len		Length of CPIO header (including name, excluding NUL)
  */
-size_t cpio_header ( struct image *image, struct cpio_header *cpio ) {
+size_t cpio_header ( struct image *image, unsigned int index,
+		     struct cpio_header *cpio ) {
+	const char *name = cpio_name ( image );
+	unsigned int mode;
+	unsigned int count;
+	unsigned int max;
+	unsigned int depth;
+	unsigned int i;
 	size_t name_len;
 	size_t len;
 
-	/* Get filename length */
-	name_len = cpio_name_len ( image );
+	/* Parse command line arguments */
+	cpio_parse_cmdline ( image, &mode, &count );
 
-	/* Images with no filename are assumed to already be CPIO archives */
-	if ( ! name_len )
+	/* Determine number of CPIO headers to be constructed */
+	max = cpio_max ( image );
+	if ( count > max )
+		count = max;
+
+	/* Determine path depth of this CPIO header */
+	if ( index >= count )
 		return 0;
+	depth = ( max - count + index + 1 );
+
+	/* Get filename length */
+	name_len = cpio_name_len ( image, depth );
+
+	/* Set directory mode or file mode as appropriate */
+	if ( name[name_len] == '/' ) {
+		mode = ( CPIO_MODE_DIR | CPIO_DEFAULT_DIR_MODE );
+	} else {
+		mode |= CPIO_MODE_FILE;
+	}
+
+	/* Set length on final header */
+	len = ( ( depth < max ) ? 0 : image->len );
 
 	/* Construct CPIO header */
 	memset ( cpio, '0', sizeof ( *cpio ) );
 	memcpy ( cpio->c_magic, CPIO_MAGIC, sizeof ( cpio->c_magic ) );
-	cpio_set_field ( cpio->c_mode, 0100644 );
+	cpio_set_field ( cpio->c_mode, mode );
 	cpio_set_field ( cpio->c_nlink, 1 );
-	cpio_set_field ( cpio->c_filesize, image->len );
+	cpio_set_field ( cpio->c_filesize, len );
 	cpio_set_field ( cpio->c_namesize, ( name_len + 1 /* NUL */ ) );
-	cpio_parse_cmdline ( image, cpio );
+	DBGC ( image, "CPIO %s %d/%d \"", image->name, depth, max );
+	for ( i = 0 ; i < name_len ; i++ )
+		DBGC ( image, "%c", name[i] );
+	DBGC ( image, "\"\n" );
+	DBGC2_HDA ( image, 0, cpio, sizeof ( *cpio ) );
 
 	/* Calculate total length */
-	len = ( ( sizeof ( *cpio ) + name_len + 1 /* NUL */ + CPIO_ALIGN - 1 )
-		& ~( CPIO_ALIGN - 1 ) );
-
-	return len;
+	return ( sizeof ( *cpio ) + name_len );
 }

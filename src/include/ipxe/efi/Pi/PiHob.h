@@ -5,7 +5,7 @@ Copyright (c) 2006 - 2017, Intel Corporation. All rights reserved.<BR>
 SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
-  PI Version 1.6
+  PI Version 1.9
 
 **/
 
@@ -234,16 +234,8 @@ typedef UINT32 EFI_RESOURCE_TYPE;
 #define EFI_RESOURCE_MEMORY_MAPPED_IO_PORT  0x00000004
 #define EFI_RESOURCE_MEMORY_RESERVED        0x00000005
 #define EFI_RESOURCE_IO_RESERVED            0x00000006
-//
-// BZ3937_EFI_RESOURCE_MEMORY_UNACCEPTED is defined for unaccepted memory.
-// But this defitinion has not been officially in the PI spec. Base
-// on the code-first we define BZ3937_EFI_RESOURCE_MEMORY_UNACCEPTED at
-// MdeModulePkg/Include/Pi/PrePiHob.h and update EFI_RESOURCE_MAX_MEMORY_TYPE
-// to 8. After BZ3937_EFI_RESOURCE_MEMORY_UNACCEPTED is officially published
-// in PI spec, we will re-visit here.
-//
-// #define BZ3937_EFI_RESOURCE_MEMORY_UNACCEPTED      0x00000007
-#define EFI_RESOURCE_MAX_MEMORY_TYPE  0x00000008
+#define EFI_RESOURCE_MEMORY_UNACCEPTED      0x00000007
+#define EFI_RESOURCE_MAX_MEMORY_TYPE        0x00000008
 
 ///
 /// A type of recount attribute type.
@@ -299,6 +291,9 @@ typedef UINT32 EFI_RESOURCE_ATTRIBUTE_TYPE;
 #define EFI_RESOURCE_ATTRIBUTE_READ_ONLY_PROTECTED    0x00040000
 #define EFI_RESOURCE_ATTRIBUTE_READ_ONLY_PROTECTABLE  0x00080000
 
+#define EFI_RESOURCE_ATTRIBUTE_ENCRYPTED        0x04000000
+#define EFI_RESOURCE_ATTRIBUTE_SPECIAL_PURPOSE  0x08000000
+#define EFI_RESOURCE_ATTRIBUTE_HOT_PLUGGABLE    0x10000000
 //
 // Physical memory relative reliability attribute. This
 // memory provides higher reliability relative to other
