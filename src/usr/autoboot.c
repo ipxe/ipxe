@@ -637,3 +637,6 @@ int ipxe ( struct net_device *netdev ) {
 		}
 	}
 }
+
+PROVIDE_REQUIRING_SYMBOL();
+REQUIRE_OBJECT ( config_main );
