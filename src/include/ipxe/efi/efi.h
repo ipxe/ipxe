@@ -389,5 +389,17 @@ extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
 extern void efi_raise_tpl ( struct efi_saved_tpl *tpl );
 extern void efi_restore_tpl ( struct efi_saved_tpl *tpl );
+extern int efi_open ( EFI_HANDLE handle, EFI_GUID *protocol,
+		      void **interface );
+extern int efi_open_unsafe ( EFI_HANDLE handle, EFI_GUID *protocol,
+			     void **interface );
+extern void efi_close_unsafe ( EFI_HANDLE handle, EFI_GUID *protocol );
+extern int efi_open_by_driver ( EFI_HANDLE handle, EFI_GUID *protocol,
+				void **interface );
+extern void efi_close_by_driver ( EFI_HANDLE handle, EFI_GUID *protocol );
+extern int efi_open_by_child ( EFI_HANDLE handle, EFI_GUID *protocol,
+			       EFI_HANDLE child, void **interface );
+extern void efi_close_by_child ( EFI_HANDLE handle, EFI_GUID *protocol,
+				 EFI_HANDLE child );
 
 #endif /* _IPXE_EFI_H */
