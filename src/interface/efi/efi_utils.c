@@ -170,8 +170,8 @@ void efi_child_del ( EFI_HANDLE parent, EFI_HANDLE child ) {
  * @v dev		Generic device to fill in
  * @ret rc		Return status code
  */
-static int efi_pci_info ( EFI_HANDLE device, const char *prefix,
-			  struct device *dev ) {
+static int efi_device_info_pci ( EFI_HANDLE device, const char *prefix,
+				 struct device *dev ) {
 	EFI_HANDLE pci_device;
 	struct efi_pci_device efipci;
 	int rc;
@@ -211,7 +211,7 @@ void efi_device_info ( EFI_HANDLE device, const char *prefix,
 	int rc;
 
 	/* Try getting underlying PCI device information */
-	if ( ( rc = efi_pci_info ( device, prefix, dev ) ) == 0 )
+	if ( ( rc = efi_device_info_pci ( device, prefix, dev ) ) == 0 )
 		return;
 
 	/* If we cannot get any underlying device information, fall
