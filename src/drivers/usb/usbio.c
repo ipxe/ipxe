@@ -1291,7 +1291,6 @@ static struct usb_host_operations usbio_operations = {
  * @ret rc		Return status code
  */
 static int usbio_supported ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_USB_DEVICE_DESCRIPTOR device;
 	EFI_USB_INTERFACE_DESCRIPTOR interface;
 	struct usb_function_descriptor desc;
@@ -1305,14 +1304,11 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 	int rc;
 
 	/* Get protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle, &efi_usb_io_protocol_guid,
-					  &usb.interface, efi_image_handle,
-					  handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_usb_io_protocol_guid,
+			       &usb.interface ) ) != 0 ) {
 		DBGCP ( handle, "USB %s is not a USB device\n",
 			efi_handle_name ( handle ) );
-		goto err_open_protocol;
+		return rc;
 	}
 
 	/* Get device descriptor */
@@ -1321,7 +1317,7 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 		rc = -EEFI ( efirc );
 		DBGC ( handle, "USB %s could not get device descriptor: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
-		goto err_get_device_descriptor;
+		return rc;
 	}
 	memset ( &desc, 0, sizeof ( desc ) );
 	desc.vendor = device.IdVendor;
@@ -1333,7 +1329,7 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 		rc = -EEFI ( efirc );
 		DBGC ( handle, "USB %s could not get interface descriptor: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
-		goto err_get_interface_descriptor;
+		return rc;
 	}
 	desc.class.class.class = interface.InterfaceClass;
 	desc.class.class.subclass = interface.InterfaceSubClass;
@@ -1341,21 +1337,10 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 
 	/* Look for a driver for this interface */
 	driver = usb_find_driver ( &desc, &id );
-	if ( ! driver ) {
-		rc = -ENOTSUP;
-		goto err_unsupported;
-	}
+	if ( ! driver )
+		return -ENOTSUP;
 
-	/* Success */
-	rc = 0;
-
- err_unsupported:
- err_get_interface_descriptor:
- err_get_device_descriptor:
-	bs->CloseProtocol ( handle, &efi_usb_io_protocol_guid,
-			    efi_image_handle, handle );
- err_open_protocol:
-	return rc;
+	return 0;
 }
 
 /**
@@ -1471,7 +1456,6 @@ static int usbio_config ( struct usbio_device *usbio ) {
  * @ret rc		Return status code
  */
 static int usbio_path ( struct usbio_device *usbio ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE handle = usbio->handle;
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_DEVICE_PATH_PROTOCOL *end;
@@ -1481,19 +1465,14 @@ static int usbio_path ( struct usbio_device *usbio ) {
 		EFI_DEVICE_PATH_PROTOCOL *path;
 	} u;
 	size_t len;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Open device path protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle,
-					  &efi_device_path_protocol_guid,
-					  &u.interface, efi_image_handle,
-					  handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_device_path_protocol_guid,
+			       &u.interface ) ) != 0 ) {
 		DBGC ( usbio, "USBIO %s cannot open device path protocol: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
-		goto err_open_protocol;
+		return rc;
 	}
 	path = u.interface;
 
@@ -1502,8 +1481,7 @@ static int usbio_path ( struct usbio_device *usbio ) {
 	if ( len < sizeof ( *usbpath ) ) {
 		DBGC ( usbio, "USBIO %s underlength device path\n",
 		       efi_handle_name ( handle ) );
-		rc = -EINVAL;
-		goto err_underlength;
+		return -EINVAL;
 	}
 	usbpath = ( ( ( void * ) path ) + len - sizeof ( *usbpath ) );
 	if ( ! ( ( usbpath->Header.Type == MESSAGING_DEVICE_PATH ) &&
@@ -1511,34 +1489,18 @@ static int usbio_path ( struct usbio_device *usbio ) {
 		DBGC ( usbio, "USBIO %s not a USB device path: ",
 		       efi_handle_name ( handle ) );
 		DBGC ( usbio, "%s\n", efi_devpath_text ( path ) );
-		rc = -EINVAL;
-		goto err_non_usb;
+		return -EINVAL;
 	}
 
 	/* Allocate copy of device path */
 	usbio->path = malloc ( len + sizeof ( *end ) );
-	if ( ! usbio->path ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
+	if ( ! usbio->path )
+		return -ENOMEM;
 	memcpy ( usbio->path, path, ( len + sizeof ( *end ) ) );
 	usbio->usbpath = ( ( ( void * ) usbio->path ) + len -
 			   sizeof ( *usbpath ) );
 
-	/* Close protocol */
-	bs->CloseProtocol ( handle, &efi_device_path_protocol_guid,
-			    efi_image_handle, handle );
-
 	return 0;
-
-	free ( usbio->path );
- err_alloc:
- err_non_usb:
- err_underlength:
-	bs->CloseProtocol ( handle, &efi_device_path_protocol_guid,
-			    efi_image_handle, handle );
- err_open_protocol:
-	return rc;
 }
 
 /**

@@ -48,23 +48,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 int efi_set_autoboot_ll_addr ( EFI_HANDLE device,
 			       EFI_DEVICE_PATH_PROTOCOL *path ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_SIMPLE_NETWORK_PROTOCOL *snp;
 		void *interface;
 	} snp;
 	EFI_SIMPLE_NETWORK_MODE *mode;
-	EFI_STATUS efirc;
 	unsigned int vlan;
 	int rc;
 
 	/* Look for an SNP instance on the image's device handle */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_simple_network_protocol_guid,
-					  &snp.interface, efi_image_handle,
-					  NULL,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( device, &efi_simple_network_protocol_guid,
+			       &snp.interface ) ) != 0 ) {
 		DBGC ( device, "EFI %s has no SNP instance: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
@@ -89,10 +83,6 @@ int efi_set_autoboot_ll_addr ( EFI_HANDLE device,
 		DBGC ( device, "EFI %s configured automatic VLAN %d\n",
 		       efi_handle_name ( device ), vlan );
 	}
-
-	/* Close protocol */
-	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
-			    efi_image_handle, NULL );
 
 	return 0;
 }

@@ -56,12 +56,8 @@ int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
 	int rc;
 
 	/* Get device path */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_device_path_protocol_guid,
-					  &u.interface,
-					  efi_image_handle, device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( device, &efi_device_path_protocol_guid,
+			       &u.interface ) ) != 0 ) {
 		DBGC ( device, "EFIDEV %s cannot open device path: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open_device_path;
@@ -100,14 +96,9 @@ int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
 		efi_path_terminate ( end );
 	}
 
-	/* Success */
-	rc = 0;
-
  err_locate_protocol:
 	free ( path );
  err_alloc_path:
-	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-			    efi_image_handle, device );
  err_open_device_path:
 	return rc;
 }

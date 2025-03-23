@@ -248,20 +248,15 @@ static int efi_prescroll ( unsigned int lines ) {
  * @v handle		Image handle
  */
 static void efi_dump_image ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_LOADED_IMAGE_PROTOCOL *image;
 		void *intf;
 	} loaded;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Open loaded image protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle,
-					  &efi_loaded_image_protocol_guid,
-					  &loaded.intf, efi_image_handle, NULL,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_loaded_image_protocol_guid,
+			       &loaded.intf ) ) != 0 ) {
 		DBGC ( colour, "WRAP %s could not get loaded image protocol: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
 		return;
@@ -277,10 +272,6 @@ static void efi_dump_image ( EFI_HANDLE handle ) {
 	DBGC ( colour, " %s\n", efi_handle_name ( loaded.image->DeviceHandle ));
 	DBGC ( colour, "WRAP %s file", efi_handle_name ( handle ) );
 	DBGC ( colour, " %s\n", efi_devpath_text ( loaded.image->FilePath ) );
-
-	/* Close loaded image protocol */
-	bs->CloseProtocol ( handle, &efi_loaded_image_protocol_guid,
-			    efi_image_handle, NULL );
 }
 
 /**

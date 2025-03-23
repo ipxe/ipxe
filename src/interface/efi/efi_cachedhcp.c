@@ -46,38 +46,31 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 int efi_cachedhcp_record ( EFI_HANDLE device,
 			   EFI_DEVICE_PATH_PROTOCOL *path ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	unsigned int vlan;
 	union {
 		EFI_PXE_BASE_CODE_PROTOCOL *pxe;
 		void *interface;
 	} pxe;
 	EFI_PXE_BASE_CODE_MODE *mode;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Get VLAN tag, if any */
 	vlan = efi_path_vlan ( path );
 
 	/* Look for a PXE base code instance on the image's device handle */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_pxe_base_code_protocol_guid,
-					  &pxe.interface, efi_image_handle,
-					  NULL,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( device, &efi_pxe_base_code_protocol_guid,
+			       &pxe.interface ) ) != 0 ) {
 		DBGC ( device, "EFI %s has no PXE base code instance: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_open;
+		return rc;
 	}
 
 	/* Do not attempt to cache IPv6 packets */
 	mode = pxe.pxe->Mode;
 	if ( mode->UsingIpv6 ) {
-		rc = -ENOTSUP;
 		DBGC ( device, "EFI %s has IPv6 PXE base code\n",
 		       efi_handle_name ( device ) );
-		goto err_ipv6;
+		return -ENOTSUP;
 	}
 
 	/* Record DHCPACK, if present */
@@ -87,7 +80,7 @@ int efi_cachedhcp_record ( EFI_HANDLE device,
 					 sizeof ( mode->DhcpAck ) ) ) != 0 ) ) {
 		DBGC ( device, "EFI %s could not record DHCPACK: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_dhcpack;
+		return rc;
 	}
 
 	/* Record ProxyDHCPOFFER, if present */
@@ -97,7 +90,7 @@ int efi_cachedhcp_record ( EFI_HANDLE device,
 					 sizeof ( mode->ProxyOffer ) ) ) != 0)){
 		DBGC ( device, "EFI %s could not record ProxyDHCPOFFER: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_proxydhcp;
+		return rc;
 	}
 
 	/* Record PxeBSACK, if present */
@@ -107,18 +100,8 @@ int efi_cachedhcp_record ( EFI_HANDLE device,
 					 sizeof ( mode->PxeReply ) ) ) != 0)){
 		DBGC ( device, "EFI %s could not record PXEBSACK: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_pxebs;
+		return rc;
 	}
 
-	/* Success */
-	rc = 0;
-
- err_pxebs:
- err_proxydhcp:
- err_dhcpack:
- err_ipv6:
-	bs->CloseProtocol ( device, &efi_pxe_base_code_protocol_guid,
-			    efi_image_handle, NULL );
- err_open:
-	return rc;
+	return 0;
 }

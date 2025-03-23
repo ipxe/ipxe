@@ -68,7 +68,6 @@ static int efi_driver_disconnecting;
  * @ret efidev		EFI device, or NULL on error
  */
 struct efi_device * efidev_alloc ( EFI_HANDLE device ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_device *efidev = NULL;
 	union {
 		EFI_DEVICE_PATH_PROTOCOL *path;
@@ -76,26 +75,21 @@ struct efi_device * efidev_alloc ( EFI_HANDLE device ) {
 	} path;
 	EFI_DEVICE_PATH_PROTOCOL *path_end;
 	size_t path_len;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Open device path */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_device_path_protocol_guid,
-					  &path.interface, efi_image_handle,
-					  device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( device, &efi_device_path_protocol_guid,
+			       &path.interface ) ) != 0 ) {
 		DBGC ( device, "EFIDRV %s could not open device path: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_open_path;
+		return NULL;
 	}
 	path_len = ( efi_path_len ( path.path ) + sizeof ( *path_end ) );
 
 	/* Allocate and initialise structure */
 	efidev = zalloc ( sizeof ( *efidev ) + path_len );
 	if ( ! efidev )
-		goto err_alloc;
+		return NULL;
 	efidev->device = device;
 	efidev->dev.desc.bus_type = BUS_TYPE_EFI;
 	efidev->path = ( ( ( void * ) efidev ) + sizeof ( *efidev ) );
@@ -103,10 +97,6 @@ struct efi_device * efidev_alloc ( EFI_HANDLE device ) {
 	INIT_LIST_HEAD ( &efidev->dev.children );
 	list_add ( &efidev->dev.siblings, &efi_devices );
 
- err_alloc:
-	bs->CloseProtocol ( device, &efi_device_path_protocol_guid,
-			    efi_image_handle, device );
- err_open_path:
 	return efidev;
 }
 
@@ -375,21 +365,18 @@ static EFI_STATUS EFIAPI
 efi_driver_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
 			     EFI_HANDLE device, EFI_HANDLE child,
 			     CHAR8 *language, CHAR16 **controller_name ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_COMPONENT_NAME2_PROTOCOL *name2;
 		void *interface;
 	} name2;
-	EFI_STATUS efirc;
+	int rc;
 
 	/* Delegate to the EFI_COMPONENT_NAME2_PROTOCOL instance
 	 * installed on child handle, if present.
 	 */
 	if ( ( child != NULL ) &&
-	     ( ( efirc = bs->OpenProtocol (
-			  child, &efi_component_name2_protocol_guid,
-			  &name2.interface, NULL, NULL,
-			  EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) == 0 ) ) {
+	     ( ( rc = efi_open ( child, &efi_component_name2_protocol_guid,
+				 &name2.interface ) ) == 0 ) ) {
 		return name2.name2->GetControllerName ( name2.name2, device,
 							child, language,
 							controller_name );

@@ -518,8 +518,6 @@ static int efi_block_describe ( void ) {
  */
 static int efi_block_root ( unsigned int drive, EFI_HANDLE handle,
 			    EFI_FILE_PROTOCOL **root ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_GUID *protocol = &efi_simple_file_system_protocol_guid;
 	union {
 		EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs;
 		void *interface;
@@ -528,13 +526,11 @@ static int efi_block_root ( unsigned int drive, EFI_HANDLE handle,
 	int rc;
 
 	/* Open filesystem protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
-					  efi_image_handle, handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_simple_file_system_protocol_guid,
+			       &u.interface ) ) != 0 ) {
 		DBGC ( drive, "EFIBLK %#02x could not open %s filesystem: %s\n",
 		       drive, efi_handle_name ( handle ), strerror ( rc ) );
-		goto err_open;
+		return rc;
 	}
 
 	/* Open root volume */
@@ -542,16 +538,10 @@ static int efi_block_root ( unsigned int drive, EFI_HANDLE handle,
 		rc = -EEFI ( efirc );
 		DBGC ( drive, "EFIBLK %#02x could not open %s root: %s\n",
 		       drive, efi_handle_name ( handle ), strerror ( rc ) );
-		goto err_volume;
+		return rc;
 	}
 
-	/* Success */
-	rc = 0;
-
- err_volume:
-	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
- err_open:
-	return rc;
+	return 0;
 }
 
 /**
@@ -674,22 +664,17 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
 			     EFI_DEVICE_PATH_PROTOCOL *path,
 			     struct san_boot_config *config,
 			     EFI_DEVICE_PATH_PROTOCOL **fspath ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_GUID *protocol = &efi_device_path_protocol_guid;
 	union {
 		EFI_DEVICE_PATH_PROTOCOL *path;
 		void *interface;
 	} u;
 	EFI_FILE *root;
 	union uuid guid;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Identify device path */
-	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
-					  efi_image_handle, handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_device_path_protocol_guid,
+			       &u.interface ) ) != 0 ) {
 		DBGC ( drive, "EFIBLK %#02x could not open %s device path: "
 		       "%s\n", drive, efi_handle_name ( handle ),
 		       strerror ( rc ) );
@@ -758,7 +743,6 @@ static int efi_block_match ( unsigned int drive, EFI_HANDLE handle,
  err_wrong_guid:
  err_no_guid:
  err_not_child:
-	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
  err_open:
 	return rc;
 }
@@ -776,7 +760,6 @@ static int efi_block_scan ( unsigned int drive, EFI_HANDLE handle,
 			    struct san_boot_config *config,
 			    EFI_DEVICE_PATH_PROTOCOL **fspath ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_GUID *protocol = &efi_device_path_protocol_guid;
 	union {
 		EFI_DEVICE_PATH_PROTOCOL *path;
 		void *interface;
@@ -791,10 +774,8 @@ static int efi_block_scan ( unsigned int drive, EFI_HANDLE handle,
 	efi_block_connect ( drive, handle );
 
 	/* Identify device path */
-	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
-					  efi_image_handle, handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_device_path_protocol_guid,
+			       &u.interface ) ) != 0 ) {
 		DBGC ( drive, "EFIBLK %#02x could not open device path: %s\n",
 		       drive, strerror ( rc ) );
 		goto err_open;
@@ -824,7 +805,6 @@ static int efi_block_scan ( unsigned int drive, EFI_HANDLE handle,
 
 	bs->FreePool ( handles );
  err_locate:
-	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
  err_open:
 	return rc;
 }
@@ -921,52 +901,37 @@ static int efi_block_exec ( unsigned int drive,
  * equivalent functionality to BIOS drive numbers.
  */
 static int efi_block_local ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_GUID *protocol = &efi_block_io_protocol_guid;
 	struct san_device *sandev;
 	struct efi_block_data *block;
 	union {
 		EFI_BLOCK_IO_PROTOCOL *blockio;
 		void *interface;
 	} u;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Check if handle belongs to a SAN device */
 	for_each_sandev ( sandev ) {
 		block = sandev->priv;
-		if ( handle == block->handle ) {
-			rc = -ENOTTY;
-			goto err_sandev;
-		}
+		if ( handle == block->handle )
+			return -ENOTTY;
 	}
 
 	/* Open block I/O protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle, protocol, &u.interface,
-					  efi_image_handle, handle,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_block_io_protocol_guid,
+			       &u.interface ) ) != 0 ) {
 		DBGC ( handle, "EFIBLK %s could not open block I/O: %s\n",
 		       efi_handle_name ( handle ), strerror ( rc ) );
-		goto err_open;
+		return rc;
 	}
 
 	/* Do not assign drive numbers for partitions */
 	if ( u.blockio->Media->LogicalPartition ) {
-		rc = -ENOTTY;
 		DBGC2 ( handle, "EFLBLK %s is a partition\n",
 			efi_handle_name ( handle ) );
-		goto err_partition;
+		return -ENOTTY;
 	}
 
-	/* Success */
-	rc = 0;
-
- err_partition:
-	bs->CloseProtocol ( handle, protocol, efi_image_handle, handle );
- err_open:
- err_sandev:
-	return rc;
+	return 0;
 }
 
 /**

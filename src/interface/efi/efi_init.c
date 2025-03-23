@@ -263,13 +263,12 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	efi_cmdline_len = efi_loaded_image->LoadOptionsSize;
 
 	/* Get loaded image's device handle's device path */
-	if ( ( efirc = bs->OpenProtocol ( efi_loaded_image->DeviceHandle,
-				&efi_device_path_protocol_guid,
-				&device_path, image_handle, NULL,
-				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( efi_loaded_image->DeviceHandle,
+			       &efi_device_path_protocol_guid,
+			       &device_path ) ) != 0 ) {
 		DBGC ( systab, "EFI could not get loaded image's device path: "
 		       "%s", strerror ( rc ) );
+		efirc = EFIRC ( rc );
 		goto err_no_device_path;
 	}
 

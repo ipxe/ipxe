@@ -234,12 +234,9 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Get the loaded image protocol for the newly loaded image */
-	efirc = bs->OpenProtocol ( handle, &efi_loaded_image_protocol_guid,
-				   &loaded.interface, efi_image_handle,
-				   NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL );
-	if ( efirc ) {
+	if ( ( rc = efi_open (  handle, &efi_loaded_image_protocol_guid,
+				&loaded.interface ) ) != 0 ) {
 		/* Should never happen */
-		rc = -EEFI ( efirc );
 		goto err_open_protocol;
 	}
 

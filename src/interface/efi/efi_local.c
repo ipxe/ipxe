@@ -208,7 +208,6 @@ static int efi_local_check_volume_name ( struct efi_local *local,
  */
 static int efi_local_open_root ( struct efi_local *local, EFI_HANDLE device,
 				 EFI_FILE_PROTOCOL **root ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		void *interface;
 		EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs;
@@ -217,15 +216,11 @@ static int efi_local_open_root ( struct efi_local *local, EFI_HANDLE device,
 	int rc;
 
 	/* Open file system protocol */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_simple_file_system_protocol_guid,
-					  &u.interface, efi_image_handle,
-					  device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( device, &efi_simple_file_system_protocol_guid,
+			       &u.interface ) ) != 0 ) {
 		DBGC ( local, "LOCAL %p could not open filesystem on %s: %s\n",
 		       local, efi_handle_name ( device ), strerror ( rc ) );
-		goto err_filesystem;
+		return rc;
 	}
 
 	/* Open root directory */
@@ -233,17 +228,10 @@ static int efi_local_open_root ( struct efi_local *local, EFI_HANDLE device,
 		rc = -EEFI ( efirc );
 		DBGC ( local, "LOCAL %p could not open volume on %s: %s\n",
 		       local, efi_handle_name ( device ), strerror ( rc ) );
-		goto err_volume;
+		return rc;
 	}
 
-	/* Success */
-	rc = 0;
-
- err_volume:
-	bs->CloseProtocol ( device, &efi_simple_file_system_protocol_guid,
-			    efi_image_handle, device );
- err_filesystem:
-	return rc;
+	return 0;
 }
 
 /**

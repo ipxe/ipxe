@@ -493,9 +493,7 @@ static struct net_device_operations snpnet_operations = {
  * @ret rc		Return status code
  */
 int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE parent;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Check that this is not a device we are providing ourselves */
@@ -506,13 +504,11 @@ int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
 	}
 
 	/* Test for presence of protocol */
-	if ( ( efirc = bs->OpenProtocol ( device, protocol,
-					  NULL, efi_image_handle, device,
-					  EFI_OPEN_PROTOCOL_TEST_PROTOCOL))!=0){
+	if ( ( rc = efi_open ( device, protocol, NULL ) ) != 0 ) {
 		DBGCP ( device, "HANDLE %s is not a %s device\n",
 			efi_handle_name ( device ),
 			efi_guid_ntoa ( protocol ) );
-		return -EEFI ( efirc );
+		return rc;
 	}
 
 	/* Check that there are no instances of this protocol further

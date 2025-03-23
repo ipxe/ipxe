@@ -161,20 +161,13 @@ static int efi_veto_uninstall ( struct efi_veto *veto ) {
 	int rc;
 
 	/* Open driver binding protocol */
-	if ( ( efirc = bs->OpenProtocol (
-			driver, &efi_driver_binding_protocol_guid,
-			&binding.interface, efi_image_handle, driver,
-			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( driver, &efi_driver_binding_protocol_guid,
+			       &binding.interface ) ) != 0 ) {
 		DBGC ( driver, "EFIVETO %s could not open driver binding "
 		       "protocol: %s\n", efi_handle_name ( driver ),
 		       strerror ( rc ) );
 		return rc;
 	}
-
-	/* Close driver binding protocol */
-	bs->CloseProtocol ( driver, &efi_driver_binding_protocol_guid,
-			    efi_image_handle, driver );
 
 	/* Uninstall driver binding protocol */
 	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
@@ -541,7 +534,6 @@ static struct efi_veto_candidate efi_vetoes[] = {
  */
 static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 			   struct efi_veto *veto ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_DRIVER_BINDING_PROTOCOL *binding;
 		void *interface;
@@ -568,47 +560,35 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 	memset ( veto, 0, sizeof ( *veto ) );
 
 	/* Open driver binding protocol */
-	if ( ( efirc = bs->OpenProtocol (
-			driver, &efi_driver_binding_protocol_guid,
-			&binding.interface, efi_image_handle, driver,
-			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( driver, &efi_driver_binding_protocol_guid,
+			       &binding.interface ) ) != 0 ) {
 		DBGC ( driver, "EFIVETO %s could not open driver binding "
 		       "protocol: %s\n", efi_handle_name ( driver ),
 		       strerror ( rc ) );
-		goto err_binding;
+		return rc;
 	}
 	image = binding.binding->ImageHandle;
 
 	/* Open loaded image protocol */
-	if ( ( efirc = bs->OpenProtocol (
-			image, &efi_loaded_image_protocol_guid,
-			&loaded.interface, efi_image_handle, image,
-			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( image, &efi_loaded_image_protocol_guid,
+			       &loaded.interface ) ) != 0 ) {
 		DBGC ( driver, "EFIVETO %s could not open",
 		       efi_handle_name ( driver ) );
 		DBGC ( driver, " %s loaded image protocol: %s\n",
 		       efi_handle_name ( image ), strerror ( rc ) );
-		goto err_loaded;
+		return rc;
 	}
 
 	/* Open component name protocol, if present */
-	if ( ( efirc = bs->OpenProtocol (
-			image, &efi_component_name2_protocol_guid,
-			&wtf2.interface, efi_image_handle, image,
-			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+	if ( ( rc = efi_open ( image, &efi_component_name2_protocol_guid,
+			       &wtf2.interface ) ) != 0 ) {
 		/* Ignore failure; is not required to be present */
-		wtf2.interface = NULL;
 	}
 
 	/* Open obsolete component name protocol, if present */
-	if ( ( efirc = bs->OpenProtocol (
-			image, &efi_component_name_protocol_guid,
-			&wtf.interface, efi_image_handle, image,
-			EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
+	if ( ( rc = efi_open ( image, &efi_component_name_protocol_guid,
+			       &wtf.interface ) ) != 0 ) {
 		/* Ignore failure; is not required to be present */
-		wtf.interface = NULL;
 	}
 
 	/* Get driver name, if available */
@@ -643,25 +623,7 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 		}
 	}
 
-	/* Success */
-	rc = 0;
-
-	/* Close protocols */
-	if ( wtf.wtf ) {
-		bs->CloseProtocol ( image, &efi_component_name_protocol_guid,
-				    efi_image_handle, image );
-	}
-	if ( wtf2.wtf2 ) {
-		bs->CloseProtocol ( image, &efi_component_name2_protocol_guid,
-				    efi_image_handle, image );
-	}
-	bs->CloseProtocol ( image, &efi_loaded_image_protocol_guid,
-			    efi_image_handle, image );
- err_loaded:
-	bs->CloseProtocol ( driver, &efi_driver_binding_protocol_guid,
-			    efi_image_handle, driver );
- err_binding:
-	return rc;
+	return 0;
 }
 
 /**

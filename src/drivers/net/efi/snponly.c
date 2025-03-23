@@ -86,13 +86,11 @@ static struct chained_protocol chained_mnp = {
  * @v chained		Chainloaded protocol
  */
 static void chained_locate ( struct chained_protocol *chained ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efi_loaded_image->DeviceHandle;
 	EFI_HANDLE handle;
 	void *match = NULL;
 	void *interface;
 	unsigned int skip;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Identify target device handle */
@@ -111,11 +109,8 @@ static void chained_locate ( struct chained_protocol *chained ) {
 		}
 
 		/* Get protocol instance */
-		if ( ( efirc = bs->OpenProtocol (
-					handle, chained->protocol, &interface,
-					efi_image_handle, handle,
-					EFI_OPEN_PROTOCOL_GET_PROTOCOL )) != 0){
-			rc = -EEFI ( efirc );
+		if ( ( rc = efi_open ( handle, chained->protocol,
+				       &interface ) ) != 0 ) {
 			DBGC ( device, "CHAINED %s could not open %s on ",
 			       efi_handle_name ( device ),
 			       efi_guid_ntoa ( chained->protocol ) );
@@ -123,8 +118,6 @@ static void chained_locate ( struct chained_protocol *chained ) {
 			       efi_handle_name ( handle ), strerror ( rc ) );
 			break;
 		}
-		bs->CloseProtocol ( handle, chained->protocol,
-				    efi_image_handle, handle );
 
 		/* Stop if we reach a non-matching protocol instance */
 		if ( match && ( match != interface ) ) {
@@ -154,20 +147,16 @@ static void chained_locate ( struct chained_protocol *chained ) {
  */
 static int chained_supported ( EFI_HANDLE device,
 			       struct chained_protocol *chained ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	void *interface;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Get protocol */
-	if ( ( efirc = bs->OpenProtocol ( device, chained->protocol, &interface,
-					  efi_image_handle, device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( device, chained->protocol,
+			       &interface ) ) != 0 ) {
 		DBGCP ( device, "CHAINED %s is not a %s device\n",
 			efi_handle_name ( device ),
 			efi_guid_ntoa ( chained->protocol ) );
-		goto err_open_protocol;
+		return rc;
 	}
 
 	/* Ignore non-matching handles */
@@ -175,21 +164,13 @@ static int chained_supported ( EFI_HANDLE device,
 		DBGC2 ( device, "CHAINED %s is not the chainloaded %s\n",
 			efi_handle_name ( device ),
 			efi_guid_ntoa ( chained->protocol ) );
-		rc = -ENOTTY;
-		goto err_no_match;
+		return -ENOTTY;
 	}
 
-	/* Success */
-	rc = 0;
 	DBGC ( device, "CHAINED %s is the chainloaded %s\n",
 	       efi_handle_name ( device ),
 	       efi_guid_ntoa ( chained->protocol ) );
-
- err_no_match:
-	bs->CloseProtocol ( device, chained->protocol, efi_image_handle,
-			    device );
- err_open_protocol:
-	return rc;
+	return 0;
 }
 
 /**
