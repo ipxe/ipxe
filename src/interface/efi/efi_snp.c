@@ -1958,10 +1958,6 @@ static int efi_snp_probe ( struct net_device *netdev, void *priv __unused ) {
 	/* Add to list of SNP devices */
 	list_add ( &snpdev->list, &efi_snp_devices );
 
-	/* Close device path */
-	bs->CloseProtocol ( efidev->device, &efi_device_path_protocol_guid,
-			    efi_image_handle, efidev->device );
-
 	DBGC ( snpdev, "SNPDEV %p installed for %s as device %s\n",
 	       snpdev, netdev->name, efi_handle_name ( snpdev->handle ) );
 	return 0;
