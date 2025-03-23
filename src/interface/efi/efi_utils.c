@@ -120,19 +120,12 @@ int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
  * @ret rc		Return status code
  */
 int efi_child_add ( EFI_HANDLE parent, EFI_HANDLE child ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	void *devpath;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Re-open the device path protocol */
-	if ( ( efirc = bs->OpenProtocol ( parent,
-					  &efi_device_path_protocol_guid,
-					  &devpath,
-					  efi_image_handle, child,
-					  EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER
-					  ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_child ( parent, &efi_device_path_protocol_guid,
+					child, &devpath ) ) != 0 ) {
 		DBGC ( parent, "EFIDEV %s could not add child",
 		       efi_handle_name ( parent ) );
 		DBGC ( parent, " %s: %s\n",
@@ -154,10 +147,8 @@ int efi_child_add ( EFI_HANDLE parent, EFI_HANDLE child ) {
  * @v child		EFI child device handle
  */
 void efi_child_del ( EFI_HANDLE parent, EFI_HANDLE child ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 
-	bs->CloseProtocol ( parent, &efi_device_path_protocol_guid,
-			    efi_image_handle, child );
+	efi_close_by_child ( parent, &efi_device_path_protocol_guid, child );
 	DBGC2 ( parent, "EFIDEV %s removed child", efi_handle_name ( parent ) );
 	DBGC2 ( parent, " %s\n", efi_handle_name ( child ) );
 }
