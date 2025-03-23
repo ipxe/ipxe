@@ -1169,11 +1169,8 @@ int efi_file_install ( EFI_HANDLE handle ) {
 	 * of calls to our DRIVER_STOP method when starting the EFI
 	 * shell.  I have no idea why this is.
 	 */
-	if ( ( efirc = bs->OpenProtocol ( handle, &efi_disk_io_protocol_guid,
-					  &diskio.interface, efi_image_handle,
-					  handle,
-					  EFI_OPEN_PROTOCOL_BY_DRIVER ) ) != 0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_driver ( handle, &efi_disk_io_protocol_guid,
+					 &diskio.interface ) ) != 0 ) {
 		DBGC ( handle, "Could not open disk I/O protocol: %s\n",
 		       strerror ( rc ) );
 		DBGC_EFI_OPENERS ( handle, handle, &efi_disk_io_protocol_guid );
@@ -1199,8 +1196,7 @@ int efi_file_install ( EFI_HANDLE handle ) {
 	efi_file_path_uninstall ( &efi_file_initrd );
  err_initrd_install:
  err_initrd_claim:
-	bs->CloseProtocol ( handle, &efi_disk_io_protocol_guid,
-			    efi_image_handle, handle );
+	efi_close_by_driver ( handle, &efi_disk_io_protocol_guid );
  err_open:
 	bs->UninstallMultipleProtocolInterfaces (
 			handle,
@@ -1228,8 +1224,7 @@ void efi_file_uninstall ( EFI_HANDLE handle ) {
 	efi_file_path_uninstall ( &efi_file_initrd );
 
 	/* Close our own disk I/O protocol */
-	bs->CloseProtocol ( handle, &efi_disk_io_protocol_guid,
-			    efi_image_handle, handle );
+	efi_close_by_driver ( handle, &efi_disk_io_protocol_guid );
 
 	/* We must install the file system protocol first, since
 	 * otherwise the EDK2 code will attempt to helpfully uninstall

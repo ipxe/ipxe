@@ -539,7 +539,6 @@ int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
  * @ret rc		Return status code
  */
 int snpnet_start ( struct efi_device *efidev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
 	EFI_SIMPLE_NETWORK_MODE *mode;
 	struct net_device *netdev;
@@ -549,12 +548,9 @@ int snpnet_start ( struct efi_device *efidev ) {
 	int rc;
 
 	/* Open SNP protocol */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_simple_network_protocol_guid,
-					  &interface, efi_image_handle, device,
-					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_driver ( device,
+					 &efi_simple_network_protocol_guid,
+					 &interface ) ) != 0 ) {
 		DBGC ( device, "SNP %s cannot open SNP protocol: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( device, device,
@@ -644,8 +640,7 @@ int snpnet_start ( struct efi_device *efidev ) {
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
-	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_by_driver ( device, &efi_simple_network_protocol_guid );
  err_open_protocol:
 	return rc;
 }
@@ -656,7 +651,6 @@ int snpnet_start ( struct efi_device *efidev ) {
  * @v efidev		EFI device
   */
 void snpnet_stop ( struct efi_device *efidev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct net_device *netdev = efidev_get_drvdata ( efidev );
 	struct snp_nic *snp = netdev->priv;
 	EFI_HANDLE device = efidev->device;
@@ -681,6 +675,5 @@ void snpnet_stop ( struct efi_device *efidev ) {
 	netdev_put ( netdev );
 
 	/* Close SNP protocol */
-	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_by_driver ( device, &efi_simple_network_protocol_guid );
 }

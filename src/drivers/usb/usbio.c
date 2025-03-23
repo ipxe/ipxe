@@ -229,13 +229,9 @@ static int usbio_open ( struct usbio_device *usbio, unsigned int interface ) {
 	}
 
 	/* Open USB I/O protocol on this handle */
-	if ( ( efirc = bs->OpenProtocol ( intf->handle,
-					  &efi_usb_io_protocol_guid,
-					  &u.interface, efi_image_handle,
-					  intf->handle,
-					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_driver ( intf->handle,
+					 &efi_usb_io_protocol_guid,
+					 &u.interface ) ) != 0 ) {
 		DBGC ( usbio, "USBIO %s cannot open ",
 		       efi_handle_name ( handle ) );
 		DBGC ( usbio, "%s: %s\n",
@@ -259,7 +255,6 @@ static int usbio_open ( struct usbio_device *usbio, unsigned int interface ) {
  * @v interface		Interface number
  */
 static void usbio_close ( struct usbio_device *usbio, unsigned int interface ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct usbio_interface *intf = &usbio->interface[interface];
 
 	/* Sanity checks */
@@ -274,8 +269,7 @@ static void usbio_close ( struct usbio_device *usbio, unsigned int interface ) {
 		return;
 
 	/* Close USB I/O protocol */
-	bs->CloseProtocol ( intf->handle, &efi_usb_io_protocol_guid,
-			    efi_image_handle, intf->handle );
+	efi_close_by_driver ( intf->handle, &efi_usb_io_protocol_guid );
 }
 
 /******************************************************************************
@@ -1608,7 +1602,6 @@ static int usbio_interfaces ( struct usbio_device *usbio ) {
  * @ret rc		Return status code
  */
 static int usbio_start ( struct efi_device *efidev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE handle = efidev->device;
 	struct usbio_device *usbio;
 	struct usb_port *port;
@@ -1616,7 +1609,6 @@ static int usbio_start ( struct efi_device *efidev ) {
 		void *interface;
 		EFI_USB_IO_PROTOCOL *io;
 	} u;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -1630,12 +1622,8 @@ static int usbio_start ( struct efi_device *efidev ) {
 	INIT_LIST_HEAD ( &usbio->endpoints );
 
 	/* Open USB I/O protocol */
-	if ( ( efirc = bs->OpenProtocol ( handle, &efi_usb_io_protocol_guid,
-					  &u.interface, efi_image_handle,
-					  handle,
-					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_driver ( handle, &efi_usb_io_protocol_guid,
+					 &u.interface ) ) != 0 ) {
 		DBGC ( usbio, "USBIO %s cannot open USB I/O protocol: %s\n",
 		       efi_handle_name ( handle ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( usbio, handle, &efi_usb_io_protocol_guid );
@@ -1692,8 +1680,7 @@ static int usbio_start ( struct efi_device *efidev ) {
 	free ( usbio->config );
  err_config:
 	list_del ( &usbio->dev.siblings );
-	bs->CloseProtocol ( handle, &efi_usb_io_protocol_guid,
-			    efi_image_handle, handle );
+	efi_close_by_driver ( handle, &efi_usb_io_protocol_guid );
  err_open_usbio:
 	free ( usbio );
  err_alloc:
@@ -1706,7 +1693,6 @@ static int usbio_start ( struct efi_device *efidev ) {
  * @v efidev		EFI device
  */
 static void usbio_stop ( struct efi_device *efidev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE handle = efidev->device;
 	struct usbio_device *usbio = efidev_get_drvdata ( efidev );
 
@@ -1716,8 +1702,7 @@ static void usbio_stop ( struct efi_device *efidev ) {
 	free ( usbio->path );
 	free ( usbio->config );
 	list_del ( &usbio->dev.siblings );
-	bs->CloseProtocol ( handle, &efi_usb_io_protocol_guid,
-			    efi_image_handle, handle );
+	efi_close_by_driver ( handle, &efi_usb_io_protocol_guid );
 	free ( usbio );
 }
 

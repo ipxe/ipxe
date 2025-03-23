@@ -902,11 +902,9 @@ static int efipci_supported ( EFI_HANDLE device ) {
  * @ret rc		Return status code
  */
 static int efipci_start ( struct efi_device *efidev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
 	struct efi_pci_device *efipci;
 	void *pci_io;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Allocate PCI device */
@@ -920,12 +918,9 @@ static int efipci_start ( struct efi_device *efidev ) {
 	if ( ( rc = efipci_info ( device, efipci ) ) != 0 )
 		goto err_info;
 
-	/* Open PCI device */
-	if ( ( efirc = bs->OpenProtocol ( device, &efi_pci_io_protocol_guid,
-					  &pci_io, efi_image_handle, device,
-					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
-		rc = -EEFI_PCI ( efirc );
+	/* Open PCI I/O protocol */
+	if ( ( rc = efi_open_by_driver ( device, &efi_pci_io_protocol_guid,
+					 &pci_io ) ) != 0 ) {
 		DBGC ( device, "EFIPCI %s could not open PCI device: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( device, device, &efi_pci_io_protocol_guid );
@@ -960,8 +955,7 @@ static int efipci_start ( struct efi_device *efidev ) {
  err_probe:
 	list_del ( &efipci->pci.dev.siblings );
  err_find_driver:
-	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_by_driver ( device, &efi_pci_io_protocol_guid );
  err_open:
  err_info:
 	free ( efipci );
@@ -976,15 +970,13 @@ static int efipci_start ( struct efi_device *efidev ) {
   */
 static void efipci_stop ( struct efi_device *efidev ) {
 	struct efi_pci_device *efipci = efidev_get_drvdata ( efidev );
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
 
 	pci_remove ( &efipci->pci );
 	list_del ( &efipci->pci.dev.siblings );
 	assert ( efipci->pci.dma.mapped == 0 );
 	assert ( efipci->pci.dma.allocated == 0 );
-	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_by_driver ( device, &efi_pci_io_protocol_guid );
 	free ( efipci );
 }
 
