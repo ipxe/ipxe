@@ -230,12 +230,14 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 	}
 	nii->pci_device = pci_device;
 
-	/* Open PCI I/O protocol */
-	if ( ( efirc = bs->OpenProtocol ( pci_device, &efi_pci_io_protocol_guid,
-					  &pci_io.interface, efi_image_handle,
-					  device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	/* Open PCI I/O protocol
+	 *
+	 * We cannot open this safely as a by-driver open, since doing
+	 * so would disconnect the underlying NII driver.  We must
+	 * therefore use an unsafe open.
+	 */
+	if ( ( rc = efi_open_unsafe ( pci_device, &efi_pci_io_protocol_guid,
+				      &pci_io.interface ) ) != 0 ) {
 		DBGC ( nii, "NII %s could not open PCI I/O protocol: %s\n",
 		       nii->dev.name, strerror ( rc ) );
 		goto err_open;
@@ -280,8 +282,7 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 	return 0;
 
  err_get_bar_attributes:
-	bs->CloseProtocol ( pci_device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_unsafe ( pci_device, &efi_pci_io_protocol_guid );
  err_open:
  err_locate:
 	return rc;
@@ -294,7 +295,6 @@ static int nii_pci_open ( struct nii_nic *nii ) {
  * @ret rc		Return status code
  */
 static void nii_pci_close ( struct nii_nic *nii ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct nii_mapping *map;
 	struct nii_mapping *tmp;
 
@@ -308,8 +308,7 @@ static void nii_pci_close ( struct nii_nic *nii ) {
 	}
 
 	/* Close protocols */
-	bs->CloseProtocol ( nii->pci_device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, nii->efidev->device );
+	efi_close_unsafe ( nii->pci_device, &efi_pci_io_protocol_guid );
 }
 
 /**

@@ -241,10 +241,8 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 	}
 
 	/* Open PCI I/O protocol */
-	if ( ( efirc = bs->OpenProtocol ( device, &efi_pci_io_protocol_guid,
-					  &pci_io, efi_image_handle, device,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_unsafe ( device, &efi_pci_io_protocol_guid,
+				      &pci_io ) ) != 0 ) {
 		DBGC ( device, "EFIBOFM %s cannot open PCI device: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open;
@@ -326,8 +324,7 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 
  err_set_status:
  err_locate_bofm:
-	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_unsafe ( device, &efi_pci_io_protocol_guid );
  err_open:
  err_info:
 	return rc;

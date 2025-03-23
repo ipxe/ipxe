@@ -241,14 +241,17 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 		}
 	}
 
-	/* Get loaded image protocol */
-	if ( ( efirc = bs->OpenProtocol ( image_handle,
-				&efi_loaded_image_protocol_guid,
-				&loaded_image, image_handle, NULL,
-				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	/* Get loaded image protocol
+	 *
+	 * We assume that our loaded image protocol will not be
+	 * uninstalled while our image code is still running.
+	 */
+	if ( ( rc = efi_open_unsafe ( image_handle,
+				      &efi_loaded_image_protocol_guid,
+				      &loaded_image ) ) != 0 ) {
 		DBGC ( systab, "EFI could not get loaded image protocol: %s",
 		       strerror ( rc ) );
+		efirc = EFIRC ( rc );
 		goto err_no_loaded_image;
 	}
 	efi_loaded_image = loaded_image;
