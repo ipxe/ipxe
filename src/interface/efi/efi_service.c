@@ -45,15 +45,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 int efi_service_add ( EFI_HANDLE service, EFI_GUID *binding,
 		      EFI_HANDLE *handle ) {
-	union {
-		EFI_SERVICE_BINDING_PROTOCOL *sb;
-		void *interface;
-	} u;
+	EFI_SERVICE_BINDING_PROTOCOL *sb;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Open service binding protocol */
-	if ( ( rc = efi_open ( service, binding, &u.interface ) ) != 0 ) {
+	if ( ( rc = efi_open ( service, binding, &sb ) ) != 0 ) {
 		DBGC ( service, "EFISVC %s cannot open %s binding: %s\n",
 		       efi_handle_name ( service ), efi_guid_ntoa ( binding ),
 		       strerror ( rc ) );
@@ -61,7 +58,7 @@ int efi_service_add ( EFI_HANDLE service, EFI_GUID *binding,
 	}
 
 	/* Create child handle */
-	if ( ( efirc = u.sb->CreateChild ( u.sb, handle ) ) != 0 ) {
+	if ( ( efirc = sb->CreateChild ( sb, handle ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( service, "EFISVC %s could not create %s child: %s\n",
 		       efi_handle_name ( service ), efi_guid_ntoa ( binding ),
@@ -85,10 +82,7 @@ int efi_service_add ( EFI_HANDLE service, EFI_GUID *binding,
  */
 int efi_service_del ( EFI_HANDLE service, EFI_GUID *binding,
 		      EFI_HANDLE handle ) {
-	union {
-		EFI_SERVICE_BINDING_PROTOCOL *sb;
-		void *interface;
-	} u;
+	EFI_SERVICE_BINDING_PROTOCOL *sb;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -97,7 +91,7 @@ int efi_service_del ( EFI_HANDLE service, EFI_GUID *binding,
 	DBGC ( service, "%s\n", efi_handle_name ( handle ) );
 
 	/* Open service binding protocol */
-	if ( ( rc = efi_open ( service, binding, &u.interface ) ) != 0 ) {
+	if ( ( rc = efi_open ( service, binding, &sb ) ) != 0 ) {
 		DBGC ( service, "EFISVC %s cannot open %s binding: %s\n",
 		       efi_handle_name ( service ), efi_guid_ntoa ( binding ),
 		       strerror ( rc ) );
@@ -105,7 +99,7 @@ int efi_service_del ( EFI_HANDLE service, EFI_GUID *binding,
 	}
 
 	/* Destroy child handle */
-	if ( ( efirc = u.sb->DestroyChild ( u.sb, handle ) ) != 0 ) {
+	if ( ( efirc = sb->DestroyChild ( sb, handle ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( service, "EFISVC %s could not destroy %s child ",
 		       efi_handle_name ( service ), efi_guid_ntoa ( binding ) );

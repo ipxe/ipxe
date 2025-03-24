@@ -173,8 +173,7 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	EFI_BOOT_SERVICES *bs;
 	struct efi_protocol *prot;
 	struct efi_config_table *tab;
-	void *loaded_image;
-	void *device_path;
+	EFI_DEVICE_PATH_PROTOCOL *device_path;
 	void *device_path_copy;
 	size_t device_path_len;
 	EFI_STATUS efirc;
@@ -248,13 +247,12 @@ EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 	 */
 	if ( ( rc = efi_open_unsafe ( image_handle,
 				      &efi_loaded_image_protocol_guid,
-				      &loaded_image ) ) != 0 ) {
+				      &efi_loaded_image ) ) != 0 ) {
 		DBGC ( systab, "EFI could not get loaded image protocol: %s",
 		       strerror ( rc ) );
 		efirc = EFIRC ( rc );
 		goto err_no_loaded_image;
 	}
-	efi_loaded_image = loaded_image;
 	DBGC ( systab, "EFI image base address %p\n",
 	       efi_loaded_image->ImageBase );
 

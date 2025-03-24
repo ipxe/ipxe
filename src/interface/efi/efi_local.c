@@ -208,23 +208,20 @@ static int efi_local_check_volume_name ( struct efi_local *local,
  */
 static int efi_local_open_root ( struct efi_local *local, EFI_HANDLE device,
 				 EFI_FILE_PROTOCOL **root ) {
-	union {
-		void *interface;
-		EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs;
-	} u;
+	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Open file system protocol */
 	if ( ( rc = efi_open ( device, &efi_simple_file_system_protocol_guid,
-			       &u.interface ) ) != 0 ) {
+			       &fs ) ) != 0 ) {
 		DBGC ( local, "LOCAL %p could not open filesystem on %s: %s\n",
 		       local, efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
 	}
 
 	/* Open root directory */
-	if ( ( efirc = u.fs->OpenVolume ( u.fs, root ) ) != 0 ) {
+	if ( ( efirc = fs->OpenVolume ( fs, root ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( local, "LOCAL %p could not open volume on %s: %s\n",
 		       local, efi_handle_name ( device ), strerror ( rc ) );

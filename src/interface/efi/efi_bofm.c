@@ -228,7 +228,6 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 	struct efi_pci_device efipci;
 	IBM_BOFM_TABLE *bofmtab;
 	IBM_BOFM_TABLE *bofmtab2;
-	void *pci_io;
 	int bofmrc;
 	EFI_STATUS efirc;
 	int rc;
@@ -242,7 +241,7 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 
 	/* Open PCI I/O protocol */
 	if ( ( rc = efi_open_unsafe ( device, &efi_pci_io_protocol_guid,
-				      &pci_io ) ) != 0 ) {
+				      &efipci.io ) ) != 0 ) {
 		DBGC ( device, "EFIBOFM %s cannot open PCI device: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open;

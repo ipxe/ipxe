@@ -389,17 +389,88 @@ extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
 extern void efi_raise_tpl ( struct efi_saved_tpl *tpl );
 extern void efi_restore_tpl ( struct efi_saved_tpl *tpl );
-extern int efi_open ( EFI_HANDLE handle, EFI_GUID *protocol,
-		      void **interface );
-extern int efi_open_unsafe ( EFI_HANDLE handle, EFI_GUID *protocol,
-			     void **interface );
+extern int efi_open_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+			      void **interface );
+extern int efi_open_unsafe_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+				     void **interface );
 extern void efi_close_unsafe ( EFI_HANDLE handle, EFI_GUID *protocol );
-extern int efi_open_by_driver ( EFI_HANDLE handle, EFI_GUID *protocol,
-				void **interface );
+extern int efi_open_by_driver_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+					void **interface );
 extern void efi_close_by_driver ( EFI_HANDLE handle, EFI_GUID *protocol );
-extern int efi_open_by_child ( EFI_HANDLE handle, EFI_GUID *protocol,
-			       EFI_HANDLE child, void **interface );
+extern int efi_open_by_child_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+				       EFI_HANDLE child, void **interface );
 extern void efi_close_by_child ( EFI_HANDLE handle, EFI_GUID *protocol,
 				 EFI_HANDLE child );
+
+/**
+ * Test protocol existence
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ * @ret rc		Return status code
+ */
+#define efi_test( handle, protocol )					\
+	efi_open_untyped ( (handle), (protocol), NULL )
+
+/**
+ * Open protocol for ephemeral use
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ * @v interface		Protocol interface pointer to fill in
+ * @ret rc		Return status code
+ */
+#define efi_open( handle, protocol, interface ) ( {			\
+	typeof ( *(interface) ) check_ptr_ptr = NULL;			\
+	efi_open_untyped ( (handle), (protocol),			\
+			   ( ( void ) check_ptr_ptr,			\
+			     ( void ** ) (interface) ) );		\
+	} )
+
+/**
+ * Open protocol for unsafe persistent use
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ * @v interface		Protocol interface pointer to fill in
+ * @ret rc		Return status code
+ */
+#define efi_open_unsafe( handle, protocol, interface ) ( {		\
+	typeof ( *(interface) ) check_ptr_ptr = NULL;			\
+	efi_open_unsafe_untyped ( (handle), (protocol),			\
+				  ( ( void ) check_ptr_ptr,		\
+				    ( void ** ) (interface) ) );	\
+	} )
+
+/**
+ * Open protocol for persistent use by a driver
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ * @v interface		Protocol interface pointer to fill in
+ * @ret rc		Return status code
+ */
+#define efi_open_by_driver( handle, protocol, interface ) ( {		\
+	typeof ( *(interface) ) check_ptr_ptr = NULL;			\
+	efi_open_by_driver_untyped ( (handle), (protocol),		\
+				     ( ( void ) check_ptr_ptr,		\
+				       ( void ** ) (interface) ) );	\
+	} )
+
+/**
+ * Open protocol for persistent use by a child controller
+ *
+ * @v handle		EFI handle
+ * @v protocol		Protocol GUID
+ * @v child		Child controller handle
+ * @v interface		Protocol interface pointer to fill in
+ * @ret rc		Return status code
+ */
+#define efi_open_by_child( handle, protocol, child, interface ) ( {	\
+	typeof ( *(interface) ) check_ptr_ptr = NULL;			\
+	efi_open_by_child_untyped ( (handle), (protocol), (child),	\
+				    ( ( void ) check_ptr_ptr,		\
+				      ( void ** ) (interface) ) );	\
+	} )
 
 #endif /* _IPXE_EFI_H */

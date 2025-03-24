@@ -187,10 +187,6 @@ static int usbio_open ( struct usbio_device *usbio, unsigned int interface ) {
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	USB_DEVICE_PATH *usbpath;
-	union {
-		void *interface;
-		EFI_USB_IO_PROTOCOL *io;
-	} u;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -231,7 +227,7 @@ static int usbio_open ( struct usbio_device *usbio, unsigned int interface ) {
 	/* Open USB I/O protocol on this handle */
 	if ( ( rc = efi_open_by_driver ( intf->handle,
 					 &efi_usb_io_protocol_guid,
-					 &u.interface ) ) != 0 ) {
+					 &intf->io ) ) != 0 ) {
 		DBGC ( usbio, "USBIO %s cannot open ",
 		       efi_handle_name ( handle ) );
 		DBGC ( usbio, "%s: %s\n",
@@ -240,7 +236,6 @@ static int usbio_open ( struct usbio_device *usbio, unsigned int interface ) {
 				   &efi_usb_io_protocol_guid );
 		return rc;
 	}
-	intf->io = u.io;
 
 	/* Increment usage count */
 	intf->count++;
@@ -1296,24 +1291,20 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 	struct usb_function_descriptor desc;
 	struct usb_driver *driver;
 	struct usb_device_id *id;
-	union {
-		void *interface;
-		EFI_USB_IO_PROTOCOL *io;
-	} usb;
+	EFI_USB_IO_PROTOCOL *io;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Get protocol */
 	if ( ( rc = efi_open ( handle, &efi_usb_io_protocol_guid,
-			       &usb.interface ) ) != 0 ) {
+			       &io ) ) != 0 ) {
 		DBGCP ( handle, "USB %s is not a USB device\n",
 			efi_handle_name ( handle ) );
 		return rc;
 	}
 
 	/* Get device descriptor */
-	if ( ( efirc = usb.io->UsbGetDeviceDescriptor ( usb.io,
-							&device ) ) != 0 ) {
+	if ( ( efirc = io->UsbGetDeviceDescriptor ( io, &device ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( handle, "USB %s could not get device descriptor: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
@@ -1324,8 +1315,7 @@ static int usbio_supported ( EFI_HANDLE handle ) {
 	desc.product = device.IdProduct;
 
 	/* Get interface descriptor */
-	if ( ( efirc = usb.io->UsbGetInterfaceDescriptor ( usb.io,
-							   &interface ) ) !=0){
+	if ( ( efirc = io->UsbGetInterfaceDescriptor ( io, &interface ) ) != 0){
 		rc = -EEFI ( efirc );
 		DBGC ( handle, "USB %s could not get interface descriptor: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
@@ -1460,21 +1450,16 @@ static int usbio_path ( struct usbio_device *usbio ) {
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	USB_DEVICE_PATH *usbpath;
-	union {
-		void *interface;
-		EFI_DEVICE_PATH_PROTOCOL *path;
-	} u;
 	size_t len;
 	int rc;
 
 	/* Open device path protocol */
 	if ( ( rc = efi_open ( handle, &efi_device_path_protocol_guid,
-			       &u.interface ) ) != 0 ) {
+			       &path ) ) != 0 ) {
 		DBGC ( usbio, "USBIO %s cannot open device path protocol: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
 		return rc;
 	}
-	path = u.interface;
 
 	/* Locate end of device path and sanity check */
 	len = efi_path_len ( path );
@@ -1567,10 +1552,6 @@ static int usbio_start ( struct efi_device *efidev ) {
 	EFI_HANDLE handle = efidev->device;
 	struct usbio_device *usbio;
 	struct usb_port *port;
-	union {
-		void *interface;
-		EFI_USB_IO_PROTOCOL *io;
-	} u;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -1585,13 +1566,12 @@ static int usbio_start ( struct efi_device *efidev ) {
 
 	/* Open USB I/O protocol */
 	if ( ( rc = efi_open_by_driver ( handle, &efi_usb_io_protocol_guid,
-					 &u.interface ) ) != 0 ) {
+					 &usbio->io ) ) != 0 ) {
 		DBGC ( usbio, "USBIO %s cannot open USB I/O protocol: %s\n",
 		       efi_handle_name ( handle ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( usbio, handle, &efi_usb_io_protocol_guid );
 		goto err_open_usbio;
 	}
-	usbio->io = u.io;
 
 	/* Describe generic device */
 	efi_device_info ( handle, "USB", &usbio->dev );

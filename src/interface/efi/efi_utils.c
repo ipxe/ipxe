@@ -45,10 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
 			EFI_HANDLE *parent, unsigned int skip ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_DEVICE_PATH_PROTOCOL *path;
-		void *interface;
-	} u;
+	EFI_DEVICE_PATH_PROTOCOL *devpath;
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	size_t len;
@@ -57,20 +54,20 @@ int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
 
 	/* Get device path */
 	if ( ( rc = efi_open ( device, &efi_device_path_protocol_guid,
-			       &u.interface ) ) != 0 ) {
+			       &devpath ) ) != 0 ) {
 		DBGC ( device, "EFIDEV %s cannot open device path: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open_device_path;
 	}
 
 	/* Create modifiable copy of device path */
-	len = ( efi_path_len ( u.path ) + sizeof ( EFI_DEVICE_PATH_PROTOCOL ));
+	len = ( efi_path_len ( devpath ) + sizeof ( *end ) );
 	path = malloc ( len );
 	if ( ! path ) {
 		rc = -ENOMEM;
 		goto err_alloc_path;
 	}
-	memcpy ( path, u.path, len );
+	memcpy ( path, devpath, len );
 
 	/* Locate parent device(s) */
 	while ( 1 ) {
@@ -111,7 +108,7 @@ int efi_locate_device ( EFI_HANDLE device, EFI_GUID *protocol,
  * @ret rc		Return status code
  */
 int efi_child_add ( EFI_HANDLE parent, EFI_HANDLE child ) {
-	void *devpath;
+	EFI_DEVICE_PATH_PROTOCOL *devpath;
 	int rc;
 
 	/* Re-open the device path protocol */

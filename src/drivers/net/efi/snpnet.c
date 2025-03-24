@@ -504,7 +504,7 @@ int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
 	}
 
 	/* Test for presence of protocol */
-	if ( ( rc = efi_open ( device, protocol, NULL ) ) != 0 ) {
+	if ( ( rc = efi_test ( device, protocol ) ) != 0 ) {
 		DBGCP ( device, "HANDLE %s is not a %s device\n",
 			efi_handle_name ( device ),
 			efi_guid_ntoa ( protocol ) );
@@ -536,10 +536,10 @@ int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
  */
 int snpnet_start ( struct efi_device *efidev ) {
 	EFI_HANDLE device = efidev->device;
+	EFI_SIMPLE_NETWORK_PROTOCOL *interface;
 	EFI_SIMPLE_NETWORK_MODE *mode;
 	struct net_device *netdev;
 	struct snp_nic *snp;
-	void *interface;
 	EFI_STATUS efirc;
 	int rc;
 

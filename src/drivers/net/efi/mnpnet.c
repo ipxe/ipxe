@@ -370,10 +370,6 @@ int mnpnet_start ( struct efi_device *efidev ) {
 	EFI_HANDLE device = efidev->device;
 	EFI_GUID *binding = &efi_managed_network_service_binding_protocol_guid;
 	EFI_SIMPLE_NETWORK_MODE mode;
-	union {
-		EFI_MANAGED_NETWORK_PROTOCOL *mnp;
-		void *interface;
-	} u;
 	struct net_device *netdev;
 	struct mnp_nic *mnp;
 	EFI_STATUS efirc;
@@ -409,12 +405,11 @@ int mnpnet_start ( struct efi_device *efidev ) {
 	/* Open MNP protocol */
 	if ( ( rc = efi_open_by_driver ( efidev->child,
 					 &efi_managed_network_protocol_guid,
-					 &u.interface ) ) != 0 ) {
+					 &mnp->mnp ) ) != 0 ) {
 		DBGC ( mnp, "MNP %s could not open MNP protocol: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		goto err_open;
 	}
-	mnp->mnp = u.mnp;
 
 	/* Get configuration */
 	efirc = mnp->mnp->GetModeData ( mnp->mnp, NULL, &mode );

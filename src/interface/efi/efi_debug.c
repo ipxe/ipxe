@@ -324,10 +324,7 @@ static const char * efi_driver_name2 ( EFI_COMPONENT_NAME2_PROTOCOL *wtf ) {
  * @ret name		Driver name, or NULL
  */
 static const char * efi_binding_name ( EFI_DRIVER_BINDING_PROTOCOL *binding ) {
-	union {
-		EFI_COMPONENT_NAME_PROTOCOL *name;
-		void *interface;
-	} u;
+	EFI_COMPONENT_NAME_PROTOCOL *name;
 	EFI_HANDLE image;
 	int rc;
 
@@ -340,13 +337,13 @@ static const char * efi_binding_name ( EFI_DRIVER_BINDING_PROTOCOL *binding ) {
 	/* Try to open component name protocol on image handle */
 	image = binding->ImageHandle;
 	if ( ( rc = efi_open ( image, &efi_component_name_protocol_guid,
-			       &u.interface ) ) != 0 ) {
+			       &name ) ) != 0 ) {
 		DBG ( "[DriverBinding no ComponentName]" );
 		return NULL;
 	}
 
 	/* Try to get name from component name protocol */
-	return efi_driver_name ( u.name );
+	return efi_driver_name ( name );
 }
 
 /**
@@ -357,10 +354,7 @@ static const char * efi_binding_name ( EFI_DRIVER_BINDING_PROTOCOL *binding ) {
  */
 static const char * efi_binding_name2 ( EFI_DRIVER_BINDING_PROTOCOL *binding ){
 	EFI_HANDLE image;
-	union {
-		EFI_COMPONENT_NAME2_PROTOCOL *name2;
-		void *interface;
-	} u;
+	EFI_COMPONENT_NAME2_PROTOCOL *name2;
 	int rc;
 
 	/* Sanity check */
@@ -372,13 +366,13 @@ static const char * efi_binding_name2 ( EFI_DRIVER_BINDING_PROTOCOL *binding ){
 	/* Try to open component name protocol on image handle */
 	image = binding->ImageHandle;
 	if ( ( rc = efi_open ( image, &efi_component_name2_protocol_guid,
-			       &u.interface ) ) != 0 ) {
+			       &name2 ) ) != 0 ) {
 		DBG ( "[DriverBinding no ComponentName2]" );
 		return NULL;
 	}
 
 	/* Try to get name from component name protocol */
-	return efi_driver_name2 ( u.name2 );
+	return efi_driver_name2 ( name2 );
 }
 
 /**

@@ -48,24 +48,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 int efi_set_autoboot_ll_addr ( EFI_HANDLE device,
 			       EFI_DEVICE_PATH_PROTOCOL *path ) {
-	union {
-		EFI_SIMPLE_NETWORK_PROTOCOL *snp;
-		void *interface;
-	} snp;
+	EFI_SIMPLE_NETWORK_PROTOCOL *snp;
 	EFI_SIMPLE_NETWORK_MODE *mode;
 	unsigned int vlan;
 	int rc;
 
 	/* Look for an SNP instance on the image's device handle */
 	if ( ( rc = efi_open ( device, &efi_simple_network_protocol_guid,
-			       &snp.interface ) ) != 0 ) {
+			       &snp ) ) != 0 ) {
 		DBGC ( device, "EFI %s has no SNP instance: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
 	}
 
 	/* Record autoboot device */
-	mode = snp.snp->Mode;
+	mode = snp->Mode;
 	vlan = efi_path_vlan ( path );
 	set_autoboot_ll_addr ( &mode->CurrentAddress, mode->HwAddressSize,
 			       vlan );

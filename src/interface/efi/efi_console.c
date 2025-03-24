@@ -416,10 +416,6 @@ struct console_driver efi_console __console_driver = {
  */
 static void efi_console_init ( void ) {
 	EFI_CONSOLE_CONTROL_SCREEN_MODE mode;
-	union {
-		void *interface;
-		EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *wtf;
-	} u;
 	int rc;
 
 	/* On some older EFI 1.10 implementations, we must use the
@@ -441,8 +437,7 @@ static void efi_console_init ( void ) {
 	 */
 	if ( ( rc = efi_open_unsafe ( efi_systab->ConsoleInHandle,
 				      &efi_simple_text_input_ex_protocol_guid,
-				      &u.interface ) ) == 0 ) {
-		efi_conin_ex = u.wtf;
+				      &efi_conin_ex ) ) == 0 ) {
 		DBG ( "EFI using SimpleTextInputEx\n" );
 	} else {
 		DBG ( "EFI has no SimpleTextInputEx: %s\n", strerror ( rc ) );

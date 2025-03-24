@@ -272,23 +272,20 @@ static EFIAPI EFI_STATUS efi_shim_get_memory_map ( UINTN *len,
  * @ret rc		Return status code
  */
 static int efi_shim_inhibit_pxe ( EFI_HANDLE handle ) {
-	union {
-		EFI_PXE_BASE_CODE_PROTOCOL *pxe;
-		void *interface;
-	} u;
+	EFI_PXE_BASE_CODE_PROTOCOL *pxe;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Locate PXE base code */
 	if ( ( rc = efi_open ( handle, &efi_pxe_base_code_protocol_guid,
-			       &u.interface ) ) != 0 ) {
+			       &pxe ) ) != 0 ) {
 		DBGC ( &efi_shim, "SHIM could not open PXE base code: %s\n",
 		       strerror ( rc ) );
 		return rc;
 	}
 
 	/* Stop PXE base code */
-	if ( ( efirc = u.pxe->Stop ( u.pxe ) ) != 0 ) {
+	if ( ( efirc = pxe->Stop ( pxe ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( &efi_shim, "SHIM could not stop PXE base code: %s\n",
 		       strerror ( rc ) );

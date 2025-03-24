@@ -47,10 +47,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 int efi_cachedhcp_record ( EFI_HANDLE device,
 			   EFI_DEVICE_PATH_PROTOCOL *path ) {
 	unsigned int vlan;
-	union {
-		EFI_PXE_BASE_CODE_PROTOCOL *pxe;
-		void *interface;
-	} pxe;
+	EFI_PXE_BASE_CODE_PROTOCOL *pxe;
 	EFI_PXE_BASE_CODE_MODE *mode;
 	int rc;
 
@@ -59,14 +56,14 @@ int efi_cachedhcp_record ( EFI_HANDLE device,
 
 	/* Look for a PXE base code instance on the image's device handle */
 	if ( ( rc = efi_open ( device, &efi_pxe_base_code_protocol_guid,
-			       &pxe.interface ) ) != 0 ) {
+			       &pxe ) ) != 0 ) {
 		DBGC ( device, "EFI %s has no PXE base code instance: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		return rc;
 	}
 
 	/* Do not attempt to cache IPv6 packets */
-	mode = pxe.pxe->Mode;
+	mode = pxe->Mode;
 	if ( mode->UsingIpv6 ) {
 		DBGC ( device, "EFI %s has IPv6 PXE base code\n",
 		       efi_handle_name ( device ) );

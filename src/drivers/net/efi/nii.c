@@ -210,10 +210,6 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 	EFI_HANDLE device = nii->efidev->device;
 	EFI_HANDLE pci_device;
 	union {
-		EFI_PCI_IO_PROTOCOL *pci_io;
-		void *interface;
-	} pci_io;
-	union {
 		EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR *acpi;
 		void *resource;
 	} desc;
@@ -237,12 +233,11 @@ static int nii_pci_open ( struct nii_nic *nii ) {
 	 * therefore use an unsafe open.
 	 */
 	if ( ( rc = efi_open_unsafe ( pci_device, &efi_pci_io_protocol_guid,
-				      &pci_io.interface ) ) != 0 ) {
+				      &nii->pci_io ) ) != 0 ) {
 		DBGC ( nii, "NII %s could not open PCI I/O protocol: %s\n",
 		       nii->dev.name, strerror ( rc ) );
 		goto err_open;
 	}
-	nii->pci_io = pci_io.pci_io;
 
 	/* Identify memory and I/O BARs */
 	nii->mem_bar = PCI_MAX_BAR;
@@ -1272,7 +1267,6 @@ int nii_start ( struct efi_device *efidev ) {
 	EFI_HANDLE device = efidev->device;
 	struct net_device *netdev;
 	struct nii_nic *nii;
-	void *interface;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -1298,13 +1292,12 @@ int nii_start ( struct efi_device *efidev ) {
 
 	/* Open NII protocol */
 	if ( ( rc = efi_open_by_driver ( device, &efi_nii31_protocol_guid,
-					 &interface ) ) != 0 ) {
+					 &nii->nii ) ) != 0 ) {
 		DBGC ( nii, "NII %s cannot open NII protocol: %s\n",
 		       nii->dev.name, strerror ( rc ) );
 		DBGC_EFI_OPENERS ( device, device, &efi_nii31_protocol_guid );
 		goto err_open_protocol;
 	}
-	nii->nii = interface;
 
 	/* Locate UNDI and entry point */
 	nii->undi = ( ( void * ) ( intptr_t ) nii->nii->Id );

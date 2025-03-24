@@ -69,22 +69,19 @@ static int efi_driver_disconnecting;
  */
 struct efi_device * efidev_alloc ( EFI_HANDLE device ) {
 	struct efi_device *efidev = NULL;
-	union {
-		EFI_DEVICE_PATH_PROTOCOL *path;
-		void *interface;
-	} path;
+	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_DEVICE_PATH_PROTOCOL *path_end;
 	size_t path_len;
 	int rc;
 
 	/* Open device path */
 	if ( ( rc = efi_open ( device, &efi_device_path_protocol_guid,
-			       &path.interface ) ) != 0 ) {
+			       &path ) ) != 0 ) {
 		DBGC ( device, "EFIDRV %s could not open device path: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		return NULL;
 	}
-	path_len = ( efi_path_len ( path.path ) + sizeof ( *path_end ) );
+	path_len = ( efi_path_len ( path ) + sizeof ( *path_end ) );
 
 	/* Allocate and initialise structure */
 	efidev = zalloc ( sizeof ( *efidev ) + path_len );
@@ -93,7 +90,7 @@ struct efi_device * efidev_alloc ( EFI_HANDLE device ) {
 	efidev->device = device;
 	efidev->dev.desc.bus_type = BUS_TYPE_EFI;
 	efidev->path = ( ( ( void * ) efidev ) + sizeof ( *efidev ) );
-	memcpy ( efidev->path, path.path, path_len );
+	memcpy ( efidev->path, path, path_len );
 	INIT_LIST_HEAD ( &efidev->dev.children );
 	list_add ( &efidev->dev.siblings, &efi_devices );
 
@@ -365,10 +362,7 @@ static EFI_STATUS EFIAPI
 efi_driver_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
 			     EFI_HANDLE device, EFI_HANDLE child,
 			     CHAR8 *language, CHAR16 **controller_name ) {
-	union {
-		EFI_COMPONENT_NAME2_PROTOCOL *name2;
-		void *interface;
-	} name2;
+	EFI_COMPONENT_NAME2_PROTOCOL *name2;
 	int rc;
 
 	/* Delegate to the EFI_COMPONENT_NAME2_PROTOCOL instance
@@ -376,10 +370,9 @@ efi_driver_controller_name ( EFI_COMPONENT_NAME2_PROTOCOL *wtf __unused,
 	 */
 	if ( ( child != NULL ) &&
 	     ( ( rc = efi_open ( child, &efi_component_name2_protocol_guid,
-				 &name2.interface ) ) == 0 ) ) {
-		return name2.name2->GetControllerName ( name2.name2, device,
-							child, language,
-							controller_name );
+				 &name2 ) ) == 0 ) ) {
+		return name2->GetControllerName ( name2, device, child,
+						  language, controller_name );
 	}
 
 	/* Otherwise, let EFI use the default Device Path Name */

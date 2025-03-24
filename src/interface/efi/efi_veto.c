@@ -153,16 +153,13 @@ static int efi_veto_disconnect ( struct efi_veto *veto ) {
 static int efi_veto_uninstall ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE driver = veto->driver;
-	union {
-		EFI_DRIVER_BINDING_PROTOCOL *binding;
-		void *interface;
-	} binding;
+	EFI_DRIVER_BINDING_PROTOCOL *binding;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Open driver binding protocol */
 	if ( ( rc = efi_open ( driver, &efi_driver_binding_protocol_guid,
-			       &binding.interface ) ) != 0 ) {
+			       &binding ) ) != 0 ) {
 		DBGC ( driver, "EFIVETO %s could not open driver binding "
 		       "protocol: %s\n", efi_handle_name ( driver ),
 		       strerror ( rc ) );
@@ -172,7 +169,7 @@ static int efi_veto_uninstall ( struct efi_veto *veto ) {
 	/* Uninstall driver binding protocol */
 	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			driver, &efi_driver_binding_protocol_guid,
-			binding.binding, NULL ) ) != 0 ) {
+			binding, NULL ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( driver, "EFIVETO %s could not uninstall driver "
 		       "binding protocol: %s\n",
@@ -534,22 +531,10 @@ static struct efi_veto_candidate efi_vetoes[] = {
  */
 static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 			   struct efi_veto *veto ) {
-	union {
-		EFI_DRIVER_BINDING_PROTOCOL *binding;
-		void *interface;
-	} binding;
-	union {
-		EFI_LOADED_IMAGE_PROTOCOL *loaded;
-		void *interface;
-	} loaded;
-	union {
-		EFI_COMPONENT_NAME2_PROTOCOL *wtf2;
-		void *interface;
-	} wtf2;
-	union {
-		EFI_COMPONENT_NAME_PROTOCOL *wtf;
-		void *interface;
-	} wtf;
+	EFI_DRIVER_BINDING_PROTOCOL *binding;
+	EFI_LOADED_IMAGE_PROTOCOL *loaded;
+	EFI_COMPONENT_NAME2_PROTOCOL *wtf2;
+	EFI_COMPONENT_NAME_PROTOCOL *wtf;
 	CHAR16 *name;
 	unsigned int i;
 	EFI_HANDLE image;
@@ -561,17 +546,17 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 
 	/* Open driver binding protocol */
 	if ( ( rc = efi_open ( driver, &efi_driver_binding_protocol_guid,
-			       &binding.interface ) ) != 0 ) {
+			       &binding ) ) != 0 ) {
 		DBGC ( driver, "EFIVETO %s could not open driver binding "
 		       "protocol: %s\n", efi_handle_name ( driver ),
 		       strerror ( rc ) );
 		return rc;
 	}
-	image = binding.binding->ImageHandle;
+	image = binding->ImageHandle;
 
 	/* Open loaded image protocol */
 	if ( ( rc = efi_open ( image, &efi_loaded_image_protocol_guid,
-			       &loaded.interface ) ) != 0 ) {
+			       &loaded ) ) != 0 ) {
 		DBGC ( driver, "EFIVETO %s could not open",
 		       efi_handle_name ( driver ) );
 		DBGC ( driver, " %s loaded image protocol: %s\n",
@@ -581,23 +566,21 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 
 	/* Open component name protocol, if present */
 	if ( ( rc = efi_open ( image, &efi_component_name2_protocol_guid,
-			       &wtf2.interface ) ) != 0 ) {
+			       &wtf2 ) ) != 0 ) {
 		/* Ignore failure; is not required to be present */
 	}
 
 	/* Open obsolete component name protocol, if present */
 	if ( ( rc = efi_open ( image, &efi_component_name_protocol_guid,
-			       &wtf.interface ) ) != 0 ) {
+			       &wtf ) ) != 0 ) {
 		/* Ignore failure; is not required to be present */
 	}
 
 	/* Get driver name, if available */
-	if ( ( wtf2.wtf2 &&
-	       ( ( efirc = wtf2.wtf2->GetDriverName ( wtf2.wtf2, "en",
-						      &name ) == 0 ) ) ) ||
-	     ( wtf.wtf &&
-	       ( ( efirc = wtf.wtf->GetDriverName ( wtf.wtf, "eng",
-						    &name ) == 0 ) ) ) ) {
+	if ( ( wtf2 && ( ( efirc = wtf2->GetDriverName ( wtf2, "en",
+							 &name ) == 0 ) ) ) ||
+	     ( wtf && ( ( efirc = wtf->GetDriverName ( wtf, "eng",
+						       &name ) == 0 ) ) ) ) {
 		/* Driver has a name */
 	} else {
 		/* Ignore failure; name is not required to be present */
@@ -606,19 +589,19 @@ static int efi_veto_find ( EFI_HANDLE driver, const char *manufacturer,
 
 	/* Check vetoes */
 	DBGC2 ( &efi_vetoes, "EFIVETO checking %s [%p,%p)\n",
-		efi_handle_name ( driver ), loaded.loaded->ImageBase,
-		( loaded.loaded->ImageBase + loaded.loaded->ImageSize ) );
+		efi_handle_name ( driver ), loaded->ImageBase,
+		( loaded->ImageBase + loaded->ImageSize ) );
 	for ( i = 0 ; i < ( sizeof ( efi_vetoes ) /
 			    sizeof ( efi_vetoes[0] ) ) ; i++ ) {
-		if ( efi_vetoes[i].veto ( binding.binding, loaded.loaded,
-					  manufacturer, name ) ) {
+		if ( efi_vetoes[i].veto ( binding, loaded, manufacturer,
+					  name ) ) {
 			DBGC ( driver, "EFIVETO %s is vetoed (%s)\n",
 			       efi_handle_name ( driver ),
 			       efi_vetoes[i].name );
 			veto->driver = driver;
-			veto->binding = binding.binding;
+			veto->binding = binding;
 			veto->image = image;
-			veto->loaded = loaded.loaded;
+			veto->loaded = loaded;
 			break;
 		}
 	}

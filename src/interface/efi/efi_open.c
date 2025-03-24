@@ -93,7 +93,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v interface		Protocol interface pointer to fill in (or NULL to test)
  * @ret rc		Return status code
  */
-int efi_open ( EFI_HANDLE handle, EFI_GUID *protocol, void **interface ) {
+int efi_open_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+		       void **interface ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE agent = efi_image_handle;
 	EFI_HANDLE controller;
@@ -176,8 +177,8 @@ int efi_open ( EFI_HANDLE handle, EFI_GUID *protocol, void **interface ) {
  * @v interface		Protocol interface pointer to fill in
  * @ret rc		Return status code
  */
-int efi_open_unsafe ( EFI_HANDLE handle, EFI_GUID *protocol,
-		      void **interface ) {
+int efi_open_unsafe_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+			      void **interface ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE agent = efi_image_handle;
 	EFI_HANDLE controller;
@@ -236,8 +237,8 @@ void efi_close_unsafe ( EFI_HANDLE handle, EFI_GUID *protocol ) {
  * @v interface		Protocol interface pointer to fill in
  * @ret rc		Return status code
  */
-int efi_open_by_driver ( EFI_HANDLE handle, EFI_GUID *protocol,
-			 void **interface ) {
+int efi_open_by_driver_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+				 void **interface ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE agent = efi_image_handle;
 	EFI_HANDLE controller;
@@ -297,8 +298,8 @@ void efi_close_by_driver ( EFI_HANDLE handle, EFI_GUID *protocol ) {
  * @v interface		Protocol interface pointer to fill in
  * @ret rc		Return status code
  */
-int efi_open_by_child ( EFI_HANDLE handle, EFI_GUID *protocol,
-			EFI_HANDLE child, void **interface ) {
+int efi_open_by_child_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
+				EFI_HANDLE child, void **interface ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE agent = efi_image_handle;
 	EFI_HANDLE controller;

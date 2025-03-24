@@ -982,9 +982,9 @@ static EFI_DISK_IO_PROTOCOL efi_disk_io_protocol = {
  */
 static int efi_file_path_claim ( struct efi_file_path *file ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_DEVICE_PATH_PROTOCOL *old;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	EFI_HANDLE handle;
-	VOID *old;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -1116,10 +1116,7 @@ static void efi_file_path_uninstall ( struct efi_file_path *file ) {
  */
 int efi_file_install ( EFI_HANDLE handle ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_DISK_IO_PROTOCOL *diskio;
-		void *interface;
-	} diskio;
+	EFI_DISK_IO_PROTOCOL *diskio;
 	struct image *image;
 	EFI_STATUS efirc;
 	int rc;
@@ -1168,13 +1165,13 @@ int efi_file_install ( EFI_HANDLE handle ) {
 	 * shell.  I have no idea why this is.
 	 */
 	if ( ( rc = efi_open_by_driver ( handle, &efi_disk_io_protocol_guid,
-					 &diskio.interface ) ) != 0 ) {
+					 &diskio ) ) != 0 ) {
 		DBGC ( handle, "Could not open disk I/O protocol: %s\n",
 		       strerror ( rc ) );
 		DBGC_EFI_OPENERS ( handle, handle, &efi_disk_io_protocol_guid );
 		goto err_open;
 	}
-	assert ( diskio.diskio == &efi_disk_io_protocol );
+	assert ( diskio == &efi_disk_io_protocol );
 
 	/* Claim Linux initrd fixed device path */
 	if ( ( rc = efi_file_path_claim ( &efi_file_initrd ) ) != 0 )

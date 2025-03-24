@@ -248,15 +248,12 @@ static int efi_prescroll ( unsigned int lines ) {
  * @v handle		Image handle
  */
 static void efi_dump_image ( EFI_HANDLE handle ) {
-	union {
-		EFI_LOADED_IMAGE_PROTOCOL *image;
-		void *intf;
-	} loaded;
+	EFI_LOADED_IMAGE_PROTOCOL *loaded;
 	int rc;
 
 	/* Open loaded image protocol */
 	if ( ( rc = efi_open ( handle, &efi_loaded_image_protocol_guid,
-			       &loaded.intf ) ) != 0 ) {
+			       &loaded ) ) != 0 ) {
 		DBGC ( colour, "WRAP %s could not get loaded image protocol: "
 		       "%s\n", efi_handle_name ( handle ), strerror ( rc ) );
 		return;
@@ -264,14 +261,14 @@ static void efi_dump_image ( EFI_HANDLE handle ) {
 
 	/* Dump image information */
 	DBGC ( colour, "WRAP %s at base %p has protocols:\n",
-	       efi_handle_name ( handle ), loaded.image->ImageBase );
+	       efi_handle_name ( handle ), loaded->ImageBase );
 	DBGC_EFI_PROTOCOLS ( colour, handle );
 	DBGC ( colour, "WRAP %s parent", efi_handle_name ( handle ) );
-	DBGC ( colour, " %s\n", efi_handle_name ( loaded.image->ParentHandle ));
+	DBGC ( colour, " %s\n", efi_handle_name ( loaded->ParentHandle ) );
 	DBGC ( colour, "WRAP %s device", efi_handle_name ( handle ) );
-	DBGC ( colour, " %s\n", efi_handle_name ( loaded.image->DeviceHandle ));
+	DBGC ( colour, " %s\n", efi_handle_name ( loaded->DeviceHandle ) );
 	DBGC ( colour, "WRAP %s file", efi_handle_name ( handle ) );
-	DBGC ( colour, " %s\n", efi_devpath_text ( loaded.image->FilePath ) );
+	DBGC ( colour, " %s\n", efi_devpath_text ( loaded->FilePath ) );
 }
 
 /**
