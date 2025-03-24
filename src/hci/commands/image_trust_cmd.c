@@ -161,6 +161,69 @@ static int imgverify_exec ( int argc, char **argv ) {
 	return rc;
 }
 
+/** "imgdigest" options */
+struct imgdigest_options {
+	/** Download timeout */
+	unsigned long timeout;
+};
+
+/** "imgdigest" option list */
+static struct option_descriptor imgdigest_opts[] = {
+	OPTION_DESC ( "timeout", 't', required_argument,
+		      struct imgdigest_options, timeout, parse_timeout),
+};
+
+/** "imgdigest" command descriptor */
+static struct command_descriptor imgdigest_cmd =
+	COMMAND_DESC ( struct imgdigest_options, imgdigest_opts, 3, 3,
+		       "<uri|image> <digestname> <digest>" );
+
+/**
+ * The "imgdigest" command
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @ret rc		Return status code
+ */
+static int imgdigest_exec ( int argc, char **argv ) {
+	struct imgdigest_options opts;
+	struct image *image;
+	const char *image_name_uri;
+	const char *digest_name;
+	const char *digest;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &imgdigest_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Parse image name/URI string */
+	image_name_uri = argv[optind];
+
+	/* Parse digest name */
+	digest_name = argv[ optind + 1 ];
+
+	/* Parse digest string */
+	digest = argv[ optind + 2 ];
+
+	/* Acquire the image */
+	if ( ( rc = imgacquire ( image_name_uri, opts.timeout, &image ) ) != 0 )
+		goto err_acquire_image;
+
+	/* Verify image */
+	if ( ( rc = imgverifydigest ( image, digest_name, digest ) ) != 0 ) {
+		printf ( "Could not verify: %s\n", strerror ( rc ) );
+		goto err_verify;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_verify:
+ err_acquire_image:
+	return rc;
+}
+
 /** Image trust management commands */
 struct command image_trust_commands[] __command = {
 	{
@@ -170,5 +233,9 @@ struct command image_trust_commands[] __command = {
 	{
 		.name = "imgverify",
 		.exec = imgverify_exec,
+	},
+	{
+		.name = "imgdigest",
+		.exec = imgdigest_exec,
 	},
 };
