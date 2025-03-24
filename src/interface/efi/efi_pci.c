@@ -771,15 +771,13 @@ static struct dma_operations efipci_dma_operations = {
  */
 
 /**
- * Open EFI PCI device
+ * Get EFI PCI device information
  *
  * @v device		EFI device handle
- * @v attributes	Protocol opening attributes
  * @v efipci		EFI PCI device to fill in
  * @ret rc		Return status code
  */
-int efipci_open ( EFI_HANDLE device, UINT32 attributes,
-		  struct efi_pci_device *efipci ) {
+int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	union {
 		EFI_PCI_IO_PROTOCOL *pci_io;
@@ -792,8 +790,9 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 
 	/* See if device is a PCI device */
 	if ( ( efirc = bs->OpenProtocol ( device, &efi_pci_io_protocol_guid,
-					  &pci_io.interface, efi_image_handle,
-					  device, attributes ) ) != 0 ) {
+					  &pci_io.interface,
+					  efi_image_handle, device,
+					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
 		rc = -EEFI_PCI ( efirc );
 		DBGCP ( device, "EFIPCI %s cannot open PCI protocols: %s\n",
 			efi_handle_name ( device ), strerror ( rc ) );
@@ -850,39 +849,6 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 	return rc;
 }
 
-/**
- * Close EFI PCI device
- *
- * @v device		EFI device handle
- */
-void efipci_close ( EFI_HANDLE device ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-
-	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, device );
-}
-
-/**
- * Get EFI PCI device information
- *
- * @v device		EFI device handle
- * @v efipci		EFI PCI device to fill in
- * @ret rc		Return status code
- */
-int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
-	int rc;
-
-	/* Open PCI device, if possible */
-	if ( ( rc = efipci_open ( device, EFI_OPEN_PROTOCOL_GET_PROTOCOL,
-				  efipci ) ) != 0 )
-		return rc;
-
-	/* Close PCI device */
-	efipci_close ( device );
-
-	return 0;
-}
-
 /******************************************************************************
  *
  * EFI PCI driver
@@ -936,8 +902,11 @@ static int efipci_supported ( EFI_HANDLE device ) {
  * @ret rc		Return status code
  */
 static int efipci_start ( struct efi_device *efidev ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
 	struct efi_pci_device *efipci;
+	void *pci_io;
+	EFI_STATUS efirc;
 	int rc;
 
 	/* Allocate PCI device */
@@ -947,10 +916,16 @@ static int efipci_start ( struct efi_device *efidev ) {
 		goto err_alloc;
 	}
 
+	/* Get PCI device information */
+	if ( ( rc = efipci_info ( device, efipci ) ) != 0 )
+		goto err_info;
+
 	/* Open PCI device */
-	if ( ( rc = efipci_open ( device, ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE ),
-				  efipci ) ) != 0 ) {
+	if ( ( efirc = bs->OpenProtocol ( device, &efi_pci_io_protocol_guid,
+					  &pci_io, efi_image_handle, device,
+					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
+					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
+		rc = -EEFI_PCI ( efirc );
 		DBGC ( device, "EFIPCI %s could not open PCI device: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( device, device, &efi_pci_io_protocol_guid );
@@ -985,8 +960,10 @@ static int efipci_start ( struct efi_device *efidev ) {
  err_probe:
 	list_del ( &efipci->pci.dev.siblings );
  err_find_driver:
-	efipci_close ( device );
+	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
+			    efi_image_handle, device );
  err_open:
+ err_info:
 	free ( efipci );
  err_alloc:
 	return rc;
@@ -999,13 +976,15 @@ static int efipci_start ( struct efi_device *efidev ) {
   */
 static void efipci_stop ( struct efi_device *efidev ) {
 	struct efi_pci_device *efipci = efidev_get_drvdata ( efidev );
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
 
 	pci_remove ( &efipci->pci );
 	list_del ( &efipci->pci.dev.siblings );
 	assert ( efipci->pci.dma.mapped == 0 );
 	assert ( efipci->pci.dma.allocated == 0 );
-	efipci_close ( device );
+	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
+			    efi_image_handle, device );
 	free ( efipci );
 }
 
