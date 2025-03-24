@@ -1000,10 +1000,8 @@ static int efi_file_path_claim ( struct efi_file_path *file ) {
 	}
 
 	/* Locate device path protocol on this handle */
-	if ( ( ( efirc = bs->HandleProtocol ( handle,
-					      &efi_device_path_protocol_guid,
-					      &old ) ) != 0 ) ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, &efi_device_path_protocol_guid,
+			       &old ) != 0 ) ) {
 		DBGC ( file, "EFIFILE %s could not locate %s: %s\n",
 		       efi_file_name ( &file->file ),
 		       efi_devpath_text ( file->path ), strerror ( rc ) );

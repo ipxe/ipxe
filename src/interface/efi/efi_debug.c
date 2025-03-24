@@ -162,15 +162,11 @@ void dbg_efi_openers ( EFI_HANDLE handle, EFI_GUID *protocol ) {
  * @v protocol		Protocol GUID
  */
 void dbg_efi_protocol ( EFI_HANDLE handle, EFI_GUID *protocol ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	VOID *interface;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Get protocol instance */
-	if ( ( efirc = bs->HandleProtocol ( handle, protocol,
-					    &interface ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open ( handle, protocol, &interface ) ) != 0 ) {
 		printf ( "HANDLE %s could not identify %s: %s\n",
 			 efi_handle_name ( handle ),
 			 efi_guid_ntoa ( protocol ), strerror ( rc ) );
