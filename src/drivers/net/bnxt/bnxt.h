@@ -933,6 +933,19 @@ struct bnxt {
 	void                      *hwrm_addr_req;
 	void                      *hwrm_addr_resp;
 	void                      *hwrm_addr_dma;
+	struct dma_device         *dma;
+	struct dma_mapping        req_mapping;
+	struct dma_mapping        resp_mapping;
+	struct dma_mapping        dma_mapped;
+	struct dma_mapping        tx_mapping;
+	struct dma_mapping        rx_mapping;
+	struct dma_mapping        cq_mapping;
+	struct dma_mapping        nq_mapping;
+	dma_addr_t                tx_addr_mapping;
+	dma_addr_t                rx_addr_mapping;
+	dma_addr_t                cq_addr_mapping;
+	dma_addr_t                nq_addr_mapping;
+
 	dma_addr_t                req_addr_mapping;
 	dma_addr_t                resp_addr_mapping;
 	dma_addr_t                dma_addr_mapping;
