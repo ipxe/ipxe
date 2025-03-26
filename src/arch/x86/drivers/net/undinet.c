@@ -972,6 +972,10 @@ int undinet_probe ( struct undi_device *undi, struct device *dev ) {
 	}
 	DBGC ( undinic, "UNDINIC %p has MAC address %s and IRQ %d\n",
 	       undinic, eth_ntoa ( netdev->hw_addr ), undinic->irq );
+	if ( undinic->irq ) {
+		/* Sanity check - prefix should have disabled the IRQ */
+		assert ( ! irq_enabled ( undinic->irq ) );
+	}
 
 	/* Get interface information */
 	memset ( &undi_iface, 0, sizeof ( undi_iface ) );
