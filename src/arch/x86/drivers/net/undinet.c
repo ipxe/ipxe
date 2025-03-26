@@ -373,6 +373,18 @@ extern void undiisr ( void );
 uint8_t __data16 ( undiisr_irq );
 #define undiisr_irq __use_data16 ( undiisr_irq )
 
+/** IRQ mask register */
+uint16_t __data16 ( undiisr_imr );
+#define undiisr_imr __use_data16 ( undiisr_imr )
+
+/** IRQ mask bit */
+uint8_t __data16 ( undiisr_bit );
+#define undiisr_bit __use_data16 ( undiisr_bit )
+
+/** IRQ rearm flag */
+uint8_t __data16 ( undiisr_rearm );
+#define undiisr_rearm __use_data16 ( undiisr_rearm )
+
 /** IRQ chain vector */
 struct segoff __data16 ( undiisr_next_handler );
 #define undiisr_next_handler __use_data16 ( undiisr_next_handler )
@@ -395,6 +407,9 @@ static void undinet_hook_isr ( unsigned int irq ) {
 	assert ( undiisr_irq == 0 );
 
 	undiisr_irq = irq;
+	undiisr_imr = IMR_REG ( irq );
+	undiisr_bit = IMR_BIT ( irq );
+	undiisr_rearm = 0;
 	hook_bios_interrupt ( IRQ_INT ( irq ), ( ( intptr_t ) undiisr ),
 			      &undiisr_next_handler );
 }
@@ -588,6 +603,14 @@ static void undinet_poll ( struct net_device *netdev ) {
 		 * support interrupts.
 		 */
 		if ( ! undinet_isr_triggered() ) {
+
+			/* Rearm interrupt if needed */
+			if ( undiisr_rearm ) {
+				undiisr_rearm = 0;
+				assert ( undinic->irq != 0 );
+				enable_irq ( undinic->irq );
+			}
+
 			/* Allow interrupt to occur */
 			profile_start ( &undinet_irq_profiler );
 			__asm__ __volatile__ ( "sti\n\t"

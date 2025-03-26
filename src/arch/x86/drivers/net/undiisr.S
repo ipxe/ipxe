@@ -33,8 +33,16 @@ undiisr:
 	/* Check that we have an UNDI entry point */
 	cmpw	$0, undinet_entry_point
 	je	chain
-	
+
+	/* Mask interrupt and set rearm flag */
+	movw	undiisr_imr, %dx
+	inb	%dx, %al
+	orb	undiisr_bit, %al
+	outb	%al, %dx
+	movb	%al, undiisr_rearm
+
 	/* Issue UNDI API call */
+	movw	%ds, %ax
 	movw	%ax, %es
 	movw	$undinet_params, %di
 	movw	$PXENV_UNDI_ISR, %bx
