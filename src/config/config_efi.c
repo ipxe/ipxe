@@ -27,25 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** @file
  *
  * EFI-specific configuration options
- *
+ * This file is a stub.
  */
 
 PROVIDE_REQUIRING_SYMBOL();
-
-/*
- * Drag in all requested console types
- *
- */
-
-#ifdef CONSOLE_EFI
-REQUIRE_OBJECT ( efi_console );
-#endif
-#ifdef CONSOLE_EFIFB
-REQUIRE_OBJECT ( efi_fbcon );
-#endif
-#ifdef CONSOLE_FRAMEBUFFER
-REQUIRE_OBJECT ( efi_fbcon );
-#endif
-#ifdef DOWNLOAD_PROTO_FILE
-REQUIRE_OBJECT ( efi_local );
-#endif

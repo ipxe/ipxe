@@ -75,12 +75,19 @@ static struct efi_saved_tpl efi_snp_saved_tpl;
  * can be described and opaquely labels both menu entries as just "EFI
  * Network".
  */
+
+PROVIDE_REQUIRING_SYMBOL();
+
 #ifdef EFI_DOWNGRADE_UX
 static EFI_GUID dummy_load_file_protocol_guid = {
 	0x6f6c7323, 0x2077, 0x7523,
 	{ 0x6e, 0x68, 0x65, 0x6c, 0x70, 0x66, 0x75, 0x6c }
 };
 #define efi_load_file_protocol_guid dummy_load_file_protocol_guid
+#define is_efi_downgrade_ux 1
+#else
+#define is_efi_downgrade_ux 0
+REQUIRE_OBJECT ( config_efi_console );
 #endif
 
 /**
@@ -1718,6 +1725,10 @@ efi_snp_load_file ( EFI_LOAD_FILE_PROTOCOL *load_file,
 		container_of ( load_file, struct efi_snp_device, load_file );
 	struct net_device *netdev = snpdev->netdev;
 	int rc;
+
+	if ( is_efi_downgrade_ux ) {
+		return EFI_UNSUPPORTED;
+	}
 
 	/* Fail unless this is a boot attempt */
 	if ( ! booting ) {
