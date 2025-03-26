@@ -325,18 +325,37 @@ print_structure_information:
  *****************************************************************************
  */
 get_physical_device:
+	/* Allow for devices that fail to set the physical device type */
+	movb	$0xeb, %al
+	movb	%al, ( pxe_parameter_structure + 0x02 )
 	/* Issue PXENV_UNDI_GET_NIC_TYPE */
 	movw	$PXENV_UNDI_GET_NIC_TYPE, %bx
 	call	pxe_call
 	jnc	1f
 	call	print_pxe_error
+	movw	$10f, %si
+	call	print_message
 	jmp	no_physical_device
 1:	/* Determine physical device type */
+	movw	$10f, %si
+	call	print_message
 	movb	( pxe_parameter_structure + 0x02 ), %al
 	cmpb	$2, %al
 	je	pci_physical_device
+	cmpb	$0xeb, %al
+	je	probably_pci_physical_device
 	jmp	no_physical_device
+	.section ".prefix.data", "aw", @progbits
+10:	.asciz	"         UNDI device is "
+	.previous
 
+probably_pci_physical_device:
+	/* Device did not write the type byte: assume PCI */
+	movw	$10f, %si
+	call	print_message
+	.section ".prefix.data", "aw", @progbits
+10:	.asciz	"probably "
+	.previous
 pci_physical_device:
 	/* Record PCI bus:dev.fn and vendor/device IDs */
 	movl	( pxe_parameter_structure + 0x03 ), %eax
@@ -348,7 +367,7 @@ pci_physical_device:
 	call	print_pci_busdevfn
 	jmp	99f
 	.section ".prefix.data", "aw", @progbits
-10:	.asciz	"         UNDI device is PCI "
+10:	.asciz	"PCI "
 	.previous
 
 no_physical_device:
@@ -356,7 +375,7 @@ no_physical_device:
 	movw	$10f, %si
 	call	print_message
 	.section ".prefix.data", "aw", @progbits
-10:	.asciz	"         Unable to determine UNDI physical device"
+10:	.asciz	"unknown"
 	.previous
 
 99:
