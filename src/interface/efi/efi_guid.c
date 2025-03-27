@@ -85,6 +85,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/UsbIo.h>
 #include <ipxe/efi/Protocol/VlanConfig.h>
 #include <ipxe/efi/Guid/Acpi.h>
+#include <ipxe/efi/Guid/Fdt.h>
 #include <ipxe/efi/Guid/FileInfo.h>
 #include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/Guid/GlobalVariable.h>
@@ -411,6 +412,10 @@ EFI_GUID efi_acpi_10_table_guid
 EFI_GUID efi_acpi_20_table_guid
 	= EFI_ACPI_20_TABLE_GUID;
 
+/** FDT table GUID */
+EFI_GUID efi_fdt_table_guid
+	= FDT_TABLE_GUID;
+
 /** SMBIOS table GUID */
 EFI_GUID efi_smbios_table_guid
 	= SMBIOS_TABLE_GUID;
@@ -524,6 +529,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Dns6" },
 	{ &efi_dns6_service_binding_protocol_guid,
 	  "Dns6Sb" },
+	{ &efi_fdt_table_guid,
+	  "Fdt" },
 	{ &efi_global_variable,
 	  "GlobalVar" },
 	{ &efi_graphics_output_protocol_guid,

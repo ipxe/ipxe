@@ -248,6 +248,7 @@ extern EFI_GUID efi_vlan_config_protocol_guid;
 
 extern EFI_GUID efi_acpi_10_table_guid;
 extern EFI_GUID efi_acpi_20_table_guid;
+extern EFI_GUID efi_fdt_table_guid;
 extern EFI_GUID efi_smbios_table_guid;
 extern EFI_GUID efi_smbios2_table_guid;
 

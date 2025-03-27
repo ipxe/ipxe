@@ -25,8 +25,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <ipxe/fdt.h>
-#include <ipxe/efi/efi.h>
 #include <ipxe/init.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/Guid/Fdt.h>
 
 /** @file
  *
@@ -34,13 +35,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-#define DEVICE_TREE_TABLE_GUID						\
-	{ 0xb1b621d5, 0xf19c, 0x41a5,					\
-	  { 0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0 } }
-
 /** EFI Flattened Device Tree configuration table */
 static struct fdt_header *efi_fdt;
-EFI_USE_TABLE ( DEVICE_TREE_TABLE, &efi_fdt, 0 );
+EFI_USE_TABLE ( FDT_TABLE, &efi_fdt, 0 );
 
 /**
  * Initialise EFI Flattened Device Tree

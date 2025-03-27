@@ -71,7 +71,7 @@ sub try_import_file {
 	  push @dependencies, $2;
 	}
 	# Check for BSD licence statement
-	if ( /^\s*SPDX-License-Identifier: BSD-2-Clause-Patent$/ ) {
+	if ( /\s*SPDX-License-Identifier: BSD-2-Clause-Patent$/ ) {
 	  die "Licence detected after header guard\n" if $guard;
 	  $licence = "BSD2_PATENT";
 	}
@@ -119,7 +119,7 @@ my $edktop = shift;
 
 # Identify edk import directories
 my $edkdirs = [ "MdePkg/Include", "MdeModulePkg/Include",
-		"NetworkPkg/Include" ];
+		"NetworkPkg/Include", "EmbeddedPkg/Include" ];
 foreach my $edkdir ( @$edkdirs ) {
   die "Directory \"$edktop\" does not appear to contain the EFI EDK2 "
       ."(missing \"$edkdir\")\n" unless -d catdir ( $edktop, $edkdir );
