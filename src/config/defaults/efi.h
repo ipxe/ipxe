@@ -64,10 +64,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #if defined ( __arm__ ) || defined ( __aarch64__ )
 #define IOAPI_ARM
+#define FDT_CMD
 #endif
 
 #if defined ( __aarch64__ )
 #define	IMAGE_GZIP		/* GZIP image support */
+#define FDT_CMD
 #endif
 
 #if defined ( __loongarch__ )
@@ -76,6 +78,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #if defined ( __riscv )
 #define IOAPI_RISCV
+#define FDT_CMD
 #endif
 
 #endif /* CONFIG_DEFAULTS_EFI_H */

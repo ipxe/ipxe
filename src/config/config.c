@@ -308,6 +308,9 @@ REQUIRE_OBJECT ( image_crypt_cmd );
 #ifdef USB_CMD
 REQUIRE_OBJECT ( usb_cmd );
 #endif
+#ifdef FDT_CMD
+REQUIRE_OBJECT ( fdt_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
