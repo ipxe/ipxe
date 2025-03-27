@@ -10,6 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <ipxe/image.h>
 
 struct net_device;
 
@@ -92,6 +93,8 @@ struct fdt {
 	/** Length of strings block */
 	size_t strings_len;
 };
+
+extern struct image_tag fdt_image __image_tag;
 
 extern int fdt_path ( const char *path, unsigned int *offset );
 extern int fdt_alias ( const char *name, unsigned int *offset );

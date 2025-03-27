@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <byteswap.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/image.h>
 #include <ipxe/fdt.h>
 
 /** @file
@@ -38,6 +39,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** The system flattened device tree (if present) */
 static struct fdt fdt;
+
+/** The downloaded flattened device tree tag */
+struct image_tag fdt_image __image_tag = {
+	.name = "FDT",
+};
 
 /** A position within a device tree */
 struct fdt_cursor {
