@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/init.h>
 #include <ipxe/rotate.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_table.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_cmdline.h>
@@ -101,24 +102,6 @@ static EFIAPI void efi_shutdown_hook ( EFI_EVENT event __unused,
 
 	/* Shut down iPXE */
 	shutdown_boot();
-}
-
-/**
- * Look up EFI configuration table
- *
- * @v guid		Configuration table GUID
- * @ret table		Configuration table, or NULL
- */
-static void * efi_find_table ( EFI_GUID *guid ) {
-	unsigned int i;
-
-	for ( i = 0 ; i < efi_systab->NumberOfTableEntries ; i++ ) {
-		if ( memcmp ( &efi_systab->ConfigurationTable[i].VendorGuid,
-			      guid, sizeof ( *guid ) ) == 0 )
-			return efi_systab->ConfigurationTable[i].VendorTable;
-	}
-
-	return NULL;
 }
 
 /**
