@@ -246,6 +246,11 @@ extern EFI_GUID efi_usb2_hc_protocol_guid;
 extern EFI_GUID efi_usb_io_protocol_guid;
 extern EFI_GUID efi_vlan_config_protocol_guid;
 
+extern EFI_GUID efi_acpi_10_table_guid;
+extern EFI_GUID efi_acpi_20_table_guid;
+extern EFI_GUID efi_smbios_table_guid;
+extern EFI_GUID efi_smbios2_table_guid;
+
 extern EFI_GUID efi_cert_x509_guid;
 extern EFI_GUID efi_file_info_id;
 extern EFI_GUID efi_file_system_info_id;

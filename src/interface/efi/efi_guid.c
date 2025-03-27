@@ -84,10 +84,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/Usb2HostController.h>
 #include <ipxe/efi/Protocol/UsbIo.h>
 #include <ipxe/efi/Protocol/VlanConfig.h>
+#include <ipxe/efi/Guid/Acpi.h>
 #include <ipxe/efi/Guid/FileInfo.h>
 #include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/Guid/GlobalVariable.h>
 #include <ipxe/efi/Guid/ImageAuthentication.h>
+#include <ipxe/efi/Guid/SmBios.h>
 #include <ipxe/efi/Guid/TlsAuthentication.h>
 
 /** @file
@@ -401,6 +403,22 @@ EFI_GUID efi_usb_io_protocol_guid
 EFI_GUID efi_vlan_config_protocol_guid
 	= EFI_VLAN_CONFIG_PROTOCOL_GUID;
 
+/** ACPI 1.0 table GUID */
+EFI_GUID efi_acpi_10_table_guid
+	= ACPI_10_TABLE_GUID;
+
+/** ACPI 2.0 table GUID */
+EFI_GUID efi_acpi_20_table_guid
+	= EFI_ACPI_20_TABLE_GUID;
+
+/** SMBIOS table GUID */
+EFI_GUID efi_smbios_table_guid
+	= SMBIOS_TABLE_GUID;
+
+/** SMBIOS3 table GUID */
+EFI_GUID efi_smbios3_table_guid
+	= SMBIOS3_TABLE_GUID;
+
 /** X.509 certificate GUID */
 EFI_GUID efi_cert_x509_guid = EFI_CERT_X509_GUID;
 
@@ -458,6 +476,10 @@ struct efi_well_known_guid {
 static struct efi_well_known_guid efi_well_known_guids[] = {
 	{ &efi_absolute_pointer_protocol_guid,
 	  "AbsolutePointer" },
+	{ &efi_acpi_10_table_guid,
+	  "Acpi10" },
+	{ &efi_acpi_20_table_guid,
+	  "Acpi20" },
 	{ &efi_acpi_table_protocol_guid,
 	  "AcpiTable" },
 	{ &efi_apple_net_boot_protocol_guid,
@@ -582,6 +604,10 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "SimpleTextInputEx" },
 	{ &efi_simple_text_output_protocol_guid,
 	  "SimpleTextOutput" },
+	{ &efi_smbios_table_guid,
+	  "Smbios" },
+	{ &efi_smbios3_table_guid,
+	  "Smbios3" },
 	{ &efi_tcg_protocol_guid,
 	  "Tcg" },
 	{ &efi_tcg2_protocol_guid,
