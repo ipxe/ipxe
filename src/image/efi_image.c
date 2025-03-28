@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_image.h>
 #include <ipxe/efi/efi_shim.h>
+#include <ipxe/efi/efi_fdt.h>
 #include <ipxe/image.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -123,6 +124,24 @@ static wchar_t * efi_image_cmdline ( struct image *image ) {
 }
 
 /**
+ * Install EFI Flattened Device Tree table (when no FDT support is present)
+ *
+ * @ret rc		Return status code
+ */
+__weak int efi_fdt_install ( void ) {
+	return 0;
+}
+
+/**
+ * Uninstall EFI Flattened Device Tree table (when no FDT support is present)
+ *
+ * @ret rc		Return status code
+ */
+__weak int efi_fdt_uninstall ( void ) {
+	return 0;
+}
+
+/**
  * Execute EFI image
  *
  * @v image		EFI image
@@ -185,6 +204,13 @@ static int efi_image_exec ( struct image *image ) {
 		DBGC ( image, "EFIIMAGE %s could not install iPXE download "
 		       "protocol: %s\n", image->name, strerror ( rc ) );
 		goto err_download_install;
+	}
+
+	/* Install Flattened Device Tree table */
+	if ( ( rc = efi_fdt_install() ) != 0 ) {
+		DBGC ( image, "EFIIMAGE %s could not install FDT: %s\n",
+		       image->name, strerror ( rc ) );
+		goto err_fdt_install;
 	}
 
 	/* Create device path for image */
@@ -313,6 +339,8 @@ static int efi_image_exec ( struct image *image ) {
  err_cmdline:
 	free ( path );
  err_image_path:
+	efi_fdt_uninstall();
+ err_fdt_install:
 	efi_download_uninstall ( snpdev->handle );
  err_download_install:
 	efi_pxe_uninstall ( snpdev->handle );

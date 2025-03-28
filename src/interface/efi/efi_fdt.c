@@ -24,9 +24,12 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
+#include <byteswap.h>
 #include <ipxe/fdt.h>
 #include <ipxe/init.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_table.h>
+#include <ipxe/efi/efi_fdt.h>
 #include <ipxe/efi/Guid/Fdt.h>
 
 /** @file
@@ -76,3 +79,82 @@ static void efi_fdt_init ( void ) {
 struct init_fn efi_fdt_init_fn __init_fn ( INIT_EARLY ) = {
 	.initialise = efi_fdt_init,
 };
+
+/**
+ * Determine length of EFI Flattened Device Tree
+ *
+ * @v data		Configuration table data (presumed valid)
+ * @ret len		Length of table
+ */
+static size_t efi_fdt_len ( const void *data ) {
+	const struct fdt_header *hdr = data;
+
+	return be32_to_cpu ( hdr->totalsize );
+}
+
+/** EFI Flattened Device Tree table type */
+static struct efi_table efi_fdt_table = {
+	.guid = &efi_fdt_table_guid,
+	.len = efi_fdt_len,
+};
+
+/** EFI Flattened Device Tree table backup */
+static void *efi_fdt_backup;
+
+/** EFI Flattened Device Tree installed table */
+static struct fdt_header *efi_fdt_installed;
+
+/**
+ * Install EFI Flattened Device Tree table
+ *
+ * @ret rc		Return status code
+ */
+int efi_fdt_install ( void ) {
+	int rc;
+
+	/* Create device tree */
+	if ( ( rc = fdt_create ( &efi_fdt_installed ) ) != 0 ) {
+		DBGC ( &efi_fdt, "EFI_FDT could not install: %s\n",
+		       strerror ( rc ) );
+		goto err_create;
+	}
+
+	/* Install table */
+	if ( ( rc = efi_install_table ( &efi_fdt_table, efi_fdt_installed,
+					&efi_fdt_backup ) ) != 0 ) {
+		DBGC ( &efi_fdt, "EFIFDT could not install: %s\n",
+		       strerror ( rc ) );
+		goto err_install;
+	}
+
+	return 0;
+
+	efi_uninstall_table ( &efi_fdt_table, &efi_fdt_backup );
+ err_install:
+	fdt_remove ( efi_fdt_installed );
+ err_create:
+	return rc;
+}
+
+/**
+ * Uninstall EFI Flattened Device Tree table
+ *
+ * @ret rc		Return status code
+ */
+int efi_fdt_uninstall ( void ) {
+	int rc;
+
+	/* Uninstall table */
+	if ( ( rc = efi_uninstall_table ( &efi_fdt_table,
+					  &efi_fdt_backup ) ) != 0 ) {
+		DBGC ( &efi_fdt, "EFIFDT could not %sinstall: %s\n",
+		       ( efi_fdt_backup ? "re" : "un" ), strerror ( rc ) );
+		/* Leak memory: there is nothing else we can do */
+		return rc;
+	}
+
+	/* Remove table */
+	fdt_remove ( efi_fdt_installed );
+
+	return 0;
+}
