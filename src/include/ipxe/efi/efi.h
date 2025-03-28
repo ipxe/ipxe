@@ -172,6 +172,7 @@ struct efi_config_table {
 
 extern EFI_GUID efi_absolute_pointer_protocol_guid;
 extern EFI_GUID efi_acpi_table_protocol_guid;
+extern EFI_GUID efi_adapter_information_protocol_guid;
 extern EFI_GUID efi_apple_net_boot_protocol_guid;
 extern EFI_GUID efi_arp_protocol_guid;
 extern EFI_GUID efi_arp_service_binding_protocol_guid;
@@ -192,6 +193,7 @@ extern EFI_GUID efi_dns4_service_binding_protocol_guid;
 extern EFI_GUID efi_dns6_protocol_guid;
 extern EFI_GUID efi_dns6_service_binding_protocol_guid;
 extern EFI_GUID efi_driver_binding_protocol_guid;
+extern EFI_GUID efi_eap_configuration_protocol_guid;
 extern EFI_GUID efi_graphics_output_protocol_guid;
 extern EFI_GUID efi_hii_config_access_protocol_guid;
 extern EFI_GUID efi_hii_font_protocol_guid;
@@ -228,6 +230,7 @@ extern EFI_GUID efi_simple_pointer_protocol_guid;
 extern EFI_GUID efi_simple_text_input_protocol_guid;
 extern EFI_GUID efi_simple_text_input_ex_protocol_guid;
 extern EFI_GUID efi_simple_text_output_protocol_guid;
+extern EFI_GUID efi_supplicant_protocol_guid;
 extern EFI_GUID efi_tcg_protocol_guid;
 extern EFI_GUID efi_tcg2_protocol_guid;
 extern EFI_GUID efi_tcp4_protocol_guid;
@@ -245,6 +248,7 @@ extern EFI_GUID efi_usb_hc_protocol_guid;
 extern EFI_GUID efi_usb2_hc_protocol_guid;
 extern EFI_GUID efi_usb_io_protocol_guid;
 extern EFI_GUID efi_vlan_config_protocol_guid;
+extern EFI_GUID efi_wifi2_protocol_guid;
 
 extern EFI_GUID efi_acpi_10_table_guid;
 extern EFI_GUID efi_acpi_20_table_guid;

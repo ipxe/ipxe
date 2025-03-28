@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/AbsolutePointer.h>
 #include <ipxe/efi/Protocol/AcpiTable.h>
+#include <ipxe/efi/Protocol/AdapterInformation.h>
 #include <ipxe/efi/Protocol/AppleNetBoot.h>
 #include <ipxe/efi/Protocol/Arp.h>
 #include <ipxe/efi/Protocol/BlockIo.h>
@@ -44,6 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/Dns4.h>
 #include <ipxe/efi/Protocol/Dns6.h>
 #include <ipxe/efi/Protocol/DriverBinding.h>
+#include <ipxe/efi/Protocol/EapConfiguration.h>
 #include <ipxe/efi/Protocol/GraphicsOutput.h>
 #include <ipxe/efi/Protocol/HiiConfigAccess.h>
 #include <ipxe/efi/Protocol/HiiFont.h>
@@ -72,6 +74,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SimpleTextIn.h>
 #include <ipxe/efi/Protocol/SimpleTextInEx.h>
 #include <ipxe/efi/Protocol/SimpleTextOut.h>
+#include <ipxe/efi/Protocol/Supplicant.h>
 #include <ipxe/efi/Protocol/TcgService.h>
 #include <ipxe/efi/Protocol/Tcg2Protocol.h>
 #include <ipxe/efi/Protocol/Tcp4.h>
@@ -84,6 +87,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/Usb2HostController.h>
 #include <ipxe/efi/Protocol/UsbIo.h>
 #include <ipxe/efi/Protocol/VlanConfig.h>
+#include <ipxe/efi/Protocol/WiFi2.h>
 #include <ipxe/efi/Guid/Acpi.h>
 #include <ipxe/efi/Guid/Fdt.h>
 #include <ipxe/efi/Guid/FileInfo.h>
@@ -111,6 +115,10 @@ EFI_GUID efi_absolute_pointer_protocol_guid
 /** ACPI table protocol GUID */
 EFI_GUID efi_acpi_table_protocol_guid
 	= EFI_ACPI_TABLE_PROTOCOL_GUID;
+
+/** Adapter information protocol GUID */
+EFI_GUID efi_adapter_information_protocol_guid
+	= EFI_ADAPTER_INFORMATION_PROTOCOL_GUID;
 
 /** Apple NetBoot protocol GUID */
 EFI_GUID efi_apple_net_boot_protocol_guid
@@ -191,6 +199,10 @@ EFI_GUID efi_dns6_service_binding_protocol_guid
 /** Driver binding protocol GUID */
 EFI_GUID efi_driver_binding_protocol_guid
 	= EFI_DRIVER_BINDING_PROTOCOL_GUID;
+
+/** EAP configuration protocol GUID */
+EFI_GUID efi_eap_configuration_protocol_guid
+	= EFI_EAP_CONFIGURATION_PROTOCOL_GUID;
 
 /** Graphics output protocol GUID */
 EFI_GUID efi_graphics_output_protocol_guid
@@ -336,6 +348,10 @@ EFI_GUID efi_simple_text_input_ex_protocol_guid
 EFI_GUID efi_simple_text_output_protocol_guid
 	= EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID;
 
+/** Supplicant protocol GUID */
+EFI_GUID efi_supplicant_protocol_guid
+	= EFI_SUPPLICANT_PROTOCOL_GUID;
+
 /** TCG protocol GUID */
 EFI_GUID efi_tcg_protocol_guid
 	= EFI_TCG_PROTOCOL_GUID;
@@ -404,6 +420,10 @@ EFI_GUID efi_usb_io_protocol_guid
 EFI_GUID efi_vlan_config_protocol_guid
 	= EFI_VLAN_CONFIG_PROTOCOL_GUID;
 
+/** WiFi 2 protocol GUID */
+EFI_GUID efi_wifi2_protocol_guid
+	= EFI_WIRELESS_MAC_CONNECTION_II_PROTOCOL_GUID;
+
 /** ACPI 1.0 table GUID */
 EFI_GUID efi_acpi_10_table_guid
 	= ACPI_10_TABLE_GUID;
@@ -469,6 +489,12 @@ static EFI_GUID efi_vlan_config_dxe_guid = {
 	{ 0xa8, 0xf4, 0x08, 0x51, 0x9b, 0xc4, 0x39, 0xdf }
 };
 
+/** WiFiConnectionMgrDxe module GUID */
+static EFI_GUID efi_wifi_connection_mgr_dxe_guid = {
+	0x99b7c019, 0x4789, 0x4829,
+	{ 0xa7, 0xbd, 0x0d, 0x4b, 0xaa, 0x62, 0x28, 0x72 }
+};
+
 /** A well-known GUID */
 struct efi_well_known_guid {
 	/** GUID */
@@ -487,6 +513,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Acpi20" },
 	{ &efi_acpi_table_protocol_guid,
 	  "AcpiTable" },
+	{ &efi_adapter_information_protocol_guid,
+	  "AdapterInfo" },
 	{ &efi_apple_net_boot_protocol_guid,
 	  "AppleNetBoot" },
 	{ &efi_arp_protocol_guid,
@@ -529,6 +557,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Dns6" },
 	{ &efi_dns6_service_binding_protocol_guid,
 	  "Dns6Sb" },
+	{ &efi_eap_configuration_protocol_guid,
+	  "EapConfig" },
 	{ &efi_fdt_table_guid,
 	  "Fdt" },
 	{ &efi_global_variable,
@@ -615,6 +645,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Smbios" },
 	{ &efi_smbios3_table_guid,
 	  "Smbios3" },
+	{ &efi_supplicant_protocol_guid,
+	  "Supplicant" },
 	{ &efi_tcg_protocol_guid,
 	  "Tcg" },
 	{ &efi_tcg2_protocol_guid,
@@ -655,6 +687,10 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "VlanConfig" },
 	{ &efi_vlan_config_dxe_guid,
 	  "VlanConfigDxe" },
+	{ &efi_wifi2_protocol_guid,
+	  "Wifi2" },
+	{ &efi_wifi_connection_mgr_dxe_guid,
+	  "WiFiConnectionMgrDxe" },
 };
 
 /**
