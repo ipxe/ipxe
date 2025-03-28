@@ -123,6 +123,7 @@ _sbi_start:
 	/* Register device tree */
 	la	a0, sysfdt
 	mv	a1, s1
+	li	a2, -1
 	call	fdt_parse
 
 	/* Call main program */

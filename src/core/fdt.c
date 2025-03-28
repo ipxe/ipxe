@@ -82,7 +82,7 @@ static int fdt_traverse ( struct fdt *fdt,
 	size_t len;
 
 	/* Sanity checks */
-	assert ( pos->offset < fdt->len );
+	assert ( pos->offset <= fdt->len );
 	assert ( ( pos->offset & ( FDT_STRUCTURE_ALIGN - 1 ) ) == 0 );
 
 	/* Clear descriptor */
@@ -453,14 +453,28 @@ int fdt_mac ( struct fdt *fdt, unsigned int offset,
  *
  * @v fdt		Device tree
  * @v hdr		Device tree header
+ * @v max_len		Maximum device tree length
  * @ret rc		Return status code
  */
-int fdt_parse ( struct fdt *fdt, const struct fdt_header *hdr ) {
+int fdt_parse ( struct fdt *fdt, const struct fdt_header *hdr,
+		size_t max_len ) {
 	const uint8_t *end;
+
+	/* Sanity check */
+	if ( sizeof ( fdt ) > max_len ) {
+		DBGC ( fdt, "FDT length %#zx too short for header\n",
+		       max_len );
+		goto err;
+	}
 
 	/* Record device tree location */
 	fdt->hdr = hdr;
 	fdt->len = be32_to_cpu ( hdr->totalsize );
+	if ( fdt->len > max_len ) {
+		DBGC ( fdt, "FDT has invalid length %#zx / %#zx\n",
+		       fdt->len, max_len );
+		goto err;
+	}
 	DBGC ( fdt, "FDT version %d at %p+%#04zx\n",
 	       be32_to_cpu ( hdr->version ), fdt->hdr, fdt->len );
 
