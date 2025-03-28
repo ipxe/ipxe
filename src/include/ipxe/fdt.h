@@ -78,9 +78,9 @@ struct fdt {
 	/** Tree data */
 	union {
 		/** Tree header */
-		const struct fdt_header *hdr;
+		struct fdt_header *hdr;
 		/** Raw data */
-		const void *raw;
+		void *raw;
 	};
 	/** Length of tree */
 	size_t len;
@@ -107,7 +107,7 @@ extern int fdt_u64 ( struct fdt *fdt, unsigned int offset, const char *name,
 		     uint64_t *value );
 extern int fdt_mac ( struct fdt *fdt, unsigned int offset,
 		     struct net_device *netdev );
-extern int fdt_parse ( struct fdt *fdt, const struct fdt_header *hdr,
+extern int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr,
 		       size_t max_len );
 
 #endif /* _IPXE_FDT_H */

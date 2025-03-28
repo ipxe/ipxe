@@ -456,8 +456,7 @@ int fdt_mac ( struct fdt *fdt, unsigned int offset,
  * @v max_len		Maximum device tree length
  * @ret rc		Return status code
  */
-int fdt_parse ( struct fdt *fdt, const struct fdt_header *hdr,
-		size_t max_len ) {
+int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 	const uint8_t *end;
 
 	/* Sanity check */

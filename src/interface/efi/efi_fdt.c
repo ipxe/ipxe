@@ -44,6 +44,8 @@ EFI_USE_TABLE ( FDT_TABLE, &efi_fdt, 0 );
  *
  */
 static void efi_fdt_init ( void ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_STATUS efirc;
 	int rc;
 
 	/* Do nothing if no configuration table is present */
@@ -59,6 +61,15 @@ static void efi_fdt_init ( void ) {
 		       strerror ( rc ) );
 		return;
 	}
+
+	/* Create copy, since table may be removed at any time */
+	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData, sysfdt.len,
+					  &sysfdt.raw ) ) != 0 ) {
+		DBGC ( &efi_fdt, "EFIFDT could not create copy\n" );
+		sysfdt.len = 0;
+		return;
+	}
+	memcpy ( sysfdt.raw, efi_fdt, sysfdt.len );
 }
 
 /** EFI Flattened Device Tree initialisation function */
