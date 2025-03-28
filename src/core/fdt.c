@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <byteswap.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/image.h>
+#include <ipxe/umalloc.h>
 #include <ipxe/fdt.h>
 
 /** @file
@@ -538,6 +539,84 @@ int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 	DBGC_HDA ( fdt, 0, hdr, sizeof ( *hdr ) );
 	memset ( fdt, 0, sizeof ( *fdt ) );
 	return -EINVAL;
+}
+
+/**
+ * Parse device tree image
+ *
+ * @v fdt		Device tree
+ * @v image		Image
+ * @ret rc		Return status code
+ */
+static int fdt_parse_image ( struct fdt *fdt, struct image *image ) {
+	int rc;
+
+	/* Parse image */
+	if ( ( rc = fdt_parse ( fdt, user_to_virt ( image->data, 0 ),
+				image->len ) ) != 0 ) {
+		DBGC ( fdt, "FDT image \"%s\" is invalid: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
+
+	DBGC ( fdt, "FDT image is \"%s\"\n", image->name );
+	return 0;
+}
+
+/**
+ * Create device tree
+ *
+ * @v hdr		Device tree header to fill in (may be set to NULL)
+ * @ret rc		Return status code
+ */
+int fdt_create ( struct fdt_header **hdr ) {
+	struct image *image;
+	struct fdt fdt;
+	void *copy;
+	int rc;
+
+	/* Use system FDT as the base by default */
+	memcpy ( &fdt, &sysfdt, sizeof ( fdt ) );
+
+	/* If an FDT image exists, use this instead */
+	image = find_image_tag ( &fdt_image );
+	if ( image && ( ( rc = fdt_parse_image ( &fdt, image ) ) != 0 ) )
+		goto err_image;
+
+	/* Exit successfully if we have no base FDT */
+	if ( ! fdt.len ) {
+		DBGC ( &fdt, "FDT has no base tree\n" );
+		goto no_fdt;
+	}
+
+	/* Create modifiable copy */
+	copy = user_to_virt ( umalloc ( fdt.len ), 0 );
+	if ( ! copy ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	memcpy ( copy, fdt.raw, fdt.len );
+	fdt.raw = copy;
+
+ no_fdt:
+	*hdr = fdt.raw;
+	return 0;
+
+	ufree ( virt_to_user ( fdt.raw ) );
+ err_alloc:
+ err_image:
+	return rc;
+}
+
+/**
+ * Remove device tree
+ *
+ * @v hdr		Device tree header, or NULL
+ */
+void fdt_remove ( struct fdt_header *hdr ) {
+
+	/* Free modifiable copy */
+	ufree ( virt_to_user ( hdr ) );
 }
 
 /* Drag in objects via fdt_traverse() */

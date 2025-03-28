@@ -109,5 +109,7 @@ extern int fdt_mac ( struct fdt *fdt, unsigned int offset,
 		     struct net_device *netdev );
 extern int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr,
 		       size_t max_len );
+extern int fdt_create ( struct fdt_header **hdr );
+extern void fdt_remove ( struct fdt_header *hdr );
 
 #endif /* _IPXE_FDT_H */
