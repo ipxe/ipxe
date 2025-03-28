@@ -95,12 +95,18 @@ struct fdt {
 };
 
 extern struct image_tag fdt_image __image_tag;
+extern struct fdt sysfdt;
 
-extern int fdt_path ( const char *path, unsigned int *offset );
-extern int fdt_alias ( const char *name, unsigned int *offset );
-extern const char * fdt_string ( unsigned int offset, const char *name );
-extern int fdt_u64 ( unsigned int offset, const char *name, uint64_t *value );
-extern int fdt_mac ( unsigned int offset, struct net_device *netdev );
-extern int register_fdt ( const struct fdt_header *hdr );
+extern int fdt_path ( struct fdt *fdt, const char *path,
+		      unsigned int *offset );
+extern int fdt_alias ( struct fdt *fdt, const char *name,
+		       unsigned int *offset );
+extern const char * fdt_string ( struct fdt *fdt, unsigned int offset,
+				 const char *name );
+extern int fdt_u64 ( struct fdt *fdt, unsigned int offset, const char *name,
+		     uint64_t *value );
+extern int fdt_mac ( struct fdt *fdt, unsigned int offset,
+		     struct net_device *netdev );
+extern int fdt_parse ( struct fdt *fdt, const struct fdt_header *hdr );
 
 #endif /* _IPXE_FDT_H */

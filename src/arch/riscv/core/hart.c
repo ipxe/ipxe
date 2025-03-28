@@ -55,7 +55,7 @@ static int hart_node ( unsigned int *offset ) {
 	snprintf ( path, sizeof ( path ), "/cpus/cpu@%lx", boot_hart );
 
 	/* Find node */
-	if ( ( rc = fdt_path ( path, offset ) ) != 0 ) {
+	if ( ( rc = fdt_path ( &sysfdt, path, offset ) ) != 0 ) {
 		DBGC ( colour, "HART could not find %s: %s\n",
 		       path, strerror ( rc ) );
 		return rc;
@@ -81,7 +81,7 @@ int hart_supported ( const char *ext ) {
 		return rc;
 
 	/* Get ISA description */
-	isa = fdt_string ( offset, "riscv,isa" );
+	isa = fdt_string ( &sysfdt, offset, "riscv,isa" );
 	if ( ! isa ) {
 		DBGC ( colour, "HART could not identify ISA\n" );
 		return -ENOENT;

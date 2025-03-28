@@ -53,9 +53,9 @@ static void efi_fdt_init ( void ) {
 	}
 	DBGC ( &efi_fdt, "EFIFDT configuration table at %p\n", efi_fdt );
 
-	/* Register device tree */
-	if ( ( rc = register_fdt ( efi_fdt ) ) != 0 ) {
-		DBGC ( &efi_fdt, "EFIFDT could not register: %s\n",
+	/* Parse as system device tree */
+	if ( ( rc = fdt_parse ( &sysfdt, efi_fdt ) ) != 0 ) {
+		DBGC ( &efi_fdt, "EFIFDT could not parse: %s\n",
 		       strerror ( rc ) );
 		return;
 	}

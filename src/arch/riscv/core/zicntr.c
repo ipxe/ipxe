@@ -152,8 +152,8 @@ static int zicntr_probe ( void ) {
 	}
 
 	/* Get timer frequency */
-	if ( ( ( rc = fdt_path ( "/cpus", &offset ) ) != 0 ) ||
-	     ( ( rc = fdt_u64 ( offset, "timebase-frequency",
+	if ( ( ( rc = fdt_path ( &sysfdt, "/cpus", &offset ) ) != 0 ) ||
+	     ( ( rc = fdt_u64 ( &sysfdt, offset, "timebase-frequency",
 				&u.freq ) ) != 0 ) ) {
 		DBGC ( colour, "ZICNTR could not determine frequency: %s\n",
 		       strerror ( rc ) );
