@@ -442,6 +442,68 @@ void efi_driver_uninstall ( void ) {
 }
 
 /**
+ * Try to disconnect an existing EFI driver
+ *
+ * @v device		EFI device
+ * @v protocol		Protocol GUID
+ * @ret rc		Return status code
+ */
+static int efi_driver_exclude ( EFI_HANDLE device, EFI_GUID *protocol ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *openers;
+	EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *opener;
+	EFI_HANDLE driver;
+	UINTN count;
+	unsigned int i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Retrieve list of openers */
+	if ( ( efirc = bs->OpenProtocolInformation ( device, protocol, &openers,
+						     &count ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( device, "EFIDRV %s could not list %s openers: %s\n",
+		       efi_handle_name ( device ), efi_guid_ntoa ( protocol ),
+		       strerror ( rc ) );
+		goto err_list;
+	}
+
+	/* Identify BY_DRIVER opener */
+	driver = NULL;
+	for ( i = 0 ; i < count ; i++ ) {
+		opener = &openers[i];
+		if ( opener->Attributes & EFI_OPEN_PROTOCOL_BY_DRIVER ) {
+			driver = opener->AgentHandle;
+			break;
+		}
+	}
+
+	/* Try to disconnect driver */
+	if ( driver ) {
+		DBGC ( device, "EFIDRV %s disconnecting %s driver ",
+		       efi_handle_name ( device ), efi_guid_ntoa ( protocol ) );
+		DBGC ( device, "%s\n", efi_handle_name ( driver ) );
+		if ( ( efirc = bs->DisconnectController ( device, driver,
+							  NULL ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( device, "EFIDRV %s could not disconnect ",
+			       efi_handle_name ( device ) );
+			DBGC ( device, "%s: %s\n",
+			       efi_handle_name ( driver ), strerror ( rc ) );
+			goto err_disconnect;
+		}
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_disconnect:
+	bs->FreePool ( openers );
+ err_list:
+	return rc;
+}
+
+/**
  * Try to connect EFI driver
  *
  * @v device		EFI device
@@ -451,6 +513,8 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE drivers[2] =
 		{ efi_driver_binding.DriverBindingHandle, NULL };
+	struct efi_driver *efidrv;
+	EFI_GUID *exclude;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -468,13 +532,20 @@ static int efi_driver_connect ( EFI_HANDLE device ) {
 	DBGC ( device, "EFIDRV %s disconnecting existing drivers\n",
 	       efi_handle_name ( device ) );
 	efi_driver_disconnecting = 1;
-	if ( ( efirc = bs->DisconnectController ( device, NULL,
-						  NULL ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIDRV %s could not disconnect existing "
-		       "drivers: %s\n", efi_handle_name ( device ),
-		       strerror ( rc ) );
-		/* Ignore the error and attempt to connect our drivers */
+	for_each_table_entry_reverse ( efidrv, EFI_DRIVERS ) {
+		exclude = efidrv->exclude;
+		if ( ! exclude )
+			continue;
+		if ( ( rc = efidrv->supported ( device ) ) != 0 )
+			continue;
+		DBGC ( device, "EFIDRV %s disconnecting %s drivers\n",
+		       efi_handle_name ( device ), efi_guid_ntoa ( exclude ) );
+		if ( ( rc = efi_driver_exclude ( device, exclude ) ) != 0 ) {
+			DBGC ( device, "EFIDRV %s could not disconnect %s "
+			       "drivers: %s\n", efi_handle_name ( device ),
+			       efi_guid_ntoa ( exclude ), strerror ( rc ) );
+			/* Ignore the error and attempt to connect anyway */
+		}
 	}
 	efi_driver_disconnecting = 0;
 	DBGC2 ( device, "EFIDRV %s after disconnecting:\n",

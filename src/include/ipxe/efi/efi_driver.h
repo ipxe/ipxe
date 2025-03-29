@@ -33,6 +33,8 @@ struct efi_device {
 struct efi_driver {
 	/** Name */
 	const char *name;
+	/** Protocol to which exclusive access is required, if any */
+	EFI_GUID *exclude;
 	/**
 	 * Check if driver supports device
 	 *

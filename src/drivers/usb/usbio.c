@@ -1651,6 +1651,7 @@ static void usbio_stop ( struct efi_device *efidev ) {
 /** EFI USB I/O driver */
 struct efi_driver usbio_driver __efi_driver ( EFI_DRIVER_HARDWARE ) = {
 	.name = "USBIO",
+	.exclude = &efi_usb_io_protocol_guid,
 	.supported = usbio_supported,
 	.start = usbio_start,
 	.stop = usbio_stop,
