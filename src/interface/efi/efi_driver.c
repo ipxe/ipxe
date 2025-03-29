@@ -167,6 +167,7 @@ static EFI_STATUS EFIAPI
 efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		       EFI_HANDLE device, EFI_DEVICE_PATH_PROTOCOL *child ) {
 	struct efi_driver *efidrv;
+	unsigned int count;
 	int rc;
 
 	DBGCP ( device, "EFIDRV %s DRIVER_SUPPORTED",
@@ -182,18 +183,24 @@ efi_driver_supported ( EFI_DRIVER_BINDING_PROTOCOL *driver __unused,
 		return EFI_ALREADY_STARTED;
 	}
 
-	/* Look for a driver claiming to support this device */
+	/* Count drivers claiming to support this device */
+	count = 0;
 	for_each_table_entry ( efidrv, EFI_DRIVERS ) {
 		if ( ( rc = efidrv->supported ( device ) ) == 0 ) {
 			DBGC ( device, "EFIDRV %s has driver \"%s\"\n",
 			       efi_handle_name ( device ), efidrv->name );
-			return 0;
+			count++;
 		}
 	}
-	DBGCP ( device, "EFIDRV %s has no driver\n",
-		efi_handle_name ( device ) );
 
-	return EFI_UNSUPPORTED;
+	/* Check that we have at least one driver */
+	if ( ! count ) {
+		DBGCP ( device, "EFIDRV %s has no driver\n",
+			efi_handle_name ( device ) );
+		return EFI_UNSUPPORTED;
+	}
+
+	return 0;
 }
 
 /**
