@@ -48,7 +48,7 @@ static int mnp_supported ( EFI_HANDLE device ) {
 }
 
 /** EFI MNP driver */
-struct efi_driver mnp_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
+struct efi_driver mnp_driver __efi_driver ( EFI_DRIVER_MNP ) = {
 	.name = "MNP",
 	.supported = mnp_supported,
 	.start = mnpnet_start,
