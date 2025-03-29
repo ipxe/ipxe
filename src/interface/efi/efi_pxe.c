@@ -1679,7 +1679,7 @@ void efi_pxe_uninstall ( EFI_HANDLE handle ) {
 
 	/* Locate PXE base code */
 	pxe = efi_pxe_find ( handle );
-	if ( ! handle ) {
+	if ( ! pxe ) {
 		DBG ( "PXE could not find base code for %s\n",
 		      efi_handle_name ( handle ) );
 		return;
