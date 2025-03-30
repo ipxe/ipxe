@@ -1090,7 +1090,8 @@ static int http_tx_request ( struct http_transaction *http ) {
 	}
 
 	/* Allocate I/O buffer */
-	iobuf = alloc_iob ( len + 1 /* NUL */ + http->request.content.len );
+	iobuf = xfer_alloc_iob ( &http->conn, ( len + 1 /* NUL */ +
+						http->request.content.len ) );
 	if ( ! iobuf ) {
 		rc = -ENOMEM;
 		goto err_alloc;

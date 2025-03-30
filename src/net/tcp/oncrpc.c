@@ -150,7 +150,7 @@ int oncrpc_call ( struct interface *intf, struct oncrpc_session *session,
 	frame_size  = oncrpc_compute_size ( header );
 	frame_size += oncrpc_compute_size ( fields );
 
-	io_buf = alloc_iob ( frame_size );
+	io_buf = xfer_alloc_iob ( intf, frame_size );
 	if ( ! io_buf )
 		return -ENOBUFS;
 
