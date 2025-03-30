@@ -196,6 +196,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 static LIST_HEAD ( tls_sessions );
 
 static void tls_tx_resume_all ( struct tls_session *session );
+static struct io_buffer * tls_alloc_iob ( struct tls_connection *tls,
+					  size_t len );
+static int tls_send_record ( struct tls_connection *tls, unsigned int type,
+			     struct io_buffer *iobuf );
 static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len );
 static void tls_clear_cipher ( struct tls_connection *tls,
@@ -1126,9 +1130,6 @@ static void tls_restart ( struct tls_connection *tls ) {
 static int tls_send_handshake ( struct tls_connection *tls,
 				const void *data, size_t len ) {
 
-	/* Add to handshake digest */
-	tls_add_handshake ( tls, data, len );
-
 	/* Send record */
 	return tls_send_plaintext ( tls, TLS_TYPE_HANDSHAKE, data, len );
 }
@@ -1333,8 +1334,8 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	} __attribute__ (( packed )) *certificates;
 	struct x509_link *link;
 	struct x509_certificate *cert;
+	struct io_buffer *iobuf;
 	size_t len;
-	int rc;
 
 	/* Calculate length of client certificates */
 	len = 0;
@@ -1348,33 +1349,28 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	/* Allocate storage for Certificate record (which may be too
 	 * large for the stack).
 	 */
-	certificates = zalloc ( sizeof ( *certificates ) + len );
-	if ( ! certificates )
+	iobuf = tls_alloc_iob ( tls, ( sizeof ( *certificates ) + len ) );
+	if ( ! iobuf )
 		return -ENOMEM_CERTIFICATE;
 
 	/* Populate record */
+	certificates = iob_put ( iobuf, sizeof ( *certificates ) );
 	certificates->type_length =
 		( cpu_to_le32 ( TLS_CERTIFICATE ) |
 		  htonl ( sizeof ( *certificates ) + len -
 			  sizeof ( certificates->type_length ) ) );
 	tls_set_uint24 ( &certificates->length, len );
-	certificate = &certificates->certificates[0];
 	list_for_each_entry ( link, &tls->client.chain->links, list ) {
 		cert = link->cert;
+		certificate = iob_put ( iobuf, sizeof ( *certificate ) );
 		tls_set_uint24 ( &certificate->length, cert->raw.len );
-		memcpy ( certificate->data, cert->raw.data, cert->raw.len );
-		certificate = ( ( ( void * ) certificate->data ) +
-				cert->raw.len );
+		memcpy ( iob_put ( iobuf, cert->raw.len ), cert->raw.data,
+			 cert->raw.len );
 	}
 
 	/* Transmit record */
-	rc = tls_send_handshake ( tls, certificates,
-				  ( sizeof ( *certificates ) + len ) );
-
-	/* Free record */
-	free ( certificates );
-
-	return rc;
+	return tls_send_record ( tls, TLS_TYPE_HANDSHAKE,
+				 iob_disown ( iobuf ) );
 }
 
 /**
@@ -2928,16 +2924,57 @@ static void tls_hmac_list ( struct tls_cipherspec *cipherspec,
 }
 
 /**
+ * Allocate I/O buffer for transmitted record
+ *
+ * @v tls		TLS connection
+ * @v len		I/O buffer payload length
+ * @ret iobuf		I/O buffer
+ */
+static struct io_buffer * tls_alloc_iob ( struct tls_connection *tls,
+					  size_t len ) {
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
+	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct cipher_algorithm *cipher = suite->cipher;
+	struct tls_header *tlshdr;
+	struct io_buffer *iobuf;
+	size_t pre_len;
+	size_t padded_len;
+	size_t post_len;
+
+	/* Calculate length of padded data */
+	padded_len = ( len + suite->mac_len );
+	if ( is_block_cipher ( cipher ) ) {
+		padded_len = ( ( padded_len + 1 + cipher->blocksize - 1 ) &
+			       ~( cipher->blocksize - 1 ) );
+		assert ( padded_len > ( len + suite->mac_len ) );
+	}
+
+	/* Calculate lengths before and after padded data */
+	pre_len = ( sizeof ( *tlshdr ) + suite->record_iv_len );
+	post_len = cipher->authsize;
+
+	/* Allocate I/O buffer */
+	iobuf = xfer_alloc_iob ( &tls->cipherstream,
+				 ( pre_len + padded_len + post_len ) );
+	if ( ! iobuf )
+		return NULL;
+
+	/* Reserve space */
+	iob_reserve ( iobuf, pre_len );
+
+	return iobuf;
+}
+
+/**
  * Send plaintext record
  *
  * @v tls		TLS connection
  * @v type		Record type
- * @v data		Plaintext record
- * @v len		Length of plaintext record
+ * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
-				const void *data, size_t len ) {
+static int tls_send_record ( struct tls_connection *tls, unsigned int type,
+			     struct io_buffer *iobuf ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct cipher_algorithm *cipher = suite->cipher;
@@ -2948,14 +2985,13 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	} __attribute__ (( packed )) iv;
 	struct tls_auth_header authhdr;
 	struct tls_header *tlshdr;
-	void *plaintext;
-	size_t plaintext_len;
-	struct io_buffer *ciphertext;
-	size_t ciphertext_len;
-	size_t padding_len;
 	uint8_t mac[digest->digestsize];
-	void *tmp;
+	size_t pad_len;
 	int rc;
+
+	/* Add to handshake digest if applicable */
+	if ( type == TLS_TYPE_HANDSHAKE )
+		tls_add_handshake ( tls, iobuf->data, iob_len ( iobuf ) );
 
 	/* Construct initialisation vector */
 	memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
@@ -2968,40 +3004,25 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	authhdr.seq = cpu_to_be64 ( tls->tx.seq );
 	authhdr.header.type = type;
 	authhdr.header.version = htons ( tls->version );
-	authhdr.header.length = htons ( len );
+	authhdr.header.length = htons ( iob_len ( iobuf ) );
 
-	/* Calculate padding length */
-	plaintext_len = ( len + suite->mac_len );
+	/* Append MAC, if applicable */
+	if ( suite->mac_len ) {
+		tls_hmac ( cipherspec, &authhdr, iobuf->data,
+			   iob_len ( iobuf ), mac );
+		memcpy ( iob_put ( iobuf, suite->mac_len ), mac,
+			 suite->mac_len );
+	}
+
+	/* Append padding, if applicable */
 	if ( is_block_cipher ( cipher ) ) {
-		padding_len = ( ( ( cipher->blocksize - 1 ) &
-				  -( plaintext_len + 1 ) ) + 1 );
-	} else {
-		padding_len = 0;
+		pad_len = ( ( ( cipher->blocksize - 1 ) &
+			      -( iob_len ( iobuf ) + 1 ) ) + 1 );
+		memset ( iob_put ( iobuf, pad_len ), ( pad_len - 1 ), pad_len );
+		assert ( ! ( iob_len ( iobuf ) & ( cipher->blocksize - 1 ) ) );
 	}
-	plaintext_len += padding_len;
-
-	/* Allocate plaintext */
-	plaintext = malloc ( plaintext_len );
-	if ( ! plaintext ) {
-		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
-		       "plaintext\n", tls, plaintext_len );
-		rc = -ENOMEM_TX_PLAINTEXT;
-		goto err_plaintext;
-	}
-
-	/* Assemble plaintext */
-	tmp = plaintext;
-	memcpy ( tmp, data, len );
-	tmp += len;
-	if ( suite->mac_len )
-		tls_hmac ( cipherspec, &authhdr, data, len, mac );
-	memcpy ( tmp, mac, suite->mac_len );
-	tmp += suite->mac_len;
-	memset ( tmp, ( padding_len - 1 ), padding_len );
-	tmp += padding_len;
-	assert ( tmp == ( plaintext + plaintext_len ) );
 	DBGC2 ( tls, "Sending plaintext data:\n" );
-	DBGC2_HD ( tls, plaintext, plaintext_len );
+	DBGC2_HDA ( tls, 0, iobuf->data, iob_len ( iobuf ) );
 
 	/* Set initialisation vector */
 	cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv, sizeof ( iv ) );
@@ -3012,37 +3033,23 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				 NULL, sizeof ( authhdr ) );
 	}
 
-	/* Allocate ciphertext */
-	ciphertext_len = ( sizeof ( *tlshdr ) + sizeof ( iv.record ) +
-			   plaintext_len + cipher->authsize );
-	ciphertext = xfer_alloc_iob ( &tls->cipherstream, ciphertext_len );
-	if ( ! ciphertext ) {
-		DBGC ( tls, "TLS %p could not allocate %zd bytes for "
-		       "ciphertext\n", tls, ciphertext_len );
-		rc = -ENOMEM_TX_CIPHERTEXT;
-		goto err_ciphertext;
-	}
+	/* Encrypt data to be transmitted and append authentication tag */
+	cipher_encrypt ( cipher, cipherspec->cipher_ctx, iobuf->data,
+			 iobuf->data, iob_len ( iobuf ) );
+	cipher_auth ( cipher, cipherspec->cipher_ctx,
+		      iob_put ( iobuf, cipher->authsize ) );
 
-	/* Assemble ciphertext */
-	tlshdr = iob_put ( ciphertext, sizeof ( *tlshdr ) );
+	/* Prepend record header and initialisation vector */
+	memcpy ( iob_push ( iobuf, sizeof ( iv.record ) ), iv.record,
+		 sizeof ( iv.record ) );
+	tlshdr = iob_push ( iobuf, sizeof ( *tlshdr ) );
 	tlshdr->type = type;
 	tlshdr->version = htons ( tls->version );
-	tlshdr->length = htons ( ciphertext_len - sizeof ( *tlshdr ) );
-	memcpy ( iob_put ( ciphertext, sizeof ( iv.record ) ), iv.record,
-		 sizeof ( iv.record ) );
-	cipher_encrypt ( cipher, cipherspec->cipher_ctx, plaintext,
-			 iob_put ( ciphertext, plaintext_len ), plaintext_len );
-	cipher_auth ( cipher, cipherspec->cipher_ctx,
-		      iob_put ( ciphertext, cipher->authsize ) );
-	assert ( iob_len ( ciphertext ) == ciphertext_len );
-
-	/* Free plaintext as soon as possible to conserve memory */
-	free ( plaintext );
-	plaintext = NULL;
+	tlshdr->length = htons ( iob_len ( iobuf ) - sizeof ( *tlshdr ) );
 
 	/* Send ciphertext */
 	if ( ( rc = xfer_deliver_iob ( &tls->cipherstream,
-				       iob_disown ( ciphertext ) ) ) != 0 ) {
+				       iob_disown ( iobuf ) ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not deliver ciphertext: %s\n",
 		       tls, strerror ( rc ) );
 		goto err_deliver;
@@ -3051,17 +3058,40 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 	/* Update TX state machine to next record */
 	tls->tx.seq += 1;
 
-	assert ( plaintext == NULL );
-	assert ( ciphertext == NULL );
+	assert ( iobuf == NULL );
 	return 0;
 
  err_deliver:
-	free_iob ( ciphertext );
- err_ciphertext:
-	free ( plaintext );
- err_plaintext:
  err_random:
+	free_iob ( iobuf );
 	return rc;
+}
+
+/**
+ * Send plaintext record
+ *
+ * @v tls		TLS connection
+ * @v type		Record type
+ * @v data		Plaintext record
+ * @v len		Length of plaintext record
+ * @ret rc		Return status code
+ */
+static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
+				const void *data, size_t len ) {
+	struct io_buffer *iobuf;
+	int rc;
+
+	/* Allocate I/O buffer */
+	iobuf = tls_alloc_iob ( tls, len );
+	if ( ! iobuf )
+		return -ENOMEM_TX_PLAINTEXT;
+	memcpy ( iob_put ( iobuf, len ), data, len );
+
+	/* Transmit I/O buffer */
+	if ( ( rc = tls_send_record ( tls, type, iob_disown ( iobuf ) ) ) != 0 )
+		return rc;
+
+	return 0;
 }
 
 /**
@@ -3281,8 +3311,9 @@ static int tls_plainstream_deliver ( struct tls_connection *tls,
 		goto done;
 	}
 
-	if ( ( rc = tls_send_plaintext ( tls, TLS_TYPE_DATA, iobuf->data,
-					 iob_len ( iobuf ) ) ) != 0 )
+	/* Send data record */
+	if ( ( rc = tls_send_record ( tls, TLS_TYPE_DATA,
+				      iob_disown ( iobuf ) ) ) != 0 )
 		goto done;
 
  done:
@@ -3310,6 +3341,7 @@ static int tls_progress ( struct tls_connection *tls,
 
 /** TLS plaintext stream interface operations */
 static struct interface_operation tls_plainstream_ops[] = {
+	INTF_OP ( xfer_alloc_iob, struct tls_connection *, tls_alloc_iob ),
 	INTF_OP ( xfer_deliver, struct tls_connection *,
 		  tls_plainstream_deliver ),
 	INTF_OP ( xfer_window, struct tls_connection *,
