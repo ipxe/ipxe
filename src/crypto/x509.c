@@ -1634,11 +1634,17 @@ struct x509_chain * x509_alloc_chain ( void ) {
  */
 int x509_append ( struct x509_chain *chain, struct x509_certificate *cert ) {
 	struct x509_link *link;
+	int rc;
+
+	/* Ensure allocation of link cannot invalidate certificate */
+	x509_get ( cert );
 
 	/* Allocate link */
 	link = zalloc ( sizeof ( *link ) );
-	if ( ! link )
-		return -ENOMEM;
+	if ( ! link ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 
 	/* Add link to chain */
 	link->cert = x509_get ( cert );
@@ -1646,7 +1652,12 @@ int x509_append ( struct x509_chain *chain, struct x509_certificate *cert ) {
 	DBGC ( chain, "X509 chain %p added X509 %p \"%s\"\n",
 	       chain, cert, x509_name ( cert ) );
 
-	return 0;
+	/* Success */
+	rc = 0;
+
+	x509_put ( cert );
+ err_alloc:
+	return rc;
 }
 
 /**

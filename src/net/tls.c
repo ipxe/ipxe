@@ -2470,9 +2470,6 @@ static int tls_new_certificate_request ( struct tls_connection *tls,
 	/* Determine client certificate to be sent, if any */
 	cert = x509_find_key ( NULL, tls->client.key );
 	if ( cert ) {
-
-		/* Get temporary reference to certificate */
-		x509_get ( cert );
 		DBGC ( tls, "TLS %p selected client certificate %s\n",
 		       tls, x509_name ( cert ) );
 
@@ -2491,14 +2488,10 @@ static int tls_new_certificate_request ( struct tls_connection *tls,
 		       "to private key\n", tls );
 	}
 
-	/* Drop local reference (if any) to client certificate */
-	x509_put ( cert );
-
 	return 0;
 
  err_auto_append:
  err_append:
-	x509_put ( cert );
 	x509_chain_put ( tls->client.chain );
 	tls->client.chain = NULL;
  err_alloc:
