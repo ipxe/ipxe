@@ -1256,7 +1256,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	max_fragment_length_ext->type = htons ( TLS_MAX_FRAGMENT_LENGTH );
 	max_fragment_length_ext->len
 		= htons ( sizeof ( max_fragment_length_ext->data ) );
-	max_fragment_length_ext->data.max = TLS_MAX_FRAGMENT_LENGTH_4096;
+	max_fragment_length_ext->data.max = TLS_MAX_FRAGMENT_LENGTH_VALUE;
 
 	/* Construct supported signature algorithms extension */
 	signature_algorithms_ext = &extensions->signature_algorithms;
@@ -2923,7 +2923,34 @@ static void tls_hmac_list ( struct tls_cipherspec *cipherspec,
 }
 
 /**
- * Allocate I/O buffer for transmitted record
+ * Calculate maximum additional length required for transmitted record(s)
+ *
+ * @v tls		TLS connection
+ * @v len		I/O buffer payload length
+ * @ret reserve		Maximum additional length to reserve
+ */
+static size_t tls_iob_reserved ( struct tls_connection *tls, size_t len ) {
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
+	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct cipher_algorithm *cipher = suite->cipher;
+	struct tls_header *tlshdr;
+	unsigned int count;
+	size_t each;
+
+	/* Calculate number of records (allowing for zero-length records) */
+	count = ( len ? ( ( len + TLS_TX_BUFSIZE - 1 ) / TLS_TX_BUFSIZE ) : 1 );
+
+	/* Calculate maximum additional length per record */
+	each = ( sizeof ( *tlshdr ) + suite->record_iv_len + suite->mac_len +
+		 ( is_block_cipher ( cipher ) ? cipher->blocksize : 0 ) +
+		 cipher->authsize );
+
+	/* Calculate maximum total additional length */
+	return ( count * each );
+}
+
+/**
+ * Allocate I/O buffer for transmitted record(s)
  *
  * @v tls		TLS connection
  * @v len		I/O buffer payload length
@@ -2931,41 +2958,25 @@ static void tls_hmac_list ( struct tls_cipherspec *cipherspec,
  */
 static struct io_buffer * tls_alloc_iob ( struct tls_connection *tls,
 					  size_t len ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
-	struct tls_cipher_suite *suite = cipherspec->suite;
-	struct cipher_algorithm *cipher = suite->cipher;
-	struct tls_header *tlshdr;
 	struct io_buffer *iobuf;
-	size_t pre_len;
-	size_t padded_len;
-	size_t post_len;
+	size_t reserve;
 
-	/* Calculate length of padded data */
-	padded_len = ( len + suite->mac_len );
-	if ( is_block_cipher ( cipher ) ) {
-		padded_len = ( ( padded_len + 1 + cipher->blocksize - 1 ) &
-			       ~( cipher->blocksize - 1 ) );
-		assert ( padded_len > ( len + suite->mac_len ) );
-	}
-
-	/* Calculate lengths before and after padded data */
-	pre_len = ( sizeof ( *tlshdr ) + suite->record_iv_len );
-	post_len = cipher->authsize;
+	/* Calculate maximum additional length to reserve */
+	reserve = tls_iob_reserved ( tls, len );
 
 	/* Allocate I/O buffer */
-	iobuf = xfer_alloc_iob ( &tls->cipherstream,
-				 ( pre_len + padded_len + post_len ) );
+	iobuf = xfer_alloc_iob ( &tls->cipherstream, ( reserve + len ) );
 	if ( ! iobuf )
 		return NULL;
 
 	/* Reserve space */
-	iob_reserve ( iobuf, pre_len );
+	iob_reserve ( iobuf, reserve );
 
 	return iobuf;
 }
 
 /**
- * Send plaintext record
+ * Send plaintext record(s)
  *
  * @v tls		TLS connection
  * @v type		Record type
@@ -2980,71 +2991,114 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 	struct digest_algorithm *digest = suite->digest;
 	struct {
 		uint8_t fixed[suite->fixed_iv_len];
-		uint8_t record[suite->record_iv_len];
+		uint8_t rec[suite->record_iv_len];
 	} __attribute__ (( packed )) iv;
 	struct tls_auth_header authhdr;
 	struct tls_header *tlshdr;
 	uint8_t mac[digest->digestsize];
+	const void *plaintext;
+	const void *encrypt;
+	void *ciphertext;
+	size_t record_len;
+	size_t encrypt_len;
 	size_t pad_len;
+	size_t len;
 	int rc;
+
+	/* Record plaintext pointer and length */
+	plaintext = iobuf->data;
+	len = iob_len ( iobuf );
 
 	/* Add to handshake digest if applicable */
 	if ( type == TLS_TYPE_HANDSHAKE )
-		tls_add_handshake ( tls, iobuf->data, iob_len ( iobuf ) );
+		tls_add_handshake ( tls, plaintext, len );
 
-	/* Construct initialisation vector */
-	memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
-	if ( ( rc = tls_generate_random ( tls, iv.record,
-					  sizeof ( iv.record ) ) ) != 0 ) {
-		goto err_random;
-	}
+	/* Start constructing ciphertext at start of reserved space */
+	iob_push ( iobuf, tls_iob_reserved ( tls, len ) );
+	iob_unput ( iobuf, iob_len ( iobuf ) );
 
-	/* Construct authentication data */
-	authhdr.seq = cpu_to_be64 ( tls->tx.seq );
-	authhdr.header.type = type;
-	authhdr.header.version = htons ( tls->version );
-	authhdr.header.length = htons ( iob_len ( iobuf ) );
+	/* Construct records */
+	do {
+		/* Limit length of this record (may be zero) */
+		record_len = len;
+		if ( record_len > TLS_TX_BUFSIZE )
+			record_len = TLS_TX_BUFSIZE;
 
-	/* Append MAC, if applicable */
-	if ( suite->mac_len ) {
-		tls_hmac ( cipherspec, &authhdr, iobuf->data,
-			   iob_len ( iobuf ), mac );
+		/* Construct and set initialisation vector */
+		memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
+		if ( ( rc = tls_generate_random ( tls, iv.rec,
+						  sizeof ( iv.rec ) ) ) != 0 ) {
+			goto err_random;
+		}
+		cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv,
+			       sizeof ( iv ) );
+
+		/* Construct and process authentication data */
+		authhdr.seq = cpu_to_be64 ( tls->tx.seq );
+		authhdr.header.type = type;
+		authhdr.header.version = htons ( tls->version );
+		authhdr.header.length = htons ( record_len );
+		if ( suite->mac_len ) {
+			tls_hmac ( cipherspec, &authhdr, plaintext, record_len,
+				   mac );
+		}
+		if ( is_auth_cipher ( cipher ) ) {
+			cipher_encrypt ( cipher, cipherspec->cipher_ctx,
+					 &authhdr, NULL, sizeof ( authhdr ) );
+		}
+
+		/* Calculate encryption length */
+		encrypt_len = ( record_len + suite->mac_len );
+		if ( is_block_cipher ( cipher ) ) {
+			pad_len = ( ( ( cipher->blocksize - 1 ) &
+				      -( encrypt_len + 1 ) ) + 1 );
+		} else {
+			pad_len = 0;
+		}
+		encrypt_len += pad_len;
+
+		/* Add record header */
+		tlshdr = iob_put ( iobuf, sizeof ( *tlshdr ) );
+		tlshdr->type = type;
+		tlshdr->version = htons ( tls->version );
+		tlshdr->length = htons ( sizeof ( iv.rec ) + encrypt_len +
+					 cipher->authsize );
+
+		/* Add record initialisation vector, if applicable */
+		memcpy ( iob_put ( iobuf, sizeof ( iv.rec ) ), iv.rec,
+			 sizeof ( iv.rec ) );
+
+		/* Copy plaintext data if necessary */
+		ciphertext = iob_put ( iobuf, record_len );
+		assert ( ciphertext <= plaintext );
+		if ( encrypt_len > record_len ) {
+			memmove ( ciphertext, plaintext, record_len );
+			encrypt = ciphertext;
+		} else {
+			encrypt = plaintext;
+		}
+
+		/* Add MAC, if applicable */
 		memcpy ( iob_put ( iobuf, suite->mac_len ), mac,
 			 suite->mac_len );
-	}
 
-	/* Append padding, if applicable */
-	if ( is_block_cipher ( cipher ) ) {
-		pad_len = ( ( ( cipher->blocksize - 1 ) &
-			      -( iob_len ( iobuf ) + 1 ) ) + 1 );
+		/* Add padding, if applicable */
 		memset ( iob_put ( iobuf, pad_len ), ( pad_len - 1 ), pad_len );
-		assert ( ! ( iob_len ( iobuf ) & ( cipher->blocksize - 1 ) ) );
-	}
-	DBGC2 ( tls, "Sending plaintext data:\n" );
-	DBGC2_HDA ( tls, 0, iobuf->data, iob_len ( iobuf ) );
 
-	/* Set initialisation vector */
-	cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv, sizeof ( iv ) );
+		/* Encrypt data and append authentication tag */
+		DBGC2 ( tls, "Sending plaintext data:\n" );
+		DBGC2_HDA ( tls, 0, encrypt, encrypt_len );
+		cipher_encrypt ( cipher, cipherspec->cipher_ctx, encrypt,
+				 ciphertext, encrypt_len );
+		cipher_auth ( cipher, cipherspec->cipher_ctx,
+			      iob_put ( iobuf, cipher->authsize ) );
 
-	/* Process authentication data, if applicable */
-	if ( is_auth_cipher ( cipher ) ) {
-		cipher_encrypt ( cipher, cipherspec->cipher_ctx, &authhdr,
-				 NULL, sizeof ( authhdr ) );
-	}
+		/* Move to next record */
+		tls->tx.seq += 1;
+		plaintext += record_len;
+		len -= record_len;
 
-	/* Encrypt data to be transmitted and append authentication tag */
-	cipher_encrypt ( cipher, cipherspec->cipher_ctx, iobuf->data,
-			 iobuf->data, iob_len ( iobuf ) );
-	cipher_auth ( cipher, cipherspec->cipher_ctx,
-		      iob_put ( iobuf, cipher->authsize ) );
-
-	/* Prepend record header and initialisation vector */
-	memcpy ( iob_push ( iobuf, sizeof ( iv.record ) ), iv.record,
-		 sizeof ( iv.record ) );
-	tlshdr = iob_push ( iobuf, sizeof ( *tlshdr ) );
-	tlshdr->type = type;
-	tlshdr->version = htons ( tls->version );
-	tlshdr->length = htons ( iob_len ( iobuf ) - sizeof ( *tlshdr ) );
+	} while ( len );
 
 	/* Send ciphertext */
 	if ( ( rc = xfer_deliver_iob ( &tls->cipherstream,
@@ -3053,9 +3107,6 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 		       tls, strerror ( rc ) );
 		goto err_deliver;
 	}
-
-	/* Update TX state machine to next record */
-	tls->tx.seq += 1;
 
 	assert ( iobuf == NULL );
 	return 0;

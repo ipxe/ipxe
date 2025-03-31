@@ -465,6 +465,17 @@ struct tls_connection {
 	struct tls_server server;
 };
 
+/** Advertised maximum fragment length */
+#define TLS_MAX_FRAGMENT_LENGTH_VALUE TLS_MAX_FRAGMENT_LENGTH_4096
+
+/** TX maximum fragment length
+ *
+ * TLS requires us to limit our transmitted records to the maximum
+ * fragment length that we attempt to negotiate, even if the server
+ * does not respect this choice.
+ */
+#define TLS_TX_BUFSIZE 4096
+
 /** RX I/O buffer size
  *
  * The maximum fragment length extension is optional, and many common
