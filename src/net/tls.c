@@ -171,10 +171,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EPERM_VERIFY						\
 	__einfo_uniqify ( EINFO_EPERM, 0x02,				\
 			  "Handshake verification failed" )
-#define EPERM_CLIENT_CERT __einfo_error ( EINFO_EPERM_CLIENT_CERT )
-#define EINFO_EPERM_CLIENT_CERT						\
-	__einfo_uniqify ( EINFO_EPERM, 0x03,				\
-			  "No suitable client certificate available" )
 #define EPERM_RENEG_INSECURE __einfo_error ( EINFO_EPERM_RENEG_INSECURE )
 #define EINFO_EPERM_RENEG_INSECURE					\
 	__einfo_uniqify ( EINFO_EPERM, 0x04,				\
@@ -2464,18 +2460,6 @@ static int tls_new_certificate_request ( struct tls_connection *tls,
 	x509_chain_put ( tls->client.chain );
 	tls->client.chain = NULL;
 
-	/* Determine client certificate to be sent */
-	cert = x509_find_key ( NULL, tls->client.key );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p could not find certificate corresponding "
-		       "to private key\n", tls );
-		rc = -EPERM_CLIENT_CERT;
-		goto err_find;
-	}
-	x509_get ( cert );
-	DBGC ( tls, "TLS %p selected client certificate %s\n",
-	       tls, x509_name ( cert ) );
-
 	/* Create client certificate chain */
 	tls->client.chain = x509_alloc_chain();
 	if ( ! tls->client.chain ) {
@@ -2483,26 +2467,41 @@ static int tls_new_certificate_request ( struct tls_connection *tls,
 		goto err_alloc;
 	}
 
-	/* Append client certificate to chain */
-	if ( ( rc = x509_append ( tls->client.chain, cert ) ) != 0 )
-		goto err_append;
+	/* Determine client certificate to be sent, if any */
+	cert = x509_find_key ( NULL, tls->client.key );
+	if ( cert ) {
 
-	/* Append any relevant issuer certificates */
-	if ( ( rc = x509_auto_append ( tls->client.chain, &certstore ) ) != 0 )
-		goto err_auto_append;
+		/* Get temporary reference to certificate */
+		x509_get ( cert );
+		DBGC ( tls, "TLS %p selected client certificate %s\n",
+		       tls, x509_name ( cert ) );
 
-	/* Drop local reference to client certificate */
+		/* Append client certificate to chain */
+		if ( ( rc = x509_append ( tls->client.chain, cert ) ) != 0 )
+			goto err_append;
+
+		/* Append any relevant issuer certificates */
+		if ( ( rc = x509_auto_append ( tls->client.chain,
+					       &certstore ) ) != 0 )
+			goto err_auto_append;
+	} else {
+
+		/* Send an empty certificate chain */
+		DBGC ( tls, "TLS %p could not find certificate corresponding "
+		       "to private key\n", tls );
+	}
+
+	/* Drop local reference (if any) to client certificate */
 	x509_put ( cert );
 
 	return 0;
 
  err_auto_append:
  err_append:
+	x509_put ( cert );
 	x509_chain_put ( tls->client.chain );
 	tls->client.chain = NULL;
  err_alloc:
-	x509_put ( cert );
- err_find:
 	return rc;
 }
 
@@ -3616,13 +3615,14 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	memcpy ( &tls->server.key, &cert->subject.public_key.raw,
 		 sizeof ( tls->server.key ) );
 
-	/* Schedule Client Key Exchange, Change Cipher, and Finished */
+	/* Schedule transmission of applicable handshake messages */
 	tls->tx.pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
 			     TLS_TX_CHANGE_CIPHER |
 			     TLS_TX_FINISHED );
 	if ( tls->client.chain ) {
-		tls->tx.pending |= ( TLS_TX_CERTIFICATE |
-				     TLS_TX_CERTIFICATE_VERIFY );
+		tls->tx.pending |= TLS_TX_CERTIFICATE;
+		if ( ! list_empty ( &tls->client.chain->links ) )
+			tls->tx.pending |= TLS_TX_CERTIFICATE_VERIFY;
 	}
 	tls_tx_resume ( tls );
 
