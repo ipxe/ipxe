@@ -73,6 +73,9 @@ struct fdt_prop {
 /** Alignment of structure block */
 #define FDT_STRUCTURE_ALIGN ( sizeof ( fdt_token_t ) )
 
+/** Maximum alignment of any block */
+#define FDT_MAX_ALIGN 8
+
 /** A device tree */
 struct fdt {
 	/** Tree data */
@@ -96,6 +99,13 @@ struct fdt {
 	size_t strings_len;
 	/** Offset to memory reservation block */
 	unsigned int reservations;
+	/** Reallocate device tree
+	 *
+	 * @v fdt		Device tree
+	 * @v len		New length
+	 * @ret rc		Return status code
+	 */
+	int ( * realloc ) ( struct fdt *fdt, size_t len );
 };
 
 extern struct image_tag fdt_image __image_tag;
@@ -113,7 +123,7 @@ extern int fdt_mac ( struct fdt *fdt, unsigned int offset,
 		     struct net_device *netdev );
 extern int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr,
 		       size_t max_len );
-extern int fdt_create ( struct fdt_header **hdr );
+extern int fdt_create ( struct fdt_header **hdr, const char *cmdline );
 extern void fdt_remove ( struct fdt_header *hdr );
 
 #endif /* _IPXE_FDT_H */

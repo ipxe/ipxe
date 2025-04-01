@@ -46,6 +46,9 @@ struct image_tag fdt_image __image_tag = {
 	.name = "FDT",
 };
 
+/** Amount of free space to add whenever we have to reallocate a tree */
+#define FDT_INSERT_PAD 1024
+
 /** A position within a device tree */
 struct fdt_cursor {
 	/** Offset within structure block */
@@ -56,6 +59,8 @@ struct fdt_cursor {
 
 /** A lexical descriptor */
 struct fdt_descriptor {
+	/** Offset within structure block */
+	unsigned int offset;
 	/** Node or property name (if applicable) */
 	const char *name;
 	/** Property data (if applicable) */
@@ -86,8 +91,9 @@ static int fdt_traverse ( struct fdt *fdt,
 	assert ( pos->offset <= fdt->len );
 	assert ( ( pos->offset & ( FDT_STRUCTURE_ALIGN - 1 ) ) == 0 );
 
-	/* Clear descriptor */
+	/* Initialise descriptor */
 	memset ( desc, 0, sizeof ( *desc ) );
+	desc->offset = pos->offset;
 
 	/* Locate token and calculate remaining space */
 	token = ( fdt->raw + fdt->structure + pos->offset );
@@ -212,8 +218,8 @@ static int fdt_child ( struct fdt *fdt, unsigned int offset, const char *name,
 
 		/* Traverse tree */
 		if ( ( rc = fdt_traverse ( fdt, &pos, &desc ) ) != 0 ) {
-			DBGC ( fdt, "FDT +%#04x has no child node \"%s\": "
-			       "%s\n", orig_offset, name, strerror ( rc ) );
+			DBGC2 ( fdt, "FDT +%#04x has no child node \"%s\": "
+				"%s\n", orig_offset, name, strerror ( rc ) );
 			return rc;
 		}
 
@@ -227,6 +233,50 @@ static int fdt_child ( struct fdt *fdt, unsigned int offset, const char *name,
 					desc.name, *child );
 				return 0;
 			}
+		}
+	}
+}
+
+/**
+ * Find end of node
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v end		End of node offset to fill in
+ * @ret rc		Return status code
+ */
+static int fdt_end ( struct fdt *fdt, unsigned int offset,
+		     unsigned int *end ) {
+	struct fdt_cursor pos;
+	struct fdt_descriptor desc;
+	unsigned int orig_offset;
+	int rc;
+
+	/* Record original offset (for debugging) */
+	orig_offset = offset;
+
+	/* Initialise cursor */
+	pos.offset = offset;
+	pos.depth = 0;
+
+	/* Find child node */
+	while ( 1 ) {
+
+		/* Record current offset */
+		*end = pos.offset;
+
+		/* Traverse tree */
+		if ( ( rc = fdt_traverse ( fdt, &pos, &desc ) ) != 0 ) {
+			DBGC ( fdt, "FDT +%#04x has malformed node: %s\n",
+			       orig_offset, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Check for end of current node */
+		if ( pos.depth == 0 ) {
+			DBGC2 ( fdt, "FDT +%#04x has end at +%#04x\n",
+				orig_offset, *end );
+			return 0;
 		}
 	}
 }
@@ -326,8 +376,8 @@ static int fdt_property ( struct fdt *fdt, unsigned int offset,
 
 		/* Traverse tree */
 		if ( ( rc = fdt_traverse ( fdt, &pos, desc ) ) != 0 ) {
-			DBGC ( fdt, "FDT +%#04x has no property \"%s\": %s\n",
-			       offset, name, strerror ( rc ) );
+			DBGC2 ( fdt, "FDT +%#04x has no property \"%s\": %s\n",
+				offset, name, strerror ( rc ) );
 			return rc;
 		}
 
@@ -459,6 +509,7 @@ int fdt_mac ( struct fdt *fdt, unsigned int offset,
  */
 int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 	const uint8_t *nul;
+	unsigned int chosen;
 	size_t end;
 
 	/* Sanity check */
@@ -553,8 +604,15 @@ int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 		       fdt->used, fdt->len );
 	}
 
-	/* Print model name (for debugging) */
-	DBGC ( fdt, "FDT model is \"%s\"\n", fdt_string ( fdt, 0, "model" ) );
+	/* Print model name and boot arguments (for debugging) */
+	if ( DBG_LOG ) {
+		DBGC ( fdt, "FDT model is \"%s\"\n",
+		       fdt_string ( fdt, 0, "model" ) );
+		if ( fdt_child ( fdt, 0, "chosen", &chosen ) == 0 ) {
+			DBGC ( fdt, "FDT boot arguments \"%s\"\n",
+			       fdt_string ( fdt, chosen, "bootargs" ) );
+		}
+	}
 
 	return 0;
 
@@ -587,12 +645,355 @@ static int fdt_parse_image ( struct fdt *fdt, struct image *image ) {
 }
 
 /**
+ * Insert empty space
+ *
+ * @v fdt		Device tree
+ * @v offset		Offset at which to insert space
+ * @v len		Length to insert (must be a multiple of FDT_MAX_ALIGN)
+ * @ret rc		Return status code
+ */
+static int fdt_insert ( struct fdt *fdt, unsigned int offset, size_t len ) {
+	size_t free;
+	size_t new;
+	int rc;
+
+	/* Sanity checks */
+	assert ( offset <= fdt->used );
+	assert ( fdt->used <= fdt->len );
+	assert ( ( len % FDT_MAX_ALIGN ) == 0 );
+
+	/* Reallocate tree if necessary */
+	free = ( fdt->len - fdt->used );
+	if ( free < len ) {
+		if ( ! fdt->realloc ) {
+			DBGC ( fdt, "FDT is not reallocatable\n" );
+			return -ENOTSUP;
+		}
+		new = ( fdt->len + ( len - free ) + FDT_INSERT_PAD );
+		if ( ( rc = fdt->realloc ( fdt, new ) ) != 0 )
+			return rc;
+	}
+	assert ( ( fdt->used + len ) <= fdt->len );
+
+	/* Insert empty space */
+	memmove ( ( fdt->raw + offset + len ), ( fdt->raw + offset ),
+		  ( fdt->used - offset ) );
+	memset ( ( fdt->raw + offset ), 0, len );
+	fdt->used += len;
+
+	/* Update offsets
+	 *
+	 * We assume that we never need to legitimately insert data at
+	 * the start of a block, and therefore can unambiguously
+	 * determine which block offsets need to be updated.
+	 *
+	 * It is the caller's responsibility to update the length (and
+	 * contents) of the block into which it has inserted space.
+	 */
+	if ( fdt->structure >= offset ) {
+		fdt->structure += len;
+		fdt->hdr->off_dt_struct = cpu_to_be32 ( fdt->structure );
+		DBGC ( fdt, "FDT structure block now at +[%#04x,%#04zx)\n",
+		       fdt->structure,
+		       ( fdt->structure + fdt->structure_len ) );
+	}
+	if ( fdt->strings >= offset ) {
+		fdt->strings += len;
+		fdt->hdr->off_dt_strings = cpu_to_be32 ( fdt->strings );
+		DBGC ( fdt, "FDT strings block now at +[%#04x,%#04zx)\n",
+		       fdt->strings, ( fdt->strings + fdt->strings_len ) );
+	}
+	if ( fdt->reservations >= offset ) {
+		fdt->reservations += len;
+		fdt->hdr->off_mem_rsvmap = cpu_to_be32 ( fdt->reservations );
+		DBGC ( fdt, "FDT memory reservations now at +[%#04x,...)\n",
+		       fdt->reservations );
+	}
+
+	return 0;
+}
+
+/**
+ * Fill space in structure block with FDT_NOP
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting offset
+ * @v len		Length (must be a multiple of FDT_STRUCTURE_ALIGN)
+ */
+static void fdt_nop ( struct fdt *fdt, unsigned int offset, size_t len ) {
+	fdt_token_t *token;
+	unsigned int count;
+
+	/* Sanity check */
+	assert ( ( len % FDT_STRUCTURE_ALIGN ) == 0 );
+
+	/* Fill with FDT_NOP */
+	token = ( fdt->raw + fdt->structure + offset );
+	count = ( len / sizeof ( *token ) );
+	while ( count-- )
+		*(token++) = cpu_to_be32 ( FDT_NOP );
+}
+
+/**
+ * Insert FDT_NOP padded space in structure block
+ *
+ * @v fdt		Device tree
+ * @v offset		Offset at which to insert space
+ * @v len		Minimal length to insert
+ * @ret rc		Return status code
+ */
+static int fdt_insert_nop ( struct fdt *fdt, unsigned int offset,
+			    size_t len ) {
+	int rc;
+
+	/* Sanity check */
+	assert ( ( offset % FDT_STRUCTURE_ALIGN ) == 0 );
+
+	/* Round up inserted length to maximal alignment */
+	len = ( ( len + FDT_MAX_ALIGN - 1 ) & ~( FDT_MAX_ALIGN - 1 ) );
+
+	/* Insert empty space in structure block */
+	if ( ( rc = fdt_insert ( fdt, ( fdt->structure + offset ),
+				 len ) ) != 0 )
+		return rc;
+
+	/* Fill with NOPs */
+	fdt_nop ( fdt, offset, len );
+
+	/* Update structure block size */
+	fdt->structure_len += len;
+	fdt->hdr->size_dt_struct = cpu_to_be32 ( fdt->structure_len );
+	DBGC ( fdt, "FDT structure block now at +[%#04x,%#04zx)\n",
+	       fdt->structure, ( fdt->structure + fdt->structure_len ) );
+
+	return 0;
+}
+
+/**
+ * Insert string in strings block
+ *
+ * @v fdt		Device tree
+ * @v string		String
+ * @v offset		String offset to fill in
+ * @ret rc		Return status code
+ */
+static int fdt_insert_string ( struct fdt *fdt, const char *string,
+			       unsigned int *offset ) {
+	size_t len = ( strlen ( string ) + 1 /* NUL */ );
+	int rc;
+
+	/* Round up inserted length to maximal alignment */
+	len = ( ( len + FDT_MAX_ALIGN - 1 ) & ~( FDT_MAX_ALIGN - 1 ) );
+
+	/* Insert space at end of strings block */
+	if ( ( rc = fdt_insert ( fdt, ( fdt->strings + fdt->strings_len ),
+				 len ) ) != 0 )
+		return rc;
+
+	/* Append string to strings block */
+	*offset = fdt->strings_len;
+	strcpy ( ( fdt->raw + fdt->strings + *offset ), string );
+
+	/* Update strings block size */
+	fdt->strings_len += len;
+	fdt->hdr->size_dt_strings = cpu_to_be32 ( fdt->strings_len );
+	DBGC ( fdt, "FDT strings block now at +[%#04x,%#04zx)\n",
+		       fdt->strings, ( fdt->strings + fdt->strings_len ) );
+
+	return 0;
+}
+
+/**
+ * Ensure child node exists
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v name		New node name
+ * @v child		Child node offset to fill in
+ * @ret rc		Return status code
+ */
+static int fdt_ensure_child ( struct fdt *fdt, unsigned int offset,
+			      const char *name, unsigned int *child ) {
+	size_t name_len = ( strlen ( name ) + 1 /* NUL */ );
+	fdt_token_t *token;
+	size_t len;
+	int rc;
+
+	/* Find existing child node, if any */
+	if ( ( rc = fdt_child ( fdt, offset, name, child ) ) == 0 )
+		return 0;
+
+	/* Find end of parent node */
+	if ( ( rc = fdt_end ( fdt, offset, child ) ) != 0 )
+		return rc;
+
+	/* Insert space for child node (with maximal alignment) */
+	len = ( sizeof ( fdt_token_t ) /* BEGIN_NODE */ + name_len +
+		sizeof ( fdt_token_t ) /* END_NODE */ );
+	if ( ( rc = fdt_insert_nop ( fdt, *child, len ) ) != 0 )
+		return rc;
+
+	/* Construct node */
+	token = ( fdt->raw + fdt->structure + *child );
+	*(token++) = cpu_to_be32 ( FDT_BEGIN_NODE );
+	memcpy ( token, name, name_len );
+	name_len = ( ( name_len + FDT_STRUCTURE_ALIGN - 1 ) &
+		     ~( FDT_STRUCTURE_ALIGN - 1 ) );
+	token = ( ( ( void * ) token ) + name_len );
+	*(token++) = cpu_to_be32 ( FDT_END_NODE );
+	DBGC2 ( fdt, "FDT +%#04x created child \"%s\" at +%#04x\n",
+		offset, name, *child );
+
+	return 0;
+}
+
+/**
+ * Ensure property exists with specified value
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v name		Property name
+ * @v data		Property data
+ * @v len		Length of property data
+ * @ret rc		Return status code
+ */
+static int fdt_ensure_property ( struct fdt *fdt, unsigned int offset,
+				 const char *name, const void *data,
+				 size_t len ) {
+	struct fdt_descriptor desc;
+	struct fdt_cursor pos;
+	struct {
+		fdt_token_t token;
+		struct fdt_prop prop;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *hdr;
+	unsigned int string;
+	size_t erase;
+	size_t insert;
+	int rc;
+
+	/* Find and reuse existing property, if any */
+	if ( ( rc = fdt_property ( fdt, offset, name, &desc ) ) == 0 ) {
+
+		/* Reuse existing name */
+		pos.offset = desc.offset;
+		hdr = ( fdt->raw + fdt->structure + pos.offset );
+		string = be32_to_cpu ( hdr->prop.name_off );
+
+		/* Erase existing property */
+		erase = ( sizeof ( *hdr ) + desc.len );
+		erase = ( ( erase + FDT_STRUCTURE_ALIGN - 1 ) &
+			  ~( FDT_STRUCTURE_ALIGN - 1 ) );
+		fdt_nop ( fdt, pos.offset, erase );
+		DBGC2 ( fdt, "FDT +%#04x erased property \"%s\"\n",
+			offset, name );
+
+		/* Calculate insertion position and length */
+		insert = ( ( desc.len < len ) ? ( len - desc.len ) : 0 );
+
+	} else {
+
+		/* Create name */
+		if ( ( rc = fdt_insert_string ( fdt, name, &string ) ) != 0 )
+			return rc;
+
+		/* Enter node */
+		pos.offset = offset;
+		pos.depth = 0;
+		if ( ( rc = fdt_traverse ( fdt, &pos, &desc ) ) != 0 )
+			return rc;
+		assert ( pos.depth == 1 );
+
+		/* Calculate insertion length */
+		insert = ( sizeof ( *hdr ) + len );
+	}
+
+	/* Insert space */
+	if ( ( rc = fdt_insert_nop ( fdt, pos.offset, insert ) ) != 0 )
+		return rc;
+
+	/* Construct property */
+	hdr = ( fdt->raw + fdt->structure + pos.offset );
+	hdr->token = cpu_to_be32 ( FDT_PROP );
+	hdr->prop.len = cpu_to_be32 ( len );
+	hdr->prop.name_off = cpu_to_be32 ( string );
+	memset ( hdr->data, 0, ( ( len + FDT_STRUCTURE_ALIGN - 1 ) &
+				 ~( FDT_STRUCTURE_ALIGN - 1 ) ) );
+	memcpy ( hdr->data, data, len );
+	DBGC2 ( fdt, "FDT +%#04x created property \"%s\"\n", offset, name );
+	DBGC2_HDA ( fdt, 0, hdr->data, len );
+
+	return 0;
+}
+
+/**
+ * Reallocate device tree via urealloc()
+ *
+ * @v fdt		Device tree
+ * @v len		New total length
+ * @ret rc		Return status code
+ */
+static int fdt_urealloc ( struct fdt *fdt, size_t len ) {
+	void *new;
+
+	/* Sanity check */
+	assert ( len >= fdt->used );
+
+	/* Attempt reallocation */
+	new = user_to_virt ( urealloc ( virt_to_user ( fdt->raw ), len ), 0 );
+	if ( ! new ) {
+		DBGC ( fdt, "FDT could not reallocate from +%#04zx to "
+		       "+%#04zx\n", fdt->len, len );
+		return -ENOMEM;
+	}
+	DBGC ( fdt, "FDT reallocated from +%#04zx to +%#04zx\n",
+	       fdt->len, len );
+
+	/* Update device tree */
+	fdt->raw = new;
+	fdt->len = len;
+	fdt->hdr->totalsize = cpu_to_be32 ( len );
+
+	return 0;
+}
+
+/**
+ * Populate device tree with boot arguments
+ *
+ * @v fdt		Device tree
+ * @v cmdline		Command line, or NULL
+ * @ret rc		Return status code
+ */
+static int fdt_bootargs ( struct fdt *fdt, const char *cmdline ) {
+	unsigned int chosen;
+	size_t len;
+	int rc;
+
+	/* Ensure "chosen" node exists */
+	if ( ( rc = fdt_ensure_child ( fdt, 0, "chosen", &chosen ) ) != 0 )
+		return rc;
+
+	/* Use empty command line if none specified */
+	if ( ! cmdline )
+		cmdline = "";
+
+	/* Ensure "bootargs" property exists */
+	len = ( strlen ( cmdline ) + 1 /* NUL */ );
+	if ( ( rc = fdt_ensure_property ( fdt, chosen, "bootargs", cmdline,
+					  len ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Create device tree
  *
  * @v hdr		Device tree header to fill in (may be set to NULL)
+ * @v cmdline		Command line, or NULL
  * @ret rc		Return status code
  */
-int fdt_create ( struct fdt_header **hdr ) {
+int fdt_create ( struct fdt_header **hdr, const char *cmdline ) {
 	struct image *image;
 	struct fdt fdt;
 	void *copy;
@@ -620,11 +1021,17 @@ int fdt_create ( struct fdt_header **hdr ) {
 	}
 	memcpy ( copy, fdt.raw, fdt.len );
 	fdt.raw = copy;
+	fdt.realloc = fdt_urealloc;
+
+	/* Populate boot arguments */
+	if ( ( rc = fdt_bootargs ( &fdt, cmdline ) ) != 0 )
+		goto err_bootargs;
 
  no_fdt:
 	*hdr = fdt.raw;
 	return 0;
 
+ err_bootargs:
 	ufree ( virt_to_user ( fdt.raw ) );
  err_alloc:
  err_image:

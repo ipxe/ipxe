@@ -126,9 +126,10 @@ static wchar_t * efi_image_cmdline ( struct image *image ) {
 /**
  * Install EFI Flattened Device Tree table (when no FDT support is present)
  *
+ * @v cmdline		Command line, or NULL
  * @ret rc		Return status code
  */
-__weak int efi_fdt_install ( void ) {
+__weak int efi_fdt_install ( const char *cmdline __unused ) {
 	return 0;
 }
 
@@ -209,7 +210,7 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Install Flattened Device Tree table */
-	if ( ( rc = efi_fdt_install() ) != 0 ) {
+	if ( ( rc = efi_fdt_install ( image->cmdline ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %s could not install FDT: %s\n",
 		       image->name, strerror ( rc ) );
 		goto err_fdt_install;

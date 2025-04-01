@@ -107,13 +107,14 @@ static struct fdt_header *efi_fdt_installed;
 /**
  * Install EFI Flattened Device Tree table
  *
+ * @v cmdline		Command line, or NULL
  * @ret rc		Return status code
  */
-int efi_fdt_install ( void ) {
+int efi_fdt_install ( const char *cmdline ) {
 	int rc;
 
 	/* Create device tree */
-	if ( ( rc = fdt_create ( &efi_fdt_installed ) ) != 0 ) {
+	if ( ( rc = fdt_create ( &efi_fdt_installed, cmdline ) ) != 0 ) {
 		DBGC ( &efi_fdt, "EFI_FDT could not install: %s\n",
 		       strerror ( rc ) );
 		goto err_create;
