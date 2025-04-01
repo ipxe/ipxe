@@ -84,6 +84,8 @@ struct fdt {
 	};
 	/** Length of tree */
 	size_t len;
+	/** Used length of tree */
+	size_t used;
 	/** Offset to structure block */
 	unsigned int structure;
 	/** Length of structure block */
@@ -92,6 +94,8 @@ struct fdt {
 	unsigned int strings;
 	/** Length of strings block */
 	size_t strings_len;
+	/** Offset to memory reservation block */
+	unsigned int reservations;
 };
 
 extern struct image_tag fdt_image __image_tag;

@@ -458,10 +458,11 @@ int fdt_mac ( struct fdt *fdt, unsigned int offset,
  * @ret rc		Return status code
  */
 int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
-	const uint8_t *end;
+	const uint8_t *nul;
+	size_t end;
 
 	/* Sanity check */
-	if ( sizeof ( fdt ) > max_len ) {
+	if ( sizeof ( *hdr ) > max_len ) {
 		DBGC ( fdt, "FDT length %#zx too short for header\n",
 		       max_len );
 		goto err;
@@ -470,6 +471,7 @@ int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 	/* Record device tree location */
 	fdt->hdr = hdr;
 	fdt->len = be32_to_cpu ( hdr->totalsize );
+	fdt->used = sizeof ( *hdr );
 	if ( fdt->len > max_len ) {
 		DBGC ( fdt, "FDT has invalid length %#zx / %#zx\n",
 		       fdt->len, max_len );
@@ -507,6 +509,9 @@ int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 		DBGC ( fdt, "FDT structure block is misaligned\n" );
 		goto err;
 	}
+	end = ( fdt->structure + fdt->structure_len );
+	if ( fdt->used < end )
+		fdt->used = end;
 
 	/* Record strings block location */
 	fdt->strings = be32_to_cpu ( hdr->off_dt_strings );
@@ -518,16 +523,34 @@ int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 		DBGC ( fdt, "FDT strings block exceeds table\n" );
 		goto err;
 	}
+	end = ( fdt->strings + fdt->strings_len );
+	if ( fdt->used < end )
+		fdt->used = end;
 
 	/* Shrink strings block to ensure NUL termination safety */
-	end = ( fdt->raw + fdt->strings + fdt->strings_len );
+	nul = ( fdt->raw + fdt->strings + fdt->strings_len );
 	for ( ; fdt->strings_len ; fdt->strings_len-- ) {
-		if ( *(--end) == '\0' )
+		if ( *(--nul) == '\0' )
 			break;
 	}
 	if ( fdt->strings_len != be32_to_cpu ( hdr->size_dt_strings ) ) {
 		DBGC ( fdt, "FDT strings block shrunk to +[%#04x,%#04zx)\n",
 		       fdt->strings, ( fdt->strings + fdt->strings_len ) );
+	}
+
+	/* Record memory reservation block location */
+	fdt->reservations = be32_to_cpu ( hdr->off_mem_rsvmap );
+	DBGC ( fdt, "FDT memory reservations at +[%#04x,...)\n",
+	       fdt->reservations );
+	if ( fdt->used <= fdt->reservations ) {
+		/* No size field exists: assume whole table is used */
+		fdt->used = fdt->len;
+	}
+
+	/* Identify free space (if any) */
+	if ( fdt->used < fdt->len ) {
+		DBGC ( fdt, "FDT free space at +[%#04zx,%#04zx)\n",
+		       fdt->used, fdt->len );
 	}
 
 	/* Print model name (for debugging) */
