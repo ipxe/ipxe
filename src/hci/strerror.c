@@ -21,6 +21,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+int uriqrencode(const char * URI, char *outbuff, size_t outbuff_sz);
+
 /**
  * Find error description
  *
@@ -76,7 +78,13 @@ static struct errortab * find_closest_error ( int errno ) {
  *
  */
 char * strerror ( int errno ) {
-	static char errbuf[64];
+	#define SQUARE 46
+
+	static char errbuf[(((SQUARE/2)+1)*SQUARE)];
+//	static char errbuf[64];
+	char errURL[32];
+	int offset = 0;
+
 	struct errortab *errortab;
 
 	/* Allow for strerror(rc) as well as strerror(errno) */
@@ -86,16 +94,22 @@ char * strerror ( int errno ) {
 	/* Find the error description, if one exists */
 	errortab = find_closest_error ( errno );
 
+	snprintf ( errURL, sizeof ( errURL ),
+			PRODUCT_ERROR_URI,
+			errno );
+
 	/* Construct the error message */
 	if ( errortab ) {
-		snprintf ( errbuf, sizeof ( errbuf ),
-			   "%s (" PRODUCT_ERROR_URI ")",
-			   errortab->text, errno );
+		offset = snprintf ( &errbuf[offset], sizeof ( errbuf ) - offset,
+			   "%s (%s)",
+			   errortab->text, errURL );
 	} else {
-		snprintf ( errbuf, sizeof ( errbuf ),
-			   "Error %#08x (" PRODUCT_ERROR_URI ")",
-			   errno, errno );
+		offset = snprintf ( &errbuf[offset], sizeof ( errbuf ) - offset,
+			   "Error %#08x (%s)",
+			   errno, errURL );
 	}
+
+	uriqrencode(errURL, &errbuf[offset], sizeof(errbuf) - offset );
 
 	return errbuf;
 }
