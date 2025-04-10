@@ -217,7 +217,8 @@ static inline void * legacy_isa_get_drvdata ( void *hwdev ) {
 	}								  \
 	static inline void						  \
 	_name ## _disable ( struct nic *nic, void *hwdev ) {		  \
-		void ( * _unsafe_disable ) () = _disable;		  \
+		void ( * _unsafe_disable ) ( struct nic *, ... ) =	  \
+			(void ( * ) ( struct nic *, ... )) _disable;	  \
 		_unsafe_disable ( nic, hwdev );				  \
 	}								  \
 	static inline int						  \
