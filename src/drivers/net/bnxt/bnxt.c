@@ -524,20 +524,23 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 	u8 drop;
 
 	dump_rx_bd ( rx_cmp, rx_cmp_hi, desc_idx );
-	assert ( !iob );
-	drop = bnxt_rx_drop ( bp, iob, rx_cmp, rx_cmp_hi, rx_cmp->len );
-	dbg_rxp ( iob->data, rx_cmp->len, drop );
-	if ( drop )
-		netdev_rx_err ( dev, iob, -EINVAL );
-	else
-		netdev_rx ( dev, iob );
-
-	bp->rx.cnt++;
-	bp->rx.iob[desc_idx] = NULL;
-	bp->rx.iob_cnt--;
-	bnxt_post_rx_buffers ( bp );
-	bnxt_adv_cq_index ( bp, 2 ); /* Rx completion is 2 entries. */
-	dbg_rx_stat ( bp );
+	if ( iob ) {
+		drop = bnxt_rx_drop ( bp, iob, rx_cmp, rx_cmp_hi, rx_cmp->len );
+		dbg_rxp ( iob->data, rx_cmp->len, drop );
+		if ( drop )
+			netdev_rx_err ( dev, iob, -EINVAL );
+		else
+			netdev_rx ( dev, iob );
+		bp->rx.cnt++;
+		bp->rx.iob[desc_idx] = NULL;
+		bp->rx.iob_cnt--;
+		bnxt_post_rx_buffers ( bp );
+		bnxt_adv_cq_index ( bp, 2 ); /* Rx completion is 2 entries. */
+		dbg_rx_stat ( bp );
+	} else {
+		bp->rx.iob[desc_idx] = NULL;
+		bp->rx.iob_cnt--;
+	}
 }
 
 static int bnxt_rx_complete ( struct net_device *dev,
@@ -2409,8 +2412,19 @@ disable_pdev:
 
 static void bnxt_remove_one ( struct pci_device *pci )
 {
-	struct net_device *netdev = pci_get_drvdata ( pci );
-	struct bnxt *bp = netdev->priv;
+	struct net_device *netdev;
+	struct bnxt *bp;
+
+        if ( ( pci == NULL ) || (pci->priv == NULL ) )
+                return;
+
+        netdev = pci_get_drvdata ( pci ) ;
+        if ( ( netdev == NULL ) )
+                return;
+
+        bp = netdev->priv;
+        if ( ( bp == NULL ) )
+                return;
 
 	DBGP ( "%s\n", __func__ );
 	/* Unregister network device */
