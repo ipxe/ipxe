@@ -69,6 +69,9 @@ struct device_description {
 /** USB bus type */
 #define BUS_TYPE_USB 10
 
+/** Devicetree bus type */
+#define BUS_TYPE_DT 11
+
 /** A hardware device */
 struct device {
 	/** Name */
