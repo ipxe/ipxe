@@ -115,6 +115,8 @@ extern int fdt_path ( struct fdt *fdt, const char *path,
 		      unsigned int *offset );
 extern int fdt_alias ( struct fdt *fdt, const char *name,
 		       unsigned int *offset );
+extern const char * fdt_strings ( struct fdt *fdt, unsigned int offset,
+				  const char *name, unsigned int *count );
 extern const char * fdt_string ( struct fdt *fdt, unsigned int offset,
 				 const char *name );
 extern int fdt_u64 ( struct fdt *fdt, unsigned int offset, const char *name,

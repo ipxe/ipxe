@@ -403,6 +403,46 @@ static int fdt_property ( struct fdt *fdt, unsigned int offset,
 }
 
 /**
+ * Find strings property
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v name		Property name
+ * @v count		String count to fill in
+ * @ret string		String property, or NULL on error
+ */
+const char * fdt_strings ( struct fdt *fdt, unsigned int offset,
+			   const char *name, unsigned int *count ) {
+	struct fdt_descriptor desc;
+	const char *data;
+	size_t len;
+	int rc;
+
+	/* Return a zero count on error */
+	*count = 0;
+
+	/* Find property */
+	if ( ( rc = fdt_property ( fdt, offset, name, &desc ) ) != 0 )
+		return NULL;
+
+	/* Check NUL termination */
+	data = desc.data;
+	if ( desc.len && ( data[ desc.len - 1 ] != '\0' ) ) {
+		DBGC ( fdt, "FDT unterminated string property \"%s\"\n",
+		       name );
+		return NULL;
+	}
+
+	/* Count number of strings */
+	for ( len = desc.len ; len-- ; ) {
+		if ( data[len] == '\0' )
+			(*count)++;
+	}
+
+	return data;
+}
+
+/**
  * Find string property
  *
  * @v fdt		Device tree
@@ -412,21 +452,10 @@ static int fdt_property ( struct fdt *fdt, unsigned int offset,
  */
 const char * fdt_string ( struct fdt *fdt, unsigned int offset,
 			  const char *name ) {
-	struct fdt_descriptor desc;
-	int rc;
+	unsigned int count;
 
-	/* Find property */
-	if ( ( rc = fdt_property ( fdt, offset, name, &desc ) ) != 0 )
-		return NULL;
-
-	/* Check NUL termination */
-	if ( strnlen ( desc.data, desc.len ) == desc.len ) {
-		DBGC ( fdt, "FDT unterminated string property \"%s\"\n",
-		       name );
-		return NULL;
-	}
-
-	return desc.data;
+	/* Find strings property */
+	return fdt_strings ( fdt, offset, name, &count );
 }
 
 /**
