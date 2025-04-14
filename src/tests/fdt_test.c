@@ -158,6 +158,7 @@ static const uint8_t sifive_u[] = {
  *
  */
 static void fdt_test_exec ( void ) {
+	struct fdt_descriptor desc;
 	struct fdt_header *hdr;
 	struct fdt fdt;
 	const char *string;
@@ -218,6 +219,19 @@ static void fdt_test_exec ( void ) {
 	ok ( ( string = fdt_string ( &fdt, offset, "compatible" ) ) != NULL );
 	ok ( strcmp ( string, "sifive,uart0" ) == 0 );
 	ok ( fdt_alias ( &fdt, "nonexistent0", &offset ) != 0 );
+
+	/* Verify node description */
+	ok ( fdt_path ( &fdt, "/memory@80000000", &offset ) == 0 );
+	ok ( fdt_describe ( &fdt, offset, &desc ) == 0 );
+	ok ( desc.offset == offset );
+	ok ( strcmp ( desc.name, "memory@80000000" ) == 0 );
+	ok ( desc.data == NULL );
+	ok ( desc.len == 0 );
+	ok ( desc.depth == +1 );
+	ok ( fdt_describe ( &fdt, desc.next, &desc ) == 0 );
+	ok ( strcmp ( desc.name, "device_type" ) == 0 );
+	ok ( strcmp ( desc.data, "memory" ) == 0 );
+	ok ( desc.depth == 0 );
 }
 
 /** FDT self-test */

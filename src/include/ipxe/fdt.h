@@ -108,9 +108,27 @@ struct fdt {
 	int ( * realloc ) ( struct fdt *fdt, size_t len );
 };
 
+/** A device tree token descriptor */
+struct fdt_descriptor {
+	/** Offset within structure block */
+	unsigned int offset;
+	/** Next offset within structure block */
+	unsigned int next;
+	/** Node or property name (if applicable) */
+	const char *name;
+	/** Property data (if applicable) */
+	const void *data;
+	/** Length of property data (if applicable) */
+	size_t len;
+	/** Depth change */
+	int depth;
+};
+
 extern struct image_tag fdt_image __image_tag;
 extern struct fdt sysfdt;
 
+extern int fdt_describe ( struct fdt *fdt, unsigned int offset,
+			  struct fdt_descriptor *desc );
 extern int fdt_path ( struct fdt *fdt, const char *path,
 		      unsigned int *offset );
 extern int fdt_alias ( struct fdt *fdt, const char *name,
