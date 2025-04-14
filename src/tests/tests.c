@@ -90,3 +90,4 @@ REQUIRE_OBJECT ( p256_test );
 REQUIRE_OBJECT ( p384_test );
 REQUIRE_OBJECT ( efi_siglist_test );
 REQUIRE_OBJECT ( cpio_test );
+REQUIRE_OBJECT ( fdt_test );
