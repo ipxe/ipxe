@@ -298,11 +298,15 @@ int fdt_path ( struct fdt *fdt, const char *path, unsigned int *offset ) {
 	*offset = 0;
 
 	/* Traverse tree one path segment at a time */
-	while ( *tmp ) {
+	while ( 1 ) {
 
 		/* Skip any leading '/' */
 		while ( *tmp == '/' )
 			tmp++;
+
+		/* Terminate if there are no more path components */
+		if ( ! *tmp )
+			break;
 
 		/* Find next '/' delimiter and convert to NUL */
 		del = strchr ( tmp, '/' );
@@ -316,9 +320,12 @@ int fdt_path ( struct fdt *fdt, const char *path, unsigned int *offset ) {
 		if ( rc != 0 )
 			return rc;
 
-		/* Move to next path component, if any */
-		while ( *tmp && ( *tmp != '/' ) )
-			tmp++;
+		/* Terminate if there are no more delimiters */
+		if ( ! del )
+			break;
+
+		/* Move to next path component */
+		tmp = del;
 	}
 
 	DBGC2 ( fdt, "FDT found path \"%s\" at +%#04x\n", path, *offset );
