@@ -201,6 +201,8 @@ static int fdt_child ( struct fdt *fdt, unsigned int offset, const char *name,
 	struct fdt_cursor pos;
 	struct fdt_descriptor desc;
 	unsigned int orig_offset;
+	const char *sep;
+	size_t name_len;
 	int rc;
 
 	/* Record original offset (for debugging) */
@@ -209,6 +211,10 @@ static int fdt_child ( struct fdt *fdt, unsigned int offset, const char *name,
 	/* Initialise cursor */
 	pos.offset = offset;
 	pos.depth = -1;
+
+	/* Determine length of name (may be terminated with NUL or '/') */
+	sep = strchr ( name, '/' );
+	name_len = ( sep ? ( ( size_t ) ( sep - name ) ) : strlen ( name ) );
 
 	/* Find child node */
 	while ( 1 ) {
@@ -227,7 +233,9 @@ static int fdt_child ( struct fdt *fdt, unsigned int offset, const char *name,
 		if ( ( pos.depth == 1 ) && desc.name && ( ! desc.data ) ) {
 			DBGC2 ( fdt, "FDT +%#04x has child node \"%s\"\n",
 				orig_offset, desc.name );
-			if ( strcmp ( name, desc.name ) == 0 ) {
+			if ( ( strlen ( desc.name ) == name_len ) &&
+			     ( memcmp ( name, desc.name, name_len ) == 0 ) ) {
+				*child = desc.offset;
 				DBGC2 ( fdt, "FDT +%#04x found child node "
 					"\"%s\" at +%#04x\n", orig_offset,
 					desc.name, *child );
@@ -290,8 +298,7 @@ static int fdt_end ( struct fdt *fdt, unsigned int offset,
  * @ret rc		Return status code
  */
 int fdt_path ( struct fdt *fdt, const char *path, unsigned int *offset ) {
-	char *tmp = ( ( char * ) path );
-	char *del;
+	const char *tmp = path;
 	int rc;
 
 	/* Initialise offset */
@@ -308,24 +315,14 @@ int fdt_path ( struct fdt *fdt, const char *path, unsigned int *offset ) {
 		if ( ! *tmp )
 			break;
 
-		/* Find next '/' delimiter and convert to NUL */
-		del = strchr ( tmp, '/' );
-		if ( del )
-			*del = '\0';
-
-		/* Find child and restore delimiter */
-		rc = fdt_child ( fdt, *offset, tmp, offset );
-		if ( del )
-			*del = '/';
-		if ( rc != 0 )
+		/* Find child */
+		if ( ( rc = fdt_child ( fdt, *offset, tmp, offset ) ) != 0 )
 			return rc;
 
-		/* Terminate if there are no more delimiters */
-		if ( ! del )
+		/* Move to next path component, if any */
+		tmp = strchr ( tmp, '/' );
+		if ( ! tmp )
 			break;
-
-		/* Move to next path component */
-		tmp = del;
 	}
 
 	DBGC2 ( fdt, "FDT found path \"%s\" at +%#04x\n", path, *offset );
