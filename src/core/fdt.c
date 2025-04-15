@@ -468,7 +468,55 @@ const char * fdt_string ( struct fdt *fdt, unsigned int offset,
 }
 
 /**
- * Find integer property
+ * Get integer property
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v name		Property name
+ * @v index		Starting cell index
+ * @v count		Number of cells (or 0 to read all remaining cells)
+ * @v value		Integer value to fill in
+ * @ret rc		Return status code
+ */
+int fdt_cells ( struct fdt *fdt, unsigned int offset, const char *name,
+		unsigned int index, unsigned int count, uint64_t *value ) {
+	struct fdt_descriptor desc;
+	const uint32_t *cell;
+	unsigned int total;
+	int rc;
+
+	/* Clear value */
+	*value = 0;
+
+	/* Find property */
+	if ( ( rc = fdt_property ( fdt, offset, name, &desc ) ) != 0 )
+		return rc;
+	cell = desc.data;
+
+	/* Determine number of cells */
+	total = ( desc.len / sizeof ( *cell ) );
+	if ( ( index > total ) || ( count > ( total - index ) ) ) {
+		DBGC ( fdt, "FDT truncated integer \"%s\"\n", name );
+		return -ERANGE;
+	}
+	if ( ! count )
+		count = ( total - index );
+	if ( count > ( sizeof ( *value ) / sizeof ( *cell ) ) ) {
+		DBGC ( fdt, "FDT overlength integer \"%s\"\n", name );
+		return -ERANGE;
+	}
+
+	/* Read value */
+	for ( cell += index ; count ; cell++, count-- ) {
+		*value <<= 32;
+		*value |= be32_to_cpu ( *cell );
+	}
+
+	return 0;
+}
+
+/**
+ * Get 64-bit integer property
  *
  * @v fdt		Device tree
  * @v offset		Starting node offset
@@ -478,30 +526,38 @@ const char * fdt_string ( struct fdt *fdt, unsigned int offset,
  */
 int fdt_u64 ( struct fdt *fdt, unsigned int offset, const char *name,
 	      uint64_t *value ) {
-	struct fdt_descriptor desc;
-	const uint8_t *data;
-	size_t remaining;
 	int rc;
 
-	/* Clear value */
-	*value = 0;
+	/* Read value */
+	if ( ( rc = fdt_cells ( fdt, offset, name, 0, 0, value ) ) != 0 )
+		return rc;
 
-	/* Find property */
-	if ( ( rc = fdt_property ( fdt, offset, name, &desc ) ) != 0 )
+	return 0;
+}
+
+/**
+ * Get 32-bit integer property
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v name		Property name
+ * @v value		Integer value to fill in
+ * @ret rc		Return status code
+ */
+int fdt_u32 ( struct fdt *fdt, unsigned int offset, const char *name,
+	      uint32_t *value ) {
+	uint64_t value64;
+	int rc;
+
+	/* Read value */
+	if ( ( rc = fdt_u64 ( fdt, offset, name, &value64 ) ) != 0 )
 		return rc;
 
 	/* Check range */
-	if ( desc.len > sizeof ( *value ) ) {
-		DBGC ( fdt, "FDT oversized integer property \"%s\"\n", name );
+	*value = value64;
+	if ( *value != value64 ) {
+		DBGC ( fdt, "FDT overlength 32-bit integer \"%s\"\n", name );
 		return -ERANGE;
-	}
-
-	/* Parse value */
-	data = desc.data;
-	remaining = desc.len;
-	while ( remaining-- ) {
-		*value <<= 8;
-		*value |= *(data++);
 	}
 
 	return 0;

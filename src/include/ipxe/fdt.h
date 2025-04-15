@@ -137,8 +137,13 @@ extern const char * fdt_strings ( struct fdt *fdt, unsigned int offset,
 				  const char *name, unsigned int *count );
 extern const char * fdt_string ( struct fdt *fdt, unsigned int offset,
 				 const char *name );
+extern int fdt_cells ( struct fdt *fdt, unsigned int offset, const char *name,
+		       unsigned int index, unsigned int count,
+		       uint64_t *value );
 extern int fdt_u64 ( struct fdt *fdt, unsigned int offset, const char *name,
 		     uint64_t *value );
+extern int fdt_u32 ( struct fdt *fdt, unsigned int offset, const char *name,
+		     uint32_t *value );
 extern int fdt_mac ( struct fdt *fdt, unsigned int offset,
 		     struct net_device *netdev );
 extern int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr,
