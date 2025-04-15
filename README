@@ -1,8 +1,1 @@
-iPXE README File
-
-Quick start guide:
-
-   cd src
-   make
-
-For any more detailed instructions, see http://ipxe.org
+Fork of official iPxe project in an attempt to permanently fix some broadcom fuckery

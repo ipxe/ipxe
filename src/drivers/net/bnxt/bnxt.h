@@ -150,7 +150,8 @@ union dma_addr64_t {
 #define DEFAULT_NUMBER_OF_RX_RINGS              0x01
 #define DEFAULT_NUMBER_OF_RING_GRPS             0x01
 #define DEFAULT_NUMBER_OF_STAT_CTXS             0x01
-#define NUM_RX_BUFFERS                          8
+#define NUM_RX_BUFFERS                          2 /* From 8 */
+/* This is to fix the HTTP hanging issue https://github.com/ipxe/ipxe/issues/1023#issuecomment-2188474322 */
 #define MAX_RX_DESC_CNT                         16
 #define MAX_TX_DESC_CNT                         16
 #define MAX_CQ_DESC_CNT                         64
