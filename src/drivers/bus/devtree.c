@@ -34,12 +34,77 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <ipxe/device.h>
 #include <ipxe/fdt.h>
+#include <ipxe/iomap.h>
 #include <ipxe/devtree.h>
 
 static struct dt_driver dt_node_driver __dt_driver;
 struct root_device dt_root_device __root_device;
 
 static void dt_remove_children ( struct dt_device *parent );
+
+/**
+ * Map devicetree range
+ *
+ * @v dt		Devicetree device
+ * @v offset		Starting node offset
+ * @v index		Region index
+ * @v len		Length to map, or 0 to map whole region
+ * @ret io_addr		I/O address, or NULL on error
+ */
+void * dt_ioremap ( struct dt_device *dt, unsigned int offset,
+		    unsigned int index, size_t len ) {
+	struct dt_device *parent =
+		container_of ( dt->dev.parent, struct dt_device, dev );
+	uint64_t address;
+	uint64_t size;
+	unsigned int cell;
+	void *io_addr;
+	int rc;
+
+	/* Read address */
+	cell = ( index * ( parent->address_cells + parent->size_cells ) );
+	if ( ( rc = fdt_cells ( &sysfdt, offset, "reg", cell,
+				parent->address_cells, &address ) ) != 0 ) {
+		DBGC ( dt, "DT %s could not read region %d address: %s\n",
+		       dt->path, index, strerror ( rc ) );
+		return NULL;
+	}
+	cell += parent->address_cells;
+
+	/* Read size (or assume sufficient, if tree specifies no sizes) */
+	size = len;
+	if ( parent->size_cells &&
+	     ( rc = fdt_cells ( &sysfdt, offset, "reg", cell,
+				parent->size_cells, &size ) ) != 0 ) {
+		DBGC ( dt, "DT %s could not read region %d size: %s\n",
+		       dt->path, index, strerror ( rc ) );
+		return NULL;
+	}
+
+	/* Use region size as length if not specified */
+	if ( ! len )
+		len = size;
+	DBGC ( dt, "DT %s region %d at %#08llx+%#04llx\n",
+	       dt->path, index, ( ( unsigned long long ) address ),
+	       ( ( unsigned long long ) size ) );
+
+	/* Verify size */
+	if ( len > size ) {
+		DBGC ( dt, "DT %s region %d is too small (%#llx/%#zx bytes)\n",
+		       dt->path, index, ( ( unsigned long long ) size ), len );
+		return NULL;
+	}
+
+	/* Map region */
+	io_addr = ioremap ( address, len );
+	if ( ! io_addr ) {
+		DBGC ( dt, "DT %s could not map region %d\n",
+		       dt->path, index );
+		return NULL;
+	}
+
+	return io_addr;
+}
 
 /**
  * Find devicetree driver
@@ -157,6 +222,16 @@ static int dt_probe_node ( struct dt_device *parent, unsigned int offset,
 	dt->dev.parent = ( parent ? &parent->dev : &dt_root_device.dev );
 	INIT_LIST_HEAD ( &dt->dev.children );
 	list_add_tail ( &dt->dev.siblings, &dt->dev.parent->children );
+
+	/* Read #address-cells and #size-cells, if present */
+	if ( ( rc = fdt_u32 ( &sysfdt, offset, "#address-cells",
+			      &dt->address_cells ) ) != 0 ) {
+		dt->address_cells = DT_DEFAULT_ADDRESS_CELLS;
+	}
+	if ( ( rc = fdt_u32 ( &sysfdt, offset, "#size-cells",
+			      &dt->size_cells ) ) != 0 ) {
+		dt->size_cells = DT_DEFAULT_SIZE_CELLS;
+	}
 
 	/* Probe device */
 	if ( ( rc = dt_probe ( dt, offset ) ) != 0 )

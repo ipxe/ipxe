@@ -21,7 +21,18 @@ struct dt_device {
 	struct dt_driver *driver;
 	/** Driver-private data */
 	void *priv;
+
+	/** Number of address cells for child devices */
+	uint32_t address_cells;
+	/** Number of size cells for child devices */
+	uint32_t size_cells;
 };
+
+/** Default number of address cells, if not specified */
+#define DT_DEFAULT_ADDRESS_CELLS 2
+
+/** Default number of size cells, if not specified */
+#define DT_DEFAULT_SIZE_CELLS 1
 
 /** A devicetree driver */
 struct dt_driver {
@@ -72,5 +83,8 @@ static inline void dt_set_drvdata ( struct dt_device *dt, void *priv ) {
 static inline void * dt_get_drvdata ( struct dt_device *dt ) {
 	return dt->priv;
 }
+
+extern void * dt_ioremap ( struct dt_device *dt, unsigned int offset,
+			   unsigned int index, size_t len );
 
 #endif /* _IPXE_DEVTREE_H */
