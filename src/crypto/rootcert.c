@@ -42,10 +42,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define FINGERPRINT_LEN SHA256_DIGEST_SIZE
 
 /* Allow trusted certificates to be overridden if not explicitly specified */
-#ifdef TRUSTED
-#define ALLOW_TRUST_OVERRIDE 0
-#else
-#define ALLOW_TRUST_OVERRIDE 1
+#ifndef ALLOW_TRUST_OVERRIDE
+ #ifdef TRUSTED
+  #define ALLOW_TRUST_OVERRIDE 0
+ #else
+  #define ALLOW_TRUST_OVERRIDE 1
+ #endif
 #endif
 
 /* Use iPXE root CA if no trusted certificates are explicitly specified */
