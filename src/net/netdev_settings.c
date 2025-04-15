@@ -169,6 +169,7 @@ static int netdev_fetch_bustype ( struct net_device *netdev, void *data,
 		[BUS_TYPE_XEN] = "XEN",
 		[BUS_TYPE_HV] = "HV",
 		[BUS_TYPE_USB] = "USB",
+		[BUS_TYPE_DT] = "DT",
 	};
 	struct device_description *desc = &netdev->dev->desc;
 	const char *bustype;
