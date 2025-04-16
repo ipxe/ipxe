@@ -457,6 +457,9 @@ struct net_device {
 /** Network device poll is in progress */
 #define NETDEV_POLL_IN_PROGRESS 0x0020
 
+/** Network device must be polled even when closed */
+#define NETDEV_INSOMNIAC 0x0040
+
 /** Link-layer protocol table */
 #define LL_PROTOCOLS __table ( struct ll_protocol, "ll_protocols" )
 
@@ -691,6 +694,17 @@ netdev_irq_enabled ( struct net_device *netdev ) {
 static inline __attribute__ (( always_inline )) int
 netdev_rx_frozen ( struct net_device *netdev ) {
 	return ( netdev->state & NETDEV_RX_FROZEN );
+}
+
+/**
+ * Check whether or not network device must be polled even while closed
+ *
+ * @v netdev		Network device
+ * @ret insomniac	Network device must be polled even while closed
+ */
+static inline __attribute__ (( always_inline )) int
+netdev_insomniac ( struct net_device *netdev ) {
+	return ( netdev->state & NETDEV_INSOMNIAC );
 }
 
 extern void * netdev_priv ( struct net_device *netdev,

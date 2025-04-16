@@ -611,8 +611,8 @@ void netdev_rx_err ( struct net_device *netdev,
  */
 void netdev_poll ( struct net_device *netdev ) {
 
-	/* Avoid calling poll() on unopened network devices */
-	if ( ! netdev_is_open ( netdev ) )
+	/* Call poll() only on open (or insomniac) network devices */
+	if ( ! ( netdev->state & ( NETDEV_OPEN | NETDEV_INSOMNIAC ) ) )
 		return;
 
 	/* Guard against re-entry */
