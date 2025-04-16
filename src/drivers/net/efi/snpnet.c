@@ -529,6 +529,26 @@ int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
 }
 
 /**
+ * Exclude existing drivers
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+int snpnet_exclude ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_simple_network_protocol_guid;
+	int rc;
+
+	/* Exclude existing SNP drivers */
+	if ( ( rc = efi_driver_exclude ( device, protocol ) ) != 0 ) {
+		DBGC ( device, "SNP %s could not exclude drivers: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Attach driver to device
  *
  * @v efidev		EFI device

@@ -1258,6 +1258,26 @@ static struct net_device_operations nii_operations = {
 };
 
 /**
+ * Exclude existing drivers
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+int nii_exclude ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_nii31_protocol_guid;
+	int rc;
+
+	/* Exclude existing NII protocol drivers */
+	if ( ( rc = efi_driver_exclude ( device, protocol ) ) != 0 ) {
+		DBGC ( device, "NII %s could not exclude drivers: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Attach driver to device
  *
  * @v efidev		EFI device

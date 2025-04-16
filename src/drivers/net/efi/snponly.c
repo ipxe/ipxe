@@ -209,8 +209,8 @@ static int mnponly_supported ( EFI_HANDLE device ) {
 /** EFI SNP chainloading-device-only driver */
 struct efi_driver snponly_driver __efi_driver ( EFI_DRIVER_SNP ) = {
 	.name = "SNPONLY",
-	.exclude = &efi_simple_network_protocol_guid,
 	.supported = snponly_supported,
+	.exclude = snpnet_exclude,
 	.start = snpnet_start,
 	.stop = snpnet_stop,
 };
@@ -218,8 +218,8 @@ struct efi_driver snponly_driver __efi_driver ( EFI_DRIVER_SNP ) = {
 /** EFI NII chainloading-device-only driver */
 struct efi_driver niionly_driver __efi_driver ( EFI_DRIVER_NII ) = {
 	.name = "NIIONLY",
-	.exclude = &efi_nii31_protocol_guid,
 	.supported = niionly_supported,
+	.exclude = nii_exclude,
 	.start = nii_start,
 	.stop = nii_stop,
 };

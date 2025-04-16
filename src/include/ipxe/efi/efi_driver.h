@@ -33,8 +33,13 @@ struct efi_device {
 struct efi_driver {
 	/** Name */
 	const char *name;
-	/** Protocol to which exclusive access is required, if any */
-	EFI_GUID *exclude;
+	/**
+	 * Exclude existing drivers
+	 *
+	 * @v device		EFI device handle
+	 * @ret rc		Return status code
+	 */
+	int ( * exclude ) ( EFI_HANDLE device );
 	/**
 	 * Check if driver supports device
 	 *
@@ -95,6 +100,7 @@ extern void efidev_free ( struct efi_device *efidev );
 extern struct efi_device * efidev_parent ( struct device *dev );
 extern int efi_driver_install ( void );
 extern void efi_driver_uninstall ( void );
+extern int efi_driver_exclude ( EFI_HANDLE device, EFI_GUID *protocol );
 extern int efi_driver_connect_all ( void );
 extern void efi_driver_disconnect_all ( void );
 extern void efi_driver_reconnect_all ( void );

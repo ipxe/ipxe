@@ -1543,6 +1543,26 @@ static int usbio_interfaces ( struct usbio_device *usbio ) {
 }
 
 /**
+ * Exclude existing drivers
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+static int usbio_exclude ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_usb_io_protocol_guid;
+	int rc;
+
+	/* Exclude existing USB I/O protocol drivers */
+	if ( ( rc = efi_driver_exclude ( device, protocol ) ) != 0 ) {
+		DBGC ( device, "USBIO %s could not exclude drivers: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Attach driver to device
  *
  * @v efidev		EFI device
@@ -1651,8 +1671,8 @@ static void usbio_stop ( struct efi_device *efidev ) {
 /** EFI USB I/O driver */
 struct efi_driver usbio_driver __efi_driver ( EFI_DRIVER_HARDWARE ) = {
 	.name = "USBIO",
-	.exclude = &efi_usb_io_protocol_guid,
 	.supported = usbio_supported,
+	.exclude = usbio_exclude,
 	.start = usbio_start,
 	.stop = usbio_stop,
 };

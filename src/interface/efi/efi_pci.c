@@ -830,6 +830,26 @@ static int efipci_supported ( EFI_HANDLE device ) {
 }
 
 /**
+ * Exclude existing drivers
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+static int efipci_exclude ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_pci_io_protocol_guid;
+	int rc;
+
+	/* Exclude existing PCI I/O protocol drivers */
+	if ( ( rc = efi_driver_exclude ( device, protocol ) ) != 0 ) {
+		DBGC ( device, "EFIPCI %s could not exclude drivers: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Attach driver to device
  *
  * @v efidev		EFI device
@@ -916,8 +936,8 @@ static void efipci_stop ( struct efi_device *efidev ) {
 /** EFI PCI driver */
 struct efi_driver efipci_driver __efi_driver ( EFI_DRIVER_HARDWARE ) = {
 	.name = "PCI",
-	.exclude = &efi_pci_io_protocol_guid,
 	.supported = efipci_supported,
+	.exclude = efipci_exclude,
 	.start = efipci_start,
 	.stop = efipci_stop,
 };
