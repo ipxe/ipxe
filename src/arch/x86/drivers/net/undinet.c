@@ -861,6 +861,8 @@ static const struct undinet_irq_broken undinet_irq_broken_list[] = {
 	{ 0x8086, 0x1503, PCI_ANY_ID, PCI_ANY_ID },
 	/* HP 745 G3 laptop */
 	{ 0x14e4, 0x1687, PCI_ANY_ID, PCI_ANY_ID },
+	/* ASUSTeK KNPA-U16 server */
+	{ 0x8086, 0x1521, 0x1043, PCI_ANY_ID },
 };
 
 /**
