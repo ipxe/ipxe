@@ -63,6 +63,7 @@ static int show_exec ( int argc, char **argv ) {
 	struct named_setting setting;
 	struct settings *origin;
 	struct setting fetched;
+	struct setting *iter;
 	char name_buf[32];
 	char *value;
 	int len;
@@ -76,18 +77,35 @@ static int show_exec ( int argc, char **argv ) {
 	if ( ( rc = parse_existing_setting ( argv[optind], &setting ) ) != 0 )
 		goto err_parse_setting;
 
-	/* Fetch formatted setting value */
-	if ( ( len = fetchf_setting_copy ( setting.settings, &setting.setting,
-					   &origin, &fetched, &value ) ) < 0 ) {
-		rc = len;
-		printf ( "Could not find \"%s\": %s\n",
-			 setting.setting.name, strerror ( rc ) );
-		goto err_fetchf;
-	}
+	if ( setting.settings && setting.setting.name[0] == 0 ) {
+		/* The user requested a scope name (e.g. "show net1/"). Iterate
+		 * over all settings and show relevant ones, similar to how the
+		 * config interface would present it. */
+		for_each_table_entry ( iter, SETTINGS ) {
+			if ( ! setting_applies ( setting.settings, iter ) )
+				continue;
 
-	/* Print setting value */
-	setting_name ( origin, &fetched, name_buf, sizeof ( name_buf ) );
-	printf ( "%s = %s\n", name_buf, value );
+			if ( fetchf_setting_copy ( setting.settings, iter,
+						   &origin, &fetched, &value ) < 0 )
+				continue;
+
+			setting_name ( origin, &fetched, name_buf, sizeof ( name_buf ) );
+			printf ( "%s/%s = %s\n", setting.settings->name, iter->name, value );
+		}
+	} else {
+		/* Fetch formatted setting value */
+		if ( ( len = fetchf_setting_copy ( setting.settings, &setting.setting,
+						   &origin, &fetched, &value ) ) < 0 ) {
+			rc = len;
+			printf ( "Could not find \"%s\": %s\n",
+				 setting.setting.name, strerror ( rc ) );
+			goto err_fetchf;
+		}
+
+		/* Print setting value */
+		setting_name ( origin, &fetched, name_buf, sizeof ( name_buf ) );
+		printf ( "%s = %s\n", name_buf, value );
+	}
 
 	/* Success */
 	rc = 0;
