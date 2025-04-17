@@ -37,6 +37,8 @@ FILE_LICENCE ( GPL2_ONLY );
 
 #define u8         unsigned char
 #define bool       boolean_t
+#define true       __bool_true
+#define false      __bool_false
 #define dma_addr_t unsigned long
 #define __le16     uint16_t
 #define __le32     uint32_t
