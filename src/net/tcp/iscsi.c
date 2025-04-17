@@ -789,8 +789,12 @@ static void iscsi_start_login ( struct iscsi_session *iscsi ) {
 	iscsi_start_tx ( iscsi );
 	request->opcode = ( ISCSI_OPCODE_LOGIN_REQUEST |
 			    ISCSI_FLAG_IMMEDIATE );
-	request->flags = ( ( iscsi->status & ISCSI_STATUS_PHASE_MASK ) |
-			   ISCSI_LOGIN_FLAG_TRANSITION );
+	request->flags = ( ( iscsi->status & ISCSI_STATUS_PHASE_MASK ));
+	/* transition to next stage only on the final CHAP message */
+	if (!(iscsi->status & ISCSI_STATUS_STRINGS_SECURITY) || 
+		 (iscsi->status & ISCSI_STATUS_STRINGS_CHAP_RESPONSE) )  {
+		request->flags |= ISCSI_LOGIN_FLAG_TRANSITION; 
+	}
 	/* version_max and version_min left as zero */
 	len = iscsi_build_login_request_strings ( iscsi, NULL, 0 );
 	ISCSI_SET_LENGTHS ( request->lengths, 0, len );
