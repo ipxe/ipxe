@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/sbi.h>
 #include <ipxe/io.h>
+#include <ipxe/keys.h>
 #include <ipxe/console.h>
 #include <config/console.h>
 
@@ -65,6 +66,11 @@ static int sbi_getchar ( void ) {
 	/* Consume and return buffered character, if any */
 	character = sbi_console_input;
 	sbi_console_input = 0;
+
+	/* Convert DEL to backspace */
+	if ( character == DEL )
+		character = BACKSPACE;
+
 	return character;
 }
 
