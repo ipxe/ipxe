@@ -232,6 +232,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_atl_hw		     ( ERRFILE_DRIVER | 0x00d80000 )
 #define ERRFILE_atl2_hw		     ( ERRFILE_DRIVER | 0x00d90000 )
 #define ERRFILE_devtree		     ( ERRFILE_DRIVER | 0x00da0000 )
+#define ERRFILE_cgem		     ( ERRFILE_DRIVER | 0x00db0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )

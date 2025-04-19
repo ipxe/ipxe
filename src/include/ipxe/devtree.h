@@ -10,11 +10,14 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/device.h>
+#include <ipxe/dma.h>
 
 /** A devicetree device */
 struct dt_device {
 	/** Generic device */
 	struct device dev;
+	/** DMA device */
+	struct dma_device dma;
 	/** Device path */
 	const char *path;
 	/** Driver for this device */
