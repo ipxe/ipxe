@@ -131,7 +131,7 @@ static int nbi_prepare_segment ( struct image *image, size_t offset __unused,
 static int nbi_load_segment ( struct image *image, size_t offset,
 			      userptr_t dest, size_t filesz,
 			      size_t memsz __unused ) {
-	memcpy_user ( dest, 0, image->data, offset, filesz );
+	memcpy ( dest, ( image->data + offset ), filesz );
 	return 0;
 }
 

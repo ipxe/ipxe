@@ -83,7 +83,7 @@ int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
 		if ( ( start >= memmap.regions[i].start ) &&
 		     ( end <= memmap.regions[i].end ) ) {
 			/* Found valid region: zero bss and return */
-			memset_user ( segment, filesz, 0, ( memsz - filesz ) );
+			memset ( ( segment + filesz ), 0, ( memsz - filesz ) );
 			return 0;
 		}
 	}

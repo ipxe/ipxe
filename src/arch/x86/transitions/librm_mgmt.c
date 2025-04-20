@@ -69,7 +69,7 @@ uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size ) {
 	userptr_t rm_stack;
 	rm_sp -= size;
 	rm_stack = real_to_user ( rm_ss, rm_sp );
-	memcpy_user ( rm_stack, 0, data, 0, size );
+	memcpy ( rm_stack, data, size );
 	return rm_sp;
 };
 
@@ -83,7 +83,7 @@ uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size ) {
 void remove_user_from_rm_stack ( userptr_t data, size_t size ) {
 	if ( data ) {
 		userptr_t rm_stack = real_to_user ( rm_ss, rm_sp );
-		memcpy_user ( rm_stack, 0, data, 0, size );
+		memcpy ( rm_stack, data, size );
 	}
 	rm_sp += size;
 };
@@ -432,10 +432,6 @@ PROVIDE_UACCESS_INLINE ( librm, phys_to_user );
 PROVIDE_UACCESS_INLINE ( librm, user_to_phys );
 PROVIDE_UACCESS_INLINE ( librm, virt_to_user );
 PROVIDE_UACCESS_INLINE ( librm, user_to_virt );
-PROVIDE_UACCESS_INLINE ( librm, memcpy_user );
-PROVIDE_UACCESS_INLINE ( librm, memmove_user );
-PROVIDE_UACCESS_INLINE ( librm, memset_user );
-PROVIDE_UACCESS_INLINE ( librm, strlen_user );
 PROVIDE_UACCESS_INLINE ( librm, memchr_user );
 PROVIDE_IOMAP_INLINE ( pages, io_to_bus );
 PROVIDE_IOMAP ( pages, ioremap, ioremap_pages );

@@ -222,8 +222,8 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 		}
 
 		/* Copy module */
-		memcpy_user ( phys_to_user ( start ), 0,
-			      module_image->data, 0, module_image->len );
+		memcpy ( phys_to_user ( start ), module_image->data,
+			 module_image->len );
 
 		/* Add module to list */
 		module = &modules[mbinfo->mods_count++];
@@ -350,7 +350,7 @@ static int multiboot_load_raw ( struct image *image,
 	}
 
 	/* Copy image to segment */
-	memcpy_user ( buffer, 0, image->data, offset, filesz );
+	memcpy ( buffer, ( image->data + offset ), filesz );
 
 	/* Record execution entry point and maximum used address */
 	*entry = hdr->mb.entry_addr;

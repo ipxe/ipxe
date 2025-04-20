@@ -66,80 +66,6 @@ trivial_user_to_virt ( userptr_t userptr, off_t offset ) {
 }
 
 /**
- * Copy data between user buffers
- *
- * @v dest		Destination
- * @v dest_off		Destination offset
- * @v src		Source
- * @v src_off		Source offset
- * @v len		Length
- */
-static inline __always_inline void
-trivial_memcpy_user ( userptr_t dest, off_t dest_off,
-		      userptr_t src, off_t src_off, size_t len ) {
-	memcpy ( ( ( void * ) dest + dest_off ),
-		 ( ( void * ) src + src_off ), len );
-}
-
-/**
- * Copy data between user buffers, allowing for overlap
- *
- * @v dest		Destination
- * @v dest_off		Destination offset
- * @v src		Source
- * @v src_off		Source offset
- * @v len		Length
- */
-static inline __always_inline void
-trivial_memmove_user ( userptr_t dest, off_t dest_off,
-		       userptr_t src, off_t src_off, size_t len ) {
-	memmove ( ( ( void * ) dest + dest_off ),
-		  ( ( void * ) src + src_off ), len );
-}
-
-/**
- * Compare data between user buffers
- *
- * @v first		First buffer
- * @v first_off		First buffer offset
- * @v second		Second buffer
- * @v second_off	Second buffer offset
- * @v len		Length
- * @ret diff		Difference
- */
-static inline __always_inline int
-trivial_memcmp_user ( userptr_t first, off_t first_off,
-		      userptr_t second, off_t second_off, size_t len ) {
-	return memcmp ( ( ( void * ) first + first_off ),
-			( ( void * ) second + second_off ), len );
-}
-
-/**
- * Fill user buffer with a constant byte
- *
- * @v buffer		User buffer
- * @v offset		Offset within buffer
- * @v c			Constant byte with which to fill
- * @v len		Length
- */
-static inline __always_inline void
-trivial_memset_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
-	memset ( ( ( void * ) buffer + offset ), c, len );
-}
-
-/**
- * Find length of NUL-terminated string in user buffer
- *
- * @v buffer		User buffer
- * @v offset		Offset within buffer
- * @ret len		Length of string (excluding NUL)
- */
-static inline __always_inline size_t
-trivial_strlen_user ( userptr_t buffer, off_t offset ) {
-	return strlen ( ( void * ) buffer + offset );
-}
-
-/**
  * Find character in user buffer
  *
  * @v buffer		User buffer
@@ -205,38 +131,6 @@ UACCESS_INLINE ( flat, virt_to_user ) ( volatile const void *addr ) {
 static inline __always_inline void *
 UACCESS_INLINE ( flat, user_to_virt ) ( userptr_t userptr, off_t offset ) {
 	return trivial_user_to_virt ( userptr, offset );
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( flat, memcpy_user ) ( userptr_t dest, off_t dest_off,
-				       userptr_t src, off_t src_off,
-				       size_t len ) {
-	trivial_memcpy_user ( dest, dest_off, src, src_off, len );
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( flat, memmove_user ) ( userptr_t dest, off_t dest_off,
-					userptr_t src, off_t src_off,
-					size_t len ) {
-	trivial_memmove_user ( dest, dest_off, src, src_off, len );
-}
-
-static inline __always_inline int
-UACCESS_INLINE ( flat, memcmp_user ) ( userptr_t first, off_t first_off,
-				       userptr_t second, off_t second_off,
-				       size_t len ) {
-	return trivial_memcmp_user ( first, first_off, second, second_off, len);
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( flat, memset_user ) ( userptr_t buffer, off_t offset,
-				       int c, size_t len ) {
-	trivial_memset_user ( buffer, offset, c, len );
-}
-
-static inline __always_inline size_t
-UACCESS_INLINE ( flat, strlen_user ) ( userptr_t buffer, off_t offset ) {
-	return trivial_strlen_user ( buffer, offset );
 }
 
 static inline __always_inline off_t
@@ -311,18 +205,6 @@ static inline __always_inline void * phys_to_virt ( unsigned long phys_addr ) {
 }
 
 /**
- * Copy data between user buffers
- *
- * @v dest		Destination
- * @v dest_off		Destination offset
- * @v src		Source
- * @v src_off		Source offset
- * @v len		Length
- */
-void memcpy_user ( userptr_t dest, off_t dest_off,
-		   userptr_t src, off_t src_off, size_t len );
-
-/**
  * Copy data to user buffer
  *
  * @v dest		Destination
@@ -332,7 +214,7 @@ void memcpy_user ( userptr_t dest, off_t dest_off,
  */
 static inline __always_inline void
 copy_to_user ( userptr_t dest, off_t dest_off, const void *src, size_t len ) {
-	memcpy_user ( dest, dest_off, virt_to_user ( src ), 0, len );
+	memcpy ( ( dest + dest_off ), src, len );
 }
 
 /**
@@ -345,52 +227,8 @@ copy_to_user ( userptr_t dest, off_t dest_off, const void *src, size_t len ) {
  */
 static inline __always_inline void
 copy_from_user ( void *dest, userptr_t src, off_t src_off, size_t len ) {
-	memcpy_user ( virt_to_user ( dest ), 0, src, src_off, len );
+	memcpy ( dest, ( src + src_off ), len );
 }
-
-/**
- * Copy data between user buffers, allowing for overlap
- *
- * @v dest		Destination
- * @v dest_off		Destination offset
- * @v src		Source
- * @v src_off		Source offset
- * @v len		Length
- */
-void memmove_user ( userptr_t dest, off_t dest_off,
-		    userptr_t src, off_t src_off, size_t len );
-
-/**
- * Compare data between user buffers
- *
- * @v first		First buffer
- * @v first_off		First buffer offset
- * @v second		Second buffer
- * @v second_off	Second buffer offset
- * @v len		Length
- * @ret diff		Difference
- */
-int memcmp_user ( userptr_t first, off_t first_off,
-		  userptr_t second, off_t second_off, size_t len );
-
-/**
- * Fill user buffer with a constant byte
- *
- * @v userptr		User buffer
- * @v offset		Offset within buffer
- * @v c			Constant byte with which to fill
- * @v len		Length
- */
-void memset_user ( userptr_t userptr, off_t offset, int c, size_t len );
-
-/**
- * Find length of NUL-terminated string in user buffer
- *
- * @v userptr		User buffer
- * @v offset		Offset within buffer
- * @ret len		Length of string (excluding NUL)
- */
-size_t strlen_user ( userptr_t userptr, off_t offset );
 
 /**
  * Find character in user buffer

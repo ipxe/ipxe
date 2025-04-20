@@ -395,7 +395,7 @@ static int exanic_open ( struct net_device *netdev ) {
 	}
 
 	/* Reset receive region contents */
-	memset_user ( port->rx, 0, 0xff, EXANIC_RX_LEN );
+	memset ( port->rx, 0xff, EXANIC_RX_LEN );
 
 	/* Reset transmit feedback region */
 	*(port->txf) = 0;

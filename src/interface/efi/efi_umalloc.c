@@ -87,8 +87,8 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 	if ( old_ptr && ( old_ptr != UNOWHERE ) ) {
 		copy_from_user ( &old_size, old_ptr, -EFI_PAGE_SIZE,
 				 sizeof ( old_size ) );
-		memcpy_user ( new_ptr, 0, old_ptr, 0,
-			      ( (old_size < new_size) ? old_size : new_size ));
+		memcpy ( new_ptr, old_ptr,
+			 ( (old_size < new_size) ? old_size : new_size ) );
 		old_pages = ( EFI_SIZE_TO_PAGES ( old_size ) + 1 );
 		phys_addr = user_to_phys ( old_ptr, -EFI_PAGE_SIZE );
 		if ( ( efirc = bs->FreePages ( phys_addr, old_pages ) ) != 0 ){

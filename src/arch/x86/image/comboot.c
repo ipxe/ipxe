@@ -267,10 +267,10 @@ static int comboot_prepare_segment ( struct image *image )
 	}
 
 	/* Zero PSP */
-	memset_user ( seg_userptr, 0, 0, 0x100 );
+	memset ( seg_userptr, 0, 0x100 );
 
 	/* Copy image to segment:0100 */
-	memcpy_user ( seg_userptr, 0x100, image->data, 0, image->len );
+	memcpy ( ( seg_userptr + 0x100 ), image->data, image->len );
 
 	return 0;
 }

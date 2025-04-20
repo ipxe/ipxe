@@ -369,8 +369,8 @@ static size_t bzimage_load_initrd ( struct image *image,
 
 	/* Copy in initrd image body and construct any cpio headers */
 	if ( address ) {
-		memmove_user ( address, len, initrd->data, 0, initrd->len );
-		memset_user ( address, 0, 0, len );
+		memmove ( ( address + len ), initrd->data, initrd->len );
+		memset ( address, 0, len );
 		offset = 0;
 		for ( i = 0 ; ( cpio_len = cpio_header ( initrd, i, &cpio ) ) ;
 		      i++ ) {
@@ -395,7 +395,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 	/* Zero-pad to next INITRD_ALIGN boundary */
 	pad_len = ( ( -len ) & ( INITRD_ALIGN - 1 ) );
 	if ( address )
-		memset_user ( address, len, 0, pad_len );
+		memset ( ( address + len ), 0, pad_len );
 
 	return len;
 }
@@ -562,10 +562,9 @@ static int bzimage_exec ( struct image *image ) {
 	unregister_image ( image_get ( image ) );
 
 	/* Load segments */
-	memcpy_user ( bzimg.rm_kernel, 0, image->data,
-		      0, bzimg.rm_filesz );
-	memcpy_user ( bzimg.pm_kernel, 0, image->data,
-		      bzimg.rm_filesz, bzimg.pm_sz );
+	memcpy ( bzimg.rm_kernel, image->data, bzimg.rm_filesz );
+	memcpy ( bzimg.pm_kernel, ( image->data + bzimg.rm_filesz ),
+		 bzimg.pm_sz );
 
 	/* Store command line */
 	bzimage_set_cmdline ( image, &bzimg );

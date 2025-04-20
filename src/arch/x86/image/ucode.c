@@ -256,7 +256,7 @@ static int ucode_update_all ( struct image *image,
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	memset_user ( status, 0, 0, len );
+	memset ( status, 0, len );
 
 	/* Construct control structure */
 	memset ( &control, 0, sizeof ( control ) );

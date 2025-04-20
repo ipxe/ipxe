@@ -1000,7 +1000,7 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	memset_user ( scratch->buffer, 0, 0, buffer_len );
+	memset ( scratch->buffer, 0, buffer_len );
 
 	/* Allocate scratchpad array */
 	array_len = ( scratch->count * sizeof ( scratch->array[0] ) );

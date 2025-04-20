@@ -49,9 +49,8 @@ void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physad
 	DBGC ( &com32_regs, "COM32 INT%x in %#08lx out %#08lx\n",
 	       interrupt, inregs_phys, outregs_phys );
 
-	memcpy_user ( virt_to_user( &com32_regs ), 0,
-	              phys_to_user ( inregs_phys ), 0,
-	              sizeof(com32sys_t) );
+	memcpy ( virt_to_user( &com32_regs ), phys_to_user ( inregs_phys ),
+		 sizeof ( com32sys_t ) );
 
 	com32_int_vector = interrupt;
 
@@ -108,9 +107,8 @@ void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physad
 		            : : );
 
 	if ( outregs_phys ) {
-		memcpy_user ( phys_to_user ( outregs_phys ), 0,
-		              virt_to_user( &com32_regs ), 0,
-		              sizeof(com32sys_t) );
+		memcpy ( phys_to_user ( outregs_phys ),
+			 virt_to_user ( &com32_regs ), sizeof ( com32sys_t ) );
 	}
 }
 
@@ -122,9 +120,8 @@ void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t
 	DBGC ( &com32_regs, "COM32 farcall %04x:%04x in %#08lx out %#08lx\n",
 	       ( proc >> 16 ), ( proc & 0xffff ), inregs_phys, outregs_phys );
 
-	memcpy_user ( virt_to_user( &com32_regs ), 0,
-	              phys_to_user ( inregs_phys ), 0,
-	              sizeof(com32sys_t) );
+	memcpy ( virt_to_user( &com32_regs ), phys_to_user ( inregs_phys ),
+		 sizeof ( com32sys_t ) );
 
 	com32_farcall_proc = proc;
 
@@ -170,9 +167,8 @@ void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t
 		            : : );
 
 	if ( outregs_phys ) {
-		memcpy_user ( phys_to_user ( outregs_phys ), 0,
-		              virt_to_user( &com32_regs ), 0,
-		              sizeof(com32sys_t) );
+		memcpy ( phys_to_user ( outregs_phys ),
+			 virt_to_user ( &com32_regs ), sizeof ( com32sys_t ) );
 	}
 }
 

@@ -464,8 +464,8 @@ static void deflate_copy ( struct deflate_chunk *out,
 		if ( copy_len > len )
 			copy_len = len;
 		while ( copy_len-- ) {
-			memcpy_user ( out->data, out_offset++,
-				      start, offset++, 1 );
+			memcpy ( ( out->data + out_offset++ ),
+				 ( start + offset++ ), 1 );
 		}
 	}
 	out->offset += len;

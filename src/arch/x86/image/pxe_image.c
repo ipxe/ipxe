@@ -66,7 +66,7 @@ static int pxe_exec ( struct image *image ) {
 	}
 
 	/* Copy image to segment */
-	memcpy_user ( buffer, 0, image->data, 0, image->len );
+	memcpy ( buffer, image->data, image->len );
 
 	/* Arbitrarily pick the most recently opened network device */
 	if ( ( netdev = last_opened_netdev() ) == NULL ) {

@@ -246,7 +246,7 @@ int image_set_data ( struct image *image, userptr_t data, size_t len ) {
 		return rc;
 
 	/* Copy in new image data */
-	memcpy_user ( image->data, 0, data, 0, len );
+	memcpy ( image->data, data, len );
 
 	return 0;
 }

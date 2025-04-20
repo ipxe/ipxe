@@ -219,7 +219,7 @@ static int com32_load_image ( struct image *image ) {
 	}
 
 	/* Copy image to segment */
-	memcpy_user ( buffer, 0, image->data, 0, filesz );
+	memcpy ( buffer, image->data, filesz );
 
 	return 0;
 }

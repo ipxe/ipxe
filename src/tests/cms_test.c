@@ -1773,8 +1773,8 @@ static void cms_decrypt_okx ( struct cms_test_image *img,
 
 	/* Check decrypted image matches expected plaintext */
 	okx ( img->image.len == expected->image.len, file, line );
-	okx ( memcmp_user ( img->image.data, 0, expected->image.data, 0,
-			    expected->image.len ) == 0, file, line );
+	okx ( memcmp ( img->image.data, expected->image.data,
+		       expected->image.len ) == 0, file, line );
 }
 #define cms_decrypt_ok( data, envelope, keypair, expected )		\
 	cms_decrypt_okx ( data, envelope, keypair, expected,		\

@@ -80,7 +80,7 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 		       user_to_phys ( highest->data, highest->len ),
 		       user_to_phys ( current, 0 ),
 		       user_to_phys ( current, highest->len ) );
-		memmove_user ( current, 0, highest->data, 0, highest->len );
+		memmove ( current, highest->data, highest->len );
 		highest->data = current;
 	}
 
@@ -96,8 +96,7 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 			       user_to_phys ( initrd->data, initrd->len ),
 			       user_to_phys ( current, 0 ),
 			       user_to_phys ( current, initrd->len ) );
-			memcpy_user ( current, 0, initrd->data, 0,
-				      initrd->len );
+			memcpy ( current, initrd->data, initrd->len );
 			initrd->data = current;
 		}
 	}
@@ -140,9 +139,10 @@ static void initrd_swap ( struct image *low, struct image *high,
 			    ~( INITRD_ALIGN - 1 ) );
 
 		/* Swap fragments */
-		memcpy_user ( free, 0, high->data, len, frag_len );
-		memmove_user ( low->data, new_len, low->data, len, low->len );
-		memcpy_user ( low->data, len, free, 0, frag_len );
+		memcpy ( free, ( high->data + len ), frag_len );
+		memmove ( ( low->data + new_len ), ( low->data + len ),
+			  low->len );
+		memcpy ( ( low->data + len ), free, frag_len );
 		len = new_len;
 	}
 

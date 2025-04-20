@@ -69,38 +69,6 @@ UACCESS_INLINE ( linux, user_to_virt ) ( userptr_t userptr, off_t offset ) {
 	return trivial_user_to_virt ( userptr, offset );
 }
 
-static inline __always_inline void
-UACCESS_INLINE ( linux, memcpy_user ) ( userptr_t dest, off_t dest_off,
-					userptr_t src, off_t src_off,
-					size_t len ) {
-	trivial_memcpy_user ( dest, dest_off, src, src_off, len );
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( linux, memmove_user ) ( userptr_t dest, off_t dest_off,
-					 userptr_t src, off_t src_off,
-					 size_t len ) {
-	trivial_memmove_user ( dest, dest_off, src, src_off, len );
-}
-
-static inline __always_inline int
-UACCESS_INLINE ( linux, memcmp_user ) ( userptr_t first, off_t first_off,
-					userptr_t second, off_t second_off,
-					size_t len ) {
-	return trivial_memcmp_user ( first, first_off, second, second_off, len);
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( linux, memset_user ) ( userptr_t buffer, off_t offset,
-					int c, size_t len ) {
-	trivial_memset_user ( buffer, offset, c, len );
-}
-
-static inline __always_inline size_t
-UACCESS_INLINE ( linux, strlen_user ) ( userptr_t buffer, off_t offset ) {
-	return trivial_strlen_user ( buffer, offset );
-}
-
 static inline __always_inline off_t
 UACCESS_INLINE ( linux, memchr_user ) ( userptr_t buffer, off_t offset,
 					int c, size_t len ) {

@@ -103,9 +103,8 @@ static void zlib_okx ( struct zlib_test *test, const char *file,
 
 	/* Verify extracted image content */
 	okx ( extracted->len == test->expected_len, file, line );
-	okx ( memcmp_user ( extracted->data, 0,
-			    virt_to_user ( test->expected ), 0,
-			    test->expected_len ) == 0, file, line );
+	okx ( memcmp ( extracted->data, virt_to_user ( test->expected ),
+		       test->expected_len ) == 0, file, line );
 
 	/* Verify extracted image name */
 	okx ( strcmp ( extracted->name, test->expected_name ) == 0,

@@ -980,7 +980,7 @@ static int gve_start ( struct gve_nic *gve ) {
 	}
 
 	/* Invalidate receive completions */
-	memset_user ( rx->cmplt, 0, 0, ( rx->count * rx->type->cmplt_len ) );
+	memset ( rx->cmplt, 0, ( rx->count * rx->type->cmplt_len ) );
 
 	/* Reset receive sequence */
 	gve->seq = gve_next ( 0 );

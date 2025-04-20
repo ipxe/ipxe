@@ -61,8 +61,8 @@ static PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
 
 	/* Copy name from external program, and open it */
 	filename = real_to_user ( file_open->FileName.segment,
-			      file_open->FileName.offset );
-	filename_len = strlen_user ( filename, 0 );
+				  file_open->FileName.offset );
+	filename_len = strlen ( filename );
 	{
 		char uri_string[ filename_len + 1 ];
 
@@ -219,7 +219,7 @@ static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
 	/* Copy name from external program, and exec it */
 	command = real_to_user ( file_exec->Command.segment,
 				 file_exec->Command.offset );
-	command_len = strlen_user ( command, 0 );
+	command_len = strlen ( command );
 	{
 		char command_string[ command_len + 1 ];
 

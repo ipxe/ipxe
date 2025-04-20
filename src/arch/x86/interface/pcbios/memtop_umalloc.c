@@ -203,8 +203,8 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 		      user_to_phys ( ptr, extmem.size ),
 		      user_to_phys ( new, 0 ),
 		      user_to_phys ( new, new_size ));
-		memmove_user ( new, 0, ptr, 0, ( ( extmem.size < new_size ) ?
-						 extmem.size : new_size ) );
+		memmove ( new, ptr, ( ( extmem.size < new_size ) ?
+				      extmem.size : new_size ) );
 		bottom = new;
 		heap_size -= ( new_size - extmem.size );
 		extmem.size = new_size;

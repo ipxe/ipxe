@@ -185,12 +185,12 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 		/* Draw background picture, if applicable */
 		if ( transparent ) {
 			if ( fbcon->picture.start ) {
-				memcpy_user ( fbcon->start, offset,
-					      fbcon->picture.start, offset,
-					      fbcon->character.len );
+				memcpy ( ( fbcon->start + offset ),
+					 ( fbcon->picture.start + offset ),
+					 fbcon->character.len );
 			} else {
-				memset_user ( fbcon->start, offset, 0,
-					      fbcon->character.len );
+				memset ( ( fbcon->start + offset ), 0,
+					 fbcon->character.len );
 			}
 		}
 
@@ -247,8 +247,8 @@ static void fbcon_scroll ( struct fbcon *fbcon ) {
 
 	/* Scroll up character array */
 	row_len = ( fbcon->character.width * sizeof ( struct fbcon_text_cell ));
-	memmove_user ( fbcon->text.start, 0, fbcon->text.start, row_len,
-		       ( row_len * ( fbcon->character.height - 1 ) ) );
+	memmove ( fbcon->text.start, ( fbcon->text.start + row_len ),
+		  ( row_len * ( fbcon->character.height - 1 ) ) );
 	fbcon_clear ( fbcon, ( fbcon->character.height - 1 ) );
 
 	/* Update cursor position */
@@ -552,7 +552,7 @@ static int fbcon_picture_init ( struct fbcon *fbcon,
 	       ( ygap + pixbuf->height ) );
 
 	/* Convert to frame buffer raw format */
-	memset_user ( picture->start, 0, 0, len );
+	memset ( picture->start, 0, len );
 	for ( y = 0 ; y < height ; y++ ) {
 		offset = ( indent + ( y * pixel->stride ) );
 		pixbuf_offset = ( pixbuf_indent + ( y * pixbuf_stride ) );
@@ -684,7 +684,7 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 	fbcon_clear ( fbcon, 0 );
 
 	/* Set framebuffer to all black (including margins) */
-	memset_user ( fbcon->start, 0, 0, fbcon->len );
+	memset ( fbcon->start, 0, fbcon->len );
 
 	/* Generate pixel buffer from background image, if applicable */
 	if ( config->pixbuf &&
@@ -692,10 +692,8 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 		goto err_picture;
 
 	/* Draw background picture (including margins), if applicable */
-	if ( fbcon->picture.start ) {
-		memcpy_user ( fbcon->start, 0, fbcon->picture.start, 0,
-			      fbcon->len );
-	}
+	if ( fbcon->picture.start )
+		memcpy ( fbcon->start, fbcon->picture.start, fbcon->len );
 
 	/* Update console width and height */
 	console_set_size ( fbcon->character.width, fbcon->character.height );

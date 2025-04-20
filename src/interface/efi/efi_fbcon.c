@@ -124,7 +124,7 @@ static int efifb_draw ( unsigned int character, unsigned int index,
 
 	/* Clear existing glyph */
 	offset = ( index * efifb.font.height );
-	memset_user ( efifb.glyphs, offset, 0, efifb.font.height );
+	memset ( ( efifb.glyphs + offset ), 0, efifb.font.height );
 
 	/* Get glyph */
 	blt = NULL;
@@ -296,7 +296,7 @@ static int efifb_glyphs ( void ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	memset_user ( efifb.glyphs, 0, 0, len );
+	memset ( efifb.glyphs, 0, len );
 
 	/* Get font data */
 	for ( character = 0 ; character < EFIFB_ASCII ; character++ ) {

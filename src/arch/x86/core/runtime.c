@@ -125,7 +125,7 @@ static int cmdline_init ( void ) {
 		return 0;
 	}
 	cmdline_user = phys_to_user ( cmdline_phys );
-	len = ( strlen_user ( cmdline_user, 0 ) + 1 /* NUL */ );
+	len = ( strlen ( cmdline_user ) + 1 /* NUL */ );
 
 	/* Allocate and copy command line */
 	cmdline_copy = malloc ( len );
