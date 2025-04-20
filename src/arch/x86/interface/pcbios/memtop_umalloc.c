@@ -122,7 +122,7 @@ static void init_eheap ( void ) {
 	userptr_t base;
 
 	heap_size = largest_memblock ( &base );
-	bottom = top = userptr_add ( base, heap_size );
+	bottom = top = ( base + heap_size );
 	DBG ( "External heap grows downwards from %lx (size %zx)\n",
 	      user_to_phys ( top, 0 ), heap_size );
 }
@@ -144,7 +144,7 @@ static void ecollect_free ( void ) {
 		DBG ( "EXTMEM freeing [%lx,%lx)\n", user_to_phys ( bottom, 0 ),
 		      user_to_phys ( bottom, extmem.size ) );
 		len = ( extmem.size + sizeof ( extmem ) );
-		bottom = userptr_add ( bottom, len );
+		bottom += len;
 		heap_size += len;
 	}
 }
@@ -179,7 +179,7 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 			DBG ( "EXTMEM out of space\n" );
 			return UNULL;
 		}
-		ptr = bottom = userptr_add ( bottom, -sizeof ( extmem ) );
+		ptr = bottom = ( bottom - sizeof ( extmem ) );
 		heap_size -= sizeof ( extmem );
 		DBG ( "EXTMEM allocating [%lx,%lx)\n",
 		      user_to_phys ( ptr, 0 ), user_to_phys ( ptr, 0 ) );
@@ -190,10 +190,10 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 	/* Expand/shrink block if possible */
 	if ( ptr == bottom ) {
 		/* Update block */
-		new = userptr_add ( ptr, - ( new_size - extmem.size ) );
+		new = ( ptr - ( new_size - extmem.size ) );
 		align = ( user_to_phys ( new, 0 ) & ( EM_ALIGN - 1 ) );
 		new_size += align;
-		new = userptr_add ( new, -align );
+		new -= align;
 		if ( new_size > ( heap_size + extmem.size ) ) {
 			DBG ( "EXTMEM out of space\n" );
 			return UNULL;

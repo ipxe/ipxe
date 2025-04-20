@@ -431,7 +431,7 @@ static int bzimage_check_initrds ( struct image *image,
 	}
 
 	/* Calculate lowest usable address */
-	bottom = userptr_add ( bzimg->pm_kernel, bzimg->pm_sz );
+	bottom = ( bzimg->pm_kernel + bzimg->pm_sz );
 
 	/* Check that total length fits within space available for
 	 * reshuffling.  This is a conservative check, since CPIO
@@ -471,14 +471,12 @@ static void bzimage_load_initrds ( struct image *image,
 	size_t len;
 
 	/* Reshuffle initrds into desired order */
-	initrd_reshuffle ( userptr_add ( bzimg->pm_kernel, bzimg->pm_sz ) );
+	initrd_reshuffle ( bzimg->pm_kernel + bzimg->pm_sz );
 
 	/* Find highest initrd */
 	for_each_image ( initrd ) {
-		if ( ( highest == NULL ) ||
-		     ( userptr_diff ( initrd->data, highest->data ) > 0 ) ) {
+		if ( ( highest == NULL ) || ( initrd->data > highest->data ) )
 			highest = initrd;
-		}
 	}
 
 	/* Do nothing if there are no initrds */
@@ -486,7 +484,7 @@ static void bzimage_load_initrds ( struct image *image,
 		return;
 
 	/* Find highest usable address */
-	top = userptr_add ( highest->data, bzimage_align ( highest->len ) );
+	top = ( highest->data + bzimage_align ( highest->len ) );
 	if ( user_to_phys ( top, -1 ) > bzimg->mem_limit ) {
 		top = phys_to_user ( ( bzimg->mem_limit + 1 ) &
 				     ~( INITRD_ALIGN - 1 ) );
@@ -509,7 +507,7 @@ static void bzimage_load_initrds ( struct image *image,
 		}
 
 		/* Load initrd at this address */
-		dest = userptr_add ( top, -offset );
+		dest = ( top - offset );
 		len = bzimage_load_initrd ( image, initrd, dest );
 
 		/* Record initrd location */

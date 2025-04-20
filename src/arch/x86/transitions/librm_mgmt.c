@@ -432,7 +432,6 @@ PROVIDE_UACCESS_INLINE ( librm, phys_to_user );
 PROVIDE_UACCESS_INLINE ( librm, user_to_phys );
 PROVIDE_UACCESS_INLINE ( librm, virt_to_user );
 PROVIDE_UACCESS_INLINE ( librm, user_to_virt );
-PROVIDE_UACCESS_INLINE ( librm, userptr_add );
 PROVIDE_UACCESS_INLINE ( librm, memcpy_user );
 PROVIDE_UACCESS_INLINE ( librm, memmove_user );
 PROVIDE_UACCESS_INLINE ( librm, memset_user );

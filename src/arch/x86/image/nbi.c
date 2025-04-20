@@ -184,10 +184,10 @@ static int nbi_process_segments ( struct image *image,
 			dest = phys_to_user ( sh.loadaddr );
 			break;
 		case NBI_LOADADDR_AFTER:
-			dest = userptr_add ( dest, memsz + sh.loadaddr );
+			dest = ( dest + memsz + sh.loadaddr );
 			break;
 		case NBI_LOADADDR_BEFORE:
-			dest = userptr_add ( dest, -sh.loadaddr );
+			dest = ( dest - sh.loadaddr );
 			break;
 		case NBI_LOADADDR_END:
 			/* Not correct according to the spec, but

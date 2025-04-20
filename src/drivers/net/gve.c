@@ -807,7 +807,7 @@ static inline __attribute__ (( always_inline )) userptr_t
 gve_buffer ( struct gve_queue *queue, unsigned int index ) {
 
 	/* Pages are currently allocated as a single contiguous block */
-	return userptr_add ( queue->qpl.data, gve_address ( queue, index ) );
+	return ( queue->qpl.data + gve_address ( queue, index ) );
 }
 
 /**

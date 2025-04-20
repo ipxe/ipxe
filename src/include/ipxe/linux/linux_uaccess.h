@@ -69,17 +69,6 @@ UACCESS_INLINE ( linux, user_to_virt ) ( userptr_t userptr, off_t offset ) {
 	return trivial_user_to_virt ( userptr, offset );
 }
 
-static inline __always_inline userptr_t
-UACCESS_INLINE ( linux, userptr_add ) ( userptr_t userptr, off_t offset ) {
-	return trivial_userptr_add ( userptr, offset );
-}
-
-static inline __always_inline off_t
-UACCESS_INLINE ( linux, userptr_diff ) ( userptr_t userptr,
-					 userptr_t subtrahend ) {
-	return trivial_userptr_diff ( userptr, subtrahend );
-}
-
 static inline __always_inline void
 UACCESS_INLINE ( linux, memcpy_user ) ( userptr_t dest, off_t dest_off,
 					userptr_t src, off_t src_off,

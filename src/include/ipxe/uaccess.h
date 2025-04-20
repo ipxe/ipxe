@@ -66,30 +66,6 @@ trivial_user_to_virt ( userptr_t userptr, off_t offset ) {
 }
 
 /**
- * Add offset to user pointer
- *
- * @v userptr		User pointer
- * @v offset		Offset
- * @ret userptr		New pointer value
- */
-static inline __always_inline userptr_t
-trivial_userptr_add ( userptr_t userptr, off_t offset ) {
-	return ( userptr + offset );
-}
-
-/**
- * Subtract user pointers
- *
- * @v userptr		User pointer
- * @v subtrahend	User pointer to be subtracted
- * @ret offset		Offset
- */
-static inline __always_inline off_t
-trivial_userptr_diff ( userptr_t userptr, userptr_t subtrahend ) {
-	return ( userptr - subtrahend );
-}
-
-/**
  * Copy data between user buffers
  *
  * @v dest		Destination
@@ -231,17 +207,6 @@ UACCESS_INLINE ( flat, user_to_virt ) ( userptr_t userptr, off_t offset ) {
 	return trivial_user_to_virt ( userptr, offset );
 }
 
-static inline __always_inline userptr_t
-UACCESS_INLINE ( flat, userptr_add ) ( userptr_t userptr, off_t offset ) {
-	return trivial_userptr_add ( userptr, offset );
-}
-
-static inline __always_inline off_t
-UACCESS_INLINE ( flat, userptr_diff ) ( userptr_t userptr,
-					userptr_t subtrahend ) {
-	return trivial_userptr_diff ( userptr, subtrahend );
-}
-
 static inline __always_inline void
 UACCESS_INLINE ( flat, memcpy_user ) ( userptr_t dest, off_t dest_off,
 				       userptr_t src, off_t src_off,
@@ -321,24 +286,6 @@ userptr_t virt_to_user ( volatile const void *addr );
  * This operation is not available under all memory models.
  */
 void * user_to_virt ( userptr_t userptr, off_t offset );
-
-/**
- * Add offset to user pointer
- *
- * @v userptr		User pointer
- * @v offset		Offset
- * @ret userptr		New pointer value
- */
-userptr_t userptr_add ( userptr_t userptr, off_t offset );
-
-/**
- * Subtract user pointers
- *
- * @v userptr		User pointer
- * @v subtrahend	User pointer to be subtracted
- * @ret offset		Offset
- */
-off_t userptr_diff ( userptr_t userptr, userptr_t subtrahend );
 
 /**
  * Convert virtual address to a physical address

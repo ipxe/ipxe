@@ -111,7 +111,7 @@ static int gzip_extract ( struct image *image, struct image *extracted ) {
 	}
 
 	/* Initialise input chunk */
-	deflate_chunk_init ( &in, userptr_add ( image->data, offset ), 0, len );
+	deflate_chunk_init ( &in, ( image->data + offset ), 0, len );
 
 	/* Presize extracted image */
 	if ( ( rc = image_set_len ( extracted,

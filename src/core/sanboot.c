@@ -625,7 +625,7 @@ static int sandev_rw ( struct san_device *sandev, uint64_t lba,
 
 		/* Move to next fragment */
 		frag_len = ( sandev->capacity.blksize * params.rw.count );
-		params.rw.buffer = userptr_add ( params.rw.buffer, frag_len );
+		params.rw.buffer += frag_len;
 		params.rw.lba += params.rw.count;
 		remaining -= params.rw.count;
 	}

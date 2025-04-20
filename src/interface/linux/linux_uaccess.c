@@ -30,7 +30,6 @@ FILE_LICENCE(GPL2_OR_LATER);
 PROVIDE_UACCESS_INLINE(linux, user_to_phys);
 PROVIDE_UACCESS_INLINE(linux, virt_to_user);
 PROVIDE_UACCESS_INLINE(linux, user_to_virt);
-PROVIDE_UACCESS_INLINE(linux, userptr_add);
 PROVIDE_UACCESS_INLINE(linux, memcpy_user);
 PROVIDE_UACCESS_INLINE(linux, memmove_user);
 PROVIDE_UACCESS_INLINE(linux, memset_user);
