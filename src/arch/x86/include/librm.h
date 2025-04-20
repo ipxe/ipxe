@@ -132,11 +132,6 @@ UACCESS_INLINE ( librm, virt_to_user ) ( volatile const void *addr ) {
 	return trivial_virt_to_user ( addr );
 }
 
-static inline __always_inline void *
-UACCESS_INLINE ( librm, user_to_virt ) ( userptr_t userptr, off_t offset ) {
-	return trivial_user_to_virt ( userptr, offset );
-}
-
 static inline __always_inline off_t
 UACCESS_INLINE ( librm, memchr_user ) ( userptr_t buffer, off_t offset,
 					int c, size_t len ) {

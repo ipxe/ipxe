@@ -245,8 +245,8 @@ static int efi_image_exec ( struct image *image ) {
 	/* Attempt loading image */
 	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path,
-				       user_to_virt ( exec->data, 0 ),
-				       exec->len, &handle ) ) != 0 ) {
+				       exec->data, exec->len,
+				       &handle ) ) != 0 ) {
 		/* Not an EFI image */
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %s could not load: %s\n",
@@ -379,8 +379,8 @@ static int efi_image_probe ( struct image *image ) {
 	/* Attempt loading image */
 	handle = NULL;
 	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, &empty_path,
-				       user_to_virt ( image->data, 0 ),
-				       image->len, &handle ) ) != 0 ) {
+				       image->data, image->len,
+				       &handle ) ) != 0 ) {
 		/* Not an EFI image */
 		rc = -EEFI_LOAD ( efirc );
 		DBGC ( image, "EFIIMAGE %s could not load: %s\n",

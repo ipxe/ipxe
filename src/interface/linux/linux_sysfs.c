@@ -70,8 +70,7 @@ int linux_sysfs_read ( const char *filename, userptr_t *data ) {
 		*data = tmp;
 
 		/* Read from file */
-		read = linux_read ( fd, user_to_virt ( *data, len ),
-				    LINUX_SYSFS_BLKSIZE );
+		read = linux_read ( fd, ( *data + len ), LINUX_SYSFS_BLKSIZE );
 		if ( read == 0 )
 			break;
 		if ( read < 0 ) {

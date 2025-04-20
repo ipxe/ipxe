@@ -101,7 +101,7 @@ static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
 		       filename, strerror ( rc ) );
 		goto err_read;
 	}
-	header = user_to_virt ( table->data, 0 );
+	header = table->data;
 	if ( ( ( ( size_t ) len ) < sizeof ( *header ) ) ||
 	     ( ( ( size_t ) len ) < le32_to_cpu ( header->length ) ) ) {
 		rc = -ENOENT;

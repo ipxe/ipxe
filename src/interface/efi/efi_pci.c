@@ -669,7 +669,7 @@ static userptr_t efipci_dma_umalloc ( struct dma_device *dma,
 static void efipci_dma_ufree ( struct dma_device *dma, struct dma_mapping *map,
 			       userptr_t addr, size_t len ) {
 
-	efipci_dma_free ( dma, map, user_to_virt ( addr, 0 ), len );
+	efipci_dma_free ( dma, map, addr, len );
 }
 
 /**

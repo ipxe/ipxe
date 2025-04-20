@@ -211,7 +211,7 @@ static void initrd_dump ( void ) {
 		       initrd->name, user_to_phys ( initrd->data, 0 ),
 		       user_to_phys ( initrd->data, initrd->len ) );
 		DBGC2_MD5A ( &images, user_to_phys ( initrd->data, 0 ),
-			     user_to_virt ( initrd->data, 0 ), initrd->len );
+			     initrd->data, initrd->len );
 	}
 }
 

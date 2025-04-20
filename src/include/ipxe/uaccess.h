@@ -52,20 +52,6 @@ trivial_virt_to_user ( volatile const void *addr ) {
 }
 
 /**
- * Convert user pointer to virtual address
- *
- * @v userptr		User pointer
- * @v offset		Offset from user pointer
- * @ret addr		Virtual address
- *
- * This operation is not available under all memory models.
- */
-static inline __always_inline void *
-trivial_user_to_virt ( userptr_t userptr, off_t offset ) {
-	return ( ( void * ) userptr + offset );
-}
-
-/**
  * Find character in user buffer
  *
  * @v buffer		User buffer
@@ -128,11 +114,6 @@ UACCESS_INLINE ( flat, virt_to_user ) ( volatile const void *addr ) {
 	return trivial_virt_to_user ( addr );
 }
 
-static inline __always_inline void *
-UACCESS_INLINE ( flat, user_to_virt ) ( userptr_t userptr, off_t offset ) {
-	return trivial_user_to_virt ( userptr, offset );
-}
-
 static inline __always_inline off_t
 UACCESS_INLINE ( flat, memchr_user ) ( userptr_t buffer, off_t offset,
 				       int c, size_t len ) {
@@ -171,17 +152,6 @@ unsigned long user_to_phys ( userptr_t userptr, off_t offset );
 userptr_t virt_to_user ( volatile const void *addr );
 
 /**
- * Convert user pointer to virtual address
- *
- * @v userptr		User pointer
- * @v offset		Offset from user pointer
- * @ret addr		Virtual address
- *
- * This operation is not available under all memory models.
- */
-void * user_to_virt ( userptr_t userptr, off_t offset );
-
-/**
  * Convert virtual address to a physical address
  *
  * @v addr		Virtual address
@@ -201,7 +171,7 @@ virt_to_phys ( volatile const void *addr ) {
  * This operation is not available under all memory models.
  */
 static inline __always_inline void * phys_to_virt ( unsigned long phys_addr ) {
-	return user_to_virt ( phys_to_user ( phys_addr ), 0 );
+	return ( phys_to_user ( phys_addr ) );
 }
 
 /**

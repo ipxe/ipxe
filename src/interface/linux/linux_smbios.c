@@ -59,7 +59,7 @@ static int linux_find_smbios ( struct smbios *smbios ) {
 		       smbios_entry_filename, strerror ( rc ) );
 		goto err_entry;
 	}
-	data = user_to_virt ( entry, 0 );
+	data = entry;
 	smbios3_entry = data;
 	smbios_entry = data;
 	if ( ( len >= ( ( int ) sizeof ( *smbios3_entry ) ) ) &&

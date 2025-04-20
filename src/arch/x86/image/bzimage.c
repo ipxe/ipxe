@@ -388,7 +388,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 		       user_to_phys ( address, ( offset + initrd->len ) ),
 		       ( filename ? " " : "" ), ( filename ? filename : "" ) );
 		DBGC2_MD5A ( image, user_to_phys ( address, offset ),
-			     user_to_virt ( address, offset ), initrd->len );
+			     ( address + offset ), initrd->len );
 	}
 	len += initrd->len;
 
@@ -427,7 +427,7 @@ static int bzimage_check_initrds ( struct image *image,
 		       ( initrd->cmdline ? " " : "" ),
 		       ( initrd->cmdline ? initrd->cmdline : "" ) );
 		DBGC2_MD5A ( image, user_to_phys ( initrd->data, 0 ),
-			     user_to_virt ( initrd->data, 0 ), initrd->len );
+			     initrd->data, initrd->len );
 	}
 
 	/* Calculate lowest usable address */
