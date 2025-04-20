@@ -96,7 +96,7 @@ trivial_userptr_add ( userptr_t userptr, off_t offset ) {
  * @ret offset		Offset
  */
 static inline __always_inline off_t
-trivial_userptr_sub ( userptr_t userptr, userptr_t subtrahend ) {
+trivial_userptr_diff ( userptr_t userptr, userptr_t subtrahend ) {
 	return ( userptr - subtrahend );
 }
 
@@ -248,9 +248,9 @@ UACCESS_INLINE ( flat, userptr_add ) ( userptr_t userptr, off_t offset ) {
 }
 
 static inline __always_inline off_t
-UACCESS_INLINE ( flat, userptr_sub ) ( userptr_t userptr,
-				       userptr_t subtrahend ) {
-	return trivial_userptr_sub ( userptr, subtrahend );
+UACCESS_INLINE ( flat, userptr_diff ) ( userptr_t userptr,
+					userptr_t subtrahend ) {
+	return trivial_userptr_diff ( userptr, subtrahend );
 }
 
 static inline __always_inline void
@@ -349,7 +349,7 @@ userptr_t userptr_add ( userptr_t userptr, off_t offset );
  * @v subtrahend	User pointer to be subtracted
  * @ret offset		Offset
  */
-off_t userptr_sub ( userptr_t userptr, userptr_t subtrahend );
+off_t userptr_diff ( userptr_t userptr, userptr_t subtrahend );
 
 /**
  * Convert virtual address to a physical address

@@ -143,9 +143,9 @@ UACCESS_INLINE ( librm, userptr_add ) ( userptr_t userptr, off_t offset ) {
 }
 
 static inline __always_inline off_t
-UACCESS_INLINE ( librm, userptr_sub ) ( userptr_t userptr,
-					userptr_t subtrahend ) {
-	return trivial_userptr_sub ( userptr, subtrahend );
+UACCESS_INLINE ( librm, userptr_diff ) ( userptr_t userptr,
+					 userptr_t subtrahend ) {
+	return trivial_userptr_diff ( userptr, subtrahend );
 }
 
 static inline __always_inline void

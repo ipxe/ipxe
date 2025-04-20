@@ -61,10 +61,10 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 		/* Find the highest image not yet in its final position */
 		highest = NULL;
 		for_each_image ( initrd ) {
-			if ( ( userptr_sub ( initrd->data, current ) < 0 ) &&
+			if ( ( userptr_diff ( initrd->data, current ) < 0 ) &&
 			     ( ( highest == NULL ) ||
-			       ( userptr_sub ( initrd->data,
-					       highest->data ) > 0 ) ) ) {
+			       ( userptr_diff ( initrd->data,
+						highest->data ) > 0 ) ) ) {
 				highest = initrd;
 			}
 		}
@@ -74,7 +74,7 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 		/* Move this image to its final position */
 		len = ( ( highest->len + INITRD_ALIGN - 1 ) &
 			~( INITRD_ALIGN - 1 ) );
-		current = userptr_sub ( current, len );
+		current = userptr_add ( current, -len );
 		DBGC ( &images, "INITRD squashing %s [%#08lx,%#08lx)->"
 		       "[%#08lx,%#08lx)\n", highest->name,
 		       user_to_phys ( highest->data, 0 ),
@@ -87,10 +87,10 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 
 	/* Copy any remaining initrds (e.g. embedded images) to the region */
 	for_each_image ( initrd ) {
-		if ( userptr_sub ( initrd->data, top ) >= 0 ) {
+		if ( userptr_diff ( initrd->data, top ) >= 0 ) {
 			len = ( ( initrd->len + INITRD_ALIGN - 1 ) &
 				~( INITRD_ALIGN - 1 ) );
-			current = userptr_sub ( current, len );
+			current = userptr_add ( current, -len );
 			DBGC ( &images, "INITRD copying %s [%#08lx,%#08lx)->"
 			       "[%#08lx,%#08lx)\n", initrd->name,
 			       user_to_phys ( initrd->data, 0 ),
@@ -235,7 +235,7 @@ void initrd_reshuffle ( userptr_t bottom ) {
 
 	/* Calculate limits of available space for initrds */
 	top = initrd_top;
-	if ( userptr_sub ( initrd_bottom, bottom ) > 0 )
+	if ( userptr_diff ( initrd_bottom, bottom ) > 0 )
 		bottom = initrd_bottom;
 
 	/* Debug */
@@ -248,7 +248,7 @@ void initrd_reshuffle ( userptr_t bottom ) {
 
 	/* Calculate available free space */
 	free = bottom;
-	free_len = userptr_sub ( used, free );
+	free_len = userptr_diff ( used, free );
 
 	/* Bubble-sort initrds into desired order */
 	while ( initrd_swap_any ( free, free_len ) ) {}
@@ -270,9 +270,9 @@ int initrd_reshuffle_check ( size_t len, userptr_t bottom ) {
 
 	/* Calculate limits of available space for initrds */
 	top = initrd_top;
-	if ( userptr_sub ( initrd_bottom, bottom ) > 0 )
+	if ( userptr_diff ( initrd_bottom, bottom ) > 0 )
 		bottom = initrd_bottom;
-	available = userptr_sub ( top, bottom );
+	available = userptr_diff ( top, bottom );
 
 	/* Allow for a sensible minimum amount of free space */
 	len += INITRD_MIN_FREE_LEN;

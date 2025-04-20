@@ -476,7 +476,7 @@ static void bzimage_load_initrds ( struct image *image,
 	/* Find highest initrd */
 	for_each_image ( initrd ) {
 		if ( ( highest == NULL ) ||
-		     ( userptr_sub ( initrd->data, highest->data ) > 0 ) ) {
+		     ( userptr_diff ( initrd->data, highest->data ) > 0 ) ) {
 			highest = initrd;
 		}
 	}
