@@ -43,7 +43,7 @@ UACCESS_INLINE ( linux, user_to_phys ) ( userptr_t userptr, off_t offset ) {
 	 * virtual address will suffice for the purpose of determining
 	 * alignment.
 	 */
-	return ( userptr + offset );
+	return ( ( unsigned long ) ( userptr + offset ) );
 }
 
 /**
@@ -56,7 +56,7 @@ static inline __always_inline userptr_t
 UACCESS_INLINE ( linux, phys_to_user ) ( physaddr_t phys_addr ) {
 
 	/* For symmetry with the stub user_to_phys() */
-	return phys_addr;
+	return ( ( userptr_t ) phys_addr );
 }
 
 static inline __always_inline userptr_t

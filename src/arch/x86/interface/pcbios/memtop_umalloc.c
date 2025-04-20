@@ -45,7 +45,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EM_ALIGN ( 4 * 1024 )
 
 /** Equivalent of NOWHERE for user pointers */
-#define UNOWHERE ( ~UNULL )
+#define UNOWHERE ( ( userptr_t ) ~( ( intptr_t ) 0 ) )
 
 /** An external memory block */
 struct external_memory {

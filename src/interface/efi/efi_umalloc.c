@@ -36,7 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** Equivalent of NOWHERE for user pointers */
-#define UNOWHERE ( ~UNULL )
+#define UNOWHERE ( ( userptr_t ) ~( ( intptr_t ) 0 ) )
 
 /**
  * Reallocate external memory

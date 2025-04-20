@@ -224,12 +224,12 @@ trivial_memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
 
 static inline __always_inline userptr_t
 UACCESS_INLINE ( flat, phys_to_user ) ( unsigned long phys_addr ) {
-	return phys_addr;
+	return ( ( userptr_t ) phys_addr );
 }
 
 static inline __always_inline unsigned long
 UACCESS_INLINE ( flat, user_to_phys ) ( userptr_t userptr, off_t offset ) {
-	return ( userptr + offset );
+	return ( ( unsigned long ) ( userptr + offset ) );
 }
 
 static inline __always_inline userptr_t

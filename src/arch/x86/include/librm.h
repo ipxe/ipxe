@@ -96,10 +96,10 @@ UACCESS_INLINE ( librm, phys_to_user ) ( unsigned long phys_addr ) {
 	 * identity-mapped.
 	 */
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
-		return phys_addr;
+		return ( ( userptr_t ) phys_addr );
 
 	/* In a 32-bit build, subtract virt_offset */
-	return ( phys_addr - virt_offset );
+	return ( ( userptr_t ) ( phys_addr - virt_offset ) );
 }
 
 /**
@@ -111,7 +111,7 @@ UACCESS_INLINE ( librm, phys_to_user ) ( unsigned long phys_addr ) {
  */
 static inline __always_inline unsigned long
 UACCESS_INLINE ( librm, user_to_phys ) ( userptr_t userptr, off_t offset ) {
-	unsigned long addr = ( userptr + offset );
+	unsigned long addr = ( ( unsigned long ) ( userptr + offset ) );
 
 	/* In a 64-bit build, any virtual address in the low 4GB is
 	 * directly usable as a physical address, since the low 4GB is
