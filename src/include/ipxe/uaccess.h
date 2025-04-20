@@ -6,17 +6,6 @@
  *
  * Access to external ("user") memory
  *
- * iPXE often needs to transfer data between internal and external
- * buffers.  On i386, the external buffers may require access via a
- * different segment, and the buffer address cannot be encoded into a
- * simple void * pointer.  The @c userptr_t type encapsulates the
- * information needed to identify an external buffer, and the
- * copy_to_user() and copy_from_user() functions provide methods for
- * transferring data between internal and external buffers.
- *
- * Note that userptr_t is an opaque type; in particular, performing
- * arithmetic upon a userptr_t is not allowed.
- *
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
@@ -36,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * A pointer to a user buffer
  *
  */
-typedef unsigned long userptr_t;
+typedef void * userptr_t;
 
 /** Equivalent of NULL for user pointers */
 #define UNULL ( ( userptr_t ) 0 )
