@@ -148,7 +148,7 @@ pxenv_file_select ( struct s_PXENV_FILE_SELECT *file_select ) {
  *
  */
 static PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
-	userptr_t buffer;
+	void *buffer;
 	ssize_t len;
 
 	DBG ( "PXENV_FILE_READ %d to %04x:%04x+%04x", file_read->FileHandle,
@@ -157,8 +157,8 @@ static PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
 
 	buffer = real_to_virt ( file_read->Buffer.segment,
 				file_read->Buffer.offset );
-	if ( ( len = read_user ( file_read->FileHandle, buffer, 0,
-				file_read->BufferSize ) ) < 0 ) {
+	if ( ( len = read ( file_read->FileHandle, buffer,
+			    file_read->BufferSize ) ) < 0 ) {
 		file_read->Status = PXENV_STATUS ( len );
 		return PXENV_EXIT_FAILURE;
 	}

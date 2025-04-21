@@ -410,7 +410,8 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 			int len = ix86->regs.cx * COMBOOT_FILE_BLOCKSZ;
 			int rc;
 			fd_set fds;
-			userptr_t buf = real_to_virt ( ix86->segs.es, ix86->regs.bx );
+			void *buf = real_to_virt ( ix86->segs.es,
+						   ix86->regs.bx );
 
 			/* Wait for data ready to read */
 			FD_ZERO ( &fds );
@@ -418,7 +419,7 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 
 			select ( &fds, 1 );
 
-			rc = read_user ( fd, buf, 0, len );
+			rc = read ( fd, buf, len );
 			if ( rc < 0 ) {
 				DBG ( "COMBOOT: read failed\n" );
 				ix86->regs.si = 0;
