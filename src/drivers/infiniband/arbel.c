@@ -2079,7 +2079,7 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 	} else {
 		assert ( arbel->firmware_len == fw_len );
 	}
-	fw_base = user_to_phys ( arbel->firmware_area, 0 );
+	fw_base = virt_to_phys ( arbel->firmware_area );
 	DBGC ( arbel, "Arbel %p firmware area at [%08lx,%08lx)\n",
 	       arbel, fw_base, ( fw_base + fw_len ) );
 	if ( ( rc = arbel_map_vpm ( arbel, arbel_cmd_map_fa,
@@ -2452,7 +2452,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 		assert ( arbel->icm_len == icm_len );
 		assert ( arbel->icm_aux_len == icm_aux_len );
 	}
-	icm_phys = user_to_phys ( arbel->icm, 0 );
+	icm_phys = virt_to_phys ( arbel->icm );
 
 	/* Allocate doorbell UAR */
 	arbel->db_rec = malloc_phys ( ARBEL_PAGE_SIZE, ARBEL_PAGE_SIZE );

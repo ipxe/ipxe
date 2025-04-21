@@ -406,7 +406,7 @@ static int exanic_open ( struct net_device *netdev ) {
 	port->rx_cons = 0;
 
 	/* Map receive region */
-	exanic_write_base ( phys_to_bus ( user_to_phys ( port->rx, 0 ) ),
+	exanic_write_base ( phys_to_bus ( virt_to_phys ( port->rx ) ),
 			    ( port->regs + EXANIC_PORT_RX_BASE ) );
 
 	/* Enable promiscuous mode */
@@ -729,8 +729,8 @@ static int exanic_probe_port ( struct exanic *exanic, struct device *dev,
 	DBGC ( port, "EXANIC %s port %d TX [%#05zx,%#05zx) TXF %#02x RX "
 	       "[%#lx,%#lx)\n", netdev->name, index, port->tx_offset,
 	       ( port->tx_offset + tx_len ), port->txf_slot,
-	       user_to_phys ( port->rx, 0 ),
-	       user_to_phys ( port->rx, EXANIC_RX_LEN ) );
+	       virt_to_phys ( port->rx ),
+	       ( virt_to_phys ( port->rx ) + EXANIC_RX_LEN ) );
 
 	/* Set initial link state */
 	exanic_check_link ( netdev );

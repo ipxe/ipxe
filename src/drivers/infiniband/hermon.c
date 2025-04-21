@@ -2382,7 +2382,7 @@ static int hermon_start_firmware ( struct hermon *hermon ) {
 	} else {
 		assert ( hermon->firmware_len == fw_len );
 	}
-	fw_base = user_to_phys ( hermon->firmware_area, 0 );
+	fw_base = virt_to_phys ( hermon->firmware_area );
 	DBGC ( hermon, "Hermon %p firmware area at physical [%08lx,%08lx)\n",
 	       hermon, fw_base, ( fw_base + fw_len ) );
 	if ( ( rc = hermon_map_vpm ( hermon, hermon_cmd_map_fa,
@@ -2752,7 +2752,7 @@ static int hermon_map_icm ( struct hermon *hermon,
 		assert ( hermon->icm_len == icm_len );
 		assert ( hermon->icm_aux_len == icm_aux_len );
 	}
-	icm_phys = user_to_phys ( hermon->icm, 0 );
+	icm_phys = virt_to_phys ( hermon->icm );
 
 	/* Map ICM auxiliary area */
 	DBGC ( hermon, "Hermon %p mapping ICM AUX => %08lx\n",

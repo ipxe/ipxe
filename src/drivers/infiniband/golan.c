@@ -486,8 +486,8 @@ static inline int golan_provide_pages ( struct golan *golan , uint32_t pages
 		for ( i = 0 , j = MANAGE_PAGES_PSA_OFFSET; i < pas_num; ++i ,++j,
 				next_page_addr += GOLAN_PAGE_SIZE ) {
 			addr = next_page_addr;
-			if (GOLAN_PAGE_MASK & user_to_phys(addr, 0)) {
-				DBGC (golan ,"Addr not Page alligned [%lx]\n", user_to_phys(addr, 0));
+			if (GOLAN_PAGE_MASK & virt_to_phys(addr)) {
+				DBGC (golan ,"Addr not Page alligned [%lx]\n", virt_to_phys(addr));
 			}
 			mailbox->mblock.data[j]	= USR_2_BE64_BUS(addr);
 		}

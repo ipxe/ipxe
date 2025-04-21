@@ -92,16 +92,17 @@ static int sdi_exec ( struct image *image ) {
 		return -ENOTTY;
 	}
 	DBGC ( image, "SDI %p image at %08lx+%08zx\n",
-	       image, user_to_phys ( image->data, 0 ), image->len );
-	DBGC ( image, "SDI %p boot code at %08lx+%llx\n", image,
-	       user_to_phys ( image->data, sdi.boot_offset ), sdi.boot_size );
+	       image, virt_to_phys ( image->data ), image->len );
+	DBGC ( image, "SDI %p boot code at %08llx+%llx\n", image,
+	       ( virt_to_phys ( image->data ) + sdi.boot_offset ),
+	       sdi.boot_size );
 
 	/* Copy boot code */
 	memcpy ( real_to_user ( SDI_BOOT_SEG, SDI_BOOT_OFF ),
 		 ( image->data + sdi.boot_offset ), sdi.boot_size );
 
 	/* Jump to boot code */
-	sdiptr = ( user_to_phys ( image->data, 0 ) | SDI_WTF );
+	sdiptr = ( virt_to_phys ( image->data ) | SDI_WTF );
 	__asm__ __volatile__ ( REAL_CODE ( "ljmp %0, %1\n\t" )
 			       : : "i" ( SDI_BOOT_SEG ),
 				   "i" ( SDI_BOOT_OFF ),

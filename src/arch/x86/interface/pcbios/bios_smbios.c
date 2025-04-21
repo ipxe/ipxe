@@ -54,7 +54,7 @@ static int bios_find_smbios2 ( struct smbios *smbios ) {
 		return rc;
 
 	/* Fill in entry point descriptor structure */
-	smbios->address = phys_to_user ( entry.smbios_address );
+	smbios->address = phys_to_virt ( entry.smbios_address );
 	smbios->len = entry.smbios_len;
 	smbios->count = entry.smbios_count;
 	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
@@ -85,7 +85,7 @@ static int bios_find_smbios3 ( struct smbios *smbios ) {
 	}
 
 	/* Fill in entry point descriptor structure */
-	smbios->address = phys_to_user ( entry.smbios_address );
+	smbios->address = phys_to_virt ( entry.smbios_address );
 	smbios->len = entry.smbios_len;
 	smbios->count = 0;
 	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );

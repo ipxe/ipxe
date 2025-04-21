@@ -10,10 +10,9 @@
  *
  * We have no concept of the underlying physical addresses, since
  * these are not exposed to userspace.  We provide a stub
- * implementation of user_to_phys() since this is required by
- * alloc_memblock().  We provide no implementation of phys_to_user();
- * any code attempting to access physical addresses will therefore
- * (correctly) fail to link.
+ * implementation of virt_to_phys() since this is required by
+ * alloc_memblock().  We provide a matching stub implementation of
+ * phys_to_virt().
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
@@ -25,14 +24,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #endif
 
 /**
- * Convert user pointer to physical address
+ * Convert virtual address to physical address
  *
- * @v userptr		User pointer
- * @v offset		Offset from user pointer
- * @ret phys_addr	Physical address
+ * @v virt		Virtual address
+ * @ret phys		Physical address
  */
-static inline __always_inline unsigned long
-UACCESS_INLINE ( linux, user_to_phys ) ( userptr_t userptr, off_t offset ) {
+static inline __always_inline physaddr_t
+UACCESS_INLINE ( linux, virt_to_phys ) ( volatile const void *virt ) {
 
 	/* We do not know the real underlying physical address.  We
 	 * provide this stub implementation only because it is
@@ -43,20 +41,20 @@ UACCESS_INLINE ( linux, user_to_phys ) ( userptr_t userptr, off_t offset ) {
 	 * virtual address will suffice for the purpose of determining
 	 * alignment.
 	 */
-	return ( ( unsigned long ) ( userptr + offset ) );
+	return ( ( physaddr_t ) virt );
 }
 
 /**
- * Convert physical address to user pointer
+ * Convert physical address to virtual address
  *
- * @v phys_addr		Physical address
- * @ret userptr		User pointer
+ * @v phys		Physical address
+ * @ret virt		Virtual address
  */
-static inline __always_inline userptr_t
-UACCESS_INLINE ( linux, phys_to_user ) ( physaddr_t phys_addr ) {
+static inline __always_inline void *
+UACCESS_INLINE ( linux, phys_to_virt ) ( physaddr_t phys ) {
 
-	/* For symmetry with the stub user_to_phys() */
-	return ( ( userptr_t ) phys_addr );
+	/* For symmetry with the stub virt_to_phys() */
+	return ( ( void * ) phys );
 }
 
 static inline __always_inline userptr_t

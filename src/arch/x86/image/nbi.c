@@ -181,7 +181,7 @@ static int nbi_process_segments ( struct image *image,
 		/* Calculate segment load address */
 		switch ( NBI_LOADADDR_FLAGS ( sh.flags ) ) {
 		case NBI_LOADADDR_ABS:
-			dest = phys_to_user ( sh.loadaddr );
+			dest = phys_to_virt ( sh.loadaddr );
 			break;
 		case NBI_LOADADDR_AFTER:
 			dest = ( dest + memsz + sh.loadaddr );
@@ -194,7 +194,7 @@ static int nbi_process_segments ( struct image *image,
 			 * maintains backwards compatibility with
 			 * previous versions of Etherboot.
 			 */
-			dest = phys_to_user ( ( extmemsize() + 1024 ) * 1024
+			dest = phys_to_virt ( ( extmemsize() + 1024 ) * 1024
 					      - sh.loadaddr );
 			break;
 		default:

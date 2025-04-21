@@ -81,7 +81,7 @@ static int imgmem_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Create image */
-	if ( ( rc = imgmem ( opts.name, phys_to_user ( data ), len ) ) != 0 )
+	if ( ( rc = imgmem ( opts.name, phys_to_virt ( data ), len ) ) != 0 )
 		return rc;
 
 	return 0;

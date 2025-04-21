@@ -72,7 +72,7 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 			return UNULL;
 		}
 		assert ( phys_addr != 0 );
-		new_ptr = phys_to_user ( phys_addr + EFI_PAGE_SIZE );
+		new_ptr = phys_to_virt ( phys_addr + EFI_PAGE_SIZE );
 		copy_to_user ( new_ptr, -EFI_PAGE_SIZE,
 			       &new_size, sizeof ( new_size ) );
 		DBG ( "EFI allocated %d pages at %llx\n",
@@ -90,7 +90,7 @@ static userptr_t efi_urealloc ( userptr_t old_ptr, size_t new_size ) {
 		memcpy ( new_ptr, old_ptr,
 			 ( (old_size < new_size) ? old_size : new_size ) );
 		old_pages = ( EFI_SIZE_TO_PAGES ( old_size ) + 1 );
-		phys_addr = user_to_phys ( old_ptr, -EFI_PAGE_SIZE );
+		phys_addr = virt_to_phys ( old_ptr - EFI_PAGE_SIZE );
 		if ( ( efirc = bs->FreePages ( phys_addr, old_pages ) ) != 0 ){
 			rc = -EEFI ( efirc );
 			DBG ( "EFI could not free %d pages at %llx: %s\n",

@@ -428,8 +428,8 @@ void setup_sipi ( unsigned int vector, uint32_t handler,
 	copy_to_real ( ( vector << 8 ), 0, sipi, ( ( size_t ) sipi_len ) );
 }
 
-PROVIDE_UACCESS_INLINE ( librm, phys_to_user );
-PROVIDE_UACCESS_INLINE ( librm, user_to_phys );
+PROVIDE_UACCESS_INLINE ( librm, phys_to_virt );
+PROVIDE_UACCESS_INLINE ( librm, virt_to_phys );
 PROVIDE_UACCESS_INLINE ( librm, virt_to_user );
 PROVIDE_UACCESS_INLINE ( librm, memchr_user );
 PROVIDE_IOMAP_INLINE ( pages, io_to_bus );

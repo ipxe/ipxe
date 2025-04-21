@@ -428,7 +428,7 @@ static int srp_cmd ( struct srp_device *srpdev,
 		cmd->data_buffer_formats |= SRP_CMD_DO_FMT_DIRECT;
 		data_out = iob_put ( iobuf, sizeof ( *data_out ) );
 		data_out->address =
-		    cpu_to_be64 ( user_to_phys ( command->data_out, 0 ) );
+		    cpu_to_be64 ( virt_to_phys ( command->data_out ) );
 		data_out->handle = ntohl ( srpdev->memory_handle );
 		data_out->len = ntohl ( command->data_out_len );
 	}
@@ -438,7 +438,7 @@ static int srp_cmd ( struct srp_device *srpdev,
 		cmd->data_buffer_formats |= SRP_CMD_DI_FMT_DIRECT;
 		data_in = iob_put ( iobuf, sizeof ( *data_in ) );
 		data_in->address =
-		     cpu_to_be64 ( user_to_phys ( command->data_in, 0 ) );
+		     cpu_to_be64 ( virt_to_phys ( command->data_in ) );
 		data_in->handle = ntohl ( srpdev->memory_handle );
 		data_in->len = ntohl ( command->data_in_len );
 	}

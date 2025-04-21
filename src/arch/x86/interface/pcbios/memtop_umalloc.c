@@ -106,7 +106,7 @@ size_t largest_memblock ( userptr_t *start ) {
 		/* Use largest block */
 		if ( region_len > len ) {
 			DBG ( "...new best block found\n" );
-			*start = phys_to_user ( region_start );
+			*start = phys_to_virt ( region_start );
 			len = region_len;
 		}
 	}
@@ -124,7 +124,7 @@ static void init_eheap ( void ) {
 	heap_size = largest_memblock ( &base );
 	bottom = top = ( base + heap_size );
 	DBG ( "External heap grows downwards from %lx (size %zx)\n",
-	      user_to_phys ( top, 0 ), heap_size );
+	      virt_to_phys ( top ), heap_size );
 }
 
 /**
@@ -141,8 +141,8 @@ static void ecollect_free ( void ) {
 				 sizeof ( extmem ) );
 		if ( extmem.used )
 			break;
-		DBG ( "EXTMEM freeing [%lx,%lx)\n", user_to_phys ( bottom, 0 ),
-		      user_to_phys ( bottom, extmem.size ) );
+		DBG ( "EXTMEM freeing [%lx,%lx)\n", virt_to_phys ( bottom ),
+		      ( virt_to_phys ( bottom ) + extmem.size ) );
 		len = ( extmem.size + sizeof ( extmem ) );
 		bottom += len;
 		heap_size += len;
@@ -182,7 +182,7 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 		ptr = bottom = ( bottom - sizeof ( extmem ) );
 		heap_size -= sizeof ( extmem );
 		DBG ( "EXTMEM allocating [%lx,%lx)\n",
-		      user_to_phys ( ptr, 0 ), user_to_phys ( ptr, 0 ) );
+		      virt_to_phys ( ptr ), virt_to_phys ( ptr ) );
 		extmem.size = 0;
 	}
 	extmem.used = ( new_size > 0 );
@@ -191,7 +191,7 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 	if ( ptr == bottom ) {
 		/* Update block */
 		new = ( ptr - ( new_size - extmem.size ) );
-		align = ( user_to_phys ( new, 0 ) & ( EM_ALIGN - 1 ) );
+		align = ( virt_to_phys ( new ) & ( EM_ALIGN - 1 ) );
 		new_size += align;
 		new -= align;
 		if ( new_size > ( heap_size + extmem.size ) ) {
@@ -199,10 +199,10 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 			return UNULL;
 		}
 		DBG ( "EXTMEM expanding [%lx,%lx) to [%lx,%lx)\n",
-		      user_to_phys ( ptr, 0 ),
-		      user_to_phys ( ptr, extmem.size ),
-		      user_to_phys ( new, 0 ),
-		      user_to_phys ( new, new_size ));
+		      virt_to_phys ( ptr ),
+		      ( virt_to_phys ( ptr ) + extmem.size ),
+		      virt_to_phys ( new ),
+		      ( virt_to_phys ( new ) + new_size ) );
 		memmove ( new, ptr, ( ( extmem.size < new_size ) ?
 				      extmem.size : new_size ) );
 		bottom = new;
@@ -213,8 +213,8 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 		if ( new_size > extmem.size ) {
 			/* Refuse to expand */
 			DBG ( "EXTMEM cannot expand [%lx,%lx)\n",
-			      user_to_phys ( ptr, 0 ),
-			      user_to_phys ( ptr, extmem.size ) );
+			      virt_to_phys ( ptr ),
+			      ( virt_to_phys ( ptr ) + extmem.size ) );
 			return UNULL;
 		}
 	}
@@ -225,9 +225,9 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 
 	/* Collect any free blocks and update hidden memory region */
 	ecollect_free();
-	hide_umalloc ( user_to_phys ( bottom, ( ( bottom == top ) ?
-						0 : -sizeof ( extmem ) ) ),
-		       user_to_phys ( top, 0 ) );
+	hide_umalloc ( ( virt_to_phys ( bottom ) -
+			 ( ( bottom == top ) ? 0 : sizeof ( extmem ) ) ),
+		       virt_to_phys ( top ) );
 
 	return ( new_size ? new : UNOWHERE );
 }

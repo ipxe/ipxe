@@ -118,14 +118,14 @@ static int txnic_create_sq ( struct txnic *vnic ) {
 	writeq ( TXNIC_QS_SQ_CFG_RESET, ( vnic->regs + TXNIC_QS_SQ_CFG(0) ) );
 
 	/* Configure and enable send queue */
-	writeq ( user_to_phys ( vnic->sq.sqe, 0 ),
+	writeq ( virt_to_phys ( vnic->sq.sqe ),
 		 ( vnic->regs + TXNIC_QS_SQ_BASE(0) ) );
 	writeq ( ( TXNIC_QS_SQ_CFG_ENA | TXNIC_QS_SQ_CFG_QSIZE_1K ),
 		 ( vnic->regs + TXNIC_QS_SQ_CFG(0) ) );
 
 	DBGC ( vnic, "TXNIC %s SQ at [%08lx,%08lx)\n",
-	       vnic->name, user_to_phys ( vnic->sq.sqe, 0 ),
-	       user_to_phys ( vnic->sq.sqe, TXNIC_SQ_SIZE ) );
+	       vnic->name, virt_to_phys ( vnic->sq.sqe ),
+	       ( virt_to_phys ( vnic->sq.sqe ) + TXNIC_SQ_SIZE ) );
 	return 0;
 }
 
@@ -277,7 +277,7 @@ static int txnic_create_rq ( struct txnic *vnic ) {
 		 ( vnic->regs + TXNIC_QS_RBDR_CFG(0) ) );
 
 	/* Configure and enable receive buffer descriptor ring */
-	writeq ( user_to_phys ( vnic->rq.rqe, 0 ),
+	writeq ( virt_to_phys ( vnic->rq.rqe ),
 		 ( vnic->regs + TXNIC_QS_RBDR_BASE(0) ) );
 	writeq ( ( TXNIC_QS_RBDR_CFG_ENA | TXNIC_QS_RBDR_CFG_QSIZE_8K |
 		   TXNIC_QS_RBDR_CFG_LINES ( TXNIC_RQE_SIZE /
@@ -288,8 +288,8 @@ static int txnic_create_rq ( struct txnic *vnic ) {
 	writeq ( TXNIC_QS_RQ_CFG_ENA, ( vnic->regs + TXNIC_QS_RQ_CFG(0) ) );
 
 	DBGC ( vnic, "TXNIC %s RQ at [%08lx,%08lx)\n",
-	       vnic->name, user_to_phys ( vnic->rq.rqe, 0 ),
-	       user_to_phys ( vnic->rq.rqe, TXNIC_RQ_SIZE ) );
+	       vnic->name, virt_to_phys ( vnic->rq.rqe ),
+	       ( virt_to_phys ( vnic->rq.rqe ) + TXNIC_RQ_SIZE ) );
 	return 0;
 }
 
@@ -463,14 +463,14 @@ static int txnic_create_cq ( struct txnic *vnic ) {
 	writeq ( TXNIC_QS_CQ_CFG_RESET, ( vnic->regs + TXNIC_QS_CQ_CFG(0) ) );
 
 	/* Configure and enable completion queue */
-	writeq ( user_to_phys ( vnic->cq.cqe, 0 ),
+	writeq ( virt_to_phys ( vnic->cq.cqe ),
 		 ( vnic->regs + TXNIC_QS_CQ_BASE(0) ) );
 	writeq ( ( TXNIC_QS_CQ_CFG_ENA | TXNIC_QS_CQ_CFG_QSIZE_256 ),
 		 ( vnic->regs + TXNIC_QS_CQ_CFG(0) ) );
 
 	DBGC ( vnic, "TXNIC %s CQ at [%08lx,%08lx)\n",
-	       vnic->name, user_to_phys ( vnic->cq.cqe, 0 ),
-	       user_to_phys ( vnic->cq.cqe, TXNIC_CQ_SIZE ) );
+	       vnic->name, virt_to_phys ( vnic->cq.cqe ),
+	       ( virt_to_phys ( vnic->cq.cqe ) + TXNIC_CQ_SIZE ) );
 	return 0;
 }
 
@@ -559,7 +559,8 @@ static void txnic_poll_cq ( struct txnic *vnic ) {
 		default:
 			DBGC ( vnic, "TXNIC %s unknown completion type %d\n",
 			       vnic->name, cqe.common.cqe_type );
-			DBGC_HDA ( vnic, user_to_phys ( vnic->cq.cqe, offset ),
+			DBGC_HDA ( vnic,
+				   ( virt_to_phys ( vnic->cq.cqe ) + offset ),
 				   &cqe, sizeof ( cqe ) );
 			break;
 		}

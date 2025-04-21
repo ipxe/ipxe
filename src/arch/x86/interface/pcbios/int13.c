@@ -743,7 +743,7 @@ static int int13_extended_rw ( struct san_device *sandev,
 	if ( ( addr.count == 0xff ) ||
 	     ( ( addr.buffer.segment == 0xffff ) &&
 	       ( addr.buffer.offset == 0xffff ) ) ) {
-		buffer = phys_to_user ( addr.buffer_phys );
+		buffer = phys_to_virt ( addr.buffer_phys );
 		DBGC2 ( sandev->drive, "%08llx",
 			( ( unsigned long long ) addr.buffer_phys ) );
 	} else {
@@ -1058,7 +1058,7 @@ static int int13_cdrom_read_boot_catalog ( struct san_device *sandev,
 
 	/* Read from boot catalog */
 	if ( ( rc = sandev_read ( sandev, start, command.count,
-				  phys_to_user ( command.buffer ) ) ) != 0 ) {
+				  phys_to_virt ( command.buffer ) ) ) != 0 ) {
 		DBGC ( sandev->drive, "INT13 drive %02x could not read boot "
 		       "catalog: %s\n", sandev->drive, strerror ( rc ) );
 		return -INT13_STATUS_READ_ERROR;
@@ -1455,7 +1455,7 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 		       "catalog (status %04x)\n", drive, status );
 		return -EIO;
 	}
-	copy_from_user ( &catalog, phys_to_user ( eltorito_cmd.buffer ), 0,
+	copy_from_user ( &catalog, phys_to_virt ( eltorito_cmd.buffer ), 0,
 			 sizeof ( catalog ) );
 
 	/* Sanity checks */

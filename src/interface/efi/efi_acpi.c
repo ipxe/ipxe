@@ -48,7 +48,7 @@ static userptr_t efi_find_rsdt ( void ) {
 
 	/* Locate RSDT via ACPI configuration table, if available */
 	if ( rsdp )
-		return phys_to_user ( rsdp->RsdtAddress );
+		return phys_to_virt ( rsdp->RsdtAddress );
 
 	return UNULL;
 }

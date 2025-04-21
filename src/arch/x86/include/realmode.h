@@ -73,7 +73,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 static inline __always_inline userptr_t
 real_to_user ( unsigned int segment, unsigned int offset ) {
-	return ( phys_to_user ( ( segment << 4 ) + offset ) );
+	return ( phys_to_virt ( ( segment << 4 ) + offset ) );
 }
 
 /**

@@ -76,10 +76,10 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 		current -= len;
 		DBGC ( &images, "INITRD squashing %s [%#08lx,%#08lx)->"
 		       "[%#08lx,%#08lx)\n", highest->name,
-		       user_to_phys ( highest->data, 0 ),
-		       user_to_phys ( highest->data, highest->len ),
-		       user_to_phys ( current, 0 ),
-		       user_to_phys ( current, highest->len ) );
+		       virt_to_phys ( highest->data ),
+		       ( virt_to_phys ( highest->data ) + highest->len ),
+		       virt_to_phys ( current ),
+		       ( virt_to_phys ( current ) + highest->len ) );
 		memmove ( current, highest->data, highest->len );
 		highest->data = current;
 	}
@@ -92,10 +92,10 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 			current -= len;
 			DBGC ( &images, "INITRD copying %s [%#08lx,%#08lx)->"
 			       "[%#08lx,%#08lx)\n", initrd->name,
-			       user_to_phys ( initrd->data, 0 ),
-			       user_to_phys ( initrd->data, initrd->len ),
-			       user_to_phys ( current, 0 ),
-			       user_to_phys ( current, initrd->len ) );
+			       virt_to_phys ( initrd->data ),
+			       ( virt_to_phys ( initrd->data ) + initrd->len ),
+			       virt_to_phys ( current ),
+			       ( virt_to_phys ( current ) + initrd->len ) );
 			memcpy ( current, initrd->data, initrd->len );
 			initrd->data = current;
 		}
@@ -119,10 +119,10 @@ static void initrd_swap ( struct image *low, struct image *high,
 	size_t new_len;
 
 	DBGC ( &images, "INITRD swapping %s [%#08lx,%#08lx)<->[%#08lx,%#08lx) "
-	       "%s\n", low->name, user_to_phys ( low->data, 0 ),
-	       user_to_phys ( low->data, low->len ),
-	       user_to_phys ( high->data, 0 ),
-	       user_to_phys ( high->data, high->len ), high->name );
+	       "%s\n", low->name, virt_to_phys ( low->data ),
+	       ( virt_to_phys ( low->data ) + low->len ),
+	       virt_to_phys ( high->data ),
+	       ( virt_to_phys ( high->data ) + high->len ), high->name );
 
 	/* Round down length of free space */
 	free_len &= ~( INITRD_ALIGN - 1 );
@@ -208,9 +208,9 @@ static void initrd_dump ( void ) {
 	/* Dump initrd locations */
 	for_each_image ( initrd ) {
 		DBGC ( &images, "INITRD %s at [%#08lx,%#08lx)\n",
-		       initrd->name, user_to_phys ( initrd->data, 0 ),
-		       user_to_phys ( initrd->data, initrd->len ) );
-		DBGC2_MD5A ( &images, user_to_phys ( initrd->data, 0 ),
+		       initrd->name, virt_to_phys ( initrd->data ),
+		       ( virt_to_phys ( initrd->data ) + initrd->len ) );
+		DBGC2_MD5A ( &images, virt_to_phys ( initrd->data ),
 			     initrd->data, initrd->len );
 	}
 }
@@ -239,7 +239,7 @@ void initrd_reshuffle ( userptr_t bottom ) {
 
 	/* Debug */
 	DBGC ( &images, "INITRD region [%#08lx,%#08lx)\n",
-	       user_to_phys ( bottom, 0 ), user_to_phys ( top, 0 ) );
+	       virt_to_phys ( bottom ), virt_to_phys ( top ) );
 	initrd_dump();
 
 	/* Squash initrds as high as possible in memory */

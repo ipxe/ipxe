@@ -492,7 +492,7 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 	}
 
 	/* Read entire file */
-	pxe_tftp.buffer = phys_to_user ( tftp_read_file->Buffer );
+	pxe_tftp.buffer = phys_to_virt ( tftp_read_file->Buffer );
 	pxe_tftp.size = tftp_read_file->BufferSize;
 	while ( ( rc = pxe_tftp.rc ) == -EINPROGRESS )
 		step();

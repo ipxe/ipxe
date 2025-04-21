@@ -49,7 +49,7 @@ void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physad
 	DBGC ( &com32_regs, "COM32 INT%x in %#08lx out %#08lx\n",
 	       interrupt, inregs_phys, outregs_phys );
 
-	memcpy ( virt_to_user( &com32_regs ), phys_to_user ( inregs_phys ),
+	memcpy ( virt_to_user( &com32_regs ), phys_to_virt ( inregs_phys ),
 		 sizeof ( com32sys_t ) );
 
 	com32_int_vector = interrupt;
@@ -107,7 +107,7 @@ void __asmcall com32_intcall ( uint8_t interrupt, physaddr_t inregs_phys, physad
 		            : : );
 
 	if ( outregs_phys ) {
-		memcpy ( phys_to_user ( outregs_phys ),
+		memcpy ( phys_to_virt ( outregs_phys ),
 			 virt_to_user ( &com32_regs ), sizeof ( com32sys_t ) );
 	}
 }
@@ -120,7 +120,7 @@ void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t
 	DBGC ( &com32_regs, "COM32 farcall %04x:%04x in %#08lx out %#08lx\n",
 	       ( proc >> 16 ), ( proc & 0xffff ), inregs_phys, outregs_phys );
 
-	memcpy ( virt_to_user( &com32_regs ), phys_to_user ( inregs_phys ),
+	memcpy ( virt_to_user( &com32_regs ), phys_to_virt ( inregs_phys ),
 		 sizeof ( com32sys_t ) );
 
 	com32_farcall_proc = proc;
@@ -167,7 +167,7 @@ void __asmcall com32_farcall ( uint32_t proc, physaddr_t inregs_phys, physaddr_t
 		            : : );
 
 	if ( outregs_phys ) {
-		memcpy ( phys_to_user ( outregs_phys ),
+		memcpy ( phys_to_virt ( outregs_phys ),
 			 virt_to_user ( &com32_regs ), sizeof ( com32sys_t ) );
 	}
 }
@@ -181,7 +181,7 @@ int __asmcall com32_cfarcall ( uint32_t proc, physaddr_t stack, size_t stacksz )
 	DBGC ( &com32_regs, "COM32 cfarcall %04x:%04x params %#08lx+%#zx\n",
 	       ( proc >> 16 ), ( proc & 0xffff ), stack, stacksz );
 
-	copy_user_to_rm_stack ( phys_to_user ( stack ), stacksz );
+	copy_user_to_rm_stack ( phys_to_virt ( stack ), stacksz );
 	com32_farcall_proc = proc;
 
 	__asm__ __volatile__ (

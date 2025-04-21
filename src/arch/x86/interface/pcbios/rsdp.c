@@ -78,10 +78,10 @@ static userptr_t rsdp_find_rsdt_range ( userptr_t start, size_t len ) {
 			continue;
 
 		/* Extract RSDT */
-		rsdt = phys_to_user ( le32_to_cpu ( rsdp.rsdt ) );
+		rsdt = phys_to_virt ( le32_to_cpu ( rsdp.rsdt ) );
 		DBGC ( rsdt, "RSDT %#08lx found via RSDP %#08lx\n",
-		       user_to_phys ( rsdt, 0 ),
-		       user_to_phys ( start, offset ) );
+		       virt_to_phys ( rsdt ),
+		       ( virt_to_phys ( start ) + offset ) );
 		return rsdt;
 	}
 
@@ -114,7 +114,7 @@ static userptr_t rsdp_find_rsdt ( void ) {
 	}
 
 	/* Search fixed BIOS area */
-	rsdt = rsdp_find_rsdt_range ( phys_to_user ( RSDP_BIOS_START ),
+	rsdt = rsdp_find_rsdt_range ( phys_to_virt ( RSDP_BIOS_START ),
 				      RSDP_BIOS_LEN );
 	if ( rsdt )
 		return rsdt;

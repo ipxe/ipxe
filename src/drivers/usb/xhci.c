@@ -1014,8 +1014,7 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 	}
 
 	/* Populate scratchpad array */
-	addr = dma_phys ( &scratch->buffer_map,
-			  user_to_phys ( scratch->buffer, 0 ) );
+	addr = dma ( &scratch->buffer_map, scratch->buffer );
 	for ( i = 0 ; i < scratch->count ; i++ ) {
 		scratch->array[i] = cpu_to_le64 ( addr );
 		addr += xhci->pagesize;
@@ -1027,8 +1026,8 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 						     scratch->array ) );
 
 	DBGC2 ( xhci, "XHCI %s scratchpad [%08lx,%08lx) array [%08lx,%08lx)\n",
-		xhci->name, user_to_phys ( scratch->buffer, 0 ),
-		user_to_phys ( scratch->buffer, buffer_len ),
+		xhci->name, virt_to_phys ( scratch->buffer ),
+		( virt_to_phys ( scratch->buffer ) + buffer_len ),
 		virt_to_phys ( scratch->array ),
 		( virt_to_phys ( scratch->array ) + array_len ) );
 	return 0;

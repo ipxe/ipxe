@@ -86,14 +86,14 @@ int find_smbios_entry ( userptr_t start, size_t len,
 		if ( ( sum = smbios_checksum ( start, offset,
 					       entry->len ) ) != 0 ) {
 			DBG ( "SMBIOS at %08lx has bad checksum %02x\n",
-			      user_to_phys ( start, offset ), sum );
+			      virt_to_phys ( start + offset ), sum );
 			continue;
 		}
 
 		/* Fill result structure */
 		DBG ( "Found SMBIOS v%d.%d entry point at %08lx\n",
 		      entry->major, entry->minor,
-		      user_to_phys ( start, offset ) );
+		      virt_to_phys ( start + offset ) );
 		return 0;
 	}
 
@@ -126,14 +126,14 @@ int find_smbios3_entry ( userptr_t start, size_t len,
 		if ( ( sum = smbios_checksum ( start, offset,
 					       entry->len ) ) != 0 ) {
 			DBG ( "SMBIOS3 at %08lx has bad checksum %02x\n",
-			      user_to_phys ( start, offset ), sum );
+			      virt_to_phys ( start + offset ), sum );
 			continue;
 		}
 
 		/* Fill result structure */
 		DBG ( "Found SMBIOS3 v%d.%d entry point at %08lx\n",
 		      entry->major, entry->minor,
-		      user_to_phys ( start, offset ) );
+		      virt_to_phys ( start + offset ) );
 		return 0;
 	}
 

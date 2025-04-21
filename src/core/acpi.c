@@ -128,16 +128,16 @@ userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 	copy_from_user ( &acpi, rsdt, 0, sizeof ( acpi ) );
 	if ( acpi.signature != cpu_to_le32 ( RSDT_SIGNATURE ) ) {
 		DBGC ( colour, "RSDT %#08lx has invalid signature:\n",
-		       user_to_phys ( rsdt, 0 ) );
-		DBGC_HDA ( colour, user_to_phys ( rsdt, 0 ), &acpi,
+		       virt_to_phys ( rsdt ) );
+		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &acpi,
 			   sizeof ( acpi ) );
 		return UNULL;
 	}
 	len = le32_to_cpu ( acpi.length );
 	if ( len < sizeof ( rsdtab->acpi ) ) {
 		DBGC ( colour, "RSDT %#08lx has invalid length:\n",
-		       user_to_phys ( rsdt, 0 ) );
-		DBGC_HDA ( colour, user_to_phys ( rsdt, 0 ), &acpi,
+		       virt_to_phys ( rsdt ) );
+		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &acpi,
 			   sizeof ( acpi ) );
 		return UNULL;
 	}
@@ -154,7 +154,7 @@ userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 				 sizeof ( entry ) );
 
 		/* Read table header */
-		table = phys_to_user ( entry );
+		table = phys_to_virt ( entry );
 		copy_from_user ( &acpi.signature, table, 0,
 				 sizeof ( acpi.signature ) );
 
@@ -169,20 +169,20 @@ userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 		/* Check table integrity */
 		if ( acpi_checksum ( table ) != 0 ) {
 			DBGC ( colour, "RSDT %#08lx found %s with bad "
-			       "checksum at %08lx\n", user_to_phys ( rsdt, 0 ),
+			       "checksum at %08lx\n", virt_to_phys ( rsdt ),
 			       acpi_name ( signature ),
-			       user_to_phys ( table, 0 ) );
+			       virt_to_phys ( table ) );
 			break;
 		}
 
 		DBGC ( colour, "RSDT %#08lx found %s at %08lx\n",
-		       user_to_phys ( rsdt, 0 ), acpi_name ( signature ),
-		       user_to_phys ( table, 0 ) );
+		       virt_to_phys ( rsdt ), acpi_name ( signature ),
+		       virt_to_phys ( table ) );
 		return table;
 	}
 
 	DBGC ( colour, "RSDT %#08lx could not find %s\n",
-	       user_to_phys ( rsdt, 0 ), acpi_name ( signature ) );
+	       virt_to_phys ( rsdt ), acpi_name ( signature ) );
 	return UNULL;
 }
 
@@ -218,7 +218,7 @@ static int acpi_zsdt ( userptr_t zsdt, uint32_t signature, void *data,
 		if ( buf != cpu_to_le32 ( signature ) )
 			continue;
 		DBGC ( zsdt, "DSDT/SSDT %#08lx found %s at offset %#zx\n",
-		       user_to_phys ( zsdt, 0 ), acpi_name ( signature ),
+		       virt_to_phys ( zsdt ), acpi_name ( signature ),
 		       offset );
 
 		/* Attempt to extract data */
@@ -251,7 +251,7 @@ int acpi_extract ( uint32_t signature, void *data,
 	fadt = acpi_table ( FADT_SIGNATURE, 0 );
 	if ( fadt ) {
 		copy_from_user ( &fadtab, fadt, 0, sizeof ( fadtab ) );
-		dsdt = phys_to_user ( fadtab.dsdt );
+		dsdt = phys_to_virt ( fadtab.dsdt );
 		if ( ( rc = acpi_zsdt ( dsdt, signature, data,
 					extract ) ) == 0 )
 			return 0;

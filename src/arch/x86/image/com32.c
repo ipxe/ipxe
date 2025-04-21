@@ -211,7 +211,7 @@ static int com32_load_image ( struct image *image ) {
 
 	filesz = image->len;
 	memsz = filesz;
-	buffer = phys_to_user ( COM32_START_PHYS );
+	buffer = phys_to_virt ( COM32_START_PHYS );
 	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
 		DBGC ( image, "COM32 %p: could not prepare segment: %s\n",
 		       image, strerror ( rc ) );

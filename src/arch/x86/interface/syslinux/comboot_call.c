@@ -114,8 +114,8 @@ static void shuffle ( unsigned int list_segment, unsigned int list_offset, unsig
 
 	/* Do the copies */
 	for ( i = 0; i < count; i++ ) {
-		userptr_t src_u = phys_to_user ( shuf[ i ].src );
-		userptr_t dest_u = phys_to_user ( shuf[ i ].dest );
+		userptr_t src_u = phys_to_virt ( shuf[ i ].src );
+		userptr_t dest_u = phys_to_virt ( shuf[ i ].dest );
 
 		if ( shuf[ i ].src == 0xFFFFFFFF ) {
 			/* Fill with 0 instead of copying */

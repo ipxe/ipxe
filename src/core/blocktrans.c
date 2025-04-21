@@ -248,7 +248,7 @@ int block_translate ( struct interface *block, userptr_t buffer, size_t size ) {
 	DBGC2 ( blktrans, "BLKTRANS %p created", blktrans );
 	if ( buffer ) {
 		DBGC2 ( blktrans, " for %#lx+%#zx",
-			user_to_phys ( buffer, 0 ), size );
+			virt_to_phys ( buffer ), size );
 	}
 	DBGC2 ( blktrans, "\n" );
 	return 0;

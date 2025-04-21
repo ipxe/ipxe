@@ -59,9 +59,9 @@ struct errortab segment_errors[] __errortab = {
  */
 int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
 	struct memory_map memmap;
-	physaddr_t start = user_to_phys ( segment, 0 );
-	physaddr_t mid = user_to_phys ( segment, filesz );
-	physaddr_t end = user_to_phys ( segment, memsz );
+	physaddr_t start = virt_to_phys ( segment );
+	physaddr_t mid = ( start + filesz );
+	physaddr_t end = ( start + memsz );
 	unsigned int i;
 
 	DBG ( "Preparing segment [%lx,%lx,%lx)\n", start, mid, end );

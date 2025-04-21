@@ -85,33 +85,32 @@ extern const unsigned long virt_offset;
 /**
  * Convert physical address to user pointer
  *
- * @v phys_addr		Physical address
- * @ret userptr		User pointer
+ * @v phys		Physical address
+ * @ret virt		Virtual address
  */
-static inline __always_inline userptr_t
-UACCESS_INLINE ( librm, phys_to_user ) ( unsigned long phys_addr ) {
+static inline __always_inline void *
+UACCESS_INLINE ( librm, phys_to_virt ) ( unsigned long phys ) {
 
 	/* In a 64-bit build, any valid physical address is directly
 	 * usable as a virtual address, since the low 4GB is
 	 * identity-mapped.
 	 */
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
-		return ( ( userptr_t ) phys_addr );
+		return ( ( void * ) phys );
 
 	/* In a 32-bit build, subtract virt_offset */
-	return ( ( userptr_t ) ( phys_addr - virt_offset ) );
+	return ( ( void * ) ( phys - virt_offset ) );
 }
 
 /**
- * Convert user buffer to physical address
+ * Convert virtual address to physical address
  *
- * @v userptr		User pointer
- * @v offset		Offset from user pointer
- * @ret phys_addr	Physical address
+ * @v virt		Virtual address
+ * @ret phys		Physical address
  */
-static inline __always_inline unsigned long
-UACCESS_INLINE ( librm, user_to_phys ) ( userptr_t userptr, off_t offset ) {
-	unsigned long addr = ( ( unsigned long ) ( userptr + offset ) );
+static inline __always_inline physaddr_t
+UACCESS_INLINE ( librm, virt_to_phys ) ( volatile const void *virt ) {
+	physaddr_t addr = ( ( physaddr_t ) virt );
 
 	/* In a 64-bit build, any virtual address in the low 4GB is
 	 * directly usable as a physical address, since the low 4GB is

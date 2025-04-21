@@ -165,7 +165,7 @@ static int ucode_status ( struct ucode_update *update,
 	assert ( id <= control->apic_max );
 
 	/* Read status report */
-	copy_from_user ( &status, phys_to_user ( control->status ),
+	copy_from_user ( &status, phys_to_virt ( control->status ),
 			 ( id * sizeof ( status ) ), sizeof ( status ) );
 
 	/* Ignore empty optional status reports */
@@ -261,7 +261,7 @@ static int ucode_update_all ( struct image *image,
 	/* Construct control structure */
 	memset ( &control, 0, sizeof ( control ) );
 	control.desc = virt_to_phys ( update->desc );
-	control.status = user_to_phys ( status, 0 );
+	control.status = virt_to_phys ( status );
 	vendor = update->vendor;
 	if ( vendor ) {
 		control.ver_clear = vendor->ver_clear;
@@ -446,8 +446,8 @@ static int ucode_parse_intel ( struct image *image, size_t start,
 	/* Populate descriptor */
 	desc.signature = hdr.signature;
 	desc.version = hdr.version;
-	desc.address = user_to_phys ( image->data,
-				      ( start + sizeof ( hdr ) ) );
+	desc.address = ( virt_to_phys ( image->data ) +
+			 start + sizeof ( hdr ) );
 
 	/* Add non-extended descriptor, if applicable */
 	ucode_describe ( image, start, &ucode_intel, &desc, hdr.platforms,
@@ -589,7 +589,8 @@ static int ucode_parse_amd ( struct image *image, size_t start,
 		copy_from_user ( &patch, image->data, ( start + offset ),
 				 sizeof ( patch ) );
 		desc.version = patch.version;
-		desc.address = user_to_phys ( image->data, ( start + offset ) );
+		desc.address = ( virt_to_phys ( image->data ) +
+				 start + offset );
 		offset += phdr.len;
 
 		/* Parse equivalence table to find matching signatures */

@@ -251,7 +251,7 @@ int cachedhcp_record ( struct cached_dhcp_packet *cache, unsigned int vlan,
 
 	/* Store as cached packet */
 	DBGC ( colour, "CACHEDHCP %s at %#08lx+%#zx/%#zx\n", cache->name,
-	       user_to_phys ( data, 0 ), len, max_len );
+	       virt_to_phys ( data ), len, max_len );
 	cache->dhcppkt = dhcppkt;
 	cache->vlan = vlan;
 

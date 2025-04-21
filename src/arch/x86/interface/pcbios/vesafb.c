@@ -473,7 +473,7 @@ static int vesafb_init ( struct console_configuration *config ) {
 	vesafb_font();
 
 	/* Initialise frame buffer console */
-	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
+	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_virt ( vesafb.start ),
 				 &vesafb.pixel, &vesafb.map, &vesafb.font,
 				 config ) ) != 0 )
 		goto err_fbcon_init;

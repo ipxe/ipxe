@@ -613,8 +613,8 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 	/* Derive overall length */
 	fbcon->len = ( pixel->height * pixel->stride );
 	DBGC ( fbcon, "FBCON %p at [%08lx,%08lx)\n", fbcon,
-	       user_to_phys ( fbcon->start, 0 ),
-	       user_to_phys ( fbcon->start, fbcon->len ) );
+	       virt_to_phys ( fbcon->start ),
+	       ( virt_to_phys ( fbcon->start ) + fbcon->len ) );
 
 	/* Calculate margin.  If the actual screen size is larger than
 	 * the requested screen size, then update the margins so that

@@ -583,7 +583,7 @@ static int efifb_init ( struct console_configuration *config ) {
 	       mode, efifb.pixel.width, efifb.pixel.height, bpp, efifb.start );
 
 	/* Initialise frame buffer console */
-	if ( ( rc = fbcon_init ( &efifb.fbcon, phys_to_user ( efifb.start ),
+	if ( ( rc = fbcon_init ( &efifb.fbcon, phys_to_virt ( efifb.start ),
 				 &efifb.pixel, &efifb.map, &efifb.font,
 				 config ) ) != 0 )
 		goto err_fbcon_init;

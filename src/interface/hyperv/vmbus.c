@@ -277,7 +277,7 @@ int vmbus_establish_gpadl ( struct vmbus_device *vmdev, userptr_t data,
 			    size_t len ) {
 	struct hv_hypervisor *hv = vmdev->hv;
 	struct vmbus *vmbus = hv->vmbus;
-	physaddr_t addr = user_to_phys ( data, 0 );
+	physaddr_t addr = virt_to_phys ( data );
 	unsigned int pfn_count = hv_pfn_count ( addr, len );
 	struct {
 		struct vmbus_gpadl_header gpadlhdr;

@@ -300,8 +300,8 @@ int register_image ( struct image *image ) {
 	image->flags |= IMAGE_REGISTERED;
 	list_add_tail ( &image->list, &images );
 	DBGC ( image, "IMAGE %s at [%lx,%lx) registered\n",
-	       image->name, user_to_phys ( image->data, 0 ),
-	       user_to_phys ( image->data, image->len ) );
+	       image->name, virt_to_phys ( image->data ),
+	       ( virt_to_phys ( image->data ) + image->len ) );
 
 	/* Try to detect image type, if applicable.  Ignore failures,
 	 * since we expect to handle some unrecognised images

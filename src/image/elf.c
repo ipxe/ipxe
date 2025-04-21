@@ -50,7 +50,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
 			      physaddr_t dest ) {
-	userptr_t buffer = phys_to_user ( dest );
+	userptr_t buffer = phys_to_virt ( dest );
 	int rc;
 
 	DBGC ( image, "ELF %p loading segment [%x,%x) to [%lx,%lx,%lx)\n",

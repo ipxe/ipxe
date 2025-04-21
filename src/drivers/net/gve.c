@@ -521,14 +521,14 @@ static int gve_deconfigure ( struct gve_nic *gve ) {
 static int gve_register ( struct gve_nic *gve, struct gve_qpl *qpl ) {
 	struct gve_pages *pages = &gve->scratch.buf->pages;
 	union gve_admin_command *cmd;
-	physaddr_t addr;
+	void *addr;
 	unsigned int i;
 	int rc;
 
 	/* Build page address list */
 	for ( i = 0 ; i < qpl->count ; i++ ) {
-		addr = user_to_phys ( qpl->data, ( i * GVE_PAGE_SIZE ) );
-		pages->addr[i] = cpu_to_be64 ( dma_phys ( &qpl->map, addr ) );
+		addr = ( qpl->data + ( i * GVE_PAGE_SIZE ) );
+		pages->addr[i] = cpu_to_be64 ( dma ( &qpl->map, addr ) );
 	}
 
 	/* Construct request */
@@ -575,11 +575,10 @@ static void gve_create_tx_param ( struct gve_queue *queue,
 				  union gve_admin_command *cmd ) {
 	struct gve_admin_create_tx *create = &cmd->create_tx;
 	const struct gve_queue_type *type = queue->type;
-	physaddr_t desc = user_to_phys ( queue->desc, 0 );
 
 	/* Construct request parameters */
 	create->res = cpu_to_be64 ( dma ( &queue->res_map, queue->res ) );
-	create->desc = cpu_to_be64 ( dma_phys ( &queue->desc_map, desc ) );
+	create->desc = cpu_to_be64 ( dma ( &queue->desc_map, queue->desc ) );
 	create->qpl_id = cpu_to_be32 ( type->qpl );
 	create->notify_id = cpu_to_be32 ( type->irq );
 }
@@ -594,14 +593,12 @@ static void gve_create_rx_param ( struct gve_queue *queue,
 				  union gve_admin_command *cmd ) {
 	struct gve_admin_create_rx *create = &cmd->create_rx;
 	const struct gve_queue_type *type = queue->type;
-	physaddr_t desc = user_to_phys ( queue->desc, 0 );
-	physaddr_t cmplt = user_to_phys ( queue->cmplt, 0 );
 
 	/* Construct request parameters */
 	create->notify_id = cpu_to_be32 ( type->irq );
 	create->res = cpu_to_be64 ( dma ( &queue->res_map, queue->res ) );
-	create->desc = cpu_to_be64 ( dma_phys ( &queue->desc_map, desc ) );
-	create->cmplt = cpu_to_be64 ( dma_phys ( &queue->cmplt_map, cmplt ) );
+	create->desc = cpu_to_be64 ( dma ( &queue->desc_map, queue->desc ) );
+	create->cmplt = cpu_to_be64 ( dma ( &queue->cmplt_map, queue->cmplt ));
 	create->qpl_id = cpu_to_be32 ( type->qpl );
 	create->bufsz = cpu_to_be16 ( GVE_BUF_SIZE );
 }
@@ -760,8 +757,8 @@ static int gve_alloc_qpl ( struct gve_nic *gve, struct gve_qpl *qpl,
 		return -ENOMEM;
 
 	DBGC ( gve, "GVE %p QPL %#08x at [%08lx,%08lx)\n",
-	       gve, qpl->id, user_to_phys ( qpl->data, 0 ),
-	       user_to_phys ( qpl->data, len ) );
+	       gve, qpl->id, virt_to_phys ( qpl->data ),
+	       ( virt_to_phys ( qpl->data ) + len ) );
 	return 0;
 }
 
@@ -883,8 +880,8 @@ static int gve_alloc_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 		goto err_desc;
 	}
 	DBGC ( gve, "GVE %p %s descriptors at [%08lx,%08lx)\n",
-	       gve, type->name, user_to_phys ( queue->desc, 0 ),
-	       user_to_phys ( queue->desc, desc_len ) );
+	       gve, type->name, virt_to_phys ( queue->desc ),
+	       ( virt_to_phys ( queue->desc ) + desc_len ) );
 
 	/* Allocate completions */
 	if ( cmplt_len ) {
@@ -895,8 +892,8 @@ static int gve_alloc_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 			goto err_cmplt;
 		}
 		DBGC ( gve, "GVE %p %s completions at [%08lx,%08lx)\n",
-		       gve, type->name, user_to_phys ( queue->cmplt, 0 ),
-		       user_to_phys ( queue->cmplt, cmplt_len ) );
+		       gve, type->name, virt_to_phys ( queue->cmplt ),
+		       ( virt_to_phys ( queue->cmplt ) + cmplt_len ) );
 	}
 
 	/* Allocate queue resources */

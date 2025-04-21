@@ -99,14 +99,14 @@ trivial_memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
 #define PROVIDE_UACCESS_INLINE( _subsys, _api_func ) \
 	PROVIDE_SINGLE_API_INLINE ( UACCESS_PREFIX_ ## _subsys, _api_func )
 
-static inline __always_inline userptr_t
-UACCESS_INLINE ( flat, phys_to_user ) ( unsigned long phys_addr ) {
-	return ( ( userptr_t ) phys_addr );
+static inline __always_inline void *
+UACCESS_INLINE ( flat, phys_to_virt ) ( physaddr_t phys ) {
+	return ( ( void * ) phys );
 }
 
-static inline __always_inline unsigned long
-UACCESS_INLINE ( flat, user_to_phys ) ( userptr_t userptr, off_t offset ) {
-	return ( ( unsigned long ) ( userptr + offset ) );
+static inline __always_inline physaddr_t
+UACCESS_INLINE ( flat, virt_to_phys ) ( volatile const void *virt ) {
+	return ( ( physaddr_t ) virt );
 }
 
 static inline __always_inline userptr_t
@@ -127,23 +127,6 @@ UACCESS_INLINE ( flat, memchr_user ) ( userptr_t buffer, off_t offset,
 #include <bits/uaccess.h>
 
 /**
- * Convert physical address to user pointer
- *
- * @v phys_addr		Physical address
- * @ret userptr		User pointer
- */
-userptr_t phys_to_user ( unsigned long phys_addr );
-
-/**
- * Convert user pointer to physical address
- *
- * @v userptr		User pointer
- * @v offset		Offset from user pointer
- * @ret phys_addr	Physical address
- */
-unsigned long user_to_phys ( userptr_t userptr, off_t offset );
-
-/**
  * Convert virtual address to user pointer
  *
  * @v addr		Virtual address
@@ -154,25 +137,21 @@ userptr_t virt_to_user ( volatile const void *addr );
 /**
  * Convert virtual address to a physical address
  *
- * @v addr		Virtual address
- * @ret phys_addr	Physical address
+ * @v virt		Virtual address
+ * @ret phys		Physical address
  */
-static inline __always_inline unsigned long
-virt_to_phys ( volatile const void *addr ) {
-	return user_to_phys ( virt_to_user ( addr ), 0 );
-}
+physaddr_t __attribute__ (( const ))
+virt_to_phys ( volatile const void *virt );
 
 /**
  * Convert physical address to a virtual address
  *
- * @v addr		Virtual address
- * @ret phys_addr	Physical address
+ * @v phys		Physical address
+ * @ret virt		Virtual address
  *
  * This operation is not available under all memory models.
  */
-static inline __always_inline void * phys_to_virt ( unsigned long phys_addr ) {
-	return ( phys_to_user ( phys_addr ) );
-}
+void * __attribute__ (( const )) phys_to_virt ( physaddr_t phys );
 
 /**
  * Copy data to user buffer
