@@ -98,7 +98,7 @@ static int sdi_exec ( struct image *image ) {
 	       sdi.boot_size );
 
 	/* Copy boot code */
-	memcpy ( real_to_user ( SDI_BOOT_SEG, SDI_BOOT_OFF ),
+	memcpy ( real_to_virt ( SDI_BOOT_SEG, SDI_BOOT_OFF ),
 		 ( image->data + sdi.boot_offset ), sdi.boot_size );
 
 	/* Jump to boot code */

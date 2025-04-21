@@ -158,7 +158,7 @@ static int bzimage_parse_header ( struct image *image,
 
 	/* Calculate load address of real-mode portion */
 	bzimg->rm_kernel_seg = ( is_bzimage ? 0x1000 : 0x9000 );
-	bzimg->rm_kernel = real_to_user ( bzimg->rm_kernel_seg, 0 );
+	bzimg->rm_kernel = real_to_virt ( bzimg->rm_kernel_seg, 0 );
 
 	/* Allow space for the stack and heap */
 	bzimg->rm_memsz += BZI_STACK_SIZE;

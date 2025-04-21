@@ -378,7 +378,7 @@ static PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
 	      tftp_read->Buffer.segment, tftp_read->Buffer.offset );
 
 	/* Read single block into buffer */
-	pxe_tftp.buffer = real_to_user ( tftp_read->Buffer.segment,
+	pxe_tftp.buffer = real_to_virt ( tftp_read->Buffer.segment,
 					 tftp_read->Buffer.offset );
 	pxe_tftp.size = pxe_tftp.blksize;
 	pxe_tftp.start = pxe_tftp.offset;

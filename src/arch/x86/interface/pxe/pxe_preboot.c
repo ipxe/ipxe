@@ -243,7 +243,7 @@ pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO *get_cached_info ) {
 			len = sizeof ( *info );
 		if ( len < sizeof ( *info ) )
 			DBGC ( &pxe_netdev, " buffer may be too short" );
-		buffer = real_to_user ( get_cached_info->Buffer.segment,
+		buffer = real_to_virt ( get_cached_info->Buffer.segment,
 					get_cached_info->Buffer.offset );
 		copy_to_user ( buffer, 0, info, len );
 		get_cached_info->BufferSize = len;

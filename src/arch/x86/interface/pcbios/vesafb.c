@@ -243,7 +243,7 @@ static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 	       controller->video_mode_ptr.offset );
 
 	/* Calculate length of mode list */
-	video_mode_ptr = real_to_user ( controller->video_mode_ptr.segment,
+	video_mode_ptr = real_to_virt ( controller->video_mode_ptr.segment,
 					controller->video_mode_ptr.offset );
 	len = 0;
 	do {

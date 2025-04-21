@@ -328,7 +328,7 @@ pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 		pxenv_udp_write->Status = PXENV_STATUS_OUT_OF_RESOURCES;
 		return PXENV_EXIT_FAILURE;
 	}
-	buffer = real_to_user ( pxenv_udp_write->buffer.segment,
+	buffer = real_to_virt ( pxenv_udp_write->buffer.segment,
 				pxenv_udp_write->buffer.offset );
 	copy_from_user ( iob_put ( iobuf, len ), buffer, 0, len );
 
@@ -438,7 +438,7 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	}
 
 	/* Copy packet to buffer and record length */
-	buffer = real_to_user ( pxenv_udp_read->buffer.segment,
+	buffer = real_to_virt ( pxenv_udp_read->buffer.segment,
 				pxenv_udp_read->buffer.offset );
 	len = iob_len ( iobuf );
 	if ( len > pxenv_udp_read->buffer_size )

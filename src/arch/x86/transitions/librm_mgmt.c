@@ -68,7 +68,7 @@ static struct profiler other_irq_profiler __profiler = { .name = "irq.other" };
 uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size ) {
 	userptr_t rm_stack;
 	rm_sp -= size;
-	rm_stack = real_to_user ( rm_ss, rm_sp );
+	rm_stack = real_to_virt ( rm_ss, rm_sp );
 	memcpy ( rm_stack, data, size );
 	return rm_sp;
 };
@@ -82,7 +82,7 @@ uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size ) {
  */
 void remove_user_from_rm_stack ( userptr_t data, size_t size ) {
 	if ( data ) {
-		userptr_t rm_stack = real_to_user ( rm_ss, rm_sp );
+		userptr_t rm_stack = real_to_virt ( rm_ss, rm_sp );
 		memcpy ( rm_stack, data, size );
 	}
 	rm_sp += size;

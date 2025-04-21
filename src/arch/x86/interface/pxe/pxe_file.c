@@ -60,7 +60,7 @@ static PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
 	DBG ( "PXENV_FILE_OPEN" );
 
 	/* Copy name from external program, and open it */
-	filename = real_to_user ( file_open->FileName.segment,
+	filename = real_to_virt ( file_open->FileName.segment,
 				  file_open->FileName.offset );
 	filename_len = strlen ( filename );
 	{
@@ -155,7 +155,7 @@ static PXENV_EXIT_t pxenv_file_read ( struct s_PXENV_FILE_READ *file_read ) {
 	      file_read->Buffer.segment, file_read->Buffer.offset,
 	      file_read->BufferSize );
 
-	buffer = real_to_user ( file_read->Buffer.segment,
+	buffer = real_to_virt ( file_read->Buffer.segment,
 				file_read->Buffer.offset );
 	if ( ( len = read_user ( file_read->FileHandle, buffer, 0,
 				file_read->BufferSize ) ) < 0 ) {
@@ -217,7 +217,7 @@ static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
 	DBG ( "PXENV_FILE_EXEC" );
 
 	/* Copy name from external program, and exec it */
-	command = real_to_user ( file_exec->Command.segment,
+	command = real_to_virt ( file_exec->Command.segment,
 				 file_exec->Command.offset );
 	command_len = strlen ( command );
 	{
@@ -259,7 +259,7 @@ pxenv_file_cmdline ( struct s_PXENV_FILE_CMDLINE *file_cmdline ) {
 	      file_cmdline->Buffer.segment, file_cmdline->Buffer.offset,
 	      file_cmdline->BufferSize, pxe_cmdline );
 
-	buffer = real_to_user ( file_cmdline->Buffer.segment,
+	buffer = real_to_virt ( file_cmdline->Buffer.segment,
 				file_cmdline->Buffer.offset );
 	len = file_cmdline->BufferSize;
 	max_len = ( pxe_cmdline ?

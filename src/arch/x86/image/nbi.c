@@ -159,7 +159,7 @@ static int nbi_process_segments ( struct image *image,
 	int rc;
 	
 	/* Copy image header to target location */
-	dest = real_to_user ( imgheader->location.segment,
+	dest = real_to_virt ( imgheader->location.segment,
 			      imgheader->location.offset );
 	filesz = memsz = NBI_HEADER_LENGTH;
 	if ( ( rc = process ( image, offset, dest, filesz, memsz ) ) != 0 )

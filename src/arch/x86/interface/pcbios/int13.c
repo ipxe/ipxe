@@ -549,7 +549,7 @@ static int int13_rw_sectors ( struct san_device *sandev,
 	lba = ( ( ( ( cylinder * int13->heads ) + head )
 		  * int13->sectors_per_track ) + sector - 1 );
 	count = ix86->regs.al;
-	buffer = real_to_user ( ix86->segs.es, ix86->regs.bx );
+	buffer = real_to_virt ( ix86->segs.es, ix86->regs.bx );
 
 	DBGC2 ( sandev->drive, "C/H/S %d/%d/%d = LBA %08lx <-> %04x:%04x "
 		"(count %d)\n", cylinder, head, sector, lba, ix86->segs.es,
@@ -747,7 +747,7 @@ static int int13_extended_rw ( struct san_device *sandev,
 		DBGC2 ( sandev->drive, "%08llx",
 			( ( unsigned long long ) addr.buffer_phys ) );
 	} else {
-		buffer = real_to_user ( addr.buffer.segment,
+		buffer = real_to_virt ( addr.buffer.segment,
 					addr.buffer.offset );
 		DBGC2 ( sandev->drive, "%04x:%04x", addr.buffer.segment,
 			addr.buffer.offset );

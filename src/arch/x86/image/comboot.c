@@ -132,7 +132,7 @@ static void comboot_init_psp ( struct image * image, userptr_t seg_userptr ) {
  * @ret rc		Return status code
  */
 static int comboot_exec_loop ( struct image *image ) {
-	userptr_t seg_userptr = real_to_user ( COMBOOT_PSP_SEG, 0 );
+	userptr_t seg_userptr = real_to_virt ( COMBOOT_PSP_SEG, 0 );
 	int state;
 
 	state = rmsetjmp ( comboot_return );
@@ -251,7 +251,7 @@ static int comboot_prepare_segment ( struct image *image )
 	int rc;
 
 	/* Load image in segment */
-	seg_userptr = real_to_user ( COMBOOT_PSP_SEG, 0 );
+	seg_userptr = real_to_virt ( COMBOOT_PSP_SEG, 0 );
 
 	/* Allow etra 0x100 bytes before image for PSP */
 	filesz = image->len + 0x100;

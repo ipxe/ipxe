@@ -49,7 +49,7 @@ static int bios_find_smbios2 ( struct smbios *smbios ) {
 	int rc;
 
 	/* Scan through BIOS segment to find SMBIOS 32-bit entry point */
-	if ( ( rc = find_smbios_entry ( real_to_user ( BIOS_SEG, 0 ), 0x10000,
+	if ( ( rc = find_smbios_entry ( real_to_virt ( BIOS_SEG, 0 ), 0x10000,
 					&entry ) ) != 0 )
 		return rc;
 
@@ -73,7 +73,7 @@ static int bios_find_smbios3 ( struct smbios *smbios ) {
 	int rc;
 
 	/* Scan through BIOS segment to find SMBIOS 64-bit entry point */
-	if ( ( rc = find_smbios3_entry ( real_to_user ( BIOS_SEG, 0 ), 0x10000,
+	if ( ( rc = find_smbios3_entry ( real_to_virt ( BIOS_SEG, 0 ), 0x10000,
 					 &entry ) ) != 0 )
 		return rc;
 

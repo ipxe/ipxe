@@ -106,7 +106,7 @@ static userptr_t rsdp_find_rsdt ( void ) {
 	/* Search EBDA */
 	get_real ( ebda_seg, BDA_SEG, BDA_EBDA );
 	if ( ebda_seg < RSDP_EBDA_END_SEG ) {
-	     ebda = real_to_user ( ebda_seg, 0 );
+	     ebda = real_to_virt ( ebda_seg, 0 );
 	     ebda_len = ( ( RSDP_EBDA_END_SEG - ebda_seg ) * 16 );
 	     rsdt = rsdp_find_rsdt_range ( ebda, ebda_len );
 	     if ( rsdt )

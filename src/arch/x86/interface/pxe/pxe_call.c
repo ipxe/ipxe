@@ -144,7 +144,7 @@ static struct profiler * pxe_api_profiler ( unsigned int opcode ) {
  */
 __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
 	uint16_t opcode = ix86->regs.bx;
-	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
+	userptr_t uparams = real_to_virt ( ix86->segs.es, ix86->regs.di );
 	struct profiler *profiler = pxe_api_profiler ( opcode );
 	struct pxe_api_call *call;
 	union u_PXENV_ANY params;
@@ -195,7 +195,7 @@ int pxe_api_call_weak ( struct i386_all_regs *ix86 ) {
  * @ret ax		PXE exit code
  */
 __asmcall void pxe_loader_call ( struct i386_all_regs *ix86 ) {
-	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
+	userptr_t uparams = real_to_virt ( ix86->segs.es, ix86->regs.di );
 	struct s_UNDI_LOADER params;
 	PXENV_EXIT_t ret;
 

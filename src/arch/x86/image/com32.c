@@ -236,7 +236,7 @@ static int com32_prepare_bounce_buffer ( struct image * image ) {
 	int rc;
 
 	seg = COM32_BOUNCE_SEG;
-	seg_userptr = real_to_user ( seg, 0 );
+	seg_userptr = real_to_virt ( seg, 0 );
 
 	/* Ensure the entire 64k segment is free */
 	memsz = 0xFFFF;
