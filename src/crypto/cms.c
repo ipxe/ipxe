@@ -39,7 +39,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/x509.h>
 #include <ipxe/image.h>
 #include <ipxe/malloc.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/privkey.h>
 #include <ipxe/cms.h>
 
@@ -80,13 +79,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_error ( EINFO_ENOTSUP_TYPE )
 #define EINFO_ENOTSUP_TYPE \
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Unrecognised message type" )
-
-/** Buffer size for decryption
- *
- * Must be at least 256 to allow block padding to be removed if
- * needed.
- */
-#define CMS_DECRYPT_BLKSZ 2048
 
 static int cms_parse_signed ( struct cms_message *cms,
 			      const struct asn1_cursor *raw );
@@ -724,28 +716,13 @@ int cms_message ( struct image *image, struct cms_message **cms ) {
  */
 static void cms_digest ( struct cms_message *cms,
 			 struct cms_participant *part,
-			 userptr_t data, size_t len, void *out ) {
+			 const void *data, size_t len, void *out ) {
 	struct digest_algorithm *digest = part->digest;
 	uint8_t ctx[ digest->ctxsize ];
-	uint8_t block[ digest->blocksize ];
-	size_t offset = 0;
-	size_t frag_len;
 
-	/* Initialise digest */
+	/* Calculate digest */
 	digest_init ( digest, ctx );
-
-	/* Process data one block at a time */
-	while ( len ) {
-		frag_len = len;
-		if ( frag_len > sizeof ( block ) )
-			frag_len = sizeof ( block );
-		copy_from_user ( block, data, offset, frag_len );
-		digest_update ( digest, ctx, block, frag_len );
-		offset += frag_len;
-		len -= frag_len;
-	}
-
-	/* Finalise digest */
+	digest_update ( digest, ctx, data, len );
 	digest_final ( digest, ctx, out );
 
 	DBGC ( cms, "CMS %p/%p digest value:\n", cms, part );
@@ -765,7 +742,7 @@ static void cms_digest ( struct cms_message *cms,
 static int cms_verify_digest ( struct cms_message *cms,
 			       struct cms_participant *part,
 			       struct x509_certificate *cert,
-			       userptr_t data, size_t len ) {
+			       const void *data, size_t len ) {
 	struct digest_algorithm *digest = part->digest;
 	struct pubkey_algorithm *pubkey = part->pubkey;
 	const struct asn1_cursor *key = &cert->subject.public_key.raw;
@@ -801,7 +778,7 @@ static int cms_verify_digest ( struct cms_message *cms,
  */
 static int cms_verify_signer ( struct cms_message *cms,
 			       struct cms_participant *part,
-			       userptr_t data, size_t len,
+			       const void *data, size_t len,
 			       time_t time, struct x509_chain *store,
 			       struct x509_root *root ) {
 	struct x509_certificate *cert;
@@ -1060,14 +1037,13 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 		  const char *name, struct private_key *private_key ) {
 	struct cipher_algorithm *cipher = cms->cipher;
 	const unsigned int original_flags = image->flags;
-	size_t offset;
-	size_t remaining;
-	size_t frag_len;
+	uint8_t ctx[ cipher->ctxsize ];
+	uint8_t ctxdup[ cipher->ctxsize ];
+	uint8_t auth[ cipher->authsize ];
+	uint8_t final[ cipher->blocksize ];
+	size_t final_len;
+	size_t bulk_len;
 	int pad_len;
-	void *tmp;
-	void *ctx;
-	void *ctxdup;
-	void *auth;
 	int rc;
 
 	/* Sanity checks */
@@ -1082,17 +1058,6 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 		rc = -EACCES_LEN;
 		goto err_blocksize;
 	}
-
-	/* Allocate temporary working space */
-	tmp = malloc ( CMS_DECRYPT_BLKSZ + ( 2 * cipher->ctxsize ) +
-		       cipher->authsize );
-	if ( ! tmp ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	ctx = ( tmp + CMS_DECRYPT_BLKSZ );
-	ctxdup = ( ctx + cipher->ctxsize );
-	auth = ( ctxdup + cipher->ctxsize );
 
 	/* Initialise cipher */
 	if ( ( rc = cms_cipher ( cms, private_key, ctx ) ) != 0 )
@@ -1110,29 +1075,15 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 		unregister_image ( image );
 	}
 
-	/* Decrypt one block at a time */
-	offset = 0;
-	remaining = image->len;
-	frag_len = 0;
-	while ( remaining ) {
+	/* Decrypt all but the final block */
+	final_len = ( ( image->len && is_block_cipher ( cipher ) ) ?
+		      cipher->blocksize : 0 );
+	bulk_len = ( image->len - final_len );
+	cipher_decrypt ( cipher, ctx, image->data, image->data, bulk_len );
 
-		/* Calculate fragment length */
-		frag_len = remaining;
-		if ( frag_len > CMS_DECRYPT_BLKSZ )
-			frag_len = CMS_DECRYPT_BLKSZ;
-
-		/* Decrypt fragment */
-		copy_from_user ( tmp, image->data, offset, frag_len );
-		cipher_decrypt ( cipher, ctx, tmp, tmp, frag_len );
-
-		/* Overwrite all but the final fragment */
-		if ( remaining > frag_len )
-			copy_to_user ( image->data, offset, tmp, frag_len );
-
-		/* Move to next block */
-		remaining -= frag_len;
-		offset += frag_len;
-	}
+	/* Decrypt final block */
+	cipher_decrypt ( cipher, ctx, ( image->data + bulk_len ), final,
+			 final_len );
 
 	/* Check authentication tag, if applicable */
 	cipher_auth ( cipher, ctx, auth );
@@ -1145,7 +1096,7 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	}
 
 	/* Check block padding, if applicable */
-	if ( ( pad_len = cms_verify_padding ( cms, tmp, frag_len ) ) < 0 ) {
+	if ( ( pad_len = cms_verify_padding ( cms, final, final_len ) ) < 0 ) {
 		rc = pad_len;
 		goto err_pad;
 	}
@@ -1166,7 +1117,7 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	 * have to include include any error-handling code path to
 	 * reconstruct the block padding.
 	 */
-	copy_to_user ( image->data, ( offset - frag_len ), tmp, frag_len );
+	memcpy ( ( image->data + bulk_len ), final, final_len );
 	image->len -= pad_len;
 
 	/* Clear image type and re-register image, if applicable */
@@ -1176,33 +1127,23 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 		image_put ( image );
 	}
 
-	/* Free temporary working space */
-	free ( tmp );
-
 	return 0;
 
  err_set_name:
  err_pad:
  err_auth:
-	/* Reencrypt all overwritten fragments.  This can be done
-	 * since we have deliberately not overwritten the final
-	 * fragment containing the potentially invalid (and therefore
+	/* Reencrypt all overwritten portions.  This can be done since
+	 * we have deliberately not overwritten the final block
+	 * containing the potentially invalid (and therefore
 	 * unreproducible) block padding.
 	 */
-	remaining = ( offset - frag_len );
-	for ( offset = 0 ; offset < remaining ; offset += CMS_DECRYPT_BLKSZ ) {
-		copy_from_user ( tmp, image->data, offset, CMS_DECRYPT_BLKSZ );
-		cipher_encrypt ( cipher, ctxdup, tmp, tmp, CMS_DECRYPT_BLKSZ );
-		copy_to_user ( image->data, offset, tmp, CMS_DECRYPT_BLKSZ );
-	}
+	cipher_encrypt ( cipher, ctxdup, image->data, image->data, bulk_len );
 	if ( original_flags & IMAGE_REGISTERED ) {
 		register_image ( image ); /* Cannot fail on re-registration */
 		image_put ( image );
 	}
 	image->flags = original_flags;
  err_cipher:
-	free ( tmp );
- err_alloc:
  err_blocksize:
  err_no_cipher:
 	return rc;

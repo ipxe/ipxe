@@ -14,7 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crypto.h>
 #include <ipxe/x509.h>
 #include <ipxe/refcnt.h>
-#include <ipxe/uaccess.h>
 
 struct image;
 struct cms_message;
