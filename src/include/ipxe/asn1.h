@@ -481,8 +481,6 @@ asn1_built ( struct asn1_builder *builder ) {
 	return &u->cursor;
 }
 
-extern int asn1_enter_partial ( struct asn1_cursor *cursor, unsigned int type,
-				size_t *extra );
 extern int asn1_enter ( struct asn1_cursor *cursor, unsigned int type );
 extern int asn1_skip_if_exists ( struct asn1_cursor *cursor,
 				 unsigned int type );

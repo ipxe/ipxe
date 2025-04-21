@@ -88,7 +88,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v cursor		ASN.1 object cursor
  * @v type		Expected type, or ASN1_ANY
- * @v extra		Additional length not present within partial cursor
  * @ret len		Length of object body, or negative error
  *
  * The object cursor will be updated to point to the start of the
@@ -100,8 +99,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * modified.  If any other error occurs, the object cursor will be
  * invalidated.
  */
-static int asn1_start ( struct asn1_cursor *cursor, unsigned int type,
-			size_t extra ) {
+static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 	unsigned int len_len;
 	unsigned int len;
 
@@ -145,49 +143,14 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type,
 		cursor->data++;
 		cursor->len--;
 	}
-	if ( ( cursor->len + extra ) < len ) {
+	if ( cursor->len < len ) {
 		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
-		       cursor, len, ( cursor->len + extra ) );
+		       cursor, len, cursor->len );
 		asn1_invalidate_cursor ( cursor );
 		return -EINVAL_ASN1_LEN;
 	}
 
 	return len;
-}
-
-/**
- * Enter ASN.1 partial object
- *
- * @v cursor		ASN.1 object cursor
- * @v type		Expected type, or ASN1_ANY
- * @v extra		Additional length beyond partial object
- * @ret rc		Return status code
- *
- * The object cursor and additional length will be updated to point to
- * the body of the current ASN.1 object.
- *
- * If any error occurs, the object cursor will be invalidated.
- */
-int asn1_enter_partial ( struct asn1_cursor *cursor, unsigned int type,
-			 size_t *extra ) {
-	int len;
-
-	/* Parse current object */
-	len = asn1_start ( cursor, type, *extra );
-	if ( len < 0 ) {
-		asn1_invalidate_cursor ( cursor );
-		return len;
-	}
-
-	/* Update cursor and additional length */
-	if ( ( ( size_t ) len ) <= cursor->len )
-		cursor->len = len;
-	assert ( ( len - cursor->len ) <= *extra );
-	*extra = ( len - cursor->len );
-
-	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
-	       cursor, type, len );
-	return 0;
 }
 
 /**
@@ -203,9 +166,22 @@ int asn1_enter_partial ( struct asn1_cursor *cursor, unsigned int type,
  * If any error occurs, the object cursor will be invalidated.
  */
 int asn1_enter ( struct asn1_cursor *cursor, unsigned int type ) {
-	static size_t no_extra = 0;
+	int len;
 
-	return asn1_enter_partial ( cursor, type, &no_extra );
+	/* Parse current object */
+	len = asn1_start ( cursor, type );
+	if ( len < 0 ) {
+		asn1_invalidate_cursor ( cursor );
+		return len;
+	}
+
+	/* Update cursor */
+	if ( ( ( size_t ) len ) <= cursor->len )
+		cursor->len = len;
+
+	DBGC ( cursor, "ASN1 %p entered object type %02x (len %x)\n",
+	       cursor, type, len );
+	return 0;
 }
 
 /**
@@ -226,7 +202,7 @@ int asn1_skip_if_exists ( struct asn1_cursor *cursor, unsigned int type ) {
 	int len;
 
 	/* Parse current object */
-	len = asn1_start ( cursor, type, 0 );
+	len = asn1_start ( cursor, type );
 	if ( len < 0 )
 		return len;
 
@@ -281,7 +257,7 @@ int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type ) {
 
 	/* Find end of object */
 	memcpy ( &temp, cursor, sizeof ( temp ) );
-	len = asn1_start ( &temp, type, 0 );
+	len = asn1_start ( &temp, type );
 	if ( len < 0 ) {
 		asn1_invalidate_cursor ( cursor );
 		return len;

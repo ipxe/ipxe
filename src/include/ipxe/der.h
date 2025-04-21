@@ -13,7 +13,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/asn1.h>
 #include <ipxe/image.h>
 
-extern int der_asn1 ( userptr_t data, size_t len, size_t offset,
+extern int der_asn1 ( const void *data, size_t len, size_t offset,
 		      struct asn1_cursor **cursor );
 
 extern struct image_type der_image_type __image_type ( PROBE_NORMAL );

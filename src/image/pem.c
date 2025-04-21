@@ -28,7 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/asn1.h>
 #include <ipxe/base64.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/pem.h>
 
@@ -46,14 +45,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v offset		Starting offset
  * @ret next		Offset to next line
  */
-static size_t pem_next ( userptr_t data, size_t len, size_t offset ) {
-	off_t eol;
+static size_t pem_next ( const void *data, size_t len, size_t offset ) {
+	const void *sep;
 
 	/* Find and skip next newline character, if any */
-	eol = memchr_user ( data, offset, '\n', ( len - offset ) );
-	if ( eol < 0 )
+	sep = memchr ( ( data + offset ), '\n', ( len - offset ) );
+	if ( ! sep )
 		return len;
-	return ( eol + 1 );
+	return ( ( sep - data ) + 1 );
 }
 
 /**
@@ -65,9 +64,9 @@ static size_t pem_next ( userptr_t data, size_t len, size_t offset ) {
  * @v marker		Boundary marker
  * @ret offset		Offset to boundary marker line, or negative error
  */
-static int pem_marker ( userptr_t data, size_t len, size_t offset,
+static int pem_marker ( const void *data, size_t len, size_t offset,
 			const char *marker ) {
-	char buf[ strlen ( marker ) ];
+	size_t marker_len = strlen ( marker );
 
 	/* Sanity check */
 	assert ( offset <= len );
@@ -76,10 +75,9 @@ static int pem_marker ( userptr_t data, size_t len, size_t offset,
 	while ( offset < len ) {
 
 		/* Check for marker */
-		if ( ( len - offset ) < sizeof ( buf ) )
+		if ( ( len - offset ) < marker_len )
 			break;
-		copy_from_user ( buf, data, offset, sizeof ( buf ) );
-		if ( memcmp ( buf, marker, sizeof ( buf ) ) == 0 )
+		if ( memcmp ( ( data + offset ), marker, marker_len ) == 0 )
 			return offset;
 
 		/* Move to next line */
@@ -102,7 +100,7 @@ static int pem_marker ( userptr_t data, size_t len, size_t offset,
  * The caller is responsible for eventually calling free() on the
  * allocated ASN.1 cursor.
  */
-int pem_asn1 ( userptr_t data, size_t len, size_t offset,
+int pem_asn1 ( const void *data, size_t len, size_t offset,
 	       struct asn1_cursor **cursor ) {
 	size_t encoded_len;
 	size_t decoded_max_len;
@@ -140,7 +138,7 @@ int pem_asn1 ( userptr_t data, size_t len, size_t offset,
 		rc = -ENOMEM;
 		goto err_alloc_encoded;
 	}
-	copy_from_user ( encoded, data, begin, encoded_len );
+	memcpy ( encoded, ( data + begin ), encoded_len );
 	encoded[encoded_len] = '\0';
 
 	/* Allocate cursor and data buffer */

@@ -1476,7 +1476,7 @@ static int ipair_rx_pubkey ( struct ipair *ipair, char *msg ) {
 	}
 
 	/* Decode inner layer of Base64 */
-	next = pem_asn1 ( virt_to_user ( decoded ), len, 0, &key );
+	next = pem_asn1 ( decoded, len, 0, &key );
 	if ( next < 0 ) {
 		rc = next;
 		DBGC ( ipair, "IPAIR %p invalid inner public key:\n%s\n",

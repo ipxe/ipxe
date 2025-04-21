@@ -54,14 +54,14 @@ static struct x509_chain efi_cacerts = {
  * @v offset		Offset within data
  * @v next		Next offset, or negative error
  */
-static int efi_cacert ( void *data, size_t len, size_t offset ) {
+static int efi_cacert ( const void *data, size_t len, size_t offset ) {
 	struct asn1_cursor *cursor;
 	struct x509_certificate *cert;
 	int next;
 	int rc;
 
 	/* Extract ASN.1 object */
-        next = efisig_asn1 ( virt_to_user ( data ), len, offset, &cursor );
+	next = efisig_asn1 ( data, len, offset, &cursor );
 	if ( next < 0 ) {
 		rc = next;
 		DBGC ( &efi_cacerts, "EFICA could not parse at +%#zx: %s\n",

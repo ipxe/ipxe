@@ -28,7 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <ipxe/asn1.h>
 #include <ipxe/der.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 
 /** @file
@@ -49,7 +48,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * The caller is responsible for eventually calling free() on the
  * allocated ASN.1 cursor.
  */
-int der_asn1 ( userptr_t data, size_t len, size_t offset,
+int der_asn1 ( const void *data, size_t len, size_t offset,
 	       struct asn1_cursor **cursor ) {
 	size_t remaining;
 	void *raw;
@@ -67,7 +66,7 @@ int der_asn1 ( userptr_t data, size_t len, size_t offset,
 	/* Populate cursor and data buffer */
 	(*cursor)->data = raw;
 	(*cursor)->len = remaining;
-	copy_from_user ( raw, data, offset, remaining );
+	memcpy ( raw, ( data + offset ), remaining );
 
 	/* Shrink cursor */
 	asn1_shrink_any ( *cursor );
@@ -83,30 +82,21 @@ int der_asn1 ( userptr_t data, size_t len, size_t offset,
  */
 static int der_image_probe ( struct image *image ) {
 	struct asn1_cursor cursor;
-	uint8_t buf[8];
-	size_t extra;
 	int rc;
 
-	/* Sanity check: no realistic DER image can be smaller than this */
-	if ( image->len < sizeof ( buf ) )
-		return -ENOEXEC;
-
-	/* Prepare partial cursor */
-	cursor.data = buf;
-	cursor.len = sizeof ( buf );
-	copy_from_user ( buf, image->data, 0, sizeof ( buf ) );
-	extra = ( image->len - sizeof ( buf ) );
+	/* Prepare cursor */
+	cursor.data = image->data;
+	cursor.len = image->len;
 
 	/* Check that image begins with an ASN.1 sequence object */
-	if ( ( rc = asn1_enter_partial ( &cursor, ASN1_SEQUENCE,
-					 &extra ) ) != 0 ) {
+	if ( ( rc = asn1_skip ( &cursor, ASN1_SEQUENCE ) ) != 0 ) {
 		DBGC ( image, "DER %s is not valid ASN.1: %s\n",
 		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Check that image comprises a single well-formed ASN.1 object */
-	if ( extra != ( image->len - sizeof ( buf ) ) ) {
+	if ( cursor.len ) {
 		DBGC ( image, "DER %s is not single ASN.1\n", image->name );
 		return -ENOEXEC;
 	}

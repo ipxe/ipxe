@@ -49,8 +49,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v dhdr		Signature data header to fill in
  * @ret rc		Return status code
  */
-static int efisig_find ( userptr_t data, size_t len, size_t *start,
-			 EFI_SIGNATURE_LIST *lhdr, EFI_SIGNATURE_DATA *dhdr ) {
+static int efisig_find ( const void *data, size_t len, size_t *start,
+			 const EFI_SIGNATURE_LIST **lhdr,
+			 const EFI_SIGNATURE_DATA **dhdr ) {
 	size_t offset;
 	size_t remaining;
 	size_t skip;
@@ -63,38 +64,38 @@ static int efisig_find ( userptr_t data, size_t len, size_t *start,
 		/* Read list header */
 		assert ( offset <= len );
 		remaining = ( len - offset );
-		if ( remaining < sizeof ( *lhdr ) ) {
+		if ( remaining < sizeof ( **lhdr ) ) {
 			DBGC ( data, "EFISIG [%#zx,%#zx) truncated header "
 			       "at +%#zx\n", *start, len, offset );
 			return -EINVAL;
 		}
-		copy_from_user ( lhdr, data, offset, sizeof ( *lhdr ) );
+		*lhdr = ( data + offset );
 
 		/* Get length of this signature list */
-		if ( remaining < lhdr->SignatureListSize ) {
+		if ( remaining < (*lhdr)->SignatureListSize ) {
 			DBGC ( data, "EFISIG [%#zx,%#zx) truncated list at "
 			       "+%#zx\n", *start, len, offset );
 			return -EINVAL;
 		}
-		remaining = lhdr->SignatureListSize;
+		remaining = (*lhdr)->SignatureListSize;
 
 		/* Get length of each signature in list */
-		dlen = lhdr->SignatureSize;
-		if ( dlen < sizeof ( *dhdr ) ) {
+		dlen = (*lhdr)->SignatureSize;
+		if ( dlen < sizeof ( **dhdr ) ) {
 			DBGC ( data, "EFISIG [%#zx,%#zx) underlength "
 			       "signatures at +%#zx\n", *start, len, offset );
 			return -EINVAL;
 		}
 
 		/* Strip list header (including variable portion) */
-		if ( ( remaining < sizeof ( *lhdr ) ) ||
-		     ( ( remaining - sizeof ( *lhdr ) ) <
-		       lhdr->SignatureHeaderSize ) ) {
+		if ( ( remaining < sizeof ( **lhdr ) ) ||
+		     ( ( remaining - sizeof ( **lhdr ) ) <
+		       (*lhdr)->SignatureHeaderSize ) ) {
 			DBGC ( data, "EFISIG [%#zx,%#zx) malformed header at "
 			       "+%#zx\n", *start, len, offset );
 			return -EINVAL;
 		}
-		skip = ( sizeof ( *lhdr ) + lhdr->SignatureHeaderSize );
+		skip = ( sizeof ( **lhdr ) + (*lhdr)->SignatureHeaderSize );
 		offset += skip;
 		remaining -= skip;
 
@@ -113,12 +114,12 @@ static int efisig_find ( userptr_t data, size_t len, size_t *start,
 				continue;
 
 			/* Read data header */
-			copy_from_user ( dhdr, data, offset, sizeof ( *dhdr ));
+			*dhdr = ( data + offset );
 			DBGC2 ( data, "EFISIG [%#zx,%#zx) %s ",
 				offset, ( offset + dlen ),
-				efi_guid_ntoa ( &lhdr->SignatureType ) );
+				efi_guid_ntoa ( &(*lhdr)->SignatureType ) );
 			DBGC2 ( data, "owner %s\n",
-				efi_guid_ntoa ( &dhdr->SignatureOwner ) );
+				efi_guid_ntoa ( &(*dhdr)->SignatureOwner ) );
 			*start = offset;
 			return 0;
 		}
@@ -137,23 +138,23 @@ static int efisig_find ( userptr_t data, size_t len, size_t *start,
  * The caller is responsible for eventually calling free() on the
  * allocated ASN.1 cursor.
  */
-int efisig_asn1 ( userptr_t data, size_t len, size_t offset,
+int efisig_asn1 ( const void *data, size_t len, size_t offset,
 		  struct asn1_cursor **cursor ) {
-	EFI_SIGNATURE_LIST lhdr;
-	EFI_SIGNATURE_DATA dhdr;
-	int ( * asn1 ) ( userptr_t data, size_t len, size_t offset,
+	const EFI_SIGNATURE_LIST *lhdr;
+	const EFI_SIGNATURE_DATA *dhdr;
+	int ( * asn1 ) ( const void *data, size_t len, size_t offset,
 			 struct asn1_cursor **cursor );
-	size_t skip = offsetof ( typeof ( dhdr ), SignatureData );
+	size_t skip = offsetof ( typeof ( *dhdr ), SignatureData );
 	int next;
 	int rc;
 
 	/* Locate signature list entry */
 	if ( ( rc = efisig_find ( data, len, &offset, &lhdr, &dhdr ) ) != 0 )
 		goto err_entry;
-	len = ( offset + lhdr.SignatureSize );
+	len = ( offset + lhdr->SignatureSize );
 
 	/* Parse as PEM or DER based on first character */
-	asn1 = ( ( dhdr.SignatureData[0] == ASN1_SEQUENCE ) ?
+	asn1 = ( ( dhdr->SignatureData[0] == ASN1_SEQUENCE ) ?
 		 der_asn1 : pem_asn1 );
 	DBGC2 ( data, "EFISIG [%#zx,%#zx) extracting %s\n", offset, len,
 		( ( asn1 == der_asn1 ) ? "DER" : "PEM" ) );
@@ -189,8 +190,8 @@ int efisig_asn1 ( userptr_t data, size_t len, size_t offset,
  * @ret rc		Return status code
  */
 static int efisig_image_probe ( struct image *image ) {
-	EFI_SIGNATURE_LIST lhdr;
-	EFI_SIGNATURE_DATA dhdr;
+	const EFI_SIGNATURE_LIST *lhdr;
+	const EFI_SIGNATURE_DATA *dhdr;
 	size_t offset = 0;
 	unsigned int count = 0;
 	int rc;
@@ -205,7 +206,7 @@ static int efisig_image_probe ( struct image *image ) {
 		}
 
 		/* Skip this entry */
-		offset += lhdr.SignatureSize;
+		offset += lhdr->SignatureSize;
 		count++;
 
 		/* Check if we have reached end of the image */
