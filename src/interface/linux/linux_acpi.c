@@ -42,7 +42,7 @@ struct linux_acpi_table {
 	/** Index */
 	unsigned int index;
 	/** Cached data */
-	userptr_t data;
+	void *data;
 };
 
 /** List of cached ACPI tables */
@@ -53,9 +53,10 @@ static LIST_HEAD ( linux_acpi_tables );
  *
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
- * @ret table		Table, or UNULL if not found
+ * @ret table		Table, or NULL if not found
  */
-static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
+static const struct acpi_header * linux_acpi_find ( uint32_t signature,
+						    unsigned int index ) {
 	struct linux_acpi_table *table;
 	struct acpi_header *header;
 	union {
@@ -121,7 +122,7 @@ static userptr_t linux_acpi_find ( uint32_t signature, unsigned int index ) {
  err_read:
 	free ( table );
  err_alloc:
-	return UNULL;
+	return NULL;
 }
 
 /**

@@ -142,8 +142,9 @@ static struct acpimac_extractor acpimac_rtxmac = {
  * string that appears shortly after an "AMAC" or "MACA" signature.
  * This should work for most implementations encountered in practice.
  */
-static int acpimac_extract ( userptr_t zsdt, size_t len, size_t offset,
-			     void *data, struct acpimac_extractor *extractor ){
+static int acpimac_extract ( const struct acpi_header *zsdt, size_t len,
+			     size_t offset, void *data,
+			     struct acpimac_extractor *extractor ) {
 	size_t prefix_len = strlen ( extractor->prefix );
 	uint8_t *hw_addr = data;
 	size_t skip = 0;
@@ -161,8 +162,8 @@ static int acpimac_extract ( userptr_t zsdt, size_t len, size_t offset,
 	      skip++ ) {
 
 		/* Read value */
-		copy_from_user ( buf, zsdt, ( offset + skip ),
-				 sizeof ( buf ) );
+		memcpy ( buf, ( ( ( const void * ) zsdt ) + offset + skip ),
+			 sizeof ( buf ) );
 
 		/* Check for expected format */
 		if ( memcmp ( buf, extractor->prefix, prefix_len ) != 0 )
@@ -203,8 +204,8 @@ static int acpimac_extract ( userptr_t zsdt, size_t len, size_t offset,
  * @v data		Data buffer
  * @ret rc		Return status code
  */
-static int acpimac_extract_auxmac ( userptr_t zsdt, size_t len, size_t offset,
-				    void *data ) {
+static int acpimac_extract_auxmac ( const struct acpi_header *zsdt,
+				    size_t len, size_t offset, void *data ) {
 
 	return acpimac_extract ( zsdt, len, offset, data, &acpimac_auxmac );
 }
@@ -218,8 +219,8 @@ static int acpimac_extract_auxmac ( userptr_t zsdt, size_t len, size_t offset,
  * @v data		Data buffer
  * @ret rc		Return status code
  */
-static int acpimac_extract_rtxmac ( userptr_t zsdt, size_t len, size_t offset,
-				    void *data ) {
+static int acpimac_extract_rtxmac ( const struct acpi_header *zsdt,
+				    size_t len, size_t offset, void *data ) {
 
 	return acpimac_extract ( zsdt, len, offset, data, &acpimac_rtxmac );
 }

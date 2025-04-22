@@ -62,8 +62,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * uglier hacks I have ever implemented, but it's still prettier than
  * the ACPI specification itself.
  */
-static int acpi_extract_sx ( userptr_t zsdt, size_t len, size_t offset,
-			     void *data ) {
+static int acpi_extract_sx ( const struct acpi_header *zsdt, size_t len,
+			     size_t offset, void *data ) {
 	unsigned int *sx = data;
 	uint8_t bytes[4];
 	uint8_t *byte;
@@ -77,7 +77,8 @@ static int acpi_extract_sx ( userptr_t zsdt, size_t len, size_t offset,
 	}
 
 	/* Read first four bytes of value */
-	copy_from_user ( bytes, zsdt, offset, sizeof ( bytes ) );
+	memcpy ( bytes, ( ( ( const void * ) zsdt ) + offset ),
+		 sizeof ( bytes ) );
 	DBGC ( colour, "ACPI found \\_Sx containing %02x:%02x:%02x:%02x\n",
 	       bytes[0], bytes[1], bytes[2], bytes[3] );
 
@@ -111,8 +112,7 @@ static int acpi_extract_sx ( userptr_t zsdt, size_t len, size_t offset,
  * @ret rc		Return status code
  */
 int acpi_poweroff ( void ) {
-	struct acpi_fadt fadtab;
-	userptr_t fadt;
+	const struct acpi_fadt *fadt;
 	unsigned int pm1a_cnt_blk;
 	unsigned int pm1b_cnt_blk;
 	unsigned int pm1a_cnt;
@@ -123,16 +123,16 @@ int acpi_poweroff ( void ) {
 	int rc;
 
 	/* Locate FADT */
-	fadt = acpi_table ( FADT_SIGNATURE, 0 );
+	fadt = container_of ( acpi_table ( FADT_SIGNATURE, 0 ),
+			      struct acpi_fadt, acpi );
 	if ( ! fadt ) {
 		DBGC ( colour, "ACPI could not find FADT\n" );
 		return -ENOENT;
 	}
 
 	/* Read FADT */
-	copy_from_user ( &fadtab, fadt, 0, sizeof ( fadtab ) );
-	pm1a_cnt_blk = le32_to_cpu ( fadtab.pm1a_cnt_blk );
-	pm1b_cnt_blk = le32_to_cpu ( fadtab.pm1b_cnt_blk );
+	pm1a_cnt_blk = le32_to_cpu ( fadt->pm1a_cnt_blk );
+	pm1b_cnt_blk = le32_to_cpu ( fadt->pm1b_cnt_blk );
 	pm1a_cnt = ( pm1a_cnt_blk + ACPI_PM1_CNT );
 	pm1b_cnt = ( pm1b_cnt_blk + ACPI_PM1_CNT );
 

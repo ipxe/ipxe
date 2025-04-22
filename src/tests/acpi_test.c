@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Forcibly enable assertions */
 #undef NDEBUG
 
+#include <string.h>
 #include <ipxe/acpi.h>
 #include <ipxe/acpimac.h>
 #include <ipxe/if_ether.h>
@@ -185,26 +186,27 @@ static struct acpi_test_tables *acpi_test_tables;
  *
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
- * @ret table		Table, or UNULL if not found
+ * @ret table		Table, or NULL if not found
  */
-static userptr_t acpi_test_find ( uint32_t signature, unsigned int index ) {
+static const struct acpi_header * acpi_test_find ( uint32_t signature,
+						   unsigned int index ) {
 	struct acpi_test_table *table;
 	unsigned int i;
 
 	/* Fail if no test tables are installed */
 	if ( ! acpi_test_tables )
-		return UNULL;
+		return NULL;
 
 	/* Scan through test tables */
 	for ( i = 0 ; i < acpi_test_tables->count ; i++ ) {
 		table = acpi_test_tables->table[i];
 		if ( ( signature == le32_to_cpu ( table->signature.raw ) ) &&
 		     ( index-- == 0 ) ) {
-			return virt_to_user ( table->data );
+			return table->data;
 		}
 	}
 
-	return UNULL;
+	return NULL;
 }
 
 /** Override ACPI table finder */

@@ -64,14 +64,15 @@ static int acpi_settings_applies ( struct settings *settings __unused,
 static int acpi_settings_fetch ( struct settings *settings,
 				 struct setting *setting,
 				 void *data, size_t len ) {
-	struct acpi_header acpi;
+	const struct acpi_header *acpi;
+	const uint8_t *src;
+	uint8_t *dst;
 	uint32_t tag_high;
 	uint32_t tag_low;
 	uint32_t tag_signature;
 	unsigned int tag_index;
 	size_t tag_offset;
 	size_t tag_len;
-	userptr_t table;
 	size_t offset;
 	size_t max_len;
 	int delta;
@@ -88,15 +89,12 @@ static int acpi_settings_fetch ( struct settings *settings,
 	       acpi_name ( tag_signature ), tag_index, tag_offset, tag_len );
 
 	/* Locate ACPI table */
-	table = acpi_table ( tag_signature, tag_index );
-	if ( ! table )
+	acpi = acpi_table ( tag_signature, tag_index );
+	if ( ! acpi )
 		return -ENOENT;
 
-	/* Read table header */
-	copy_from_user ( &acpi, table, 0, sizeof ( acpi ) );
-
 	/* Calculate starting offset and maximum available length */
-	max_len = le32_to_cpu ( acpi.length );
+	max_len = le32_to_cpu ( acpi->length );
 	if ( tag_offset > max_len )
 		return -ENOENT;
 	offset = tag_offset;
@@ -115,10 +113,11 @@ static int acpi_settings_fetch ( struct settings *settings,
 	}
 
 	/* Read data */
+	src = ( ( ( const void * ) acpi ) + offset );
+	dst = data;
 	for ( i = 0 ; ( ( i < max_len ) && ( i < len ) ) ; i++ ) {
-		copy_from_user ( data, table, offset, 1 );
-		data++;
-		offset += delta;
+		*(dst++) = *src;
+		src += delta;
 	}
 
 	/* Set type if not already specified */

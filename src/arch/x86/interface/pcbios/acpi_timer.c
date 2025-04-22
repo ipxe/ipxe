@@ -102,20 +102,19 @@ static void acpi_udelay ( unsigned long usecs ) {
  * @ret rc		Return status code
  */
 static int acpi_timer_probe ( void ) {
-	struct acpi_fadt fadtab;
-	userptr_t fadt;
+	const struct acpi_fadt *fadt;
 	unsigned int pm_tmr_blk;
 
 	/* Locate FADT */
-	fadt = acpi_table ( FADT_SIGNATURE, 0 );
+	fadt = container_of ( acpi_table ( FADT_SIGNATURE, 0 ),
+			      struct acpi_fadt, acpi );
 	if ( ! fadt ) {
 		DBGC ( &acpi_timer, "ACPI could not find FADT\n" );
 		return -ENOENT;
 	}
 
 	/* Read FADT */
-	copy_from_user ( &fadtab, fadt, 0, sizeof ( fadtab ) );
-	pm_tmr_blk = le32_to_cpu ( fadtab.pm_tmr_blk );
+	pm_tmr_blk = le32_to_cpu ( fadt->pm_tmr_blk );
 	if ( ! pm_tmr_blk ) {
 		DBGC ( &acpi_timer, "ACPI has no timer\n" );
 		return -ENOENT;

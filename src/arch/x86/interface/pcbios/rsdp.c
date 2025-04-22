@@ -53,50 +53,51 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * @v start		Start address to search
  * @v len		Length to search
- * @ret rsdt		ACPI root system description table, or UNULL
+ * @ret rsdt		ACPI root system description table, or NULL
  */
-static userptr_t rsdp_find_rsdt_range ( userptr_t start, size_t len ) {
+static const struct acpi_rsdt * rsdp_find_rsdt_range ( const void *start,
+						       size_t len ) {
 	static const char signature[8] = RSDP_SIGNATURE;
-	struct acpi_rsdp rsdp;
-	userptr_t rsdt;
+	const struct acpi_rsdp *rsdp;
+	const struct acpi_rsdt *rsdt;
 	size_t offset;
 	uint8_t sum;
 	unsigned int i;
 
 	/* Search for RSDP */
-	for ( offset = 0 ; ( ( offset + sizeof ( rsdp ) ) < len ) ;
+	for ( offset = 0 ; ( ( offset + sizeof ( *rsdp ) ) < len ) ;
 	      offset += RSDP_STRIDE ) {
 
 		/* Check signature and checksum */
-		copy_from_user ( &rsdp, start, offset, sizeof ( rsdp ) );
-		if ( memcmp ( rsdp.signature, signature,
+		rsdp = ( start + offset );
+		if ( memcmp ( rsdp->signature, signature,
 			      sizeof ( signature ) ) != 0 )
 			continue;
-		for ( sum = 0, i = 0 ; i < sizeof ( rsdp ) ; i++ )
-			sum += *( ( ( uint8_t * ) &rsdp ) + i );
+		for ( sum = 0, i = 0 ; i < sizeof ( *rsdp ) ; i++ )
+			sum += *( ( ( uint8_t * ) rsdp ) + i );
 		if ( sum != 0 )
 			continue;
 
 		/* Extract RSDT */
-		rsdt = phys_to_virt ( le32_to_cpu ( rsdp.rsdt ) );
+		rsdt = phys_to_virt ( le32_to_cpu ( rsdp->rsdt ) );
 		DBGC ( rsdt, "RSDT %#08lx found via RSDP %#08lx\n",
 		       virt_to_phys ( rsdt ),
 		       ( virt_to_phys ( start ) + offset ) );
 		return rsdt;
 	}
 
-	return UNULL;
+	return NULL;
 }
 
 /**
  * Locate ACPI root system description table
  *
- * @ret rsdt		ACPI root system description table, or UNULL
+ * @ret rsdt		ACPI root system description table, or NULL
  */
-static userptr_t rsdp_find_rsdt ( void ) {
-	static userptr_t rsdt;
+static const struct acpi_rsdt * rsdp_find_rsdt ( void ) {
+	static const struct acpi_rsdt *rsdt;
+	const void *ebda;
 	uint16_t ebda_seg;
-	userptr_t ebda;
 	size_t ebda_len;
 
 	/* Return existing RSDT if already found */
@@ -119,7 +120,7 @@ static userptr_t rsdp_find_rsdt ( void ) {
 	if ( rsdt )
 		return rsdt;
 
-	return UNULL;
+	return NULL;
 }
 
 PROVIDE_ACPI ( rsdp, acpi_find_rsdt, rsdp_find_rsdt );

@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <ipxe/acpi.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Guid/Acpi.h>
 #include <ipxe/efi/efi_acpi.h>
@@ -42,15 +43,15 @@ EFI_USE_TABLE ( ACPI_10_TABLE, &rsdp, 0 );
 /**
  * Locate ACPI root system description table
  *
- * @ret rsdt		ACPI root system description table, or UNULL
+ * @ret rsdt		ACPI root system description table, or NULL
  */
-static userptr_t efi_find_rsdt ( void ) {
+static const struct acpi_rsdt * efi_find_rsdt ( void ) {
 
 	/* Locate RSDT via ACPI configuration table, if available */
 	if ( rsdp )
 		return phys_to_virt ( rsdp->RsdtAddress );
 
-	return UNULL;
+	return NULL;
 }
 
 PROVIDE_ACPI ( efi, acpi_find_rsdt, efi_find_rsdt );

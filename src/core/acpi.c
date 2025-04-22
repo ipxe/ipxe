@@ -23,6 +23,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <string.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <ipxe/uaccess.h>
@@ -54,25 +55,17 @@ typeof ( acpi_find ) *acpi_finder __attribute__ (( weak )) = acpi_find;
 /**
  * Compute ACPI table checksum
  *
- * @v table		Any ACPI table
+ * @v acpi		Any ACPI table header
  * @ret checksum	0 if checksum is good
  */
-static uint8_t acpi_checksum ( userptr_t table ) {
-	struct acpi_header acpi;
+static uint8_t acpi_checksum ( const struct acpi_header *acpi ) {
+	const uint8_t *byte = ( ( const void * ) acpi );
+	size_t len = le32_to_cpu ( acpi->length );
 	uint8_t sum = 0;
-	uint8_t data = 0;
-	unsigned int i;
-
-	/* Read table length */
-	copy_from_user ( &acpi.length, table,
-			 offsetof ( typeof ( acpi ), length ),
-			 sizeof ( acpi.length ) );
 
 	/* Compute checksum */
-	for ( i = 0 ; i < le32_to_cpu ( acpi.length ) ; i++ ) {
-		copy_from_user ( &data, table, i, sizeof ( data ) );
-		sum += data;
-	}
+	while ( len-- )
+		sum += *(byte++);
 
 	return sum;
 }
@@ -85,7 +78,7 @@ static uint8_t acpi_checksum ( userptr_t table ) {
 void acpi_fix_checksum ( struct acpi_header *acpi ) {
 
 	/* Update checksum */
-	acpi->checksum -= acpi_checksum ( virt_to_user ( acpi ) );
+	acpi->checksum -= acpi_checksum ( acpi );
 }
 
 /**
@@ -93,9 +86,10 @@ void acpi_fix_checksum ( struct acpi_header *acpi ) {
  *
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
- * @ret table		Table, or UNULL if not found
+ * @ret table		Table, or NULL if not found
  */
-userptr_t acpi_table ( uint32_t signature, unsigned int index ) {
+const struct acpi_header * acpi_table ( uint32_t signature,
+					unsigned int index ) {
 
 	return ( *acpi_finder ) ( signature, index );
 }
@@ -105,14 +99,12 @@ userptr_t acpi_table ( uint32_t signature, unsigned int index ) {
  *
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
- * @ret table		Table, or UNULL if not found
+ * @ret table		Table, or NULL if not found
  */
-userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
-	struct acpi_header acpi;
-	struct acpi_rsdt *rsdtab;
-	typeof ( rsdtab->entry[0] ) entry;
-	userptr_t rsdt;
-	userptr_t table;
+const struct acpi_header * acpi_find_via_rsdt ( uint32_t signature,
+						unsigned int index ) {
+	const struct acpi_rsdt *rsdt;
+	const struct acpi_header *table;
 	size_t len;
 	unsigned int count;
 	unsigned int i;
@@ -121,45 +113,38 @@ userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 	rsdt = acpi_find_rsdt();
 	if ( ! rsdt ) {
 		DBG ( "RSDT not found\n" );
-		return UNULL;
+		return NULL;
 	}
 
 	/* Read RSDT header */
-	copy_from_user ( &acpi, rsdt, 0, sizeof ( acpi ) );
-	if ( acpi.signature != cpu_to_le32 ( RSDT_SIGNATURE ) ) {
+	if ( rsdt->acpi.signature != cpu_to_le32 ( RSDT_SIGNATURE ) ) {
 		DBGC ( colour, "RSDT %#08lx has invalid signature:\n",
 		       virt_to_phys ( rsdt ) );
-		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &acpi,
-			   sizeof ( acpi ) );
-		return UNULL;
+		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &rsdt->acpi,
+			   sizeof ( rsdt->acpi ) );
+		return NULL;
 	}
-	len = le32_to_cpu ( acpi.length );
-	if ( len < sizeof ( rsdtab->acpi ) ) {
+	len = le32_to_cpu ( rsdt->acpi.length );
+	if ( len < sizeof ( rsdt->acpi ) ) {
 		DBGC ( colour, "RSDT %#08lx has invalid length:\n",
 		       virt_to_phys ( rsdt ) );
-		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &acpi,
-			   sizeof ( acpi ) );
-		return UNULL;
+		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &rsdt->acpi,
+			   sizeof ( rsdt->acpi ) );
+		return NULL;
 	}
 
 	/* Calculate number of entries */
-	count = ( ( len - sizeof ( rsdtab->acpi ) ) / sizeof ( entry ) );
+	count = ( ( len - sizeof ( rsdt->acpi ) ) /
+		  sizeof ( rsdt->entry[0] ) );
 
 	/* Search through entries */
 	for ( i = 0 ; i < count ; i++ ) {
 
-		/* Get table address */
-		copy_from_user ( &entry, rsdt,
-				 offsetof ( typeof ( *rsdtab ), entry[i] ),
-				 sizeof ( entry ) );
-
 		/* Read table header */
-		table = phys_to_virt ( entry );
-		copy_from_user ( &acpi.signature, table, 0,
-				 sizeof ( acpi.signature ) );
+		table = phys_to_virt ( rsdt->entry[i] );
 
 		/* Check table signature */
-		if ( acpi.signature != cpu_to_le32 ( signature ) )
+		if ( table->signature != cpu_to_le32 ( signature ) )
 			continue;
 
 		/* Check index */
@@ -169,13 +154,13 @@ userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 		/* Check table integrity */
 		if ( acpi_checksum ( table ) != 0 ) {
 			DBGC ( colour, "RSDT %#08lx found %s with bad "
-			       "checksum at %08lx\n", virt_to_phys ( rsdt ),
+			       "checksum at %#08lx\n", virt_to_phys ( rsdt ),
 			       acpi_name ( signature ),
 			       virt_to_phys ( table ) );
 			break;
 		}
 
-		DBGC ( colour, "RSDT %#08lx found %s at %08lx\n",
+		DBGC ( colour, "RSDT %#08lx found %s at %#08lx\n",
 		       virt_to_phys ( rsdt ), acpi_name ( signature ),
 		       virt_to_phys ( table ) );
 		return table;
@@ -183,7 +168,7 @@ userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
 
 	DBGC ( colour, "RSDT %#08lx could not find %s\n",
 	       virt_to_phys ( rsdt ), acpi_name ( signature ) );
-	return UNULL;
+	return NULL;
 }
 
 /**
@@ -195,26 +180,27 @@ userptr_t acpi_find_via_rsdt ( uint32_t signature, unsigned int index ) {
  * @v extract		Extraction method
  * @ret rc		Return status code
  */
-static int acpi_zsdt ( userptr_t zsdt, uint32_t signature, void *data,
-		       int ( * extract ) ( userptr_t zsdt, size_t len,
-					   size_t offset, void *data ) ) {
-	struct acpi_header acpi;
+static int acpi_zsdt ( const struct acpi_header *zsdt,
+		       uint32_t signature, void *data,
+		       int ( * extract ) ( const struct acpi_header *zsdt,
+					   size_t len, size_t offset,
+					   void *data ) ) {
 	uint32_t buf;
 	size_t offset;
 	size_t len;
 	int rc;
 
 	/* Read table header */
-	copy_from_user ( &acpi, zsdt, 0, sizeof ( acpi ) );
-	len = le32_to_cpu ( acpi.length );
+	len = le32_to_cpu ( zsdt->length );
 
 	/* Locate signature */
-	for ( offset = sizeof ( acpi ) ;
+	for ( offset = sizeof ( *zsdt ) ;
 	      ( ( offset + sizeof ( buf ) /* signature */ ) < len ) ;
 	      offset++ ) {
 
 		/* Check signature */
-		copy_from_user ( &buf, zsdt, offset, sizeof ( buf ) );
+		memcpy ( &buf, ( ( ( const void * ) zsdt ) + offset ),
+			 sizeof ( buf ) );
 		if ( buf != cpu_to_le32 ( signature ) )
 			continue;
 		DBGC ( zsdt, "DSDT/SSDT %#08lx found %s at offset %#zx\n",
@@ -238,20 +224,20 @@ static int acpi_zsdt ( userptr_t zsdt, uint32_t signature, void *data,
  * @ret rc		Return status code
  */
 int acpi_extract ( uint32_t signature, void *data,
-		   int ( * extract ) ( userptr_t zsdt, size_t len,
-				       size_t offset, void *data ) ) {
-	struct acpi_fadt fadtab;
-	userptr_t fadt;
-	userptr_t dsdt;
-	userptr_t ssdt;
+		   int ( * extract ) ( const struct acpi_header *zsdt,
+				       size_t len, size_t offset,
+				       void *data ) ) {
+	const struct acpi_fadt *fadt;
+	const struct acpi_header *dsdt;
+	const struct acpi_header *ssdt;
 	unsigned int i;
 	int rc;
 
 	/* Try DSDT first */
-	fadt = acpi_table ( FADT_SIGNATURE, 0 );
+	fadt = container_of ( acpi_table ( FADT_SIGNATURE, 0 ),
+			      struct acpi_fadt, acpi );
 	if ( fadt ) {
-		copy_from_user ( &fadtab, fadt, 0, sizeof ( fadtab ) );
-		dsdt = phys_to_virt ( fadtab.dsdt );
+		dsdt = phys_to_virt ( fadt->dsdt );
 		if ( ( rc = acpi_zsdt ( dsdt, signature, data,
 					extract ) ) == 0 )
 			return 0;
