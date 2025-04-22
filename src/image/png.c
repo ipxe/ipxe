@@ -336,13 +336,12 @@ static int png_palette ( struct image *image, struct png_context *png,
  */
 static int png_image_data ( struct image *image, struct png_context *png,
 			    size_t len ) {
-	struct deflate_chunk in;
 	int rc;
 
 	/* Deflate this chunk */
-	deflate_chunk_init ( &in, image->data, png->offset,
-			     ( png->offset + len ) );
-	if ( ( rc = deflate_inflate ( &png->deflate, &in, &png->raw ) ) != 0 ) {
+	if ( ( rc = deflate_inflate ( &png->deflate,
+				      ( image->data + png->offset ),
+				      len, &png->raw ) ) != 0 ) {
 		DBGC ( image, "PNG %s could not decompress: %s\n",
 		       image->name, strerror ( rc ) );
 		return rc;

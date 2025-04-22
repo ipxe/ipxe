@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef NDEBUG
 
 #include <stdint.h>
+#include <string.h>
 #include <ipxe/image.h>
 #include <ipxe/gzip.h>
 #include <ipxe/test.h>
@@ -114,8 +115,7 @@ static void gzip_okx ( struct gzip_test *test, const char *file,
 	struct image *extracted;
 
 	/* Construct compressed image */
-	image = image_memory ( test->compressed_name,
-			       virt_to_user ( test->compressed ),
+	image = image_memory ( test->compressed_name, test->compressed,
 			       test->compressed_len );
 	okx ( image != NULL, file, line );
 	okx ( image->len == test->compressed_len, file, line );
@@ -128,7 +128,7 @@ static void gzip_okx ( struct gzip_test *test, const char *file,
 
 	/* Verify extracted image content */
 	okx ( extracted->len == test->expected_len, file, line );
-	okx ( memcmp ( extracted->data, virt_to_user ( test->expected ),
+	okx ( memcmp ( extracted->data, test->expected,
 		       test->expected_len ) == 0, file, line );
 
 	/* Verify extracted image name */

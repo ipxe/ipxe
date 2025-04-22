@@ -24,10 +24,10 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/deflate.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/zlib.h>
 #include <ipxe/gzip.h>
@@ -46,83 +46,92 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret rc		Return status code
  */
 static int gzip_extract ( struct image *image, struct image *extracted ) {
-	struct gzip_header header;
-	struct gzip_extra_header extra;
-	struct gzip_crc_header crc;
-	struct gzip_footer footer;
-	struct deflate_chunk in;
-	unsigned int strings;
-	size_t offset;
+	const struct gzip_header *header;
+	const struct gzip_extra_header *extra;
+	const struct gzip_crc_header *crc;
+	const struct gzip_footer *footer;
+	const void *data;
+	size_t extra_len;
+	size_t string_len;
 	size_t len;
-	off_t nul;
+	unsigned int strings;
 	int rc;
 
 	/* Sanity check */
-	assert ( image->len >= ( sizeof ( header ) + sizeof ( footer ) ) );
+	assert ( image->len >= ( sizeof ( *header ) + sizeof ( *footer ) ) );
+	data = image->data;
+	len = image->len;
 
 	/* Extract footer */
-	len = ( image->len - sizeof ( footer ) );
-	copy_from_user ( &footer, image->data, len, sizeof ( footer ) );
+	assert ( len >= sizeof ( *footer ) );
+	len -= sizeof ( *footer );
+	footer = ( data + len );
 
 	/* Extract fixed header */
-	copy_from_user ( &header, image->data, 0, sizeof ( header ) );
-	offset = sizeof ( header );
-	assert ( offset <= ( image->len - sizeof ( footer ) ) );
+	assert ( len >= sizeof ( *header ) );
+	header = data;
+	data += sizeof ( *header );
+	len -= sizeof ( *header );
 
 	/* Skip extra header, if present */
-	if ( header.flags & GZIP_FL_EXTRA ) {
-		copy_from_user ( &extra, image->data, offset,
-				 sizeof ( extra ) );
-		offset += sizeof ( extra );
-		offset += le16_to_cpu ( extra.len );
-		if ( offset > len ) {
+	if ( header->flags & GZIP_FL_EXTRA ) {
+		if ( len < sizeof ( *extra ) ) {
 			DBGC ( image, "GZIP %p overlength extra header\n",
 			       image );
 			return -EINVAL;
 		}
+		extra = data;
+		data += sizeof ( *extra );
+		len -= sizeof ( *extra );
+		extra_len = le16_to_cpu ( extra->len );
+		if ( len < extra_len ) {
+			DBGC ( image, "GZIP %p overlength extra header\n",
+			       image );
+			return -EINVAL;
+		}
+		data += extra_len;
+		len -= extra_len;
 	}
-	assert ( offset <= ( image->len - sizeof ( footer ) ) );
 
 	/* Skip name and/or comment, if present */
 	strings = 0;
-	if ( header.flags & GZIP_FL_NAME )
+	if ( header->flags & GZIP_FL_NAME )
 		strings++;
-	if ( header.flags & GZIP_FL_COMMENT )
+	if ( header->flags & GZIP_FL_COMMENT )
 		strings++;
 	while ( strings-- ) {
-		nul = memchr_user ( image->data, offset, 0, ( len - offset ) );
-		if ( nul < 0 ) {
+		string_len = strnlen ( data, len );
+		if ( string_len == len ) {
 			DBGC ( image, "GZIP %p overlength name/comment\n",
 			       image );
 			return -EINVAL;
 		}
-		offset = ( nul + 1 /* NUL */ );
+		data += ( string_len + 1 /* NUL */ );
+		len -= ( string_len + 1 /* NUL */ );
 	}
-	assert ( offset <= ( image->len - sizeof ( footer ) ) );
 
 	/* Skip CRC, if present */
-	if ( header.flags & GZIP_FL_HCRC ) {
-		offset += sizeof ( crc );
-		if ( offset > len ) {
+	if ( header->flags & GZIP_FL_HCRC ) {
+		if ( len < sizeof ( *crc ) ) {
 			DBGC ( image, "GZIP %p overlength CRC header\n",
 			       image );
 			return -EINVAL;
 		}
+		data += sizeof ( *crc );
+		len -= sizeof ( *crc );
 	}
-
-	/* Initialise input chunk */
-	deflate_chunk_init ( &in, ( image->data + offset ), 0, len );
 
 	/* Presize extracted image */
 	if ( ( rc = image_set_len ( extracted,
-				    le32_to_cpu ( footer.len ) ) ) != 0 ) {
+				    le32_to_cpu ( footer->len ) ) ) != 0 ) {
 		DBGC ( image, "GZIP %p could not presize: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Decompress image (expanding if necessary) */
-	if ( ( rc = zlib_deflate ( DEFLATE_RAW, &in, extracted ) ) != 0 ) {
+	if ( ( rc = zlib_deflate ( DEFLATE_RAW, data, len,
+				   extracted ) ) != 0 ) {
 		DBGC ( image, "GZIP %p could not decompress: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
@@ -138,19 +147,18 @@ static int gzip_extract ( struct image *image, struct image *extracted ) {
  * @ret rc		Return status code
  */
 static int gzip_probe ( struct image *image ) {
-	struct gzip_header header;
-	struct gzip_footer footer;
+	const struct gzip_header *header;
+	const struct gzip_footer *footer;
 
 	/* Sanity check */
-	if ( image->len < ( sizeof ( header ) + sizeof ( footer ) ) ) {
+	if ( image->len < ( sizeof ( *header ) + sizeof ( *footer ) ) ) {
 		DBGC ( image, "GZIP %p image too short\n", image );
 		return -ENOEXEC;
 	}
+	header = image->data;
 
 	/* Check magic header */
-	copy_from_user ( &header.magic, image->data, 0,
-			 sizeof ( header.magic ) );
-	if ( header.magic != cpu_to_be16 ( GZIP_MAGIC ) ) {
+	if ( header->magic != cpu_to_be16 ( GZIP_MAGIC ) ) {
 		DBGC ( image, "GZIP %p invalid magic\n", image );
 		return -ENOEXEC;
 	}

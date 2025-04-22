@@ -28,15 +28,15 @@ union zlib_magic {
  * @v magic		Magic header
  * @ret is_valid	Magic header is valid
  */
-static inline int zlib_magic_is_valid ( union zlib_magic *magic ) {
+static inline int zlib_magic_is_valid ( const union zlib_magic *magic ) {
 
 	/* Check magic value as per RFC 6713 */
 	return ( ( ( magic->cmf & 0x8f ) == 0x08 ) &&
 		 ( ( be16_to_cpu ( magic->check ) % 31 ) == 0 ) );
 }
 
-extern int zlib_deflate ( enum deflate_format format, struct deflate_chunk *in,
-			  struct image *extracted );
+extern int zlib_deflate ( enum deflate_format format, const void *data,
+			  size_t len, struct image *extracted );
 
 extern struct image_type zlib_image_type __image_type ( PROBE_NORMAL );
 
