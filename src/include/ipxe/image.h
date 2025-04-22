@@ -38,7 +38,7 @@ struct image {
 	/** Command line to pass to image */
 	char *cmdline;
 	/** Raw file image */
-	userptr_t data;
+	void *data;
 	/** Length of raw file image */
 	size_t len;
 
@@ -191,7 +191,8 @@ extern int image_set_name ( struct image *image, const char *name );
 extern char * image_strip_suffix ( struct image *image );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
 extern int image_set_len ( struct image *image, size_t len );
-extern int image_set_data ( struct image *image, userptr_t data, size_t len );
+extern int image_set_data ( struct image *image, const void *data,
+			    size_t len );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
 extern struct image * find_image ( const char *name );
@@ -200,7 +201,7 @@ extern int image_exec ( struct image *image );
 extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
 extern int image_set_trust ( int require_trusted, int permanent );
-extern struct image * image_memory ( const char *name, userptr_t data,
+extern struct image * image_memory ( const char *name, const void *data,
 				     size_t len );
 extern const char * image_argument ( struct image *image, const char *key );
 extern int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf );
