@@ -237,8 +237,8 @@ struct xfer_buffer_operations xferbuf_malloc_operations = {
  * @ret rc		Return status code
  */
 static int xferbuf_umalloc_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
-	userptr_t *udata = xferbuf->data;
-	userptr_t new_udata;
+	void **udata = xferbuf->data;
+	void *new_udata;
 
 	new_udata = urealloc ( *udata, len );
 	if ( ! new_udata )
@@ -257,9 +257,9 @@ static int xferbuf_umalloc_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
  */
 static void xferbuf_umalloc_write ( struct xfer_buffer *xferbuf, size_t offset,
 				    const void *data, size_t len ) {
-	userptr_t *udata = xferbuf->data;
+	void **udata = xferbuf->data;
 
-	copy_to_user ( *udata, offset, data, len );
+	memcpy ( ( *udata + offset ), data, len );
 }
 
 /**
@@ -272,9 +272,9 @@ static void xferbuf_umalloc_write ( struct xfer_buffer *xferbuf, size_t offset,
  */
 static void xferbuf_umalloc_read ( struct xfer_buffer *xferbuf, size_t offset,
 				   void *data, size_t len ) {
-	userptr_t *udata = xferbuf->data;
+	void **udata = xferbuf->data;
 
-	copy_from_user ( data, *udata, offset, len );
+	memcpy ( data, ( *udata + offset ), len );
 }
 
 /** umalloc()-based data buffer operations */

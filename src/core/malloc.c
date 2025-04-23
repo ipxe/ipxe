@@ -71,23 +71,6 @@ struct autosized_block {
 	char data[0];
 };
 
-/**
- * Address for zero-length memory blocks
- *
- * @c malloc(0) or @c realloc(ptr,0) will return the special value @c
- * NOWHERE.  Calling @c free(NOWHERE) will have no effect.
- *
- * This is consistent with the ANSI C standards, which state that
- * "either NULL or a pointer suitable to be passed to free()" must be
- * returned in these cases.  Using a special non-NULL value means that
- * the caller can take a NULL return value to indicate failure,
- * without first having to check for a requested size of zero.
- *
- * Code outside of malloc.c do not ever need to refer to the actual
- * value of @c NOWHERE; this is an internal definition.
- */
-#define NOWHERE ( ( void * ) ~( ( intptr_t ) 0 ) )
-
 /** List of free memory blocks */
 static LIST_HEAD ( free_blocks );
 

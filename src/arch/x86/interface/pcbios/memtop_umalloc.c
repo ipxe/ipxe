@@ -44,9 +44,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Alignment of external allocated memory */
 #define EM_ALIGN ( 4 * 1024 )
 
-/** Equivalent of NOWHERE for user pointers */
-#define UNOWHERE ( ( userptr_t ) ~( ( intptr_t ) 0 ) )
-
 /** An external memory block */
 struct external_memory {
 	/** Size of this memory block (excluding this header) */
@@ -56,10 +53,10 @@ struct external_memory {
 };
 
 /** Top of heap */
-static userptr_t top = UNULL;
+static void *top = NULL;
 
 /** Bottom of heap (current lowest allocated block) */
-static userptr_t bottom = UNULL;
+static void *bottom = NULL;
 
 /** Remaining space on heap */
 static size_t heap_size;
@@ -70,7 +67,7 @@ static size_t heap_size;
  * @ret start		Start of region
  * @ret len		Length of region
  */
-size_t largest_memblock ( userptr_t *start ) {
+size_t largest_memblock ( void **start ) {
 	struct memory_map memmap;
 	struct memory_region *region;
 	physaddr_t max = EM_MAX_ADDRESS;
@@ -81,7 +78,7 @@ size_t largest_memblock ( userptr_t *start ) {
 	size_t len = 0;
 
 	/* Avoid returning uninitialised data on error */
-	*start = UNULL;
+	*start = NULL;
 
 	/* Scan through all memory regions */
 	get_memmap ( &memmap );
@@ -119,7 +116,7 @@ size_t largest_memblock ( userptr_t *start ) {
  *
  */
 static void init_eheap ( void ) {
-	userptr_t base;
+	void *base;
 
 	heap_size = largest_memblock ( &base );
 	bottom = top = ( base + heap_size );
@@ -137,8 +134,8 @@ static void ecollect_free ( void ) {
 
 	/* Walk the free list and collect empty blocks */
 	while ( bottom != top ) {
-		copy_from_user ( &extmem, bottom, -sizeof ( extmem ),
-				 sizeof ( extmem ) );
+		memcpy ( &extmem, ( bottom - sizeof ( extmem ) ),
+			 sizeof ( extmem ) );
 		if ( extmem.used )
 			break;
 		DBG ( "EXTMEM freeing [%lx,%lx)\n", virt_to_phys ( bottom ),
@@ -152,16 +149,16 @@ static void ecollect_free ( void ) {
 /**
  * Reallocate external memory
  *
- * @v old_ptr		Memory previously allocated by umalloc(), or UNULL
+ * @v old_ptr		Memory previously allocated by umalloc(), or NULL
  * @v new_size		Requested size
- * @ret new_ptr		Allocated memory, or UNULL
+ * @ret new_ptr		Allocated memory, or NULL
  *
  * Calling realloc() with a new size of zero is a valid way to free a
  * memory block.
  */
-static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
+static void * memtop_urealloc ( void *ptr, size_t new_size ) {
 	struct external_memory extmem;
-	userptr_t new = ptr;
+	void *new = ptr;
 	size_t align;
 
 	/* (Re)initialise external memory allocator if necessary */
@@ -169,15 +166,15 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 		init_eheap();
 
 	/* Get block properties into extmem */
-	if ( ptr && ( ptr != UNOWHERE ) ) {
+	if ( ptr && ( ptr != NOWHERE ) ) {
 		/* Determine old size */
-		copy_from_user ( &extmem, ptr, -sizeof ( extmem ),
-				 sizeof ( extmem ) );
+		memcpy ( &extmem, ( ptr - sizeof ( extmem ) ),
+			 sizeof ( extmem ) );
 	} else {
 		/* Create a zero-length block */
 		if ( heap_size < sizeof ( extmem ) ) {
 			DBG ( "EXTMEM out of space\n" );
-			return UNULL;
+			return NULL;
 		}
 		ptr = bottom = ( bottom - sizeof ( extmem ) );
 		heap_size -= sizeof ( extmem );
@@ -196,7 +193,7 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 		new -= align;
 		if ( new_size > ( heap_size + extmem.size ) ) {
 			DBG ( "EXTMEM out of space\n" );
-			return UNULL;
+			return NULL;
 		}
 		DBG ( "EXTMEM expanding [%lx,%lx) to [%lx,%lx)\n",
 		      virt_to_phys ( ptr ),
@@ -215,13 +212,12 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 			DBG ( "EXTMEM cannot expand [%lx,%lx)\n",
 			      virt_to_phys ( ptr ),
 			      ( virt_to_phys ( ptr ) + extmem.size ) );
-			return UNULL;
+			return NULL;
 		}
 	}
 
 	/* Write back block properties */
-	copy_to_user ( new, -sizeof ( extmem ), &extmem,
-		       sizeof ( extmem ) );
+	memcpy ( ( new - sizeof ( extmem ) ), &extmem, sizeof ( extmem ) );
 
 	/* Collect any free blocks and update hidden memory region */
 	ecollect_free();
@@ -229,7 +225,7 @@ static userptr_t memtop_urealloc ( userptr_t ptr, size_t new_size ) {
 			 ( ( bottom == top ) ? 0 : sizeof ( extmem ) ) ),
 		       virt_to_phys ( top ) );
 
-	return ( new_size ? new : UNOWHERE );
+	return ( new_size ? new : NOWHERE );
 }
 
 PROVIDE_UMALLOC ( memtop, urealloc, memtop_urealloc );

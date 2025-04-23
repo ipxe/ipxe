@@ -11,7 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/iobuf.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/interface.h>
 #include <ipxe/xfer.h>
 
@@ -84,7 +83,7 @@ xferbuf_malloc_init ( struct xfer_buffer *xferbuf ) {
  * @v data		User pointer
  */
 static inline __attribute__ (( always_inline )) void
-xferbuf_umalloc_init ( struct xfer_buffer *xferbuf, userptr_t *data ) {
+xferbuf_umalloc_init ( struct xfer_buffer *xferbuf, void **data ) {
 	xferbuf->data = data;
 	xferbuf->op = &xferbuf_umalloc_operations;
 }

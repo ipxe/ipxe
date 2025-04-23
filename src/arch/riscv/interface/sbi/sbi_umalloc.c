@@ -32,23 +32,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Equivalent of NOWHERE for user pointers */
-#define UNOWHERE ( ~UNULL )
-
 /**
  * Reallocate external memory
  *
- * @v old_ptr		Memory previously allocated by umalloc(), or UNULL
+ * @v old_ptr		Memory previously allocated by umalloc(), or NULL
  * @v new_size		Requested size
- * @ret new_ptr		Allocated memory, or UNULL
+ * @ret new_ptr		Allocated memory, or NULL
  *
  * Calling realloc() with a new size of zero is a valid way to free a
  * memory block.
  */
-static userptr_t sbi_urealloc ( userptr_t old_ptr, size_t new_size ) {
+static void * sbi_urealloc ( void * old_ptr, size_t new_size ) {
 
 	/* External allocation not yet implemented: allocate from heap */
-	return ( ( userptr_t ) realloc ( ( ( void * ) old_ptr ), new_size ) );
+	return ( realloc ( old_ptr, new_size ) );
 }
 
 PROVIDE_UMALLOC ( sbi, urealloc, sbi_urealloc );

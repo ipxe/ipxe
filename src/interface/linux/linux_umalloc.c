@@ -31,9 +31,6 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 #include <ipxe/linux_api.h>
 
-/** Special address returned for empty allocations */
-#define NOWHERE ((void *)-1)
-
 /** Poison to make the metadata more unique */
 #define POISON 0xa5a5a5a5
 #define min(a,b) (((a)<(b))?(a):(b))
@@ -47,7 +44,16 @@ struct metadata
 
 #define SIZE_MD (sizeof(struct metadata))
 
-/** Simple realloc which passes most of the work to mmap(), mremap() and munmap() */
+/**
+ * Reallocate external memory
+ *
+ * @v old_ptr		Memory previously allocated by umalloc(), or NULL
+ * @v new_size		Requested size
+ * @ret new_ptr		Allocated memory, or NULL
+ *
+ * Calling realloc() with a new size of zero is a valid way to free a
+ * memory block.
+ */
 static void * linux_realloc(void *ptr, size_t size)
 {
 	struct metadata md = {0, 0};
@@ -136,19 +142,4 @@ static void * linux_realloc(void *ptr, size_t size)
 	return ptr;
 }
 
-/**
- * Reallocate external memory
- *
- * @v old_ptr		Memory previously allocated by umalloc(), or UNULL
- * @v new_size		Requested size
- * @ret new_ptr		Allocated memory, or UNULL
- *
- * Calling realloc() with a new size of zero is a valid way to free a
- * memory block.
- */
-static userptr_t linux_urealloc(userptr_t old_ptr, size_t new_size)
-{
-	return (userptr_t)linux_realloc((void *)old_ptr, new_size);
-}
-
-PROVIDE_UMALLOC(linux, urealloc, linux_urealloc);
+PROVIDE_UMALLOC(linux, urealloc, linux_realloc);

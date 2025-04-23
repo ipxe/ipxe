@@ -1,12 +1,11 @@
 #include <stdio.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/io.h>
 
 void umalloc_test ( void ) {
 	struct memory_map memmap;
-	userptr_t bob;
-	userptr_t fred;
+	void *bob;
+	void *fred;
 
 	printf ( "Before allocation:\n" );
 	get_memmap ( &memmap );

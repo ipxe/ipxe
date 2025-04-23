@@ -21,6 +21,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/tables.h>
 #include <valgrind/memcheck.h>
 
+/**
+ * Address for zero-length memory blocks
+ *
+ * @c malloc(0) or @c realloc(ptr,0) will return the special value @c
+ * NOWHERE.  Calling @c free(NOWHERE) will have no effect.
+ *
+ * This is consistent with the ANSI C standards, which state that
+ * "either NULL or a pointer suitable to be passed to free()" must be
+ * returned in these cases.  Using a special non-NULL value means that
+ * the caller can take a NULL return value to indicate failure,
+ * without first having to check for a requested size of zero.
+ *
+ * Code outside of the memory allocators themselves does not ever need
+ * to refer to the actual value of @c NOWHERE; this is an internal
+ * definition.
+ */
+#define NOWHERE ( ( void * ) ~( ( intptr_t ) 0 ) )
+
 extern size_t freemem;
 extern size_t usedmem;
 extern size_t maxusedmem;
