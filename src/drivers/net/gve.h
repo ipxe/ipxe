@@ -17,7 +17,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/dma.h>
 #include <ipxe/pci.h>
 #include <ipxe/in.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/process.h>
 #include <ipxe/retry.h>
 
@@ -459,7 +458,7 @@ struct gve_resources {
  */
 struct gve_qpl {
 	/** Page addresses */
-	userptr_t data;
+	void *data;
 	/** Page mapping */
 	struct dma_mapping map;
 	/** Number of pages */
@@ -569,9 +568,21 @@ struct gve_rx_completion {
 /** A descriptor queue */
 struct gve_queue {
 	/** Descriptor ring */
-	userptr_t desc;
+	union {
+		/** Transmit descriptors */
+		struct gve_tx_descriptor *tx;
+		/** Receive descriptors */
+		struct gve_rx_descriptor *rx;
+		/** Raw data */
+		void *raw;
+	} desc;
 	/** Completion ring */
-	userptr_t cmplt;
+	union {
+		/** Receive completions */
+		struct gve_rx_completion *rx;
+		/** Raw data */
+		void *raw;
+	} cmplt;
 	/** Queue resources */
 	struct gve_resources *res;
 
