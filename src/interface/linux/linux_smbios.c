@@ -35,7 +35,7 @@ static const char smbios_entry_filename[] =
 static const char smbios_filename[] = "/sys/firmware/dmi/tables/DMI";
 
 /** Cache SMBIOS data */
-static userptr_t smbios_data;
+static void *smbios_data;
 
 /**
  * Find SMBIOS
@@ -46,7 +46,7 @@ static userptr_t smbios_data;
 static int linux_find_smbios ( struct smbios *smbios ) {
 	struct smbios3_entry *smbios3_entry;
 	struct smbios_entry *smbios_entry;
-	userptr_t entry;
+	void *entry;
 	void *data;
 	int len;
 	int rc;
@@ -98,6 +98,7 @@ static int linux_find_smbios ( struct smbios *smbios ) {
 	return 0;
 
 	ufree ( smbios_data );
+	smbios_data = NULL;
  err_read:
  err_version:
 	ufree ( entry );
@@ -116,6 +117,7 @@ static void linux_smbios_shutdown ( int booting __unused ) {
 
 	/* Free SMBIOS data */
 	ufree ( smbios_data );
+	smbios_data = NULL;
 }
 
 /** SMBIOS shutdown function */

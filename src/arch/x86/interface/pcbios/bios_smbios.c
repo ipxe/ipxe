@@ -45,19 +45,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret rc		Return status code
  */
 static int bios_find_smbios2 ( struct smbios *smbios ) {
-	struct smbios_entry entry;
-	int rc;
+	const struct smbios_entry *entry;
 
 	/* Scan through BIOS segment to find SMBIOS 32-bit entry point */
-	if ( ( rc = find_smbios_entry ( real_to_virt ( BIOS_SEG, 0 ), 0x10000,
-					&entry ) ) != 0 )
-		return rc;
+	entry = find_smbios_entry ( real_to_virt ( BIOS_SEG, 0 ), 0x10000 );
+	if ( ! entry )
+		return -ENOENT;
 
 	/* Fill in entry point descriptor structure */
-	smbios->address = phys_to_virt ( entry.smbios_address );
-	smbios->len = entry.smbios_len;
-	smbios->count = entry.smbios_count;
-	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
+	smbios->address = phys_to_virt ( entry->smbios_address );
+	smbios->len = entry->smbios_len;
+	smbios->count = entry->smbios_count;
+	smbios->version = SMBIOS_VERSION ( entry->major, entry->minor );
 
 	return 0;
 }
@@ -69,26 +68,25 @@ static int bios_find_smbios2 ( struct smbios *smbios ) {
  * @ret rc		Return status code
  */
 static int bios_find_smbios3 ( struct smbios *smbios ) {
-	struct smbios3_entry entry;
-	int rc;
+	const struct smbios3_entry *entry;
 
 	/* Scan through BIOS segment to find SMBIOS 64-bit entry point */
-	if ( ( rc = find_smbios3_entry ( real_to_virt ( BIOS_SEG, 0 ), 0x10000,
-					 &entry ) ) != 0 )
-		return rc;
+	entry = find_smbios3_entry ( real_to_virt ( BIOS_SEG, 0 ), 0x10000 );
+	if ( ! entry )
+		return -ENOENT;
 
 	/* Check that address is accessible */
-	if ( entry.smbios_address > ~( ( physaddr_t ) 0 ) ) {
+	if ( entry->smbios_address > ~( ( physaddr_t ) 0 ) ) {
 		DBG ( "SMBIOS3 at %08llx is inaccessible\n",
-		      ( ( unsigned long long ) entry.smbios_address ) );
+		      ( ( unsigned long long ) entry->smbios_address ) );
 		return -ENOTSUP;
 	}
 
 	/* Fill in entry point descriptor structure */
-	smbios->address = phys_to_virt ( entry.smbios_address );
-	smbios->len = entry.smbios_len;
+	smbios->address = phys_to_virt ( entry->smbios_address );
+	smbios->len = entry->smbios_len;
 	smbios->count = 0;
-	smbios->version = SMBIOS_VERSION ( entry.major, entry.minor );
+	smbios->version = SMBIOS_VERSION ( entry->major, entry->minor );
 
 	return 0;
 }

@@ -81,15 +81,17 @@ static int smbios_applies ( struct settings *settings __unused,
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int smbios_fetch ( struct settings *settings __unused,
-			  struct setting *setting,
+static int smbios_fetch ( struct settings *settings, struct setting *setting,
 			  void *data, size_t len ) {
-	struct smbios_structure structure;
+	const struct smbios_header *structure;
 	unsigned int tag_instance;
 	unsigned int tag_type;
 	unsigned int tag_offset;
 	unsigned int tag_len;
-	int rc;
+	const void *src;
+	size_t src_len;
+	unsigned int string;
+	union uuid uuid;
 
 	/* Split tag into instance, type, offset and length */
 	tag_instance = ( ( setting->tag >> 24 ) & 0xff );
@@ -98,81 +100,75 @@ static int smbios_fetch ( struct settings *settings __unused,
 	tag_len = ( setting->tag & 0xff );
 
 	/* Find SMBIOS structure */
-	if ( ( rc = find_smbios_structure ( tag_type, tag_instance,
-					    &structure ) ) != 0 )
-		return rc;
+	structure = smbios_structure ( tag_type, tag_instance );
+	if ( ! structure )
+		return -ENOENT;
+	src = structure;
+	src_len = structure->len;
+	string = 0;
 
-	{
-		uint8_t buf[structure.header.len];
-		const void *raw;
-		union uuid uuid;
-		unsigned int index;
-
-		/* Read SMBIOS structure */
-		if ( ( rc = read_smbios_structure ( &structure, buf,
-						    sizeof ( buf ) ) ) != 0 )
-			return rc;
-
-		/* A <length> of zero indicates that the byte at
-		 * <offset> contains a string index.  An <offset> of
-		 * zero indicates that the <length> contains a literal
-		 * string index.
-		 *
-		 * Since the byte at offset zero can never contain a
-		 * string index, and a literal string index can never
-		 * be zero, the combination of both <length> and
-		 * <offset> being zero indicates that the entire
-		 * structure is to be read.
-		 */
-		if ( ( tag_len == 0 ) && ( tag_offset == 0 ) ) {
-			tag_len = sizeof ( buf );
-		} else if ( ( tag_len == 0 ) || ( tag_offset == 0 ) ) {
-			index = ( ( tag_offset == 0 ) ?
-				  tag_len : buf[tag_offset] );
-			if ( ( rc = read_smbios_string ( &structure, index,
-							 data, len ) ) < 0 ) {
-				return rc;
-			}
-			if ( ! setting->type )
-				setting->type = &setting_type_string;
-			return rc;
-		}
-
-		/* Limit length */
-		if ( tag_offset > sizeof ( buf ) ) {
-			tag_len = 0;
-		} else if ( ( tag_offset + tag_len ) > sizeof ( buf ) ) {
-			tag_len = ( sizeof ( buf ) - tag_offset );
-		}
-
-		/* Mangle UUIDs if necessary.  iPXE treats UUIDs as
-		 * being in network byte order (big-endian).  SMBIOS
-		 * specification version 2.6 states that UUIDs are
-		 * stored with little-endian values in the first three
-		 * fields; earlier versions did not specify an
-		 * endianness.  dmidecode assumes that the byte order
-		 * is little-endian if and only if the SMBIOS version
-		 * is 2.6 or higher; we match this behaviour.
-		 */
-		raw = &buf[tag_offset];
-		if ( ( ( setting->type == &setting_type_uuid ) ||
-		       ( setting->type == &setting_type_guid ) ) &&
-		     ( tag_len == sizeof ( uuid ) ) &&
-		     ( smbios_version() >= SMBIOS_VERSION ( 2, 6 ) ) ) {
-			DBG ( "SMBIOS detected mangled UUID\n" );
-			memcpy ( &uuid, &buf[tag_offset], sizeof ( uuid ) );
-			uuid_mangle ( &uuid );
-			raw = &uuid;
-		}
-
-		/* Return data */
-		if ( len > tag_len )
-			len = tag_len;
-		memcpy ( data, raw, len );
-		if ( ! setting->type )
-			setting->type = &setting_type_hex;
-		return tag_len;
+	/* A <length> of zero indicates that the byte at <offset>
+	 * contains a string index.  An <offset> of zero indicates
+	 * that the <length> contains a literal string index.
+	 *
+	 * Since the byte at offset zero can never contain a string
+	 * index, and a literal string index can never be zero, the
+	 * combination of both <length> and <offset> being zero
+	 * indicates that the entire structure is to be read.
+	 */
+	if ( ( tag_len == 0 ) && ( tag_offset == 0 ) ) {
+		/* Read whole structure */
+	} else if ( ( tag_len == 0 ) || ( tag_offset == 0 ) ) {
+		/* Read string */
+		string = tag_len;
+		if ( ( string == 0 ) && ( tag_offset < src_len ) )
+			string = *( ( uint8_t * ) src + tag_offset );
+		src = smbios_string ( structure, string );
+		if ( ! src )
+			return -ENOENT;
+		assert ( string > 0 );
+		src_len = strlen ( src );
+	} else if ( tag_offset > src_len ) {
+		/* Empty read beyond end of structure */
+		src_len = 0;
+	} else {
+		/* Read partial structure */
+		src += tag_offset;
+		src_len -= tag_offset;
+		if ( src_len > tag_len )
+			src_len = tag_len;
 	}
+
+	/* Mangle UUIDs if necessary.  iPXE treats UUIDs as being in
+	 * network byte order (big-endian).  SMBIOS specification
+	 * version 2.6 states that UUIDs are stored with little-endian
+	 * values in the first three fields; earlier versions did not
+	 * specify an endianness.  dmidecode assumes that the byte
+	 * order is little-endian if and only if the SMBIOS version is
+	 * 2.6 or higher; we match this behaviour.
+	 */
+	if ( ( ( setting->type == &setting_type_uuid ) ||
+	       ( setting->type == &setting_type_guid ) ) &&
+	     ( src_len == sizeof ( uuid ) ) &&
+	     ( smbios_version() >= SMBIOS_VERSION ( 2, 6 ) ) ) {
+		DBGC ( settings, "SMBIOS detected mangled UUID\n" );
+		memcpy ( &uuid, src, sizeof ( uuid ) );
+		uuid_mangle ( &uuid );
+		src = &uuid;
+	}
+
+	/* Return data */
+	if ( len > src_len )
+		len = src_len;
+	memcpy ( data, src, len );
+
+	/* Set default type */
+	if ( ! setting->type ) {
+		setting->type = ( string ? &setting_type_string :
+				  &setting_type_hex );
+	}
+
+	return src_len;
 }
 
 /** SMBIOS settings operations */
@@ -192,12 +188,12 @@ static struct settings smbios_settings = {
 
 /** Initialise SMBIOS settings */
 static void smbios_init ( void ) {
+	struct settings *settings = &smbios_settings;
 	int rc;
 
-	if ( ( rc = register_settings ( &smbios_settings, NULL,
-					"smbios" ) ) != 0 ) {
-		DBG ( "SMBIOS could not register settings: %s\n",
-		      strerror ( rc ) );
+	if ( ( rc = register_settings ( settings, NULL, "smbios" ) ) != 0 ) {
+		DBGC ( settings, "SMBIOS could not register settings: %s\n",
+		       strerror ( rc ) );
 		return;
 	}
 }

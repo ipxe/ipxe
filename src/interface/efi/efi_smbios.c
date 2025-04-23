@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/smbios.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Guid/SmBios.h>
