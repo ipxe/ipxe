@@ -35,4 +35,3 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 PROVIDE_UACCESS_INLINE ( flat, phys_to_virt );
 PROVIDE_UACCESS_INLINE ( flat, virt_to_phys );
 PROVIDE_UACCESS_INLINE ( flat, virt_to_user );
-PROVIDE_UACCESS_INLINE ( flat, memchr_user );

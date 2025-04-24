@@ -131,13 +131,6 @@ UACCESS_INLINE ( librm, virt_to_user ) ( volatile const void *addr ) {
 	return trivial_virt_to_user ( addr );
 }
 
-static inline __always_inline off_t
-UACCESS_INLINE ( librm, memchr_user ) ( userptr_t buffer, off_t offset,
-					int c, size_t len ) {
-	return trivial_memchr_user ( buffer, offset, c, len );
-}
-
-
 /******************************************************************************
  *
  * Access to variables in .data16 and .text16

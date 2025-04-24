@@ -51,23 +51,6 @@ trivial_virt_to_user ( volatile const void *addr ) {
 	return ( ( userptr_t ) addr );
 }
 
-/**
- * Find character in user buffer
- *
- * @v buffer		User buffer
- * @v offset		Starting offset within buffer
- * @v c			Character to search for
- * @v len		Length of user buffer
- * @ret offset		Offset of character, or <0 if not found
- */
-static inline __always_inline off_t
-trivial_memchr_user ( userptr_t buffer, off_t offset, int c, size_t len ) {
-	void *found;
-
-	found = memchr ( ( ( void * ) buffer + offset ), c, len );
-	return ( found ? ( found - ( void * ) buffer ) : -1 );
-}
-
 /** @} */
 
 /**
@@ -112,12 +95,6 @@ UACCESS_INLINE ( flat, virt_to_phys ) ( volatile const void *virt ) {
 static inline __always_inline userptr_t
 UACCESS_INLINE ( flat, virt_to_user ) ( volatile const void *addr ) {
 	return trivial_virt_to_user ( addr );
-}
-
-static inline __always_inline off_t
-UACCESS_INLINE ( flat, memchr_user ) ( userptr_t buffer, off_t offset,
-				       int c, size_t len ) {
-	return trivial_memchr_user ( buffer, offset, c, len );
 }
 
 /* Include all architecture-independent user access API headers */
@@ -178,16 +155,5 @@ static inline __always_inline void
 copy_from_user ( void *dest, userptr_t src, off_t src_off, size_t len ) {
 	memcpy ( dest, ( src + src_off ), len );
 }
-
-/**
- * Find character in user buffer
- *
- * @v userptr		User buffer
- * @v offset		Starting offset within buffer
- * @v c			Character to search for
- * @v len		Length of user buffer
- * @ret offset		Offset of character, or <0 if not found
- */
-off_t memchr_user ( userptr_t userptr, off_t offset, int c, size_t len );
 
 #endif /* _IPXE_UACCESS_H */
