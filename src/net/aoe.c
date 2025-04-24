@@ -33,7 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/list.h>
 #include <ipxe/if_ether.h>
 #include <ipxe/iobuf.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/features.h>
 #include <ipxe/interface.h>
@@ -391,8 +390,7 @@ static void aoecmd_ata_cmd ( struct aoe_command *aoecmd,
 	if ( ! command->cb.lba48 )
 		aoeata->lba.bytes[3] |=
 			( command->cb.device & ATA_DEV_MASK );
-	copy_from_user ( aoeata->data, command->data_out, 0,
-			 command->data_out_len );
+	memcpy ( aoeata->data, command->data_out, command->data_out_len );
 
 	DBGC2 ( aoedev, "AoE %s/%08x ATA cmd %02x:%02x:%02x:%02x:%08llx",
 		aoedev_name ( aoedev ), aoecmd->tag, aoeata->aflags,
@@ -452,8 +450,7 @@ static int aoecmd_ata_rsp ( struct aoe_command *aoecmd, const void *data,
 	}
 
 	/* Copy out data payload */
-	copy_to_user ( command->data_in, 0, aoeata->data,
-		       command->data_in_len );
+	memcpy ( command->data_in, aoeata->data, command->data_in_len );
 
 	return 0;
 }

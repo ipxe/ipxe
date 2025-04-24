@@ -45,8 +45,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret rc		Return status code
  */
 int block_read ( struct interface *control, struct interface *data,
-		 uint64_t lba, unsigned int count,
-		 userptr_t buffer, size_t len ) {
+		 uint64_t lba, unsigned int count, void *buffer,
+		 size_t len ) {
 	struct interface *dest;
 	block_read_TYPE ( void * ) *op =
 		intf_get_dest_op ( control, block_read, &dest );
@@ -76,8 +76,8 @@ int block_read ( struct interface *control, struct interface *data,
  * @ret rc		Return status code
  */
 int block_write ( struct interface *control, struct interface *data,
-		  uint64_t lba, unsigned int count,
-		  userptr_t buffer, size_t len ) {
+		  uint64_t lba, unsigned int count, void *buffer,
+		  size_t len ) {
 	struct interface *dest;
 	block_write_TYPE ( void * ) *op =
 		intf_get_dest_op ( control, block_write, &dest );

@@ -181,8 +181,7 @@ static int int13_parse_eltorito ( struct san_device *sandev, void *scratch ) {
 	int rc;
 
 	/* Read boot record volume descriptor */
-	if ( ( rc = sandev_read ( sandev, ELTORITO_LBA, 1,
-				  virt_to_user ( boot ) ) ) != 0 ) {
+	if ( ( rc = sandev_read ( sandev, ELTORITO_LBA, 1, boot ) ) != 0 ) {
 		DBGC ( sandev->drive, "INT13 drive %02x could not read El "
 		       "Torito boot record volume descriptor: %s\n",
 		       sandev->drive, strerror ( rc ) );
@@ -228,7 +227,7 @@ static int int13_guess_geometry_hdd ( struct san_device *sandev, void *scratch,
 	int rc;
 
 	/* Read partition table */
-	if ( ( rc = sandev_read ( sandev, 0, 1, virt_to_user ( mbr ) ) ) != 0 ) {
+	if ( ( rc = sandev_read ( sandev, 0, 1, mbr ) ) != 0 ) {
 		DBGC ( sandev->drive, "INT13 drive %02x could not read "
 		       "partition table to guess geometry: %s\n",
 		       sandev->drive, strerror ( rc ) );
@@ -517,12 +516,12 @@ static int int13_rw_sectors ( struct san_device *sandev,
 			      int ( * sandev_rw ) ( struct san_device *sandev,
 						    uint64_t lba,
 						    unsigned int count,
-						    userptr_t buffer ) ) {
+						    void *buffer ) ) {
 	struct int13_data *int13 = sandev->priv;
 	unsigned int cylinder, head, sector;
 	unsigned long lba;
 	unsigned int count;
-	userptr_t buffer;
+	void *buffer;
 	int rc;
 
 	/* Validate blocksize */
@@ -710,12 +709,12 @@ static int int13_extended_rw ( struct san_device *sandev,
 			       int ( * sandev_rw ) ( struct san_device *sandev,
 						     uint64_t lba,
 						     unsigned int count,
-						     userptr_t buffer ) ) {
+						     void *buffer ) ) {
 	struct int13_disk_address addr;
 	uint8_t bufsize;
 	uint64_t lba;
 	unsigned long count;
-	userptr_t buffer;
+	void *buffer;
 	int rc;
 
 	/* Extended reads are not allowed on floppy drives.
@@ -1455,8 +1454,8 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
 		       "catalog (status %04x)\n", drive, status );
 		return -EIO;
 	}
-	copy_from_user ( &catalog, phys_to_virt ( eltorito_cmd.buffer ), 0,
-			 sizeof ( catalog ) );
+	memcpy ( &catalog, phys_to_virt ( eltorito_cmd.buffer ),
+		 sizeof ( catalog ) );
 
 	/* Sanity checks */
 	if ( catalog.valid.platform_id != ELTORITO_PLATFORM_X86 ) {

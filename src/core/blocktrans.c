@@ -81,7 +81,7 @@ static void blktrans_xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
 	if ( blktrans->buffer ) {
 
 		/* Write data to buffer */
-		copy_to_user ( blktrans->buffer, offset, data, len );
+		memcpy ( ( blktrans->buffer + offset ), data, len );
 
 	} else {
 
@@ -107,7 +107,7 @@ static void blktrans_xferbuf_read ( struct xfer_buffer *xferbuf, size_t offset,
 	if ( blktrans->buffer ) {
 
 		/* Read data from buffer */
-		copy_from_user ( data, blktrans->buffer, offset, len );
+		memcpy ( data, ( blktrans->buffer + offset ), len );
 
 	} else {
 
@@ -216,11 +216,11 @@ static struct interface_descriptor blktrans_xfer_desc =
  * Insert block device translator
  *
  * @v block		Block device interface
- * @v buffer		Data buffer (or UNULL)
+ * @v buffer		Data buffer (or NULL)
  * @v size		Length of data buffer, or block size
  * @ret rc		Return status code
  */
-int block_translate ( struct interface *block, userptr_t buffer, size_t size ) {
+int block_translate ( struct interface *block, void *buffer, size_t size ) {
 	struct block_translator *blktrans;
 	int rc;
 

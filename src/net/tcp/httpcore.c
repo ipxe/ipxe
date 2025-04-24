@@ -503,7 +503,7 @@ http_content_buffer ( struct http_transaction *http ) {
 __weak int http_block_read ( struct http_transaction *http __unused,
 			     struct interface *data __unused,
 			     uint64_t lba __unused, unsigned int count __unused,
-			     userptr_t buffer __unused, size_t len __unused ) {
+			     void *buffer __unused, size_t len __unused ) {
 
 	return -ENOTSUP;
 }

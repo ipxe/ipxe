@@ -2,7 +2,6 @@
 #define _IPXE_SCSI_H
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/interface.h>
 
 /** @file
@@ -252,14 +251,14 @@ struct scsi_cmd {
 	/** CDB for this command */
 	union scsi_cdb cdb;
 	/** Data-out buffer (may be NULL) */
-	userptr_t data_out;
+	void *data_out;
 	/** Data-out buffer length
 	 *
 	 * Must be zero if @c data_out is NULL
 	 */
 	size_t data_out_len;
 	/** Data-in buffer (may be NULL) */
-	userptr_t data_in;
+	void *data_in;
 	/** Data-in buffer length
 	 *
 	 * Must be zero if @c data_in is NULL

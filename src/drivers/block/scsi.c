@@ -279,7 +279,7 @@ struct scsi_command {
 	/** Number of blocks */
 	unsigned int count;
 	/** Data buffer */
-	userptr_t buffer;
+	void *buffer;
 	/** Length of data buffer */
 	size_t len;
 	/** Command tag */
@@ -591,12 +591,12 @@ static void scsicmd_read_capacity_cmd ( struct scsi_command *scsicmd,
 		readcap16->service_action =
 			SCSI_SERVICE_ACTION_READ_CAPACITY_16;
 		readcap16->len = cpu_to_be32 ( sizeof ( *capacity16 ) );
-		command->data_in = virt_to_user ( capacity16 );
+		command->data_in = capacity16;
 		command->data_in_len = sizeof ( *capacity16 );
 	} else {
 		/* Use READ CAPACITY (10) */
 		readcap10->opcode = SCSI_OPCODE_READ_CAPACITY_10;
-		command->data_in = virt_to_user ( capacity10 );
+		command->data_in = capacity10;
 		command->data_in_len = sizeof ( *capacity10 );
 	}
 }
@@ -721,7 +721,7 @@ static int scsidev_command ( struct scsi_device *scsidev,
 			     struct interface *block,
 			     struct scsi_command_type *type,
 			     uint64_t lba, unsigned int count,
-			     userptr_t buffer, size_t len ) {
+			     void *buffer, size_t len ) {
 	struct scsi_command *scsicmd;
 	int rc;
 
@@ -773,7 +773,7 @@ static int scsidev_command ( struct scsi_device *scsidev,
 static int scsidev_read ( struct scsi_device *scsidev,
 			  struct interface *block,
 			  uint64_t lba, unsigned int count,
-			  userptr_t buffer, size_t len ) {
+			  void *buffer, size_t len ) {
 	return scsidev_command ( scsidev, block, &scsicmd_read,
 				 lba, count, buffer, len );
 }
@@ -792,7 +792,7 @@ static int scsidev_read ( struct scsi_device *scsidev,
 static int scsidev_write ( struct scsi_device *scsidev,
 			   struct interface *block,
 			   uint64_t lba, unsigned int count,
-			   userptr_t buffer, size_t len ) {
+			   void *buffer, size_t len ) {
 	return scsidev_command ( scsidev, block, &scsicmd_write,
 				 lba, count, buffer, len );
 }
@@ -807,7 +807,7 @@ static int scsidev_write ( struct scsi_device *scsidev,
 static int scsidev_read_capacity ( struct scsi_device *scsidev,
 				   struct interface *block ) {
 	return scsidev_command ( scsidev, block, &scsicmd_read_capacity,
-				 0, 0, UNULL, 0 );
+				 0, 0, NULL, 0 );
 }
 
 /**
@@ -820,7 +820,7 @@ static int scsidev_read_capacity ( struct scsi_device *scsidev,
 static int scsidev_test_unit_ready ( struct scsi_device *scsidev,
 				     struct interface *block ) {
 	return scsidev_command ( scsidev, block, &scsicmd_test_unit_ready,
-				 0, 0, UNULL, 0 );
+				 0, 0, NULL, 0 );
 }
 
 /**

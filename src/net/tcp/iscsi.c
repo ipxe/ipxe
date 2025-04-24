@@ -39,7 +39,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/open.h>
 #include <ipxe/scsi.h>
 #include <ipxe/process.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/tcpip.h>
 #include <ipxe/settings.h>
 #include <ipxe/features.h>
@@ -478,7 +477,7 @@ static int iscsi_rx_data_in ( struct iscsi_session *iscsi,
 	assert ( iscsi->command != NULL );
 	assert ( iscsi->command->data_in );
 	assert ( ( offset + len ) <= iscsi->command->data_in_len );
-	copy_to_user ( iscsi->command->data_in, offset, data, len );
+	memcpy ( ( iscsi->command->data_in + offset ), data, len );
 
 	/* Wait for whole SCSI response to arrive */
 	if ( remaining )
@@ -598,8 +597,8 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
 	if ( ! iobuf )
 		return -ENOMEM;
 	
-	copy_from_user ( iob_put ( iobuf, len ),
-			 iscsi->command->data_out, offset, len );
+	memcpy ( iob_put ( iobuf, len ),
+		 ( iscsi->command->data_out + offset ), len );
 	memset ( iob_put ( iobuf, pad_len ), 0, pad_len );
 
 	return xfer_deliver_iob ( &iscsi->socket, iobuf );

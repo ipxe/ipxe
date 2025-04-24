@@ -95,8 +95,9 @@ struct efi_block_data {
 static int efi_block_rw ( struct san_device *sandev, uint64_t lba,
 			  void *data, size_t len,
 			  int ( * sandev_rw ) ( struct san_device *sandev,
-						uint64_t lba, unsigned int count,
-						userptr_t buffer ) ) {
+						uint64_t lba,
+						unsigned int count,
+						void *buffer ) ) {
 	struct efi_block_data *block = sandev->priv;
 	unsigned int count;
 	int rc;

@@ -2,7 +2,6 @@
 #define _IPXE_ATA_H
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/interface.h>
 
 /** @file
@@ -173,7 +172,7 @@ struct ata_cmd {
 	 * If non-NULL, this buffer must be ata_command::cb::count
 	 * sectors in size.
 	 */
-	userptr_t data_out;
+	void *data_out;
 	/** Data-out buffer length
 	 *
 	 * Must be zero if @c data_out is NULL
@@ -184,7 +183,7 @@ struct ata_cmd {
 	 * If non-NULL, this buffer must be ata_command::cb::count
 	 * sectors in size.
 	 */
-	userptr_t data_in;
+	void *data_in;
 	/** Data-in buffer length
 	 *
 	 * Must be zero if @c data_in is NULL

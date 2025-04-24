@@ -261,9 +261,9 @@ extern struct san_device * sandev_next ( unsigned int drive );
 extern int sandev_reopen ( struct san_device *sandev );
 extern int sandev_reset ( struct san_device *sandev );
 extern int sandev_read ( struct san_device *sandev, uint64_t lba,
-			 unsigned int count, userptr_t buffer );
+			 unsigned int count, void *buffer );
 extern int sandev_write ( struct san_device *sandev, uint64_t lba,
-			  unsigned int count, userptr_t buffer );
+			  unsigned int count, void *buffer );
 extern struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
 					  size_t priv_size );
 extern int register_sandev ( struct san_device *sandev, unsigned int drive,
