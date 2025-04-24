@@ -357,24 +357,22 @@ static void ucode_describe ( struct image *image, size_t start,
  * @ret rc		Return status code
  */
 static int ucode_verify ( struct image *image, size_t start, size_t len ) {
-	uint32_t checksum = 0;
-	uint32_t dword;
-	size_t offset;
+	const uint32_t *dword;
+	uint32_t checksum;
+	unsigned int count;
 
 	/* Check length is a multiple of dwords */
-	if ( ( len % sizeof ( dword ) ) != 0 ) {
+	if ( ( len % sizeof ( *dword ) ) != 0 ) {
 		DBGC ( image, "UCODE %s+%#04zx invalid length %#zx\n",
 		       image->name, start, len );
 		return -EINVAL;
 	}
+	dword = ( image->data + start );
 
 	/* Calculate checksum */
-	for ( offset = start ; len ;
-	      offset += sizeof ( dword ), len -= sizeof ( dword ) ) {
-		copy_from_user ( &dword, image->data, offset,
-				 sizeof ( dword ) );
-		checksum += dword;
-	}
+	count = ( len / sizeof ( *dword ) );
+	for ( checksum = 0 ; count ; count-- )
+		checksum += *(dword++);
 	if ( checksum != 0 ) {
 		DBGC ( image, "UCODE %s+%#04zx bad checksum %#08x\n",
 		       image->name, start, checksum );
@@ -394,9 +392,9 @@ static int ucode_verify ( struct image *image, size_t start, size_t len ) {
  */
 static int ucode_parse_intel ( struct image *image, size_t start,
 			       struct ucode_update *update ) {
-	struct intel_ucode_header hdr;
-	struct intel_ucode_ext_header exthdr;
-	struct intel_ucode_ext ext;
+	const struct intel_ucode_header *hdr;
+	const struct intel_ucode_ext_header *exthdr;
+	const struct intel_ucode_ext *ext;
 	struct ucode_descriptor desc;
 	size_t remaining;
 	size_t offset;
@@ -407,27 +405,27 @@ static int ucode_parse_intel ( struct image *image, size_t start,
 
 	/* Read header */
 	remaining = ( image->len - start );
-	if ( remaining < sizeof ( hdr ) ) {
+	if ( remaining < sizeof ( *hdr ) ) {
 		DBGC ( image, "UCODE %s+%#04zx too small for Intel header\n",
 		       image->name, start );
 		return -ENOEXEC;
 	}
-	copy_from_user ( &hdr, image->data, start, sizeof ( hdr ) );
+	hdr = ( image->data + start );
 
 	/* Determine lengths */
-	data_len = hdr.data_len;
+	data_len = hdr->data_len;
 	if ( ! data_len )
 		data_len = INTEL_UCODE_DATA_LEN;
-	len = hdr.len;
+	len = hdr->len;
 	if ( ! len )
-		len = ( sizeof ( hdr ) + data_len );
+		len = ( sizeof ( *hdr ) + data_len );
 
 	/* Verify a selection of fields */
-	if ( ( hdr.hver != INTEL_UCODE_HVER ) ||
-	     ( hdr.lver != INTEL_UCODE_LVER ) ||
-	     ( len < sizeof ( hdr ) ) ||
+	if ( ( hdr->hver != INTEL_UCODE_HVER ) ||
+	     ( hdr->lver != INTEL_UCODE_LVER ) ||
+	     ( len < sizeof ( *hdr ) ) ||
 	     ( len > remaining ) ||
-	     ( data_len > ( len - sizeof ( hdr ) ) ) ||
+	     ( data_len > ( len - sizeof ( *hdr ) ) ) ||
 	     ( ( data_len % sizeof ( uint32_t ) ) != 0 ) ||
 	     ( ( len % INTEL_UCODE_ALIGN ) != 0 ) ) {
 		DBGC2 ( image, "UCODE %s+%#04zx is not an Intel update\n",
@@ -442,48 +440,46 @@ static int ucode_parse_intel ( struct image *image, size_t start,
 		return rc;
 
 	/* Populate descriptor */
-	desc.signature = hdr.signature;
-	desc.version = hdr.version;
-	desc.address = ( virt_to_phys ( image->data ) +
-			 start + sizeof ( hdr ) );
+	desc.signature = hdr->signature;
+	desc.version = hdr->version;
+	desc.address = ( virt_to_phys ( image->data ) + start +
+			 sizeof ( *hdr ) );
 
 	/* Add non-extended descriptor, if applicable */
-	ucode_describe ( image, start, &ucode_intel, &desc, hdr.platforms,
+	ucode_describe ( image, start, &ucode_intel, &desc, hdr->platforms,
 			 update );
 
 	/* Construct extended descriptors, if applicable */
-	offset = ( sizeof ( hdr ) + data_len );
-	if ( offset <= ( len - sizeof ( exthdr ) ) ) {
+	offset = ( sizeof ( *hdr ) + data_len );
+	if ( offset <= ( len - sizeof ( *exthdr ) ) ) {
 
 		/* Read extended header */
-		copy_from_user ( &exthdr, image->data, ( start + offset ),
-				 sizeof ( exthdr ) );
-		offset += sizeof ( exthdr );
+		exthdr = ( image->data + start + offset );
+		offset += sizeof ( *exthdr );
 
 		/* Read extended signatures */
-		for ( i = 0 ; i < exthdr.count ; i++ ) {
+		for ( i = 0 ; i < exthdr->count ; i++ ) {
 
 			/* Read extended signature */
-			if ( offset > ( len - sizeof ( ext ) ) ) {
+			if ( offset > ( len - sizeof ( *ext ) ) ) {
 				DBGC ( image, "UCODE %s+%#04zx extended "
 				       "signature overrun\n",
 				       image->name, start );
 				return -EINVAL;
 			}
-			copy_from_user ( &ext, image->data, ( start + offset ),
-					 sizeof ( ext ) );
-			offset += sizeof ( ext );
+			ext = ( image->data + start + offset );
+			offset += sizeof ( *ext );
 
 			/* Avoid duplicating non-extended descriptor */
-			if ( ( ext.signature == hdr.signature ) &&
-			     ( ext.platforms == hdr.platforms ) ) {
+			if ( ( ext->signature == hdr->signature ) &&
+			     ( ext->platforms == hdr->platforms ) ) {
 				continue;
 			}
 
 			/* Construct descriptor, if applicable */
-			desc.signature = ext.signature;
+			desc.signature = ext->signature;
 			ucode_describe ( image, start, &ucode_intel, &desc,
-					 ext.platforms, update );
+					 ext->platforms, update );
 		}
 	}
 
@@ -500,10 +496,10 @@ static int ucode_parse_intel ( struct image *image, size_t start,
  */
 static int ucode_parse_amd ( struct image *image, size_t start,
 			     struct ucode_update *update ) {
-	struct amd_ucode_header hdr;
-	struct amd_ucode_equivalence equiv;
-	struct amd_ucode_patch_header phdr;
-	struct amd_ucode_patch patch;
+	const struct amd_ucode_header *hdr;
+	const struct amd_ucode_equivalence *equiv;
+	const struct amd_ucode_patch_header *phdr;
+	const struct amd_ucode_patch *patch;
 	struct ucode_descriptor desc;
 	size_t remaining;
 	size_t offset;
@@ -513,92 +509,85 @@ static int ucode_parse_amd ( struct image *image, size_t start,
 
 	/* Read header */
 	remaining = ( image->len - start );
-	if ( remaining < sizeof ( hdr ) ) {
+	if ( remaining < sizeof ( *hdr ) ) {
 		DBGC ( image, "UCODE %s+%#04zx too small for AMD header\n",
 		       image->name, start );
 		return -ENOEXEC;
 	}
-	copy_from_user ( &hdr, image->data, start, sizeof ( hdr ) );
+	hdr = ( image->data + start );
 
 	/* Check header */
-	if ( hdr.magic != AMD_UCODE_MAGIC ) {
+	if ( hdr->magic != AMD_UCODE_MAGIC ) {
 		DBGC2 ( image, "UCODE %s+%#04zx is not an AMD update\n",
 			image->name, start );
 		return -ENOEXEC;
 	}
 	DBGC2 ( image, "UCODE %s+%#04zx is an AMD update\n",
 		image->name, start );
-	if ( hdr.type != AMD_UCODE_EQUIV_TYPE ) {
+	if ( hdr->type != AMD_UCODE_EQUIV_TYPE ) {
 		DBGC ( image, "UCODE %s+%#04zx unsupported equivalence table "
-		       "type %d\n", image->name, start, hdr.type );
+		       "type %d\n", image->name, start, hdr->type );
 		return -ENOTSUP;
 	}
-	if ( hdr.len > ( remaining - sizeof ( hdr ) ) ) {
+	if ( hdr->len > ( remaining - sizeof ( *hdr ) ) ) {
 		DBGC ( image, "UCODE %s+%#04zx truncated equivalence table\n",
 		       image->name, start );
 		return -EINVAL;
 	}
 
 	/* Count number of equivalence table entries */
-	offset = sizeof ( hdr );
-	for ( count = 0 ; offset < ( sizeof ( hdr ) + hdr.len ) ;
-	      count++, offset += sizeof ( equiv ) ) {
-		copy_from_user ( &equiv, image->data, ( start + offset ),
-				 sizeof ( equiv ) );
-		if ( ! equiv.signature )
+	offset = sizeof ( *hdr );
+	equiv = ( image->data + start + offset );
+	for ( count = 0 ; offset < ( sizeof ( *hdr ) + hdr->len ) ;
+	      count++, offset += sizeof ( *equiv ) ) {
+		if ( ! equiv[count].signature )
 			break;
 	}
 	DBGC2 ( image, "UCODE %s+%#04zx has %d equivalence table entries\n",
 		image->name, start, count );
 
 	/* Parse available updates */
-	offset = ( sizeof ( hdr ) + hdr.len );
+	offset = ( sizeof ( *hdr ) + hdr->len );
 	used = 0;
 	while ( used < count ) {
 
 		/* Read patch header */
-		if ( ( offset + sizeof ( phdr ) ) > remaining ) {
+		if ( ( offset + sizeof ( *phdr ) ) > remaining ) {
 			DBGC ( image, "UCODE %s+%#04zx truncated patch "
 			       "header\n", image->name, start );
 			return -EINVAL;
 		}
-		copy_from_user ( &phdr, image->data, ( start + offset ),
-				 sizeof ( phdr ) );
-		offset += sizeof ( phdr );
+		phdr = ( image->data + start + offset );
+		offset += sizeof ( *phdr );
 
 		/* Validate patch header */
-		if ( phdr.type != AMD_UCODE_PATCH_TYPE ) {
+		if ( phdr->type != AMD_UCODE_PATCH_TYPE ) {
 			DBGC ( image, "UCODE %s+%#04zx unsupported patch type "
-			       "%d\n", image->name, start, phdr.type );
+			       "%d\n", image->name, start, phdr->type );
 			return -ENOTSUP;
 		}
-		if ( phdr.len < sizeof ( patch ) ) {
+		if ( phdr->len < sizeof ( *patch ) ) {
 			DBGC ( image, "UCODE %s+%#04zx underlength patch\n",
 			       image->name, start );
 			return -EINVAL;
 		}
-		if ( phdr.len > ( remaining - offset ) ) {
+		if ( phdr->len > ( remaining - offset ) ) {
 			DBGC ( image, "UCODE %s+%#04zx truncated patch\n",
 			       image->name, start );
 			return -EINVAL;
 		}
 
 		/* Read patch and construct descriptor */
-		copy_from_user ( &patch, image->data, ( start + offset ),
-				 sizeof ( patch ) );
-		desc.version = patch.version;
+		patch = ( image->data + start + offset );
+		desc.version = patch->version;
 		desc.address = ( virt_to_phys ( image->data ) +
 				 start + offset );
-		offset += phdr.len;
+		offset += phdr->len;
 
 		/* Parse equivalence table to find matching signatures */
 		for ( i = 0 ; i < count ; i++ ) {
-			copy_from_user ( &equiv, image->data,
-					 ( start + sizeof ( hdr ) +
-					   ( i * ( sizeof ( equiv ) ) ) ),
-					 sizeof ( equiv ) );
-			if ( patch.id == equiv.id ) {
-				desc.signature = equiv.signature;
+			if ( patch->id == equiv[i].id ) {
+				desc.signature = equiv[i].signature;
 				ucode_describe ( image, start, &ucode_amd,
 						 &desc, 0, update );
 				used++;
@@ -743,19 +732,19 @@ static int ucode_exec ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int ucode_probe ( struct image *image ) {
-	union {
+	const union {
 		struct intel_ucode_header intel;
 		struct amd_ucode_header amd;
-	} header;
+	} *header;
 
 	/* Sanity check */
-	if ( image->len < sizeof ( header )  ) {
+	if ( image->len < sizeof ( *header )  ) {
 		DBGC ( image, "UCODE %s too short\n", image->name );
 		return -ENOEXEC;
 	}
 
 	/* Read first microcode image header */
-	copy_from_user ( &header, image->data, 0, sizeof ( header ) );
+	header = image->data;
 
 	/* Check for something that looks like an Intel update
 	 *
@@ -768,19 +757,19 @@ static int ucode_probe ( struct image *image ) {
 	 * the image, and do not want to have a microcode image
 	 * erroneously treated as a PXE boot executable.
 	 */
-	if ( ( header.intel.hver == INTEL_UCODE_HVER ) &&
-	     ( header.intel.lver == INTEL_UCODE_LVER ) &&
-	     ( ( header.intel.date.century == 0x19 ) ||
-	       ( ( header.intel.date.century >= 0x20 ) &&
-		 ( header.intel.date.century <= 0x29 ) ) ) ) {
+	if ( ( header->intel.hver == INTEL_UCODE_HVER ) &&
+	     ( header->intel.lver == INTEL_UCODE_LVER ) &&
+	     ( ( header->intel.date.century == 0x19 ) ||
+	       ( ( header->intel.date.century >= 0x20 ) &&
+		 ( header->intel.date.century <= 0x29 ) ) ) ) {
 		DBGC ( image, "UCODE %s+%#04zx looks like an Intel update\n",
 		       image->name, ( ( size_t ) 0 ) );
 		return 0;
 	}
 
 	/* Check for AMD update signature */
-	if ( ( header.amd.magic == AMD_UCODE_MAGIC ) &&
-	     ( header.amd.type == AMD_UCODE_EQUIV_TYPE ) ) {
+	if ( ( header->amd.magic == AMD_UCODE_MAGIC ) &&
+	     ( header->amd.type == AMD_UCODE_EQUIV_TYPE ) ) {
 		DBGC ( image, "UCODE %s+%#04zx looks like an AMD update\n",
 		       image->name, ( ( size_t ) 0 ) );
 		return 0;
