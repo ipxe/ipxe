@@ -45,61 +45,33 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FEATURE ( FEATURE_IMAGE, "SDI", DHCP_EB_FEATURE_SDI, 1 );
 
 /**
- * Parse SDI image header
- *
- * @v image		SDI file
- * @v sdi		SDI header to fill in
- * @ret rc		Return status code
- */
-static int sdi_parse_header ( struct image *image, struct sdi_header *sdi ) {
-
-	/* Sanity check */
-	if ( image->len < sizeof ( *sdi ) ) {
-		DBGC ( image, "SDI %p too short for SDI header\n", image );
-		return -ENOEXEC;
-	}
-
-	/* Read in header */
-	copy_from_user ( sdi, image->data, 0, sizeof ( *sdi ) );
-
-	/* Check signature */
-	if ( sdi->magic != SDI_MAGIC ) {
-		DBGC ( image, "SDI %p is not an SDI image\n", image );
-		return -ENOEXEC;
-	}
-
-	return 0;
-}
-
-/**
  * Execute SDI image
  *
  * @v image		SDI file
  * @ret rc		Return status code
  */
 static int sdi_exec ( struct image *image ) {
-	struct sdi_header sdi;
+	struct sdi_header *sdi;
 	uint32_t sdiptr;
-	int rc;
 
-	/* Parse image header */
-	if ( ( rc = sdi_parse_header ( image, &sdi ) ) != 0 )
-		return rc;
+	/* Sanity check */
+	assert ( image->len >= sizeof ( *sdi ) );
+	sdi = image->data;
 
 	/* Check that image is bootable */
-	if ( sdi.boot_size == 0 ) {
-		DBGC ( image, "SDI %p is not bootable\n", image );
+	if ( sdi->boot_size == 0 ) {
+		DBGC ( image, "SDI %s is not bootable\n", image->name );
 		return -ENOTTY;
 	}
-	DBGC ( image, "SDI %p image at %08lx+%08zx\n",
-	       image, virt_to_phys ( image->data ), image->len );
-	DBGC ( image, "SDI %p boot code at %08llx+%llx\n", image,
-	       ( virt_to_phys ( image->data ) + sdi.boot_offset ),
-	       sdi.boot_size );
+	DBGC ( image, "SDI %s image at %08lx+%08zx\n",
+	       image->name, virt_to_phys ( image->data ), image->len );
+	DBGC ( image, "SDI %s boot code at %08llx+%llx\n", image->name,
+	       ( virt_to_phys ( image->data ) + sdi->boot_offset ),
+	       sdi->boot_size );
 
 	/* Copy boot code */
 	memcpy ( real_to_virt ( SDI_BOOT_SEG, SDI_BOOT_OFF ),
-		 ( image->data + sdi.boot_offset ), sdi.boot_size );
+		 ( image->data + sdi->boot_offset ), sdi->boot_size );
 
 	/* Jump to boot code */
 	sdiptr = ( virt_to_phys ( image->data ) | SDI_WTF );
@@ -123,12 +95,22 @@ static int sdi_exec ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int sdi_probe ( struct image *image ) {
-	struct sdi_header sdi;
-	int rc;
+	const struct sdi_header *sdi;
 
-	/* Parse image */
-	if ( ( rc = sdi_parse_header ( image, &sdi ) ) != 0 )
-		return rc;
+	/* Sanity check */
+	if ( image->len < sizeof ( *sdi ) ) {
+		DBGC ( image, "SDI %s too short for SDI header\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+	sdi = image->data;
+
+	/* Check signature */
+	if ( sdi->magic != SDI_MAGIC ) {
+		DBGC ( image, "SDI %s is not an SDI image\n",
+		       image->name );
+		return -ENOEXEC;
+	}
 
 	return 0;
 }
