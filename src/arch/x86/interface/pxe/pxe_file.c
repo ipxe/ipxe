@@ -53,30 +53,20 @@ FEATURE ( FEATURE_MISC, "PXEXT", DHCP_EB_FEATURE_PXE_EXT, 2 );
  *
  */
 static PXENV_EXIT_t pxenv_file_open ( struct s_PXENV_FILE_OPEN *file_open ) {
-	userptr_t filename;
-	size_t filename_len;
+	const char *filename;
 	int fd;
 
 	DBG ( "PXENV_FILE_OPEN" );
 
-	/* Copy name from external program, and open it */
+	/* Open specified filename */
 	filename = real_to_virt ( file_open->FileName.segment,
 				  file_open->FileName.offset );
-	filename_len = strlen ( filename );
-	{
-		char uri_string[ filename_len + 1 ];
-
-		copy_from_user ( uri_string, filename, 0,
-				 sizeof ( uri_string ) );
-		DBG ( " %s", uri_string );
-		fd = open ( uri_string );
-	}
-
+	DBG ( " %s", filename );
+	fd = open ( filename );
 	if ( fd < 0 ) {
 		file_open->Status = PXENV_STATUS ( fd );
 		return PXENV_EXIT_FAILURE;
 	}
-
 	DBG ( " as file %d", fd );
 
 	file_open->FileHandle = fd;
@@ -210,27 +200,18 @@ pxenv_get_file_size ( struct s_PXENV_GET_FILE_SIZE *get_file_size ) {
  *
  */
 static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
-	userptr_t command;
-	size_t command_len;
+	const char *command;
 	int rc;
 
 	DBG ( "PXENV_FILE_EXEC" );
 
-	/* Copy name from external program, and exec it */
+	/* Execute specified command */
 	command = real_to_virt ( file_exec->Command.segment,
 				 file_exec->Command.offset );
-	command_len = strlen ( command );
-	{
-		char command_string[ command_len + 1 ];
-
-		copy_from_user ( command_string, command, 0,
-				 sizeof ( command_string ) );
-		DBG ( " %s", command_string );
-
-		if ( ( rc = system ( command_string ) ) != 0 ) {
-			file_exec->Status = PXENV_STATUS ( rc );
-			return PXENV_EXIT_FAILURE;
-		}
+	DBG ( " %s", command );
+	if ( ( rc = system ( command ) ) != 0 ) {
+		file_exec->Status = PXENV_STATUS ( rc );
+		return PXENV_EXIT_FAILURE;
 	}
 
 	file_exec->Status = PXENV_STATUS_SUCCESS;
@@ -251,8 +232,7 @@ static PXENV_EXIT_t pxenv_file_exec ( struct s_PXENV_FILE_EXEC *file_exec ) {
  */
 static PXENV_EXIT_t
 pxenv_file_cmdline ( struct s_PXENV_FILE_CMDLINE *file_cmdline ) {
-	userptr_t buffer;
-	size_t max_len;
+	char *buffer;
 	size_t len;
 
 	DBG ( "PXENV_FILE_CMDLINE to %04x:%04x+%04x \"%s\"\n",
@@ -262,12 +242,12 @@ pxenv_file_cmdline ( struct s_PXENV_FILE_CMDLINE *file_cmdline ) {
 	buffer = real_to_virt ( file_cmdline->Buffer.segment,
 				file_cmdline->Buffer.offset );
 	len = file_cmdline->BufferSize;
-	max_len = ( pxe_cmdline ?
-		    ( strlen ( pxe_cmdline ) + 1 /* NUL */ ) : 0 );
-	if ( len > max_len )
-		len = max_len;
-	copy_to_user ( buffer, 0, pxe_cmdline, len );
-	file_cmdline->BufferSize = max_len;
+	if ( pxe_cmdline ) {
+		len = snprintf ( buffer, len, "%s", pxe_cmdline );
+		file_cmdline->BufferSize = ( len + 1 /* NUL */ );
+	} else {
+		file_cmdline->BufferSize = 0;
+	}
 
 	file_cmdline->Status = PXENV_STATUS_SUCCESS;
 	return PXENV_EXIT_SUCCESS;
