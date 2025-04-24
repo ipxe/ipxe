@@ -85,8 +85,6 @@ struct pxe_api_call {
 	 * @ret exit		PXE API call exit code
 	 */
 	PXENV_EXIT_t ( * entry ) ( union u_PXENV_ANY *params );
-	/** Length of parameters */
-	uint16_t params_len;
 	/** Opcode */
 	uint16_t opcode;
 };
@@ -112,7 +110,6 @@ struct pxe_api_call {
 			 ( union u_PXENV_ANY *params ) ) _entry )	      \
 		   : ( ( PXENV_EXIT_t ( * )				      \
 			 ( union u_PXENV_ANY *params ) ) _entry ) ),	      \
-	.params_len = sizeof ( _params_type ),				      \
 	.opcode = _opcode,						      \
 	}
 
