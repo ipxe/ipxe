@@ -72,8 +72,7 @@ int efi_cachedhcp_record ( EFI_HANDLE device,
 
 	/* Record DHCPACK, if present */
 	if ( mode->DhcpAckReceived &&
-	     ( ( rc = cachedhcp_record ( &cached_dhcpack, vlan,
-					 virt_to_user ( &mode->DhcpAck ),
+	     ( ( rc = cachedhcp_record ( &cached_dhcpack, vlan, &mode->DhcpAck,
 					 sizeof ( mode->DhcpAck ) ) ) != 0 ) ) {
 		DBGC ( device, "EFI %s could not record DHCPACK: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
@@ -83,7 +82,7 @@ int efi_cachedhcp_record ( EFI_HANDLE device,
 	/* Record ProxyDHCPOFFER, if present */
 	if ( mode->ProxyOfferReceived &&
 	     ( ( rc = cachedhcp_record ( &cached_proxydhcp, vlan,
-					 virt_to_user ( &mode->ProxyOffer ),
+					 &mode->ProxyOffer,
 					 sizeof ( mode->ProxyOffer ) ) ) != 0)){
 		DBGC ( device, "EFI %s could not record ProxyDHCPOFFER: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
@@ -92,9 +91,8 @@ int efi_cachedhcp_record ( EFI_HANDLE device,
 
 	/* Record PxeBSACK, if present */
 	if ( mode->PxeReplyReceived &&
-	     ( ( rc = cachedhcp_record ( &cached_pxebs, vlan,
-					 virt_to_user ( &mode->PxeReply ),
-					 sizeof ( mode->PxeReply ) ) ) != 0)){
+	     ( ( rc = cachedhcp_record ( &cached_pxebs, vlan, &mode->PxeReply,
+					 sizeof ( mode->PxeReply ) ) ) != 0 )){
 		DBGC ( device, "EFI %s could not record PXEBSACK: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		return rc;

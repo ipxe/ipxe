@@ -121,7 +121,7 @@ struct golan_firmware_area {
 	 * final teardown, in order to avoid memory map changes at
 	 * runtime.
 	 */
-	userptr_t area;
+	void *area;
 };
 /* Queue Pair */
 #define GOLAN_SEND_WQE_BB_SIZE			64

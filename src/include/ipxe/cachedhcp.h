@@ -10,7 +10,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
-#include <ipxe/uaccess.h>
 
 struct net_device;
 struct cached_dhcp_packet;
@@ -20,7 +19,7 @@ extern struct cached_dhcp_packet cached_proxydhcp;
 extern struct cached_dhcp_packet cached_pxebs;
 
 extern int cachedhcp_record ( struct cached_dhcp_packet *cache,
-			      unsigned int vlan, userptr_t data,
+			      unsigned int vlan, const void *data,
 			      size_t max_len );
 extern void cachedhcp_recycle ( struct net_device *netdev );
 

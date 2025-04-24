@@ -177,12 +177,12 @@ static size_t efi_file_len ( struct efi_file *file ) {
  * Read chunk of EFI file
  *
  * @v reader		EFI file reader
- * @v data		Input data, or UNULL to zero-fill
+ * @v data		Input data, or NULL to zero-fill
  * @v len		Length of input data
  * @ret len		Length of output data
  */
 static size_t efi_file_read_chunk ( struct efi_file_reader *reader,
-				    userptr_t data, size_t len ) {
+				    const void *data, size_t len ) {
 	struct efi_file *file = reader->file;
 	size_t offset;
 
@@ -203,7 +203,7 @@ static size_t efi_file_read_chunk ( struct efi_file_reader *reader,
 
 	/* Copy or zero output data */
 	if ( data ) {
-		copy_from_user ( reader->data, data, offset, len );
+		memcpy ( reader->data, ( data + offset ), len );
 	} else {
 		memset ( reader->data, 0, len );
 	}
@@ -262,7 +262,7 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 			       efi_file_name ( file ), reader->pos,
 			       ( reader->pos + pad_len ) );
 		}
-		len += efi_file_read_chunk ( reader, UNULL, pad_len );
+		len += efi_file_read_chunk ( reader, NULL, pad_len );
 
 		/* Read CPIO header(s), if applicable */
 		name = cpio_name ( image );
@@ -274,13 +274,10 @@ static size_t efi_file_read_initrd ( struct efi_file_reader *reader ) {
 			       efi_file_name ( file ), reader->pos,
 			       ( reader->pos + cpio_len + pad_len ),
 			       image->name );
-			len += efi_file_read_chunk ( reader,
-						     virt_to_user ( &cpio ),
+			len += efi_file_read_chunk ( reader, &cpio,
 						     sizeof ( cpio ) );
-			len += efi_file_read_chunk ( reader,
-						     virt_to_user ( name ),
-						     name_len );
-			len += efi_file_read_chunk ( reader, UNULL, pad_len );
+			len += efi_file_read_chunk ( reader, name, name_len );
+			len += efi_file_read_chunk ( reader, NULL, pad_len );
 		}
 
 		/* Read file data */

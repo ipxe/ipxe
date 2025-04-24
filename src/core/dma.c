@@ -136,7 +136,7 @@ static void * dma_op_umalloc ( struct dma_device *dma,
 	struct dma_operations *op = dma->op;
 
 	if ( ! op )
-		return UNULL;
+		return NULL;
 	return op->umalloc ( dma, map, len, align );
 }
 

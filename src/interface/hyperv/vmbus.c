@@ -273,7 +273,7 @@ static int vmbus_negotiate_version ( struct hv_hypervisor *hv ) {
  * @v len		Length of data buffer
  * @ret gpadl		GPADL ID, or negative error
  */
-int vmbus_establish_gpadl ( struct vmbus_device *vmdev, userptr_t data,
+int vmbus_establish_gpadl ( struct vmbus_device *vmdev, void *data,
 			    size_t len ) {
 	struct hv_hypervisor *hv = vmdev->hv;
 	struct vmbus *vmbus = hv->vmbus;
@@ -442,7 +442,7 @@ int vmbus_open ( struct vmbus_device *vmdev,
 	memset ( ring, 0, len );
 
 	/* Establish GPADL for ring buffer */
-	gpadl = vmbus_establish_gpadl ( vmdev, virt_to_user ( ring ), len );
+	gpadl = vmbus_establish_gpadl ( vmdev, ring, len );
 	if ( gpadl < 0 ) {
 		rc = gpadl;
 		goto err_establish;

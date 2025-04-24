@@ -1037,7 +1037,7 @@ static int fdt_urealloc ( struct fdt *fdt, size_t len ) {
 	assert ( len >= fdt->used );
 
 	/* Attempt reallocation */
-	new = urealloc ( virt_to_user ( fdt->raw ), len );
+	new = urealloc ( fdt->raw, len );
 	if ( ! new ) {
 		DBGC ( fdt, "FDT could not reallocate from +%#04zx to "
 		       "+%#04zx\n", fdt->len, len );
@@ -1129,7 +1129,7 @@ int fdt_create ( struct fdt_header **hdr, const char *cmdline ) {
 	return 0;
 
  err_bootargs:
-	ufree ( virt_to_user ( fdt.raw ) );
+	ufree ( fdt.raw );
  err_alloc:
  err_image:
 	return rc;
@@ -1143,7 +1143,7 @@ int fdt_create ( struct fdt_header **hdr, const char *cmdline ) {
 void fdt_remove ( struct fdt_header *hdr ) {
 
 	/* Free modifiable copy */
-	ufree ( virt_to_user ( hdr ) );
+	ufree ( hdr );
 }
 
 /* Drag in objects via fdt_describe() */

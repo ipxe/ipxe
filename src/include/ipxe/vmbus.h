@@ -13,7 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uuid.h>
 #include <ipxe/device.h>
 #include <ipxe/tables.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/hyperv.h>
 
@@ -634,7 +633,7 @@ vmbus_gpadl_is_obsolete ( unsigned int gpadl ) {
 	return ( gpadl <= vmbus_obsolete_gpadl );
 }
 
-extern int vmbus_establish_gpadl ( struct vmbus_device *vmdev, userptr_t data,
+extern int vmbus_establish_gpadl ( struct vmbus_device *vmdev, void *data,
 				   size_t len );
 extern int vmbus_gpadl_teardown ( struct vmbus_device *vmdev,
 				  unsigned int gpadl );

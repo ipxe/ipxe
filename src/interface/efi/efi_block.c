@@ -110,8 +110,7 @@ static int efi_block_rw ( struct san_device *sandev, uint64_t lba,
 	}
 
 	/* Read from / write to block device */
-	if ( ( rc = sandev_rw ( sandev, lba, count,
-				virt_to_user ( data ) ) ) != 0 ) {
+	if ( ( rc = sandev_rw ( sandev, lba, count, data ) ) != 0 ) {
 		DBGC ( sandev->drive, "EFIBLK %#02x I/O failed: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		return rc;

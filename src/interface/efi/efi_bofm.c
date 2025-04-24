@@ -284,8 +284,7 @@ static int efi_bofm_start ( struct efi_device *efidev ) {
 			efi_handle_name ( device ) );
 		DBGC2_HD ( device, bofmtab2, bofmtab2->Parameters.Length );
 	}
-	bofmrc = bofm ( virt_to_user ( bofmtab2 ? bofmtab2 : bofmtab ),
-			&efipci.pci );
+	bofmrc = bofm ( ( bofmtab2 ? bofmtab2 : bofmtab ), &efipci.pci );
 	DBGC ( device, "EFIBOFM %s status %08x\n",
 	       efi_handle_name ( device ), bofmrc );
 	DBGC2 ( device, "EFIBOFM %s version 1 after processing:\n",

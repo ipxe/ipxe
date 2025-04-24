@@ -622,7 +622,7 @@ static int netvsc_buffer_copy ( struct vmbus_xfer_pages *pages, void *data,
 		return -ERANGE;
 
 	/* Copy data from buffer */
-	copy_from_user ( data, buffer->data, offset, len );
+	memcpy ( data, ( buffer->data + offset ), len );
 
 	return 0;
 }

@@ -10,7 +10,6 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/ib_packet.h>
 #include <ipxe/bofm.h>
 #include <ipxe/nvsvpd.h>
@@ -887,7 +886,7 @@ struct hermon {
 	 * final teardown, in order to avoid memory map changes at
 	 * runtime.
 	 */
-	userptr_t firmware_area;
+	void *firmware_area;
 	/** ICM map */
 	struct hermon_icm_map icm_map[HERMON_ICM_NUM_REGIONS];
 	/** ICM size */
@@ -900,7 +899,7 @@ struct hermon {
 	 * final teardown, in order to avoid memory map changes at
 	 * runtime.
 	 */
-	userptr_t icm;
+	void *icm;
 
 	/** Event queue */
 	struct hermon_event_queue eq;

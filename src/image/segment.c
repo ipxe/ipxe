@@ -57,7 +57,7 @@ struct errortab segment_errors[] __errortab = {
  * @v memsz		Size of the segment
  * @ret rc		Return status code
  */
-int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
+int prep_segment ( void *segment, size_t filesz, size_t memsz ) {
 	struct memory_map memmap;
 	physaddr_t start = virt_to_phys ( segment );
 	physaddr_t mid = ( start + filesz );

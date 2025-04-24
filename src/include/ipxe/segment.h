@@ -10,8 +10,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <ipxe/uaccess.h>
+#include <stdint.h>
 
-extern int prep_segment ( userptr_t segment, size_t filesz, size_t memsz );
+extern int prep_segment ( void *segment, size_t filesz, size_t memsz );
 
 #endif /* _IPXE_SEGMENT_H */

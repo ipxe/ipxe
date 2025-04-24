@@ -2422,7 +2422,7 @@ static void hermon_stop_firmware ( struct hermon *hermon ) {
 		DBGC ( hermon, "Hermon %p FATAL could not stop firmware: %s\n",
 		       hermon, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
-		hermon->firmware_area = UNULL;
+		hermon->firmware_area = NULL;
 		return;
 	}
 }

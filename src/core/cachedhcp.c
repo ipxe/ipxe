@@ -198,7 +198,7 @@ static int cachedhcp_apply ( struct cached_dhcp_packet *cache,
  * @ret rc		Return status code
  */
 int cachedhcp_record ( struct cached_dhcp_packet *cache, unsigned int vlan,
-		       userptr_t data, size_t max_len ) {
+		       const void *data, size_t max_len ) {
 	struct dhcp_packet *dhcppkt;
 	struct dhcp_packet *tmp;
 	struct dhcphdr *dhcphdr;
@@ -216,7 +216,7 @@ int cachedhcp_record ( struct cached_dhcp_packet *cache, unsigned int vlan,
 		return -ENOMEM;
 	}
 	dhcphdr = ( ( ( void * ) dhcppkt ) + sizeof ( *dhcppkt ) );
-	copy_from_user ( dhcphdr, data, 0, max_len );
+	memcpy ( dhcphdr, data, max_len );
 	dhcppkt_init ( dhcppkt, dhcphdr, max_len );
 
 	/* Shrink packet to required length.  If reallocation fails,

@@ -54,7 +54,7 @@ const char *pxe_cmdline;
  * @ret rc		Return status code
  */
 static int pxe_exec ( struct image *image ) {
-	userptr_t buffer = real_to_virt ( 0, 0x7c00 );
+	void *buffer = real_to_virt ( 0, 0x7c00 );
 	struct net_device *netdev;
 	int rc;
 

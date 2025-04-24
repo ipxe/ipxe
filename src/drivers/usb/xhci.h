@@ -11,7 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <assert.h>
 #include <ipxe/pci.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/usb.h>
 
 /** Minimum alignment required for data structures
@@ -1054,7 +1053,7 @@ struct xhci_scratchpad {
 	/** Number of page-sized scratchpad buffers */
 	unsigned int count;
 	/** Scratchpad buffer area */
-	userptr_t buffer;
+	void *buffer;
 	/** Buffer DMA mapping */
 	struct dma_mapping buffer_map;
 	/** Scratchpad array */

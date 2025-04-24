@@ -33,7 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/in.h>
 #include <ipxe/tftp.h>
 #include <ipxe/iobuf.h>
@@ -49,7 +48,7 @@ struct pxe_tftp_connection {
 	/** Data transfer interface */
 	struct interface xfer;
 	/** Data buffer */
-	userptr_t buffer;
+	void *buffer;
 	/** Size of data buffer */
 	size_t size;
 	/** Starting offset of data buffer */
@@ -121,9 +120,8 @@ static int pxe_tftp_xfer_deliver ( struct pxe_tftp_connection *pxe_tftp,
 		      ( pxe_tftp->start + pxe_tftp->size ) );
 		rc = -ENOBUFS;
 	} else {
-		copy_to_user ( pxe_tftp->buffer,
-			       ( pxe_tftp->offset - pxe_tftp->start ),
-			       iobuf->data, len );
+		memcpy ( ( pxe_tftp->buffer + pxe_tftp->offset -
+			   pxe_tftp->start ), iobuf->data, len );
 	}
 
 	/* Calculate new buffer position */
@@ -385,7 +383,7 @@ static PXENV_EXIT_t pxenv_tftp_read ( struct s_PXENV_TFTP_READ *tftp_read ) {
 	while ( ( ( rc = pxe_tftp.rc ) == -EINPROGRESS ) &&
 		( pxe_tftp.offset == pxe_tftp.start ) )
 		step();
-	pxe_tftp.buffer = UNULL;
+	pxe_tftp.buffer = NULL;
 	tftp_read->BufferSize = ( pxe_tftp.offset - pxe_tftp.start );
 	tftp_read->PacketNumber = ++pxe_tftp.blkidx;
 
@@ -496,7 +494,7 @@ PXENV_EXIT_t pxenv_tftp_read_file ( struct s_PXENV_TFTP_READ_FILE
 	pxe_tftp.size = tftp_read_file->BufferSize;
 	while ( ( rc = pxe_tftp.rc ) == -EINPROGRESS )
 		step();
-	pxe_tftp.buffer = UNULL;
+	pxe_tftp.buffer = NULL;
 	tftp_read_file->BufferSize = pxe_tftp.max_offset;
 
 	/* Close TFTP file */

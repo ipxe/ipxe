@@ -9,7 +9,6 @@
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/udp.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/process.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/malloc.h>
@@ -296,7 +295,7 @@ pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	};
 	size_t len;
 	struct io_buffer *iobuf;
-	userptr_t buffer;
+	const void *buffer;
 	int rc;
 
 	DBG ( "PXENV_UDP_WRITE" );
@@ -330,7 +329,7 @@ pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	}
 	buffer = real_to_virt ( pxenv_udp_write->buffer.segment,
 				pxenv_udp_write->buffer.offset );
-	copy_from_user ( iob_put ( iobuf, len ), buffer, 0, len );
+	memcpy ( iob_put ( iobuf, len ), buffer, len );
 
 	DBG ( " %04x:%04x+%x %d->%s:%d\n", pxenv_udp_write->buffer.segment,
 	      pxenv_udp_write->buffer.offset, pxenv_udp_write->buffer_size,
@@ -400,7 +399,7 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	struct pxe_udp_pseudo_header *pshdr;
 	uint16_t d_port_wanted = pxenv_udp_read->d_port;
 	uint16_t d_port;
-	userptr_t buffer;
+	void *buffer;
 	size_t len;
 
 	/* Try receiving a packet, if the queue is empty */
@@ -443,7 +442,7 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	len = iob_len ( iobuf );
 	if ( len > pxenv_udp_read->buffer_size )
 		len = pxenv_udp_read->buffer_size;
-	copy_to_user ( buffer, 0, iobuf->data, len );
+	memcpy ( buffer, iobuf->data, len );
 	pxenv_udp_read->buffer_size = len;
 
 	/* Fill in source/dest information */

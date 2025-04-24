@@ -177,7 +177,7 @@ struct nii_nic {
 	size_t mtu;
 
 	/** Hardware transmit/receive buffer */
-	userptr_t buffer;
+	void *buffer;
 	/** Hardware transmit/receive buffer length */
 	size_t buffer_len;
 

@@ -10,8 +10,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
 
-extern size_t largest_memblock ( userptr_t *start );
+extern size_t largest_memblock ( void **start );
 
 #endif /* _IPXE_MEMBLOCK_H */

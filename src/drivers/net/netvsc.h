@@ -305,7 +305,7 @@ struct netvsc_buffer {
 	/** Buffer length */
 	size_t len;
 	/** Buffer */
-	userptr_t data;
+	void *data;
 	/** GPADL ID */
 	unsigned int gpadl;
 };

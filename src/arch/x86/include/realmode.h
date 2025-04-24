@@ -87,7 +87,7 @@ real_to_virt ( unsigned int segment, unsigned int offset ) {
 static inline __always_inline void
 copy_to_real ( unsigned int dest_seg, unsigned int dest_off,
 	       void *src, size_t n ) {
-	copy_to_user ( real_to_virt ( dest_seg, dest_off ), 0, src, n );
+	memcpy ( real_to_virt ( dest_seg, dest_off ), src, n );
 }
 
 /**
@@ -101,7 +101,7 @@ copy_to_real ( unsigned int dest_seg, unsigned int dest_off,
 static inline __always_inline void
 copy_from_real ( void *dest, unsigned int src_seg,
 		 unsigned int src_off, size_t n ) {
-	copy_from_user ( dest, real_to_virt ( src_seg, src_off ), 0, n );
+	memcpy ( dest, real_to_virt ( src_seg, src_off ), n );
 }
 
 /**

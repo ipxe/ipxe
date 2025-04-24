@@ -26,7 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/init.h>
 #include <ipxe/pci.h>
 #include <ipxe/ethernet.h>
@@ -111,7 +110,7 @@ void bofm_test ( struct pci_device *pci ) {
 	printf ( "BOFMTEST performing harvest\n" );
 	bofmtab_harvest.en.busdevfn = pci->busdevfn;
 	DBG_HDA ( 0, &bofmtab_harvest, sizeof ( bofmtab_harvest ) );
-	bofmrc = bofm ( virt_to_user ( &bofmtab_harvest ), pci );
+	bofmrc = bofm ( &bofmtab_harvest, pci );
 	printf ( "BOFMTEST harvest result %08x\n", bofmrc );
 	if ( bofmtab_harvest.en.options & BOFM_EN_HVST ) {
 		printf ( "BOFMTEST harvested MAC address %s\n",
@@ -125,7 +124,7 @@ void bofm_test ( struct pci_device *pci ) {
 	printf ( "BOFMTEST performing update\n" );
 	bofmtab_update.en.busdevfn = pci->busdevfn;
 	DBG_HDA ( 0, &bofmtab_update, sizeof ( bofmtab_update ) );
-	bofmrc = bofm ( virt_to_user ( &bofmtab_update ), pci );
+	bofmrc = bofm ( &bofmtab_update, pci );
 	printf ( "BOFMTEST update result %08x\n", bofmrc );
 	if ( bofmtab_update.en.options & BOFM_EN_CSM_SUCCESS ) {
 		printf ( "BOFMTEST updated MAC address to %s\n",

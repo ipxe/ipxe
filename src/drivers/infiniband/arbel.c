@@ -2119,7 +2119,7 @@ static void arbel_stop_firmware ( struct arbel *arbel ) {
 		DBGC ( arbel, "Arbel %p FATAL could not stop firmware: %s\n",
 		       arbel, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
-		arbel->firmware_area = UNULL;
+		arbel->firmware_area = NULL;
 		return;
 	}
 }
