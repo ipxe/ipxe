@@ -62,10 +62,6 @@ static int digest_exec ( int argc, char **argv,
 	struct image *image;
 	uint8_t digest_ctx[digest->ctxsize];
 	uint8_t digest_out[digest->digestsize];
-	uint8_t buf[128];
-	size_t offset;
-	size_t len;
-	size_t frag_len;
 	int i;
 	unsigned j;
 	int rc;
@@ -79,20 +75,10 @@ static int digest_exec ( int argc, char **argv,
 		/* Acquire image */
 		if ( ( rc = imgacquire ( argv[i], 0, &image ) ) != 0 )
 			continue;
-		offset = 0;
-		len = image->len;
 
-		/* calculate digest */
+		/* Calculate digest */
 		digest_init ( digest, digest_ctx );
-		while ( len ) {
-			frag_len = len;
-			if ( frag_len > sizeof ( buf ) )
-				frag_len = sizeof ( buf );
-			copy_from_user ( buf, image->data, offset, frag_len );
-			digest_update ( digest, digest_ctx, buf, frag_len );
-			len -= frag_len;
-			offset += frag_len;
-		}
+		digest_update ( digest, digest_ctx, image->data, image->len );
 		digest_final ( digest, digest_ctx, digest_out );
 
 		for ( j = 0 ; j < sizeof ( digest_out ) ; j++ )
