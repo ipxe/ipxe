@@ -142,7 +142,7 @@ int pxe_probe ( struct image *image ) {
  * @ret rc		Return status code
  */
 int pxe_probe_no_mz ( struct image *image ) {
-	uint16_t magic;
+	const uint16_t *magic;
 	int rc;
 
 	/* Probe PXE image */
@@ -152,9 +152,9 @@ int pxe_probe_no_mz ( struct image *image ) {
 	/* Reject image with an "MZ" signature which may indicate an
 	 * EFI image incorrectly handed out to a BIOS system.
 	 */
-	if ( image->len >= sizeof ( magic ) ) {
-		copy_from_user ( &magic, image->data, 0, sizeof ( magic ) );
-		if ( magic == cpu_to_le16 ( EFI_IMAGE_DOS_SIGNATURE ) ) {
+	if ( image->len >= sizeof ( *magic ) ) {
+		magic = image->data;
+		if ( *magic == cpu_to_le16 ( EFI_IMAGE_DOS_SIGNATURE ) ) {
 			DBGC ( image, "IMAGE %p may be an EFI image\n",
 			       image );
 			return -ENOTTY;
