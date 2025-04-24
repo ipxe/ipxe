@@ -540,26 +540,23 @@ static void exanic_poll_tx ( struct net_device *netdev ) {
 static void exanic_poll_rx ( struct net_device *netdev ) {
 	struct exanic_port *port = netdev->priv;
 	struct exanic_rx_chunk *rx;
-	struct exanic_rx_descriptor desc;
+	unsigned int index;
 	uint8_t current;
 	uint8_t previous;
-	size_t offset;
 	size_t len;
 
 	for ( ; ; port->rx_cons++ ) {
 
 		/* Fetch descriptor */
-		offset = ( ( port->rx_cons * sizeof ( *rx ) ) % EXANIC_RX_LEN );
-		copy_from_user ( &desc, port->rx,
-				 ( offset + offsetof ( typeof ( *rx ), desc ) ),
-				 sizeof ( desc ) );
+		index = ( port->rx_cons % EXANIC_RX_COUNT );
+		rx = &port->rx[index];
 
 		/* Calculate generation */
-		current = ( port->rx_cons / ( EXANIC_RX_LEN / sizeof ( *rx ) ));
+		current = ( port->rx_cons / EXANIC_RX_COUNT );
 		previous = ( current - 1 );
 
 		/* Do nothing if no chunk is ready */
-		if ( desc.generation == previous )
+		if ( rx->desc.generation == previous )
 			break;
 
 		/* Allocate I/O buffer if needed */
@@ -573,14 +570,12 @@ static void exanic_poll_rx ( struct net_device *netdev ) {
 		}
 
 		/* Calculate chunk length */
-		len = ( desc.len ? desc.len : sizeof ( rx->data ) );
+		len = ( rx->desc.len ? rx->desc.len : sizeof ( rx->data ) );
 
 		/* Append data to I/O buffer */
 		if ( len <= iob_tailroom ( port->rx_iobuf ) ) {
-			copy_from_user ( iob_put ( port->rx_iobuf, len ),
-					 port->rx,
-					 ( offset + offsetof ( typeof ( *rx ),
-							       data ) ), len );
+			memcpy ( iob_put ( port->rx_iobuf, len ),
+				 rx->data, len );
 		} else {
 			DBGC ( port, "EXANIC %s RX too large\n",
 			       netdev->name );
@@ -589,23 +584,19 @@ static void exanic_poll_rx ( struct net_device *netdev ) {
 
 		/* Check for overrun */
 		rmb();
-		copy_from_user ( &desc.generation, port->rx,
-				 ( offset + offsetof ( typeof ( *rx ),
-						       desc.generation ) ),
-				 sizeof ( desc.generation ) );
-		if ( desc.generation != current ) {
+		if ( rx->desc.generation != current ) {
 			DBGC ( port, "EXANIC %s RX overrun\n", netdev->name );
 			port->rx_rc = -ENOBUFS;
 			continue;
 		}
 
 		/* Wait for end of packet */
-		if ( ! desc.len )
+		if ( ! rx->desc.len )
 			continue;
 
 		/* Check for receive errors */
-		if ( desc.status & EXANIC_STATUS_ERROR_MASK ) {
-			port->rx_rc = -EIO_STATUS ( desc.status );
+		if ( rx->desc.status & EXANIC_STATUS_ERROR_MASK ) {
+			port->rx_rc = -EIO_STATUS ( rx->desc.status );
 			DBGC ( port, "EXANIC %s RX %04x error: %s\n",
 			       netdev->name, port->rx_cons,
 			       strerror ( port->rx_rc ) );
