@@ -149,41 +149,38 @@ static const char * ucode_vendor_name ( const union ucode_vendor_id *vendor ) {
  *
  * @v update		Microcode update
  * @v control		Microcode update control
+ * @v status		Microcode update status
  * @v summary		Microcode update summary
  * @v id		APIC ID
  * @v optional		Status report is optional
  * @ret rc		Return status code
  */
-static int ucode_status ( struct ucode_update *update,
-			  struct ucode_control *control,
+static int ucode_status ( const struct ucode_update *update,
+			  const struct ucode_control *control,
+			  const struct ucode_status *status,
 			  struct ucode_summary *summary,
 			  unsigned int id, int optional ) {
-	struct ucode_status status;
 	struct ucode_descriptor *desc;
 
 	/* Sanity check */
 	assert ( id <= control->apic_max );
 
-	/* Read status report */
-	copy_from_user ( &status, phys_to_virt ( control->status ),
-			 ( id * sizeof ( status ) ), sizeof ( status ) );
-
 	/* Ignore empty optional status reports */
-	if ( optional && ( ! status.signature ) )
+	if ( optional && ( ! status->signature ) )
 		return 0;
 	DBGC ( update, "UCODE %#08x signature %#08x ucode %#08x->%#08x\n",
-	       id, status.signature, status.before, status.after );
+	       id, status->signature, status->before, status->after );
 
 	/* Check CPU signature */
-	if ( ! status.signature ) {
+	if ( ! status->signature ) {
 		DBGC2 ( update, "UCODE %#08x has no signature\n", id );
 		return -ENOENT;
 	}
 
 	/* Check APIC ID is correct */
-	if ( status.id != id ) {
+	if ( status->id != id ) {
 		DBGC ( update, "UCODE %#08x wrong APIC ID %#08x\n",
-		       id, status.id );
+		       id, status->id );
 		return -EINVAL;
 	}
 
@@ -195,29 +192,29 @@ static int ucode_status ( struct ucode_update *update,
 	}
 
 	/* Check microcode was not downgraded */
-	if ( status.after < status.before ) {
+	if ( status->after < status->before ) {
 		DBGC ( update, "UCODE %#08x was downgraded %#08x->%#08x\n",
-		       id, status.before, status.after );
+		       id, status->before, status->after );
 		return -ENOTTY;
 	}
 
 	/* Check that expected updates (if any) were applied */
 	for ( desc = update->desc ; desc->signature ; desc++ ) {
-		if ( ( desc->signature == status.signature ) &&
-		     ( status.after < desc->version ) ) {
+		if ( ( desc->signature == status->signature ) &&
+		     ( status->after < desc->version ) ) {
 			DBGC ( update, "UCODE %#08x failed update %#08x->%#08x "
-			       "(wanted %#08x)\n", id, status.before,
-			       status.after, desc->version );
+			       "(wanted %#08x)\n", id, status->before,
+			       status->after, desc->version );
 			return -EIO;
 		}
 	}
 
 	/* Update summary */
 	summary->count++;
-	if ( status.before < summary->low )
-		summary->low = status.before;
-	if ( status.after > summary->high )
-		summary->high = status.after;
+	if ( status->before < summary->low )
+		summary->low = status->before;
+	if ( status->after > summary->high )
+		summary->high = status->after;
 
 	return 0;
 }
@@ -231,13 +228,13 @@ static int ucode_status ( struct ucode_update *update,
  * @ret rc		Return status code
  */
 static int ucode_update_all ( struct image *image,
-			      struct ucode_update *update,
+			      const struct ucode_update *update,
 			      struct ucode_summary *summary ) {
 	struct ucode_control control;
 	struct ucode_vendor *vendor;
-	userptr_t status;
+	struct ucode_status *status;
 	unsigned int max;
-	unsigned int i;
+	unsigned int id;
 	size_t len;
 	int rc;
 
@@ -248,7 +245,7 @@ static int ucode_update_all ( struct image *image,
 
 	/* Allocate status reports */
 	max = mp_max_cpuid();
-	len = ( ( max + 1 ) * sizeof ( struct ucode_status ) );
+	len = ( ( max + 1 ) * sizeof ( *status ) );
 	status = umalloc ( len );
 	if ( ! status ) {
 		DBGC ( image, "UCODE %s could not allocate %d status reports\n",
@@ -274,8 +271,9 @@ static int ucode_update_all ( struct image *image,
 
 	/* Update microcode on boot processor */
 	mp_exec_boot ( ucode_update, &control );
-	if ( ( rc = ucode_status ( update, &control, summary,
-				   mp_boot_cpuid(), 0 ) ) != 0 ) {
+	id = mp_boot_cpuid();
+	if ( ( rc = ucode_status ( update, &control, &status[id],
+				   summary, id, 0 ) ) != 0 ) {
 		DBGC ( image, "UCODE %s failed on boot processor: %s\n",
 		       image->name, strerror ( rc ) );
 		goto err_boot;
@@ -293,9 +291,9 @@ static int ucode_update_all ( struct image *image,
 
 	/* Check status reports */
 	summary->count = 0;
-	for ( i = 0 ; i <= max ; i++ ) {
-		if ( ( rc = ucode_status ( update, &control, summary,
-					   i, 1 ) ) != 0 ) {
+	for ( id = 0 ; id <= max ; id++ ) {
+		if ( ( rc = ucode_status ( update, &control, &status[id],
+					   summary, id, 1 ) ) != 0 ) {
 			goto err_status;
 		}
 	}
