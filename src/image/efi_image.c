@@ -422,42 +422,40 @@ static int efi_pe_image_probe ( struct image *image ) {
 	const UINT16 magic = ( ( sizeof ( UINTN ) == sizeof ( uint32_t ) ) ?
 			       EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC :
 			       EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC );
-	union {
-		EFI_IMAGE_DOS_HEADER dos;
-		EFI_IMAGE_OPTIONAL_HEADER_UNION pe;
-	} u;
+	const EFI_IMAGE_DOS_HEADER *dos;
+	const EFI_IMAGE_OPTIONAL_HEADER_UNION *pe;
 
 	/* Check for existence of DOS header */
-	if ( image->len < sizeof ( u.dos ) ) {
+	if ( image->len < sizeof ( *dos ) ) {
 		DBGC ( image, "EFIIMAGE %s too short for DOS header\n",
 		       image->name );
 		return -ENOEXEC;
 	}
-	copy_from_user ( &u.dos, image->data, 0, sizeof ( u.dos ) );
-	if ( u.dos.e_magic != EFI_IMAGE_DOS_SIGNATURE ) {
+	dos = image->data;
+	if ( dos->e_magic != EFI_IMAGE_DOS_SIGNATURE ) {
 		DBGC ( image, "EFIIMAGE %s missing MZ signature\n",
 		       image->name );
 		return -ENOEXEC;
 	}
 
 	/* Check for existence of PE header */
-	if ( ( image->len < u.dos.e_lfanew ) ||
-	     ( ( image->len - u.dos.e_lfanew ) < sizeof ( u.pe ) ) ) {
+	if ( ( image->len < dos->e_lfanew ) ||
+	     ( ( image->len - dos->e_lfanew ) < sizeof ( *pe ) ) ) {
 		DBGC ( image, "EFIIMAGE %s too short for PE header\n",
 		       image->name );
 		return -ENOEXEC;
 	}
-	copy_from_user ( &u.pe, image->data, u.dos.e_lfanew, sizeof ( u.pe ) );
-	if ( u.pe.Pe32.Signature != EFI_IMAGE_NT_SIGNATURE ) {
+	pe = ( image->data + dos->e_lfanew );
+	if ( pe->Pe32.Signature != EFI_IMAGE_NT_SIGNATURE ) {
 		DBGC ( image, "EFIIMAGE %s missing PE signature\n",
 		       image->name );
 		return -ENOEXEC;
 	}
 
 	/* Check PE header magic */
-	if ( u.pe.Pe32.OptionalHeader.Magic != magic ) {
+	if ( pe->Pe32.OptionalHeader.Magic != magic ) {
 		DBGC ( image, "EFIIMAGE %s incorrect magic %04x\n",
-		       image->name, u.pe.Pe32.OptionalHeader.Magic );
+		       image->name, pe->Pe32.OptionalHeader.Magic );
 		return -ENOEXEC;
 	}
 
