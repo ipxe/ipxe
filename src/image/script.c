@@ -69,7 +69,7 @@ static int process_script ( struct image *image,
 	size_t line_offset;
 	char *label;
 	char *command;
-	off_t eol;
+	const void *eol;
 	size_t frag_len;
 	char *tmp;
 	int rc;
@@ -81,11 +81,13 @@ static int process_script ( struct image *image,
 	do {
 
 		/* Find length of next line, excluding any terminating '\n' */
-		eol = memchr_user ( image->data, script_offset, '\n',
-				    ( image->len - script_offset ) );
-		if ( eol < 0 )
-			eol = image->len;
-		frag_len = ( eol - script_offset );
+		eol = memchr ( ( image->data + script_offset ), '\n',
+			       ( image->len - script_offset ) );
+		if ( eol ) {
+			frag_len = ( ( eol - image->data ) - script_offset );
+		} else {
+			frag_len = ( image->len - script_offset );
+		}
 
 		/* Allocate buffer for line */
 		tmp = realloc ( line, ( len + frag_len + 1 /* NUL */ ) );
@@ -96,8 +98,8 @@ static int process_script ( struct image *image,
 		line = tmp;
 
 		/* Copy line */
-		copy_from_user ( ( line + len ), image->data, script_offset,
-				 frag_len );
+		memcpy ( ( line + len ), ( image->data + script_offset ),
+			 frag_len );
 		len += frag_len;
 
 		/* Move to next line in script */
@@ -220,20 +222,24 @@ static int script_probe ( struct image *image ) {
 	static const char ipxe_magic[] = "#!ipxe";
 	static const char gpxe_magic[] = "#!gpxe";
 	static_assert ( sizeof ( ipxe_magic ) == sizeof ( gpxe_magic ) );
-	char test[ sizeof ( ipxe_magic ) - 1 /* NUL */
-		   + 1 /* terminating space */];
+	const struct {
+		char magic[ sizeof ( ipxe_magic ) - 1 /* NUL */ ];
+		char space;
+	} __attribute__ (( packed )) *test;
 
 	/* Sanity check */
-	if ( image->len < sizeof ( test ) ) {
+	if ( image->len < sizeof ( *test ) ) {
 		DBGC ( image, "Too short to be a script\n" );
 		return -ENOEXEC;
 	}
 
 	/* Check for magic signature */
-	copy_from_user ( test, image->data, 0, sizeof ( test ) );
-	if ( ! ( ( ( memcmp ( test, ipxe_magic, sizeof ( test ) - 1 ) == 0 ) ||
-		   ( memcmp ( test, gpxe_magic, sizeof ( test ) - 1 ) == 0 )) &&
-		 isspace ( test[ sizeof ( test ) - 1 ] ) ) ) {
+	test = image->data;
+	if ( ! ( ( ( memcmp ( test->magic, ipxe_magic,
+			      sizeof ( test->magic ) ) == 0 ) ||
+		   ( memcmp ( test->magic, gpxe_magic,
+			      sizeof ( test->magic ) ) == 0 ) ) &&
+		 isspace ( test->space ) ) ) {
 		DBGC ( image, "Invalid magic signature\n" );
 		return -ENOEXEC;
 	}
