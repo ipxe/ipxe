@@ -12,7 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/ansiesc.h>
 #include <ipxe/utf8.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/console.h>
 
 /** Character width, in pixels */
@@ -38,9 +37,9 @@ struct fbcon_font {
 	 * Get character glyph
 	 *
 	 * @v character		Unicode character
-	 * @v glyph		Character glyph to fill in
+	 * @ret glyph		Character glyph
 	 */
-	void ( * glyph ) ( unsigned int character, uint8_t *glyph );
+	const uint8_t * ( * glyph ) ( unsigned int character );
 };
 
 /** A frame buffer geometry
@@ -100,19 +99,19 @@ struct fbcon_text_cell {
 /** A frame buffer text array */
 struct fbcon_text {
 	/** Stored text cells */
-	userptr_t start;
+	struct fbcon_text_cell *cells;
 };
 
 /** A frame buffer background picture */
 struct fbcon_picture {
 	/** Start address */
-	userptr_t start;
+	void *start;
 };
 
 /** A frame buffer console */
 struct fbcon {
 	/** Start address */
-	userptr_t start;
+	void *start;
 	/** Length of one complete displayed screen */
 	size_t len;
 	/** Pixel geometry */
@@ -149,7 +148,7 @@ struct fbcon {
 	int show_cursor;
 };
 
-extern int fbcon_init ( struct fbcon *fbcon, userptr_t start,
+extern int fbcon_init ( struct fbcon *fbcon, void *start,
 			struct fbcon_geometry *pixel,
 			struct fbcon_colour_map *map,
 			struct fbcon_font *font,

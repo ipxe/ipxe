@@ -103,7 +103,7 @@ struct vesafb {
 	/** Font definition */
 	struct fbcon_font font;
 	/** Character glyphs */
-	struct segoff glyphs;
+	const uint8_t *glyphs;
 	/** Saved VGA mode */
 	uint8_t saved_mode;
 };
@@ -140,11 +140,10 @@ static int vesafb_rc ( unsigned int status ) {
  * Get character glyph
  *
  * @v character		Unicode character
- * @v glyph		Character glyph to fill in
+ * @ret glyph		Character glyph
  */
-static void vesafb_glyph ( unsigned int character, uint8_t *glyph ) {
+static const uint8_t * vesafb_glyph ( unsigned int character ) {
 	unsigned int index;
-	size_t offset;
 
 	/* Identify glyph */
 	if ( character < VESAFB_ASCII ) {
@@ -155,10 +154,8 @@ static void vesafb_glyph ( unsigned int character, uint8_t *glyph ) {
 		index = VESAFB_UNKNOWN;
 	}
 
-	/* Copy glyph from BIOS font table */
-	offset = ( index * VESAFB_CHAR_HEIGHT );
-	copy_from_real ( glyph, vesafb.glyphs.segment,
-			 ( vesafb.glyphs.offset + offset ), VESAFB_CHAR_HEIGHT);
+	/* Return glyph in BIOS font table */
+	return &vesafb.glyphs[ index * VESAFB_CHAR_HEIGHT ];
 }
 
 /**
@@ -166,6 +163,7 @@ static void vesafb_glyph ( unsigned int character, uint8_t *glyph ) {
  *
  */
 static void vesafb_font ( void ) {
+	struct segoff glyphs;
 
 	/* Get font information
 	 *
@@ -186,12 +184,13 @@ static void vesafb_font ( void ) {
 					   "movw %%es, %%cx\n\t"
 					   "movw %%bp, %%dx\n\t"
 					   "popw %%bp\n\t" /* gcc bug */ )
-			       : "=c" ( vesafb.glyphs.segment ),
-				 "=d" ( vesafb.glyphs.offset )
+			       : "=c" ( glyphs.segment ),
+				 "=d" ( glyphs.offset )
 			       : "a" ( VBE_GET_FONT ),
 				 "b" ( VESAFB_FONT ) );
 	DBGC ( &vbe_buf, "VESAFB has font %04x at %04x:%04x\n",
-	       VESAFB_FONT, vesafb.glyphs.segment, vesafb.glyphs.offset );
+	       VESAFB_FONT, glyphs.segment, glyphs.offset );
+	vesafb.glyphs = real_to_virt ( glyphs.segment, glyphs.offset );
 	vesafb.font.height = VESAFB_CHAR_HEIGHT;
 	vesafb.font.glyph = vesafb_glyph;
 }
@@ -206,8 +205,8 @@ static void vesafb_font ( void ) {
  */
 static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 	struct vbe_controller_info *controller = &vbe_buf.controller;
-	userptr_t video_mode_ptr;
-	uint16_t mode_number;
+	const uint16_t *video_mode_ptr;
+	const uint16_t *mode_number;
 	uint16_t status;
 	size_t len;
 	int rc;
@@ -245,18 +244,16 @@ static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 	/* Calculate length of mode list */
 	video_mode_ptr = real_to_virt ( controller->video_mode_ptr.segment,
 					controller->video_mode_ptr.offset );
-	len = 0;
-	do {
-		copy_from_user ( &mode_number, video_mode_ptr, len,
-				 sizeof ( mode_number ) );
-		len += sizeof ( mode_number );
-	} while ( mode_number != VBE_MODE_END );
+	mode_number = video_mode_ptr;
+	while ( *(mode_number++) != VBE_MODE_END ) {}
+	len = ( ( ( const void * ) mode_number ) -
+		( ( const void * ) video_mode_ptr ) );
 
 	/* Allocate and fill mode list */
 	*mode_numbers = malloc ( len );
 	if ( ! *mode_numbers )
 		return -ENOMEM;
-	copy_from_user ( *mode_numbers, video_mode_ptr, 0, len );
+	memcpy ( *mode_numbers, video_mode_ptr, len );
 
 	return 0;
 }

@@ -42,6 +42,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/ansicol.h>
 #include <ipxe/fbcon.h>
 #include <ipxe/console.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/rotate.h>
 #include <config/console.h>
@@ -91,7 +92,7 @@ struct efifb {
 	/** Font definition */
 	struct fbcon_font font;
 	/** Character glyph cache */
-	userptr_t glyphs;
+	uint8_t *glyphs;
 	/** Dynamic characters in cache */
 	unsigned int dynamic[EFIFB_DYNAMIC];
 	/** Next dynamic character cache entry to evict */
@@ -117,14 +118,14 @@ static int efifb_draw ( unsigned int character, unsigned int index,
 	unsigned int height;
 	unsigned int x;
 	unsigned int y;
+	uint8_t *glyph;
 	uint8_t bitmask;
-	size_t offset;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Clear existing glyph */
-	offset = ( index * efifb.font.height );
-	memset ( ( efifb.glyphs + offset ), 0, efifb.font.height );
+	glyph = &efifb.glyphs[ index * efifb.font.height ];
+	memset ( glyph, 0, efifb.font.height );
 
 	/* Get glyph */
 	blt = NULL;
@@ -157,8 +158,7 @@ static int efifb_draw ( unsigned int character, unsigned int index,
 			pixel++;
 		}
 		bitmask ^= toggle;
-		copy_to_user ( efifb.glyphs, offset++, &bitmask,
-			       sizeof ( bitmask ) );
+		*(glyph++) = bitmask;
 	}
 
 	/* Free glyph */
@@ -223,11 +223,10 @@ static unsigned int efifb_dynamic ( unsigned int character ) {
  * Get character glyph
  *
  * @v character		Unicode character
- * @v glyph		Character glyph to fill in
+ * @ret glyph		Character glyph to fill in
  */
-static void efifb_glyph ( unsigned int character, uint8_t *glyph ) {
+static const uint8_t * efifb_glyph ( unsigned int character ) {
 	unsigned int index;
-	size_t offset;
 
 	/* Identify glyph */
 	if ( character < EFIFB_ASCII ) {
@@ -241,9 +240,8 @@ static void efifb_glyph ( unsigned int character, uint8_t *glyph ) {
 		index = efifb_dynamic ( character );
 	}
 
-	/* Copy cached glyph */
-	offset = ( index * efifb.font.height );
-	copy_from_user ( glyph, efifb.glyphs, offset, efifb.font.height );
+	/* Return cached glyph */
+	return &efifb.glyphs[ index * efifb.font.height ];
 }
 
 /**
