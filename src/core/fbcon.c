@@ -233,22 +233,46 @@ static void fbcon_redraw ( struct fbcon *fbcon ) {
  * @v fbcon		Frame buffer console
  */
 static void fbcon_scroll ( struct fbcon *fbcon ) {
-	size_t row_len;
+	const struct fbcon_text_cell *old;
+	struct fbcon_text_cell *new;
+	unsigned int xpos;
+	unsigned int ypos;
+	unsigned int character;
+	uint32_t foreground;
+	uint32_t background;
 
 	/* Sanity check */
 	assert ( fbcon->ypos == fbcon->character.height );
 
 	/* Scroll up character array */
-	row_len = ( fbcon->character.width * sizeof ( fbcon->text.cells[0] ) );
-	memmove ( fbcon_cell ( fbcon, 0, 0 ), fbcon_cell ( fbcon, 0, 1 ),
-		  ( row_len * ( fbcon->character.height - 1 ) ) );
-	fbcon_clear ( fbcon, ( fbcon->character.height - 1 ) );
+	new = fbcon_cell ( fbcon, 0, 0 );
+	old = fbcon_cell ( fbcon, 0, 1 );
+	for ( ypos = 0 ; ypos < ( fbcon->character.height - 1 ) ; ypos++ ) {
+		for ( xpos = 0 ; xpos < fbcon->character.width ; xpos++ ) {
+			/* Redraw character (if changed) */
+			character = old->character;
+			foreground = old->foreground;
+			background = old->background;
+			if ( ( new->character != character ) ||
+			     ( new->foreground != foreground ) ||
+			     ( new->background != background ) ) {
+				new->character = character;
+				new->foreground = foreground;
+				new->background = background;
+				fbcon_draw ( fbcon, new, xpos, ypos );
+			}
+			new++;
+			old++;
+		}
+	}
+
+	/* Clear bottom row */
+	fbcon_clear ( fbcon, ypos );
+	for ( xpos = 0 ; xpos < fbcon->character.width ; xpos++ )
+		fbcon_draw ( fbcon, new++, xpos, ypos );
 
 	/* Update cursor position */
 	fbcon->ypos--;
-
-	/* Redraw all characters */
-	fbcon_redraw ( fbcon );
 }
 
 /**
