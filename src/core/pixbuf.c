@@ -65,7 +65,8 @@ struct pixel_buffer * alloc_pixbuf ( unsigned int width, unsigned int height ) {
 	ref_init ( &pixbuf->refcnt, free_pixbuf );
 	pixbuf->width = width;
 	pixbuf->height = height;
-	pixbuf->len = ( width * height * sizeof ( uint32_t ) );
+	pixbuf->pixels = ( width * height );
+	pixbuf->len = ( pixbuf->pixels * sizeof ( uint32_t ) );
 
 	/* Check for multiplication overflow */
 	if ( ( width != 0 ) &&

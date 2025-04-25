@@ -22,6 +22,8 @@ struct pixel_buffer {
 	unsigned int height;
 	/** 32-bit (8:8:8:8) xRGB pixel data, in host-endian order */
 	uint32_t *data;
+	/** Total number of pixels */
+	unsigned int pixels;
 	/** Total length */
 	size_t len;
 };
