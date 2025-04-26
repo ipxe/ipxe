@@ -1,5 +1,5 @@
 #ifndef _IPXE_XENVER_H
-#define _IPXE_VENVER_H
+#define _IPXE_XENVER_H
 
 /** @file
  *
