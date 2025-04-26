@@ -18,7 +18,7 @@ struct eltorito_descriptor_fixed {
 	/** Descriptor type */
 	uint8_t type;
 	/** Identifier ("CD001") */
-	uint8_t id[5];
+	uint8_t id[6];
 	/** Version, must be 1 */
 	uint8_t version;
 	/** Boot system indicator; must be "EL TORITO SPECIFICATION" */

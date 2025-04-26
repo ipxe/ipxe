@@ -342,8 +342,7 @@ eeprom_rdy()
  * before
  */
 static int
-get_e(offset)
-int offset;
+get_e(int offset)
 {
 	if (!eeprom_rdy())
 		return (0xffff);

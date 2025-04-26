@@ -67,7 +67,7 @@ union ucode_vendor_id {
 	/** CPUID registers */
 	uint32_t dword[3];
 	/** Human-readable string */
-	uint8_t string[12];
+	uint8_t string[13];
 };
 
 /** A CPU vendor */

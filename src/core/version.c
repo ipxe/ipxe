@@ -121,4 +121,4 @@ const char build_name_prefix[] __attribute__ (( section ( ".prefix.name" ) ))
 #define SBAT_DATA SBAT_HEADER "" SBAT_IPXE "" SBAT_PRODUCT
 
 /** SBAT data (without any NUL terminator) */
-const char sbat[ sizeof ( SBAT_DATA ) - 1 ] __sbat = SBAT_DATA;
+const char sbat[ sizeof ( SBAT_DATA ) ] __sbat = SBAT_DATA;

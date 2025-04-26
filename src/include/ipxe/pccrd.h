@@ -23,7 +23,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** A PeerDist discovery reply block count */
 struct peerdist_discovery_block_count {
 	/** Count (as an eight-digit hex value) */
-	char hex[8];
+	char hex[9];
 } __attribute__ (( packed ));
 
 /** A PeerDist discovery reply */

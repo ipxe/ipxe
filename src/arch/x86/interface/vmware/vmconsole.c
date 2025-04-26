@@ -50,7 +50,7 @@ static int vmconsole_channel;
 
 /** VMware logfile console line buffer */
 static struct {
-	char prefix[4];
+	char prefix[5];
 	char message[VMCONSOLE_BUFSIZE];
 } vmconsole_buffer = {
 	.prefix = "log ",

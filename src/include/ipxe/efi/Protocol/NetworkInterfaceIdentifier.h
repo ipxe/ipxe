@@ -62,7 +62,7 @@ struct _EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL {
   UINT64     ImageAddr;     ///< The address of the first byte of the identifying structure for this
                             ///< network interface.  This is set to zero if there is no structure.
   UINT32     ImageSize;     ///< The size of unrelocated network interface image.
-  CHAR8      StringId[4];   ///< A four-character ASCII string that is sent in the class identifier field of
+  CHAR8      StringId[5];   ///< A four-character ASCII string that is sent in the class identifier field of
                             ///< option 60 in DHCP. For a Type of EfiNetworkInterfaceUndi, this field is UNDI.
   UINT8      Type;          ///< Network interface type. This will be set to one of the values
                             ///< in EFI_NETWORK_INTERFACE_TYPE.

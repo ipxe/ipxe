@@ -41,7 +41,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** An ACPI test table signature */
 union acpi_test_signature {
 	/** String */
-	char str[4];
+	char str[5];
 	/** Raw value */
 	uint32_t raw;
 };

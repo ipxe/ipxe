@@ -44,7 +44,7 @@ struct mschapv2_auth {
 	 * hexadecimal encoding of the actual authenticator response
 	 * value.  Joy.
 	 */
-	char wtf[42];
+	char wtf[43];
 } __attribute__ (( packed ));
 
 extern void mschapv2_response ( const char *username, const char *password,

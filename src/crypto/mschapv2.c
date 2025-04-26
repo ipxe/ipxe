@@ -96,11 +96,11 @@ union mschapv2_password_hash {
 };
 
 /** MS-CHAPv2 magic constant 1 */
-static const char mschapv2_magic1[39] =
+static const char mschapv2_magic1[40] =
 	"Magic server to client signing constant";
 
 /** MS-CHAPv2 magic constant 2 */
-static const char mschapv2_magic2[41] =
+static const char mschapv2_magic2[42] =
 	"Pad to make it do more than one iteration";
 
 /**

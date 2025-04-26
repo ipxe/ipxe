@@ -20,7 +20,7 @@ struct iso9660_primary_descriptor_fixed {
 	/** Descriptor type */
 	uint8_t type;
 	/** Identifier ("CD001") */
-	uint8_t id[5];
+	uint8_t id[6];
 } __attribute__ (( packed ));
 
 /** An ISO9660 Primary Volume Descriptor */
