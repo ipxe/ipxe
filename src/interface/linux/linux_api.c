@@ -225,6 +225,7 @@ int __asmcall linux_poll ( struct pollfd *fds, unsigned int nfds,
 	ret = poll ( fds, nfds, timeout );
 	if ( ret == -1 )
 		linux_errno = errno;
+	return ret;
 }
 
 /**
