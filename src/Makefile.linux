@@ -29,8 +29,12 @@ NON_AUTO_MEDIA = linux
 # Compiler flags for building host API wrapper
 #
 LINUX_CFLAGS	+= -Os -idirafter include -DSYMBOL_PREFIX=$(SYMBOL_PREFIX)
+LINUX_CFLAGS	+= -Wall -W
 ifneq ($(SYSROOT),)
 LINUX_CFLAGS	+= --sysroot=$(SYSROOT)
+endif
+ifneq ($(NO_WERROR),1)
+LINUX_CFLAGS	+= -Werror
 endif
 
 # Check for libslirp
