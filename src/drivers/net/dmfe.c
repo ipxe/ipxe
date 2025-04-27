@@ -435,7 +435,7 @@ static void dmfe_transmit(struct nic *nic,
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void dmfe_disable ( struct nic *nic __unused ) {
+static void dmfe_disable ( struct nic *nic __unused, void *hwdev __unused ) {
 	/* Reset & stop DM910X board */
 	outl(DM910X_RESET, BASE + DCR0);
 	udelay(5);

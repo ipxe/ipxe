@@ -644,7 +644,7 @@ static void depca_transmit(
 /**************************************************************************
 DISABLE - Turn off ethernet interface
 ***************************************************************************/
-static void depca_disable ( struct nic *nic ) {
+static void depca_disable ( struct nic *nic, void *hwdev __unused ) {
 	depca_reset(nic);
 
 	STOP_DEPCA(nic->ioaddr);

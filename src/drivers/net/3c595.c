@@ -443,7 +443,7 @@ vxsetlink(void)
     GO_WINDOW(1); 
 }
 
-static void t595_disable ( struct nic *nic ) {
+static void t595_disable ( struct nic *nic, void *hwdev __unused ) {
 
 	t595_reset(nic);
 

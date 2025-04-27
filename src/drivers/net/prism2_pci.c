@@ -44,7 +44,7 @@ static int prism2_pci_probe ( struct nic *nic, struct pci_device *pci ) {
   return prism2_probe ( nic, hw );
 }
 
-static void prism2_pci_disable ( struct nic *nic ) {
+static void prism2_pci_disable ( struct nic *nic, void *hwdev __unused ) {
   prism2_disable ( nic );
 }
 

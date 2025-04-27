@@ -597,7 +597,7 @@ static int ns8390_poll(struct nic *nic, int retrieve)
 /**************************************************************************
 NS8390_DISABLE - Turn off adapter
 **************************************************************************/
-static void ns8390_disable ( struct nic *nic ) {
+static void ns8390_disable ( struct nic *nic, void *hwdev __unused ) {
 	ns8390_reset(nic);
 }
 

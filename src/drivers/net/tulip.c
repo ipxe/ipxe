@@ -494,7 +494,7 @@ static void tulip_reset(struct nic *nic);
 static void tulip_transmit(struct nic *nic, const char *d, unsigned int t,
                            unsigned int s, const char *p);
 static int tulip_poll(struct nic *nic, int retrieve);
-static void tulip_disable(struct nic *nic);
+static void tulip_disable(struct nic *nic, void *hwdev);
 static void nway_start(struct nic *nic);
 static void pnic_do_nway(struct nic *nic);
 static void select_media(struct nic *nic, int startup);
@@ -1128,7 +1128,7 @@ static int tulip_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void tulip_disable ( struct nic *nic ) {
+static void tulip_disable ( struct nic *nic, void *hwdev __unused ) {
 
     whereami("tulip_disable\n");
 

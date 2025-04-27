@@ -217,8 +217,7 @@ static inline void * legacy_isa_get_drvdata ( void *hwdev ) {
 	}								  \
 	static inline void						  \
 	_name ## _disable ( struct nic *nic, void *hwdev ) {		  \
-		void ( * _unsafe_disable ) () = _disable;		  \
-		_unsafe_disable ( nic, hwdev );				  \
+		_disable ( nic, hwdev );				  \
 	}								  \
 	static inline int						  \
 	_name ## _pci_legacy_probe ( struct pci_device *pci ) {		  \

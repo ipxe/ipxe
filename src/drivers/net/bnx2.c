@@ -2671,6 +2671,12 @@ err_out_disable:
 	return 0;
 }
 
+static void
+bnx2_remove(struct nic *nic, void *hwdev __unused)
+{
+	bnx2_disable(nic);
+}
+
 static struct pci_device_id bnx2_nics[] = {
 	PCI_ROM(0x14e4, 0x164a, "bnx2-5706",        "Broadcom NetXtreme II BCM5706", 0),
 	PCI_ROM(0x14e4, 0x164c, "bnx2-5708",        "Broadcom NetXtreme II BCM5708", 0),
@@ -2680,7 +2686,7 @@ static struct pci_device_id bnx2_nics[] = {
 
 PCI_DRIVER ( bnx2_driver, bnx2_nics, PCI_NO_CLASS );
 
-DRIVER ( "BNX2", nic_driver, pci_driver, bnx2_driver, bnx2_probe, bnx2_disable );
+DRIVER ( "BNX2", nic_driver, pci_driver, bnx2_driver, bnx2_probe, bnx2_remove );
 
 /*
 static struct pci_driver bnx2_driver __pci_driver = {

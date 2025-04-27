@@ -609,7 +609,7 @@ static int amd8111e_poll(struct nic *nic, int retrieve)
 	return pkt_ok;
 }
 
-static void amd8111e_disable(struct nic *nic)
+static void amd8111e_disable(struct nic *nic, void *hwdev __unused)
 {
 	struct amd8111e_priv *lp = nic->priv_data;
 
