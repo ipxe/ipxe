@@ -368,6 +368,15 @@ WNAPM_FLAGS := $(shell $(WNAPM_TEST) && \
 WORKAROUND_CFLAGS += $(WNAPM_FLAGS)
 endif
 
+# gcc 15 generates warnings for fixed-length character array
+# initializers that lack a terminating NUL.  Inhibit the warnings.
+#
+WNUSI_TEST = $(CC) -Wunterminated-string-initialization -x c -c /dev/null \
+		   -o /dev/null >/dev/null 2>&1
+WNUSI_FLAGS := $(shell $(WNUSI_TEST) && \
+		 $(ECHO) '-Wno-unterminated-string-initialization')
+WORKAROUND_CFLAGS += $(WNUSI_FLAGS)
+
 # Some versions of gas choke on division operators, treating them as
 # comment markers.  Specifying --divide will work around this problem,
 # but isn't available on older gas versions.
