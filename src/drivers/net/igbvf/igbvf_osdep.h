@@ -35,8 +35,9 @@ FILE_LICENCE ( GPL2_ONLY );
 #ifndef _IGBVF_OSDEP_H_
 #define _IGBVF_OSDEP_H_
 
+#include <stdbool.h>
+
 #define u8         unsigned char
-#define bool       boolean_t
 #define dma_addr_t unsigned long
 #define __le16     uint16_t
 #define __le32     uint32_t
@@ -51,10 +52,6 @@ FILE_LICENCE ( GPL2_ONLY );
 #define ETH_FCS_LEN 4
 
 typedef int spinlock_t;
-typedef enum {
-    false = 0,
-    true = 1
-} boolean_t;
 
 #define usec_delay(x) udelay(x)
 #define msec_delay(x) mdelay(x)

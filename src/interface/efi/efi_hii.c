@@ -147,13 +147,13 @@ void efi_ifr_end_op ( struct efi_ifr_builder *ifr ) {
  */
 void efi_ifr_false_op ( struct efi_ifr_builder *ifr ) {
 	size_t dispaddr = ifr->ops_len;
-	EFI_IFR_FALSE *false;
+	EFI_IFR_FALSE *op;
 
 	/* Add opcode */
-	false = efi_ifr_op ( ifr, EFI_IFR_FALSE_OP, sizeof ( *false ) );
+	op = efi_ifr_op ( ifr, EFI_IFR_FALSE_OP, sizeof ( *op ) );
 
 	DBGC ( ifr, "IFR %p false\n", ifr );
-	DBGC2_HDA ( ifr, dispaddr, false, sizeof ( *false ) );
+	DBGC2_HDA ( ifr, dispaddr, op, sizeof ( *op ) );
 }
 
 /**
@@ -462,13 +462,13 @@ void efi_ifr_text_op ( struct efi_ifr_builder *ifr, unsigned int prompt_id,
  */
 void efi_ifr_true_op ( struct efi_ifr_builder *ifr ) {
 	size_t dispaddr = ifr->ops_len;
-	EFI_IFR_TRUE *true;
+	EFI_IFR_TRUE *op;
 
 	/* Add opcode */
-	true = efi_ifr_op ( ifr, EFI_IFR_TRUE_OP, sizeof ( *true ) );
+	op = efi_ifr_op ( ifr, EFI_IFR_TRUE_OP, sizeof ( *op ) );
 
 	DBGC ( ifr, "IFR %p true\n", ifr );
-	DBGC2_HDA ( ifr, dispaddr, true, sizeof ( *true ) );
+	DBGC2_HDA ( ifr, dispaddr, op, sizeof ( *op ) );
 }
 
 /**
