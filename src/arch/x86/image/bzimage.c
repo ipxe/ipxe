@@ -416,7 +416,7 @@ static size_t bzimage_load_initrd ( struct image *image,
 static int bzimage_check_initrds ( struct image *image,
 				   struct bzimage_context *bzimg ) {
 	struct image *initrd;
-	userptr_t bottom;
+	physaddr_t bottom;
 	size_t len = 0;
 	int rc;
 
@@ -437,7 +437,7 @@ static int bzimage_check_initrds ( struct image *image,
 	}
 
 	/* Calculate lowest usable address */
-	bottom = ( bzimg->pm_kernel + bzimg->pm_sz );
+	bottom = virt_to_phys ( bzimg->pm_kernel + bzimg->pm_sz );
 
 	/* Check that total length fits within space available for
 	 * reshuffling.  This is a conservative check, since CPIO
@@ -451,7 +451,7 @@ static int bzimage_check_initrds ( struct image *image,
 	}
 
 	/* Check that total length fits within kernel's memory limit */
-	if ( ( virt_to_phys ( bottom ) + len ) > bzimg->mem_limit ) {
+	if ( ( bottom + len ) > bzimg->mem_limit ) {
 		DBGC ( image, "bzImage %s not enough space for initrds\n",
 		       image->name );
 		return -ENOBUFS;
@@ -477,7 +477,7 @@ static void bzimage_load_initrds ( struct image *image,
 	size_t len;
 
 	/* Reshuffle initrds into desired order */
-	initrd_reshuffle ( bzimg->pm_kernel + bzimg->pm_sz );
+	initrd_reshuffle ( virt_to_phys ( bzimg->pm_kernel + bzimg->pm_sz ) );
 
 	/* Find highest initrd */
 	for_each_image ( initrd ) {

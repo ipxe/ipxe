@@ -9,7 +9,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <ipxe/uaccess.h>
+#include <stdint.h>
 
 /** Minimum free space required to reshuffle initrds
  *
@@ -17,7 +17,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define INITRD_MIN_FREE_LEN ( 512 * 1024 )
 
-extern void initrd_reshuffle ( userptr_t bottom );
-extern int initrd_reshuffle_check ( size_t len, userptr_t bottom );
+extern void initrd_reshuffle ( physaddr_t bottom );
+extern int initrd_reshuffle_check ( size_t len, physaddr_t bottom );
 
 #endif /* _INITRD_H */

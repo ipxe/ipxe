@@ -38,21 +38,22 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /** Maximum address available for initrd */
-userptr_t initrd_top;
+static physaddr_t initrd_top;
 
 /** Minimum address available for initrd */
-userptr_t initrd_bottom;
+static physaddr_t initrd_bottom;
 
 /**
  * Squash initrds as high as possible in memory
  *
- * @v top		Highest possible address
- * @ret used		Lowest address used by initrds
+ * @v top		Highest possible physical address
+ * @ret used		Lowest physical address used by initrds
  */
-static userptr_t initrd_squash_high ( userptr_t top ) {
-	userptr_t current = top;
+static physaddr_t initrd_squash_high ( physaddr_t top ) {
+	physaddr_t current = top;
 	struct image *initrd;
 	struct image *highest;
+	void *data;
 	size_t len;
 
 	/* Squash up any initrds already within or below the region */
@@ -61,9 +62,11 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 		/* Find the highest image not yet in its final position */
 		highest = NULL;
 		for_each_image ( initrd ) {
-			if ( ( initrd->data < current ) &&
+			data = initrd->data;
+			if ( ( virt_to_phys ( data ) < current ) &&
 			     ( ( highest == NULL ) ||
-			       ( initrd->data > highest->data ) ) ) {
+			       ( virt_to_phys ( data ) >
+				 virt_to_phys ( highest->data ) ) ) ) {
 				highest = initrd;
 			}
 		}
@@ -78,15 +81,15 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 		       "[%#08lx,%#08lx)\n", highest->name,
 		       virt_to_phys ( highest->data ),
 		       ( virt_to_phys ( highest->data ) + highest->len ),
-		       virt_to_phys ( current ),
-		       ( virt_to_phys ( current ) + highest->len ) );
-		memmove ( current, highest->data, highest->len );
-		highest->data = current;
+		       current, ( current + highest->len ) );
+		data = phys_to_virt ( current );
+		memmove ( data, highest->data, highest->len );
+		highest->data = data;
 	}
 
 	/* Copy any remaining initrds (e.g. embedded images) to the region */
 	for_each_image ( initrd ) {
-		if ( initrd->data >= top ) {
+		if ( virt_to_phys ( initrd->data ) >= top ) {
 			len = ( ( initrd->len + INITRD_ALIGN - 1 ) &
 				~( INITRD_ALIGN - 1 ) );
 			current -= len;
@@ -94,10 +97,10 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
 			       "[%#08lx,%#08lx)\n", initrd->name,
 			       virt_to_phys ( initrd->data ),
 			       ( virt_to_phys ( initrd->data ) + initrd->len ),
-			       virt_to_phys ( current ),
-			       ( virt_to_phys ( current ) + initrd->len ) );
-			memcpy ( current, initrd->data, initrd->len );
-			initrd->data = current;
+			       current, ( current + initrd->len ) );
+			data = phys_to_virt ( current );
+			memcpy ( data, initrd->data, initrd->len );
+			initrd->data = data;
 		}
 	}
 
@@ -113,7 +116,7 @@ static userptr_t initrd_squash_high ( userptr_t top ) {
  * @v free_len		Length of free space
  */
 static void initrd_swap ( struct image *low, struct image *high,
-			  userptr_t free, size_t free_len ) {
+			  void *free, size_t free_len ) {
 	size_t len = 0;
 	size_t frag_len;
 	size_t new_len;
@@ -158,11 +161,11 @@ static void initrd_swap ( struct image *low, struct image *high,
  * @v free_len		Length of free space
  * @ret swapped		A pair of initrds was swapped
  */
-static int initrd_swap_any ( userptr_t free, size_t free_len ) {
+static int initrd_swap_any ( void *free, size_t free_len ) {
 	struct image *low;
 	struct image *high;
 	size_t padded_len;
-	userptr_t adjacent;
+	void *adjacent;
 
 	/* Find any pair of initrds that can be swapped */
 	for_each_image ( low ) {
@@ -218,7 +221,7 @@ static void initrd_dump ( void ) {
 /**
  * Reshuffle initrds into desired order at top of memory
  *
- * @v bottom		Lowest address available for initrds
+ * @v bottom		Lowest physical address available for initrds
  *
  * After this function returns, the initrds have been rearranged in
  * memory and the external heap structures will have been corrupted.
@@ -226,10 +229,10 @@ static void initrd_dump ( void ) {
  * to the loaded OS kernel; no further execution within iPXE is
  * permitted.
  */
-void initrd_reshuffle ( userptr_t bottom ) {
-	userptr_t top;
-	userptr_t used;
-	userptr_t free;
+void initrd_reshuffle ( physaddr_t bottom ) {
+	physaddr_t top;
+	physaddr_t used;
+	void *free;
 	size_t free_len;
 
 	/* Calculate limits of available space for initrds */
@@ -238,16 +241,15 @@ void initrd_reshuffle ( userptr_t bottom ) {
 		bottom = initrd_bottom;
 
 	/* Debug */
-	DBGC ( &images, "INITRD region [%#08lx,%#08lx)\n",
-	       virt_to_phys ( bottom ), virt_to_phys ( top ) );
+	DBGC ( &images, "INITRD region [%#08lx,%#08lx)\n", bottom, top );
 	initrd_dump();
 
 	/* Squash initrds as high as possible in memory */
 	used = initrd_squash_high ( top );
 
 	/* Calculate available free space */
-	free = bottom;
-	free_len = ( used - free );
+	free = phys_to_virt ( bottom );
+	free_len = ( used - bottom );
 
 	/* Bubble-sort initrds into desired order */
 	while ( initrd_swap_any ( free, free_len ) ) {}
@@ -260,11 +262,11 @@ void initrd_reshuffle ( userptr_t bottom ) {
  * Check that there is enough space to reshuffle initrds
  *
  * @v len		Total length of initrds (including padding)
- * @v bottom		Lowest address available for initrds
+ * @v bottom		Lowest physical address available for initrds
  * @ret rc		Return status code
  */
-int initrd_reshuffle_check ( size_t len, userptr_t bottom ) {
-	userptr_t top;
+int initrd_reshuffle_check ( size_t len, physaddr_t bottom ) {
+	physaddr_t top;
 	size_t available;
 
 	/* Calculate limits of available space for initrds */
@@ -285,6 +287,7 @@ int initrd_reshuffle_check ( size_t len, userptr_t bottom ) {
  *
  */
 static void initrd_startup ( void ) {
+	void *bottom;
 	size_t len;
 
 	/* Record largest memory block available.  Do this after any
@@ -294,7 +297,8 @@ static void initrd_startup ( void ) {
 	 * but before any allocations for downloaded images (which we
 	 * can safely reuse when rearranging).
 	 */
-	len = largest_memblock ( &initrd_bottom );
+	len = largest_memblock ( &bottom );
+	initrd_bottom = virt_to_phys ( bottom );
 	initrd_top = ( initrd_bottom + len );
 }
 
