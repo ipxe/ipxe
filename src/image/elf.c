@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <elf.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/segment.h>
 #include <ipxe/image.h>
 #include <ipxe/elf.h>
@@ -48,9 +47,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v dest		Destination address
  * @ret rc		Return status code
  */
-static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
+static int elf_load_segment ( struct image *image, const Elf_Phdr *phdr,
 			      physaddr_t dest ) {
-	userptr_t buffer = phys_to_virt ( dest );
+	void *buffer = phys_to_virt ( dest );
 	int rc;
 
 	DBGC ( image, "ELF %s loading segment [%x,%x) to [%lx,%lx,%lx)\n",
@@ -82,9 +81,11 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
  * @ret max		Maximum used address
  * @ret rc		Return status code
  */
-static int elf_segment ( struct image *image, Elf_Ehdr *ehdr, Elf_Phdr *phdr,
+static int elf_segment ( struct image *image, const Elf_Ehdr *ehdr,
+			 const Elf_Phdr *phdr,
 			 int ( * process ) ( struct image *image,
-					     Elf_Phdr *phdr, physaddr_t dest ),
+					     const Elf_Phdr *phdr,
+					     physaddr_t dest ),
 			 physaddr_t *entry, physaddr_t *max ) {
 	physaddr_t dest;
 	physaddr_t end;
@@ -151,11 +152,12 @@ static int elf_segment ( struct image *image, Elf_Ehdr *ehdr, Elf_Phdr *phdr,
  * @ret max		Maximum used address
  * @ret rc		Return status code
  */
-int elf_segments ( struct image *image, Elf_Ehdr *ehdr,
-		   int ( * process ) ( struct image *image, Elf_Phdr *phdr,
+int elf_segments ( struct image *image, const Elf_Ehdr *ehdr,
+		   int ( * process ) ( struct image *image,
+				       const Elf_Phdr *phdr,
 				       physaddr_t dest ),
 		   physaddr_t *entry, physaddr_t *max ) {
-	Elf_Phdr phdr;
+	const Elf_Phdr *phdr;
 	Elf_Off phoff;
 	unsigned int phnum;
 	int rc;
@@ -169,13 +171,14 @@ int elf_segments ( struct image *image, Elf_Ehdr *ehdr,
 	/* Read and process ELF program headers */
 	for ( phoff = ehdr->e_phoff , phnum = ehdr->e_phnum ; phnum ;
 	      phoff += ehdr->e_phentsize, phnum-- ) {
-		if ( phoff > image->len ) {
+		if ( ( image->len < phoff ) ||
+		     ( ( image->len - phoff ) < sizeof ( *phdr ) ) ) {
 			DBGC ( image, "ELF %s program header %d outside "
 			       "image\n", image->name, phnum );
 			return -ENOEXEC;
 		}
-		copy_from_user ( &phdr, image->data, phoff, sizeof ( phdr ) );
-		if ( ( rc = elf_segment ( image, ehdr, &phdr, process,
+		phdr = ( image->data + phoff );
+		if ( ( rc = elf_segment ( image, ehdr, phdr, process,
 					  entry, max ) ) != 0 )
 			return rc;
 	}
@@ -206,19 +209,23 @@ int elf_load ( struct image *image, physaddr_t *entry, physaddr_t *max ) {
 		[EI_MAG3]	= ELFMAG3,
 		[EI_CLASS]	= ELFCLASS,
 	};
-	Elf_Ehdr ehdr;
+	const Elf_Ehdr *ehdr;
 	int rc;
 
 	/* Read ELF header */
-	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
-	if ( memcmp ( &ehdr.e_ident[EI_MAG0], e_ident,
-		      sizeof ( e_ident ) ) != 0 ) {
+	if ( image->len < sizeof ( *ehdr ) ) {
+		DBGC ( image, "ELF %s too short for ELF header\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+	ehdr = image->data;
+	if ( memcmp ( ehdr->e_ident, e_ident, sizeof ( e_ident ) ) != 0 ) {
 		DBGC ( image, "ELF %s has invalid signature\n", image->name );
 		return -ENOEXEC;
 	}
 
 	/* Load ELF segments into memory */
-	if ( ( rc = elf_segments ( image, &ehdr, elf_load_segment,
+	if ( ( rc = elf_segments ( image, ehdr, elf_load_segment,
 				   entry, max ) ) != 0 )
 		return rc;
 

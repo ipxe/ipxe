@@ -87,7 +87,7 @@ static int elfboot_exec ( struct image *image ) {
  * @v dest		Destination address
  * @ret rc		Return status code
  */
-static int elfboot_check_segment ( struct image *image, Elf_Phdr *phdr,
+static int elfboot_check_segment ( struct image *image, const Elf_Phdr *phdr,
 				   physaddr_t dest ) {
 
 	/* Check that ELF segment uses flat physical addressing */
@@ -107,7 +107,7 @@ static int elfboot_check_segment ( struct image *image, Elf_Phdr *phdr,
  * @ret rc		Return status code
  */
 static int elfboot_probe ( struct image *image ) {
-	Elf32_Ehdr ehdr;
+	const Elf32_Ehdr *ehdr;
 	static const uint8_t e_ident[] = {
 		[EI_MAG0]	= ELFMAG0,
 		[EI_MAG1]	= ELFMAG1,
@@ -122,14 +122,19 @@ static int elfboot_probe ( struct image *image ) {
 	int rc;
 
 	/* Read ELF header */
-	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
-	if ( memcmp ( ehdr.e_ident, e_ident, sizeof ( e_ident ) ) != 0 ) {
+	if ( image->len < sizeof ( *ehdr ) ) {
+		DBGC ( image, "ELF %s too short for ELF header\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+	ehdr = image->data;
+	if ( memcmp ( ehdr->e_ident, e_ident, sizeof ( e_ident ) ) != 0 ) {
 		DBGC ( image, "ELF %s invalid identifier\n", image->name );
 		return -ENOEXEC;
 	}
 
 	/* Check that this image uses flat physical addressing */
-	if ( ( rc = elf_segments ( image, &ehdr, elfboot_check_segment,
+	if ( ( rc = elf_segments ( image, ehdr, elfboot_check_segment,
 				   &entry, &max ) ) != 0 ) {
 		DBGC ( image, "ELF %s is not loadable: %s\n",
 		       image->name, strerror ( rc ) );

@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <realmode.h>
 #include <multiboot.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
 #include <ipxe/io.h>
@@ -86,14 +85,6 @@ FEATURE ( FEATURE_IMAGE, "MBOOT", DHCP_EB_FEATURE_MULTIBOOT, 1 );
  * allowed to ignore the optional feature flags.
  */
 #define MB_UNSUPPORTED_FLAGS ( MB_COMPULSORY_FLAGS & ~MB_SUPPORTED_FLAGS )
-
-/** A multiboot header descriptor */
-struct multiboot_header_info {
-	/** The actual multiboot header */
-	struct multiboot_header mb;
-	/** Offset of header within the multiboot image */
-	size_t offset;
-};
 
 /** Multiboot module command lines */
 static char __bss16_array ( mb_cmdlines, [MB_MAX_CMDLINE] );
@@ -267,82 +258,89 @@ static struct multiboot_module __bss16_array ( mbmodules, [MAX_MODULES] );
  * Find multiboot header
  *
  * @v image		Multiboot file
- * @v hdr		Multiboot header descriptor to fill in
- * @ret rc		Return status code
+ * @ret offset		Offset to Multiboot header, or negative error
  */
-static int multiboot_find_header ( struct image *image,
-				   struct multiboot_header_info *hdr ) {
-	uint32_t buf[64];
+static int multiboot_find_header ( struct image *image ) {
+	const struct multiboot_header *mb;
 	size_t offset;
-	unsigned int buf_idx;
 	uint32_t checksum;
 
-	/* Scan through first 8kB of image file 256 bytes at a time.
-	 * (Use the buffering to avoid the overhead of a
-	 * copy_from_user() for every dword.)
-	 */
-	for ( offset = 0 ; offset < 8192 ; offset += sizeof ( buf[0] ) ) {
+	/* Scan through first 8kB of image file */
+	for ( offset = 0 ; offset < 8192 ; offset += 4 ) {
 		/* Check for end of image */
-		if ( offset > image->len )
+		if ( ( offset + sizeof ( *mb ) ) > image->len )
 			break;
-		/* Refill buffer if applicable */
-		buf_idx = ( ( offset % sizeof ( buf ) ) / sizeof ( buf[0] ) );
-		if ( buf_idx == 0 ) {
-			copy_from_user ( buf, image->data, offset,
-					 sizeof ( buf ) );
-		}
+		mb = ( image->data + offset );
 		/* Check signature */
-		if ( buf[buf_idx] != MULTIBOOT_HEADER_MAGIC )
+		if ( mb->magic != MULTIBOOT_HEADER_MAGIC )
 			continue;
 		/* Copy header and verify checksum */
-		copy_from_user ( &hdr->mb, image->data, offset,
-				 sizeof ( hdr->mb ) );
-		checksum = ( hdr->mb.magic + hdr->mb.flags +
-			     hdr->mb.checksum );
+		checksum = ( mb->magic + mb->flags + mb->checksum );
 		if ( checksum != 0 )
 			continue;
-		/* Record offset of multiboot header and return */
-		hdr->offset = offset;
-		return 0;
+		/* Return header */
+		return offset;
 	}
 
 	/* No multiboot header found */
+	DBGC ( image, "MULTIBOOT %s has no multiboot header\n",
+	       image->name );
 	return -ENOEXEC;
 }
 
 /**
  * Load raw multiboot image into memory
  *
- * @v image		Multiboot file
- * @v hdr		Multiboot header descriptor
+ * @v image		Multiboot image
+ * @v offset		Offset to Multiboot header
  * @ret entry		Entry point
  * @ret max		Maximum used address
  * @ret rc		Return status code
  */
-static int multiboot_load_raw ( struct image *image,
-				struct multiboot_header_info *hdr,
+static int multiboot_load_raw ( struct image *image, size_t offset,
 				physaddr_t *entry, physaddr_t *max ) {
-	size_t offset;
+	const struct multiboot_header *mb = ( image->data + offset );
 	size_t filesz;
 	size_t memsz;
-	userptr_t buffer;
+	void *buffer;
 	int rc;
 
 	/* Sanity check */
-	if ( ! ( hdr->mb.flags & MB_FLAG_RAW ) ) {
+	if ( ! ( mb->flags & MB_FLAG_RAW ) ) {
 		DBGC ( image, "MULTIBOOT %s is not flagged as a raw image\n",
 		       image->name );
 		return -EINVAL;
 	}
 
-	/* Verify and prepare segment */
-	offset = ( hdr->offset - hdr->mb.header_addr + hdr->mb.load_addr );
-	filesz = ( hdr->mb.load_end_addr ?
-		   ( hdr->mb.load_end_addr - hdr->mb.load_addr ) :
+	/* Calculate starting offset within file */
+	if ( ( mb->load_addr > mb->header_addr ) ||
+	     ( ( mb->header_addr - mb->load_addr ) > offset ) ) {
+		DBGC ( image, "MULTIBOOT %s has misplaced header\n",
+		       image->name );
+		return -EINVAL;
+	}
+	offset -= ( mb->header_addr - mb->load_addr );
+	assert ( offset < image->len );
+
+	/* Calculate length of initialized data */
+	filesz = ( mb->load_end_addr ?
+		   ( mb->load_end_addr - mb->load_addr ) :
 		   ( image->len - offset ) );
-	memsz = ( hdr->mb.bss_end_addr ?
-		  ( hdr->mb.bss_end_addr - hdr->mb.load_addr ) : filesz );
-	buffer = phys_to_virt ( hdr->mb.load_addr );
+	if ( filesz > image->len ) {
+		DBGC ( image, "MULTIBOOT %s has overlength data\n",
+		       image->name );
+		return -EINVAL;
+	}
+
+	/* Calculate length of uninitialised data */
+	memsz = ( mb->bss_end_addr ?
+		  ( mb->bss_end_addr - mb->load_addr ) : filesz );
+	DBGC ( image, "MULTIBOOT %s loading [%zx,%zx) to [%x,%zx,%zx)\n",
+	       image->name, offset, ( offset + filesz ), mb->load_addr,
+	       ( mb->load_addr + filesz ), ( mb->load_addr + memsz ) );
+
+	/* Verify and prepare segment */
+	buffer = phys_to_virt ( mb->load_addr );
 	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
 		DBGC ( image, "MULTIBOOT %s could not prepare segment: %s\n",
 		       image->name, strerror ( rc ) );
@@ -353,8 +351,8 @@ static int multiboot_load_raw ( struct image *image,
 	memcpy ( buffer, ( image->data + offset ), filesz );
 
 	/* Record execution entry point and maximum used address */
-	*entry = hdr->mb.entry_addr;
-	*max = ( hdr->mb.load_addr + memsz );
+	*entry = mb->entry_addr;
+	*max = ( mb->load_addr + memsz );
 
 	return 0;
 }
@@ -388,22 +386,24 @@ static int multiboot_load_elf ( struct image *image, physaddr_t *entry,
  * @ret rc		Return status code
  */
 static int multiboot_exec ( struct image *image ) {
-	struct multiboot_header_info hdr;
+	const struct multiboot_header *mb;
 	physaddr_t entry;
 	physaddr_t max;
+	int offset;
 	int rc;
 
 	/* Locate multiboot header, if present */
-	if ( ( rc = multiboot_find_header ( image, &hdr ) ) != 0 ) {
-		DBGC ( image, "MULTIBOOT %s has no multiboot header\n",
-		       image->name );
+	offset = multiboot_find_header ( image );
+	if ( offset < 0 ) {
+		rc = offset;
 		return rc;
 	}
+	mb = ( image->data + offset );
 
 	/* Abort if we detect flags that we cannot support */
-	if ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) {
-		DBGC ( image, "MULTIBOOT %s flags %08x not supported\n",
-		       image->name, ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) );
+	if ( mb->flags & MB_UNSUPPORTED_FLAGS ) {
+		DBGC ( image, "MULTIBOOT %s flags %#08x not supported\n",
+		       image->name, ( mb->flags & MB_UNSUPPORTED_FLAGS ) );
 		return -ENOTSUP;
 	}
 
@@ -413,8 +413,10 @@ static int multiboot_exec ( struct image *image ) {
 	 * behaviour.
 	 */
 	if ( ( ( rc = multiboot_load_elf ( image, &entry, &max ) ) != 0 ) &&
-	     ( ( rc = multiboot_load_raw ( image, &hdr, &entry, &max ) ) != 0 ))
+	     ( ( rc = multiboot_load_raw ( image, offset, &entry,
+					   &max ) ) != 0 ) ) {
 		return rc;
+	}
 
 	/* Populate multiboot information structure */
 	memset ( &mbinfo, 0, sizeof ( mbinfo ) );
@@ -469,17 +471,19 @@ static int multiboot_exec ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int multiboot_probe ( struct image *image ) {
-	struct multiboot_header_info hdr;
+	const struct multiboot_header *mb;
+	int offset;
 	int rc;
 
 	/* Locate multiboot header, if present */
-	if ( ( rc = multiboot_find_header ( image, &hdr ) ) != 0 ) {
-		DBGC ( image, "MULTIBOOT %s has no multiboot header\n",
-		       image->name );
+	offset = multiboot_find_header ( image );
+	if ( offset < 0 ) {
+		rc = offset;
 		return rc;
 	}
-	DBGC ( image, "MULTIBOOT %s found header with flags %08x\n",
-	       image->name, hdr.mb.flags );
+	mb = ( image->data + offset );
+	DBGC ( image, "MULTIBOOT %s found header at +%#x with flags %#08x\n",
+	       image->name, offset, mb->flags );
 
 	return 0;
 }
