@@ -114,9 +114,7 @@ static void cmdline_strip ( char *cmdline, const char *cruft ) {
  * @ret rc		Return status code
  */
 static int cmdline_init ( void ) {
-	userptr_t cmdline_user;
 	char *cmdline;
-	size_t len;
 	int rc;
 
 	/* Do nothing if no command line was specified */
@@ -124,19 +122,15 @@ static int cmdline_init ( void ) {
 		DBGC ( colour, "RUNTIME found no command line\n" );
 		return 0;
 	}
-	cmdline_user = phys_to_virt ( cmdline_phys );
-	len = ( strlen ( cmdline_user ) + 1 /* NUL */ );
 
 	/* Allocate and copy command line */
-	cmdline_copy = malloc ( len );
+	cmdline_copy = strdup ( phys_to_virt ( cmdline_phys ) );
 	if ( ! cmdline_copy ) {
-		DBGC ( colour, "RUNTIME could not allocate %zd bytes for "
-		       "command line\n", len );
+		DBGC ( colour, "RUNTIME could not allocate command line\n" );
 		rc = -ENOMEM;
 		goto err_alloc_cmdline_copy;
 	}
 	cmdline = cmdline_copy;
-	copy_from_user ( cmdline, cmdline_user, 0, len );
 	DBGC ( colour, "RUNTIME found command line \"%s\" at %08x\n",
 	       cmdline, cmdline_phys );
 
@@ -151,7 +145,7 @@ static int cmdline_init ( void ) {
 	DBGC ( colour, "RUNTIME using command line \"%s\"\n", cmdline );
 
 	/* Prepare and register image */
-	cmdline_image.data = virt_to_user ( cmdline );
+	cmdline_image.data = cmdline;
 	cmdline_image.len = strlen ( cmdline );
 	if ( cmdline_image.len ) {
 		if ( ( rc = register_image ( &cmdline_image ) ) != 0 ) {
