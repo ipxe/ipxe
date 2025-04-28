@@ -124,8 +124,8 @@ static void multiboot_build_memmap ( struct image *image,
 	memset ( mbmemmap, 0, sizeof ( *mbmemmap ) );
 	for ( i = 0 ; i < memmap.count ; i++ ) {
 		if ( i >= limit ) {
-			DBGC ( image, "MULTIBOOT %p limit of %d memmap "
-			       "entries reached\n", image, limit );
+			DBGC ( image, "MULTIBOOT %s limit of %d memmap "
+			       "entries reached\n", image->name, limit );
 			break;
 		}
 		mbmemmap[i].size = ( sizeof ( mbmemmap[i] ) -
@@ -199,8 +199,8 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 	for_each_image ( module_image ) {
 
 		if ( mbinfo->mods_count >= limit ) {
-			DBGC ( image, "MULTIBOOT %p limit of %d modules "
-			       "reached\n", image, limit );
+			DBGC ( image, "MULTIBOOT %s limit of %d modules "
+			       "reached\n", image->name, limit );
 			break;
 		}
 
@@ -215,8 +215,8 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 		if ( ( rc = prep_segment ( phys_to_virt ( start ),
 					   module_image->len,
 					   module_image->len ) ) != 0 ) {
-			DBGC ( image, "MULTIBOOT %p could not prepare module "
-			       "%s: %s\n", image, module_image->name,
+			DBGC ( image, "MULTIBOOT %s could not prepare module "
+			       "%s: %s\n", image->name, module_image->name,
 			       strerror ( rc ) );
 			return rc;
 		}
@@ -231,8 +231,8 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 		module->mod_end = ( start + module_image->len );
 		module->string = multiboot_add_cmdline ( module_image );
 		module->reserved = 0;
-		DBGC ( image, "MULTIBOOT %p module %s is [%x,%x)\n",
-		       image, module_image->name, module->mod_start,
+		DBGC ( image, "MULTIBOOT %s module %s is [%x,%x)\n",
+		       image->name, module_image->name, module->mod_start,
 		       module->mod_end );
 		start += module_image->len;
 	}
@@ -330,8 +330,8 @@ static int multiboot_load_raw ( struct image *image,
 
 	/* Sanity check */
 	if ( ! ( hdr->mb.flags & MB_FLAG_RAW ) ) {
-		DBGC ( image, "MULTIBOOT %p is not flagged as a raw image\n",
-		       image );
+		DBGC ( image, "MULTIBOOT %s is not flagged as a raw image\n",
+		       image->name );
 		return -EINVAL;
 	}
 
@@ -344,8 +344,8 @@ static int multiboot_load_raw ( struct image *image,
 		  ( hdr->mb.bss_end_addr - hdr->mb.load_addr ) : filesz );
 	buffer = phys_to_virt ( hdr->mb.load_addr );
 	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
-		DBGC ( image, "MULTIBOOT %p could not prepare segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "MULTIBOOT %s could not prepare segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -373,8 +373,8 @@ static int multiboot_load_elf ( struct image *image, physaddr_t *entry,
 
 	/* Load ELF image*/
 	if ( ( rc = elf_load ( image, entry, max ) ) != 0 ) {
-		DBGC ( image, "MULTIBOOT %p ELF image failed to load: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "MULTIBOOT %s ELF image failed to load: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -395,15 +395,15 @@ static int multiboot_exec ( struct image *image ) {
 
 	/* Locate multiboot header, if present */
 	if ( ( rc = multiboot_find_header ( image, &hdr ) ) != 0 ) {
-		DBGC ( image, "MULTIBOOT %p has no multiboot header\n",
-		       image );
+		DBGC ( image, "MULTIBOOT %s has no multiboot header\n",
+		       image->name );
 		return rc;
 	}
 
 	/* Abort if we detect flags that we cannot support */
 	if ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) {
-		DBGC ( image, "MULTIBOOT %p flags %08x not supported\n",
-		       image, ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) );
+		DBGC ( image, "MULTIBOOT %s flags %08x not supported\n",
+		       image->name, ( hdr.mb.flags & MB_UNSUPPORTED_FLAGS ) );
 		return -ENOTSUP;
 	}
 
@@ -444,8 +444,8 @@ static int multiboot_exec ( struct image *image ) {
 				 ( sizeof(mbmemmap) / sizeof(mbmemmap[0]) ) );
 
 	/* Jump to OS with flat physical addressing */
-	DBGC ( image, "MULTIBOOT %p starting execution at %lx\n",
-	       image, entry );
+	DBGC ( image, "MULTIBOOT %s starting execution at %lx\n",
+	       image->name, entry );
 	__asm__ __volatile__ ( PHYS_CODE ( "pushl %%ebp\n\t"
 					   "call *%%edi\n\t"
 					   "popl %%ebp\n\t" )
@@ -454,7 +454,7 @@ static int multiboot_exec ( struct image *image ) {
 			           "D" ( entry )
 			       : "ecx", "edx", "esi", "memory" );
 
-	DBGC ( image, "MULTIBOOT %p returned\n", image );
+	DBGC ( image, "MULTIBOOT %s returned\n", image->name );
 
 	/* It isn't safe to continue after calling shutdown() */
 	while ( 1 ) {}
@@ -474,12 +474,12 @@ static int multiboot_probe ( struct image *image ) {
 
 	/* Locate multiboot header, if present */
 	if ( ( rc = multiboot_find_header ( image, &hdr ) ) != 0 ) {
-		DBGC ( image, "MULTIBOOT %p has no multiboot header\n",
-		       image );
+		DBGC ( image, "MULTIBOOT %s has no multiboot header\n",
+		       image->name );
 		return rc;
 	}
-	DBGC ( image, "MULTIBOOT %p found header with flags %08x\n",
-	       image, hdr.mb.flags );
+	DBGC ( image, "MULTIBOOT %s found header with flags %08x\n",
+	       image->name, hdr.mb.flags );
 
 	return 0;
 }

@@ -52,8 +52,8 @@ static int elfboot_exec ( struct image *image ) {
 
 	/* Load the image using core ELF support */
 	if ( ( rc = elf_load ( image, &entry, &max ) ) != 0 ) {
-		DBGC ( image, "ELF %p could not load: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "ELF %s could not load: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -63,14 +63,15 @@ static int elfboot_exec ( struct image *image ) {
 	shutdown_boot();
 
 	/* Jump to OS with flat physical addressing */
-	DBGC ( image, "ELF %p starting execution at %lx\n", image, entry );
+	DBGC ( image, "ELF %s starting execution at %lx\n",
+	       image->name, entry );
 	__asm__ __volatile__ ( PHYS_CODE ( "pushl %%ebp\n\t" /* gcc bug */
 					   "call *%%edi\n\t"
 					   "popl %%ebp\n\t" /* gcc bug */ )
 			       : : "D" ( entry )
 			       : "eax", "ebx", "ecx", "edx", "esi", "memory" );
 
-	DBGC ( image, "ELF %p returned\n", image );
+	DBGC ( image, "ELF %s returned\n", image->name );
 
 	/* It isn't safe to continue after calling shutdown() */
 	while ( 1 ) {}
@@ -91,8 +92,8 @@ static int elfboot_check_segment ( struct image *image, Elf_Phdr *phdr,
 
 	/* Check that ELF segment uses flat physical addressing */
 	if ( phdr->p_vaddr != dest ) {
-		DBGC ( image, "ELF %p uses virtual addressing (phys %x, "
-		       "virt %x)\n", image, phdr->p_paddr, phdr->p_vaddr );
+		DBGC ( image, "ELF %s uses virtual addressing (phys %x, virt "
+		       "%x)\n", image->name, phdr->p_paddr, phdr->p_vaddr );
 		return -ENOEXEC;
 	}
 
@@ -123,14 +124,15 @@ static int elfboot_probe ( struct image *image ) {
 	/* Read ELF header */
 	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
 	if ( memcmp ( ehdr.e_ident, e_ident, sizeof ( e_ident ) ) != 0 ) {
-		DBGC ( image, "Invalid ELF identifier\n" );
+		DBGC ( image, "ELF %s invalid identifier\n", image->name );
 		return -ENOEXEC;
 	}
 
 	/* Check that this image uses flat physical addressing */
 	if ( ( rc = elf_segments ( image, &ehdr, elfboot_check_segment,
 				   &entry, &max ) ) != 0 ) {
-		DBGC ( image, "Unloadable ELF image\n" );
+		DBGC ( image, "ELF %s is not loadable: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 

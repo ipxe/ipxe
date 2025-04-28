@@ -53,15 +53,15 @@ static int elf_load_segment ( struct image *image, Elf_Phdr *phdr,
 	userptr_t buffer = phys_to_virt ( dest );
 	int rc;
 
-	DBGC ( image, "ELF %p loading segment [%x,%x) to [%lx,%lx,%lx)\n",
-	       image, phdr->p_offset, ( phdr->p_offset + phdr->p_filesz ),
+	DBGC ( image, "ELF %s loading segment [%x,%x) to [%lx,%lx,%lx)\n",
+	       image->name, phdr->p_offset, ( phdr->p_offset + phdr->p_filesz ),
 	       dest, ( dest + phdr->p_filesz ), ( dest + phdr->p_memsz ) );
 
 	/* Verify and prepare segment */
 	if ( ( rc = prep_segment ( buffer, phdr->p_filesz,
 				   phdr->p_memsz ) ) != 0 ) {
-		DBGC ( image, "ELF %p could not prepare segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "ELF %s could not prepare segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -97,7 +97,7 @@ static int elf_segment ( struct image *image, Elf_Ehdr *ehdr, Elf_Phdr *phdr,
 
 	/* Check segment lies within image */
 	if ( ( phdr->p_offset + phdr->p_filesz ) > image->len ) {
-		DBGC ( image, "ELF %p segment outside image\n", image );
+		DBGC ( image, "ELF %s segment outside image\n", image->name );
 		return -ENOEXEC;
 	}
 
@@ -109,8 +109,8 @@ static int elf_segment ( struct image *image, Elf_Ehdr *ehdr, Elf_Phdr *phdr,
 	if ( ! dest )
 		dest = phdr->p_vaddr;
 	if ( ! dest ) {
-		DBGC ( image, "ELF %p segment loads to physical address 0\n",
-		       image );
+		DBGC ( image, "ELF %s segment loads to physical address 0\n",
+		       image->name );
 		return -ENOEXEC;
 	}
 	end = ( dest + phdr->p_memsz );
@@ -126,14 +126,14 @@ static int elf_segment ( struct image *image, Elf_Ehdr *ehdr, Elf_Phdr *phdr,
 	/* Set execution address, if it lies within this segment */
 	if ( ( e_offset = ( ehdr->e_entry - dest ) ) < phdr->p_filesz ) {
 		*entry = ehdr->e_entry;
-		DBGC ( image, "ELF %p found physical entry point at %lx\n",
-		       image, *entry );
+		DBGC ( image, "ELF %s found physical entry point at %lx\n",
+		       image->name, *entry );
 	} else if ( ( e_offset = ( ehdr->e_entry - phdr->p_vaddr ) )
 		    < phdr->p_filesz ) {
 		if ( ! *entry ) {
 			*entry = ( dest + e_offset );
-			DBGC ( image, "ELF %p found virtual entry point at %lx"
-			       " (virt %lx)\n", image, *entry,
+			DBGC ( image, "ELF %s found virtual entry point at %lx"
+			       " (virt %lx)\n", image->name, *entry,
 			       ( ( unsigned long ) ehdr->e_entry ) );
 		}
 	}
@@ -170,8 +170,8 @@ int elf_segments ( struct image *image, Elf_Ehdr *ehdr,
 	for ( phoff = ehdr->e_phoff , phnum = ehdr->e_phnum ; phnum ;
 	      phoff += ehdr->e_phentsize, phnum-- ) {
 		if ( phoff > image->len ) {
-			DBGC ( image, "ELF %p program header %d outside "
-			       "image\n", image, phnum );
+			DBGC ( image, "ELF %s program header %d outside "
+			       "image\n", image->name, phnum );
 			return -ENOEXEC;
 		}
 		copy_from_user ( &phdr, image->data, phoff, sizeof ( phdr ) );
@@ -182,8 +182,8 @@ int elf_segments ( struct image *image, Elf_Ehdr *ehdr,
 
 	/* Check for a valid execution address */
 	if ( ! *entry ) {
-		DBGC ( image, "ELF %p entry point %lx outside image\n",
-		       image, ( ( unsigned long ) ehdr->e_entry ) );
+		DBGC ( image, "ELF %s entry point %lx outside image\n",
+		       image->name, ( ( unsigned long ) ehdr->e_entry ) );
 		return -ENOEXEC;
 	}
 
@@ -213,7 +213,7 @@ int elf_load ( struct image *image, physaddr_t *entry, physaddr_t *max ) {
 	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
 	if ( memcmp ( &ehdr.e_ident[EI_MAG0], e_ident,
 		      sizeof ( e_ident ) ) != 0 ) {
-		DBGC ( image, "ELF %p has invalid signature\n", image );
+		DBGC ( image, "ELF %s has invalid signature\n", image->name );
 		return -ENOEXEC;
 	}
 
