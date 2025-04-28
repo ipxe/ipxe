@@ -102,8 +102,8 @@ static int bzimage_parse_header ( struct image *image,
 
 	/* Sanity check */
 	if ( image->len < ( BZI_HDR_OFFSET + sizeof ( bzimg->bzhdr ) ) ) {
-		DBGC ( image, "bzImage %p too short for kernel header\n",
-		       image );
+		DBGC ( image, "bzImage %s too short for kernel header\n",
+		       image->name );
 		return -ENOEXEC;
 	}
 
@@ -118,8 +118,8 @@ static int bzimage_parse_header ( struct image *image,
 	bzimg->rm_filesz = ( ( ( bzimg->bzhdr.setup_sects ?
 				 bzimg->bzhdr.setup_sects : 4 ) + 1 ) << 9 );
 	if ( bzimg->rm_filesz > image->len ) {
-		DBGC ( image, "bzImage %p too short for %zd byte of setup\n",
-		       image, bzimg->rm_filesz );
+		DBGC ( image, "bzImage %s too short for %zd byte of setup\n",
+		       image->name, bzimg->rm_filesz );
 		return -ENOEXEC;
 	}
 	bzimg->rm_memsz = BZI_ASSUMED_RM_SIZE;
@@ -130,7 +130,8 @@ static int bzimage_parse_header ( struct image *image,
 
 	/* Check for signatures and determine version */
 	if ( bzimg->bzhdr.boot_flag != BZI_BOOT_FLAG ) {
-		DBGC ( image, "bzImage %p missing 55AA signature\n", image );
+		DBGC ( image, "bzImage %s missing 55AA signature\n",
+		       image->name );
 		return -ENOEXEC;
 	}
 	if ( bzimg->bzhdr.header == BZI_SIGNATURE ) {
@@ -146,8 +147,9 @@ static int bzimage_parse_header ( struct image *image,
 		 */
 		bzimg->version = 0x0100;
 		if ( bzimg->bzhdr.syssize != syssize ) {
-			DBGC ( image, "bzImage %p bad syssize %x (expected "
-			       "%x)\n", image, bzimg->bzhdr.syssize, syssize );
+			DBGC ( image, "bzImage %s bad syssize %x (expected "
+			       "%x)\n", image->name, bzimg->bzhdr.syssize,
+			       syssize );
 			return -ENOEXEC;
 		}
 	}
@@ -183,8 +185,8 @@ static int bzimage_parse_header ( struct image *image,
 	bzimg->cmdline_size = ( ( bzimg->version >= 0x0206 ) ?
 				bzimg->bzhdr.cmdline_size : BZI_CMDLINE_SIZE );
 
-	DBGC ( image, "bzImage %p version %04x RM %#lx+%#zx PM %#lx+%#zx "
-	       "cmdlen %zd\n", image, bzimg->version,
+	DBGC ( image, "bzImage %s version %04x RM %#lx+%#zx PM %#lx+%#zx "
+	       "cmdlen %zd\n", image->name, bzimg->version,
 	       virt_to_phys ( bzimg->rm_kernel ), bzimg->rm_filesz,
 	       virt_to_phys ( bzimg->pm_kernel ), bzimg->pm_sz,
 	       bzimg->cmdline_size );
@@ -239,7 +241,8 @@ static void bzimage_update_header ( struct image *image,
 	copy_to_user ( dst, BZI_HDR_OFFSET, &bzimg->bzhdr,
 		       sizeof ( bzimg->bzhdr ) );
 
-	DBGC ( image, "bzImage %p vidmode %d\n", image, bzimg->vid_mode );
+	DBGC ( image, "bzImage %s vidmode %d\n",
+	       image->name, bzimg->vid_mode );
 }
 
 /**
@@ -270,8 +273,9 @@ static int bzimage_parse_cmdline ( struct image *image,
 		} else {
 			bzimg->vid_mode = strtoul ( vga, &end, 0 );
 			if ( *end ) {
-				DBGC ( image, "bzImage %p strange \"vga=\" "
-				       "terminator '%c'\n", image, *end );
+				DBGC ( image, "bzImage %s strange \"vga=\" "
+				       "terminator '%c'\n",
+				       image->name, *end );
 			}
 		}
 		if ( sep )
@@ -298,8 +302,8 @@ static int bzimage_parse_cmdline ( struct image *image,
 		case ' ':
 			break;
 		default:
-			DBGC ( image, "bzImage %p strange \"mem=\" "
-			       "terminator '%c'\n", image, *end );
+			DBGC ( image, "bzImage %s strange \"mem=\" "
+			       "terminator '%c'\n", image->name, *end );
 			break;
 		}
 		bzimg->mem_limit -= 1;
@@ -325,7 +329,8 @@ static void bzimage_set_cmdline ( struct image *image,
 		cmdline_len = bzimg->cmdline_size;
 	copy_to_user ( bzimg->rm_kernel, bzimg->rm_cmdline,
 		       cmdline, cmdline_len );
-	DBGC ( image, "bzImage %p command line \"%s\"\n", image, cmdline );
+	DBGC ( image, "bzImage %s command line \"%s\"\n",
+	       image->name, cmdline );
 }
 
 /**
@@ -382,8 +387,9 @@ static size_t bzimage_load_initrd ( struct image *image,
 			offset += ( cpio_len + cpio_pad_len ( cpio_len ) );
 		}
 		assert ( offset == len );
-		DBGC ( image, "bzImage %p initrd %p [%#08lx,%#08lx,%#08lx)"
-		       "%s%s\n", image, initrd, virt_to_phys ( address ),
+		DBGC ( image, "bzImage %s initrd %s [%#08lx,%#08lx,%#08lx)"
+		       "%s%s\n", image->name, initrd->name,
+		       virt_to_phys ( address ),
 		       ( virt_to_phys ( address ) + offset ),
 		       ( virt_to_phys ( address ) + offset + initrd->len ),
 		       ( filename ? " " : "" ), ( filename ? filename : "" ) );
@@ -421,8 +427,8 @@ static int bzimage_check_initrds ( struct image *image,
 		len += bzimage_load_initrd ( image, initrd, UNULL );
 		len = bzimage_align ( len );
 
-		DBGC ( image, "bzImage %p initrd %p from [%#08lx,%#08lx)%s%s\n",
-		       image, initrd, virt_to_phys ( initrd->data ),
+		DBGC ( image, "bzImage %s initrd %s from [%#08lx,%#08lx)%s%s\n",
+		       image->name, initrd->name, virt_to_phys ( initrd->data ),
 		       ( virt_to_phys ( initrd->data ) + initrd->len ),
 		       ( initrd->cmdline ? " " : "" ),
 		       ( initrd->cmdline ? initrd->cmdline : "" ) );
@@ -439,15 +445,15 @@ static int bzimage_check_initrds ( struct image *image,
 	 * doesn't hurt and keeps the code simple.
 	 */
 	if ( ( rc = initrd_reshuffle_check ( len, bottom ) ) != 0 ) {
-		DBGC ( image, "bzImage %p failed reshuffle check: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "bzImage %s failed reshuffle check: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Check that total length fits within kernel's memory limit */
 	if ( ( virt_to_phys ( bottom ) + len ) > bzimg->mem_limit ) {
-		DBGC ( image, "bzImage %p not enough space for initrds\n",
-		       image );
+		DBGC ( image, "bzImage %s not enough space for initrds\n",
+		       image->name );
 		return -ENOBUFS;
 	}
 
@@ -489,8 +495,8 @@ static void bzimage_load_initrds ( struct image *image,
 		top = phys_to_virt ( ( bzimg->mem_limit + 1 ) &
 				     ~( INITRD_ALIGN - 1 ) );
 	}
-	DBGC ( image, "bzImage %p loading initrds from %#08lx downwards\n",
-	       image, ( virt_to_phys ( top ) - 1UL ) );
+	DBGC ( image, "bzImage %s loading initrds from %#08lx downwards\n",
+	       image->name, ( virt_to_phys ( top ) - 1UL ) );
 
 	/* Load initrds in order */
 	for_each_image ( initrd ) {
@@ -516,8 +522,8 @@ static void bzimage_load_initrds ( struct image *image,
 		bzimg->ramdisk_size = ( virt_to_phys ( dest ) + len -
 					bzimg->ramdisk_image );
 	}
-	DBGC ( image, "bzImage %p initrds at [%#08lx,%#08lx)\n",
-	       image, bzimg->ramdisk_image,
+	DBGC ( image, "bzImage %s initrds at [%#08lx,%#08lx)\n",
+	       image->name, bzimg->ramdisk_image,
 	       ( bzimg->ramdisk_image + bzimg->ramdisk_size ) );
 }
 
@@ -539,14 +545,14 @@ static int bzimage_exec ( struct image *image ) {
 	/* Prepare segments */
 	if ( ( rc = prep_segment ( bzimg.rm_kernel, bzimg.rm_filesz,
 				   bzimg.rm_memsz ) ) != 0 ) {
-		DBGC ( image, "bzImage %p could not prepare RM segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "bzImage %s could not prepare RM segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 	if ( ( rc = prep_segment ( bzimg.pm_kernel, bzimg.pm_sz,
 				   bzimg.pm_sz ) ) != 0 ) {
-		DBGC ( image, "bzImage %p could not prepare PM segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "bzImage %s could not prepare PM segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -580,8 +586,8 @@ static int bzimage_exec ( struct image *image ) {
 	/* Update kernel header */
 	bzimage_update_header ( image, &bzimg, bzimg.rm_kernel );
 
-	DBGC ( image, "bzImage %p jumping to RM kernel at %04x:0000 "
-	       "(stack %04x:%04zx)\n", image, ( bzimg.rm_kernel_seg + 0x20 ),
+	DBGC ( image, "bzImage %s jumping to RM kernel at %04x:0000 (stack "
+	       "%04x:%04zx)\n", image->name, ( bzimg.rm_kernel_seg + 0x20 ),
 	       bzimg.rm_kernel_seg, bzimg.rm_heap );
 
 	/* Jump to the kernel */
