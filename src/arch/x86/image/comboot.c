@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <realmode.h>
 #include <basemem.h>
 #include <comboot.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
 #include <ipxe/init.h>
@@ -67,62 +66,53 @@ struct comboot_psp {
  *
  * @v image		COMBOOT image
  */
-static void comboot_copy_cmdline ( struct image * image, userptr_t seg_userptr ) {
+static void comboot_copy_cmdline ( struct image * image, void *seg ) {
 	const char *cmdline = ( image->cmdline ? image->cmdline : "" );
 	int cmdline_len = strlen ( cmdline );
+	uint8_t *psp_cmdline;
+
+	/* Limit length of command line */
 	if( cmdline_len > COMBOOT_MAX_CMDLINE_LEN )
 		cmdline_len = COMBOOT_MAX_CMDLINE_LEN;
-	uint8_t len_byte = cmdline_len;
-	char spc = ' ', cr = '\r';
 
 	/* Copy length to byte before command line */
-	copy_to_user ( seg_userptr, COMBOOT_PSP_CMDLINE_OFFSET - 1,
-	               &len_byte, 1 );
+	psp_cmdline = ( seg + COMBOOT_PSP_CMDLINE_OFFSET );
+	psp_cmdline[-1] = cmdline_len;
 
 	/* Command line starts with space */
-	copy_to_user ( seg_userptr,
-	               COMBOOT_PSP_CMDLINE_OFFSET,
-	               &spc, 1 );
+	psp_cmdline[0] = ' ';
 
 	/* Copy command line */
-	copy_to_user ( seg_userptr,
-	               COMBOOT_PSP_CMDLINE_OFFSET + 1,
-	               cmdline, cmdline_len );
+	memcpy ( &psp_cmdline[1], cmdline, cmdline_len );
 
 	/* Command line ends with CR */
-	copy_to_user ( seg_userptr,
-	               COMBOOT_PSP_CMDLINE_OFFSET + cmdline_len + 1,
-	               &cr, 1 );
+	psp_cmdline[ 1 + cmdline_len ] = '\r';
 }
 
 /**
  * Initialize PSP
  *
  * @v image		COMBOOT image
- * @v seg_userptr	segment to initialize
+ * @v seg		segment to initialize
  */
-static void comboot_init_psp ( struct image * image, userptr_t seg_userptr ) {
-	struct comboot_psp psp;
+static void comboot_init_psp ( struct image * image, void *seg ) {
+	struct comboot_psp *psp;
 
 	/* Fill PSP */
+	psp = seg;
 
 	/* INT 20h instruction, byte order reversed */
-	psp.int20 = 0x20CD;
+	psp->int20 = 0x20CD;
 
 	/* get_fbms() returns BIOS free base memory counter, which is in
 	 * kilobytes; x * 1024 / 16 == x * 64 == x << 6 */
-	psp.first_non_free_para = get_fbms() << 6;
+	psp->first_non_free_para = get_fbms() << 6;
 
 	DBGC ( image, "COMBOOT %p: first non-free paragraph = 0x%x\n",
-	       image, psp.first_non_free_para );
-
-	/* Copy the PSP to offset 0 of segment.
-	 * The rest of the PSP was already zeroed by
-	 * comboot_prepare_segment. */
-	copy_to_user ( seg_userptr, 0, &psp, sizeof( psp ) );
+	       image, psp->first_non_free_para );
 
 	/* Copy the command line to the PSP */
-	comboot_copy_cmdline ( image, seg_userptr );
+	comboot_copy_cmdline ( image, seg );
 }
 
 /**
@@ -132,7 +122,7 @@ static void comboot_init_psp ( struct image * image, userptr_t seg_userptr ) {
  * @ret rc		Return status code
  */
 static int comboot_exec_loop ( struct image *image ) {
-	userptr_t seg_userptr = real_to_virt ( COMBOOT_PSP_SEG, 0 );
+	void *seg = real_to_virt ( COMBOOT_PSP_SEG, 0 );
 	int state;
 
 	state = rmsetjmp ( comboot_return );
@@ -141,7 +131,7 @@ static int comboot_exec_loop ( struct image *image ) {
 	case 0: /* First time through; invoke COMBOOT program */
 
 		/* Initialize PSP */
-		comboot_init_psp ( image, seg_userptr );
+		comboot_init_psp ( image, seg );
 
 		/* Hook COMBOOT API interrupts */
 		hook_comboot_interrupts();
@@ -246,12 +236,12 @@ static int comboot_identify ( struct image *image ) {
  */
 static int comboot_prepare_segment ( struct image *image )
 {
-	userptr_t seg_userptr;
+	void *seg;
 	size_t filesz, memsz;
 	int rc;
 
 	/* Load image in segment */
-	seg_userptr = real_to_virt ( COMBOOT_PSP_SEG, 0 );
+	seg = real_to_virt ( COMBOOT_PSP_SEG, 0 );
 
 	/* Allow etra 0x100 bytes before image for PSP */
 	filesz = image->len + 0x100;
@@ -260,17 +250,17 @@ static int comboot_prepare_segment ( struct image *image )
 	memsz = 0xFFFF;
 
 	/* Prepare, verify, and load the real-mode segment */
-	if ( ( rc = prep_segment ( seg_userptr, filesz, memsz ) ) != 0 ) {
+	if ( ( rc = prep_segment ( seg, filesz, memsz ) ) != 0 ) {
 		DBGC ( image, "COMBOOT %p: could not prepare segment: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Zero PSP */
-	memset ( seg_userptr, 0, 0x100 );
+	memset ( seg, 0, 0x100 );
 
 	/* Copy image to segment:0100 */
-	memcpy ( ( seg_userptr + 0x100 ), image->data, image->len );
+	memcpy ( ( seg + 0x100 ), image->data, image->len );
 
 	return 0;
 }

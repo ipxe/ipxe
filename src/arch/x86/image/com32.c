@@ -162,15 +162,13 @@ static int com32_exec_loop ( struct image *image ) {
 static int com32_identify ( struct image *image ) {
 	const char *ext;
 	static const uint8_t magic[] = { 0xB8, 0xFF, 0x4C, 0xCD, 0x21 };
-	uint8_t buf[5];
 
-	if ( image->len >= 5 ) {
+	if ( image->len >= sizeof ( magic ) ) {
 		/* Check for magic number
 		 * mov eax,21cd4cffh
 		 * B8 FF 4C CD 21
 		 */
-		copy_from_user ( buf, image->data, 0, sizeof(buf) );
-		if ( ! memcmp ( buf, magic, sizeof(buf) ) ) {
+		if ( memcmp ( image->data, magic, sizeof ( magic) ) == 0 ) {
 			DBGC ( image, "COM32 %p: found magic number\n",
 			       image );
 			return 0;
@@ -206,7 +204,7 @@ static int com32_identify ( struct image *image ) {
  */
 static int com32_load_image ( struct image *image ) {
 	size_t filesz, memsz;
-	userptr_t buffer;
+	void *buffer;
 	int rc;
 
 	filesz = image->len;
@@ -230,20 +228,18 @@ static int com32_load_image ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int com32_prepare_bounce_buffer ( struct image * image ) {
-	unsigned int seg;
-	userptr_t seg_userptr;
+	void *seg;
 	size_t filesz, memsz;
 	int rc;
 
-	seg = COM32_BOUNCE_SEG;
-	seg_userptr = real_to_virt ( seg, 0 );
+	seg = real_to_virt ( COM32_BOUNCE_SEG, 0 );
 
 	/* Ensure the entire 64k segment is free */
 	memsz = 0xFFFF;
 	filesz = 0;
 
 	/* Prepare, verify, and load the real-mode segment */
-	if ( ( rc = prep_segment ( seg_userptr, filesz, memsz ) ) != 0 ) {
+	if ( ( rc = prep_segment ( seg, filesz, memsz ) ) != 0 ) {
 		DBGC ( image, "COM32 %p: could not prepare bounce buffer segment: %s\n",
 		       image, strerror ( rc ) );
 		return rc;
