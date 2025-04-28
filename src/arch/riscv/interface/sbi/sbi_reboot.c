@@ -37,13 +37,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Reboot system
  *
- * @v warm		Perform a warm reboot
+ * @v flags		Reboot flags
  */
-static void sbi_reboot ( int warm ) {
+static void sbi_reboot ( int flags ) {
 	struct sbi_return ret;
+	int warm;
 	int rc;
 
 	/* Reboot system */
+	warm = ( flags & REBOOT_WARM );
 	ret = sbi_ecall_2 ( SBI_SRST, SBI_SRST_SYSTEM_RESET,
 			    ( warm ? SBI_RESET_WARM : SBI_RESET_COLD ), 0 );
 

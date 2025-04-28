@@ -37,13 +37,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Reboot system
  *
- * @v warm		Perform a warm reboot
+ * @v flags		Reboot flags
  */
-static void efi_reboot ( int warm ) {
+static void efi_reboot ( int flags ) {
 	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	EFI_RESET_TYPE type;
 
 	/* Use runtime services to reset system */
-	rs->ResetSystem ( ( warm ? EfiResetWarm : EfiResetCold ), 0, 0, NULL );
+	type = ( ( flags & REBOOT_WARM ) ? EfiResetWarm : EfiResetCold );
+	rs->ResetSystem ( type, 0, 0, NULL );
 }
 
 /**

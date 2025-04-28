@@ -59,6 +59,7 @@ static struct command_descriptor reboot_cmd =
  */
 static int reboot_exec ( int argc, char **argv ) {
 	struct reboot_options opts;
+	int flags = 0;
 	int rc;
 
 	/* Parse options */
@@ -66,7 +67,9 @@ static int reboot_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Reboot system */
-	reboot ( opts.warm );
+	if ( opts.warm )
+		flags |= REBOOT_WARM;
+	reboot ( flags );
 
 	return 0;
 }
