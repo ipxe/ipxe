@@ -58,35 +58,36 @@ static struct profiler timer_irq_profiler __profiler = { .name = "irq.timer" };
 static struct profiler other_irq_profiler __profiler = { .name = "irq.other" };
 
 /**
- * Allocate space on the real-mode stack and copy data there from a
- * user buffer
+ * Allocate space on the real-mode stack and copy data there
  *
- * @v data		User buffer
+ * @v data		Stack data
  * @v size		Size of stack data
  * @ret sp		New value of real-mode stack pointer
  */
-uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size ) {
-	userptr_t rm_stack;
+uint16_t copy_to_rm_stack ( const void *data, size_t size ) {
+	void *rm_stack;
+
 	rm_sp -= size;
 	rm_stack = real_to_virt ( rm_ss, rm_sp );
 	memcpy ( rm_stack, data, size );
 	return rm_sp;
-};
+}
 
 /**
- * Deallocate space on the real-mode stack, optionally copying back
- * data to a user buffer.
+ * Deallocate space on the real-mode stack, optionally copying back data
  *
- * @v data		User buffer
+ * @v data		Stack data buffer, or NULL
  * @v size		Size of stack data
  */
-void remove_user_from_rm_stack ( userptr_t data, size_t size ) {
+void remove_from_rm_stack ( void *data, size_t size ) {
+	const void *rm_stack;
+
 	if ( data ) {
-		userptr_t rm_stack = real_to_virt ( rm_ss, rm_sp );
-		memcpy ( rm_stack, data, size );
+		rm_stack = real_to_virt ( rm_ss, rm_sp );
+		memcpy ( data, rm_stack, size );
 	}
 	rm_sp += size;
-};
+}
 
 /**
  * Set interrupt vector

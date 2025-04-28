@@ -188,8 +188,8 @@ extern const uint16_t __text16 ( rm_cs );
 extern const uint16_t __text16 ( rm_ds );
 #define rm_ds __use_text16 ( rm_ds )
 
-extern uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size );
-extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
+extern uint16_t copy_to_rm_stack ( const void *data, size_t size );
+extern void remove_from_rm_stack ( void *data, size_t size );
 
 /* CODE_DEFAULT: restore default .code32/.code64 directive */
 #ifdef __x86_64__
