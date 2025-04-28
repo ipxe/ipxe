@@ -27,9 +27,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 typedef void * userptr_t;
 
-/** Equivalent of NULL for user pointers */
-#define UNULL ( ( userptr_t ) 0 )
-
 /**
  * @defgroup uaccess_trivial Trivial user access API implementations
  *
