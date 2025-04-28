@@ -88,14 +88,9 @@ static uint16_t comboot_graphics_mode = 0;
  * Print a string with a particular terminator
  */
 static void print_user_string ( unsigned int segment, unsigned int offset, char terminator ) {
-	int i = 0;
-	char c;
-	userptr_t str = real_to_virt ( segment, offset );
-	for ( ; ; ) {
-		copy_from_user ( &c, str, i, 1 );
-		if ( c == terminator ) break;
-		putchar ( c );
-		i++;
+	char *c;
+	for ( c = real_to_virt ( segment, offset ) ; *c != terminator ; c++ ) {
+		putchar ( *c );
 	}
 }
 
@@ -109,26 +104,26 @@ static void shuffle ( unsigned int list_segment, unsigned int list_offset, unsig
 	unsigned int i;
 
 	/* Copy shuffle descriptor list so it doesn't get overwritten */
-	copy_from_user ( shuf, real_to_virt ( list_segment, list_offset ), 0,
-	                 count * sizeof( comboot_shuffle_descriptor ) );
+	memcpy ( shuf, real_to_virt ( list_segment, list_offset ),
+		 count * sizeof( comboot_shuffle_descriptor ) );
 
 	/* Do the copies */
 	for ( i = 0; i < count; i++ ) {
-		userptr_t src_u = phys_to_virt ( shuf[ i ].src );
-		userptr_t dest_u = phys_to_virt ( shuf[ i ].dest );
+		const void *src = phys_to_virt ( shuf[ i ].src );
+		void *dest = phys_to_virt ( shuf[ i ].dest );
 
 		if ( shuf[ i ].src == 0xFFFFFFFF ) {
 			/* Fill with 0 instead of copying */
-			memset ( dest_u, 0, shuf[ i ].len );
+			memset ( dest, 0, shuf[ i ].len );
 		} else if ( shuf[ i ].dest == 0xFFFFFFFF ) {
 			/* Copy new list of descriptors */
 			count = shuf[ i ].len / sizeof( comboot_shuffle_descriptor );
 			assert ( count <= COMBOOT_MAX_SHUFFLE_DESCRIPTORS );
-			copy_from_user ( shuf, src_u, 0, shuf[ i ].len );
+			memcpy ( shuf, src, shuf[ i ].len );
 			i = -1;
 		} else {
 			/* Regular copy */
-			memmove ( dest_u, src_u, shuf[ i ].len );
+			memmove ( dest, src, shuf[ i ].len );
 		}
 	}
 }
@@ -164,7 +159,7 @@ void comboot_force_text_mode ( void ) {
 /**
  * Fetch kernel and optional initrd
  */
-static int comboot_fetch_kernel ( char *kernel_file, char *cmdline ) {
+static int comboot_fetch_kernel ( const char *kernel_file, char *cmdline ) {
 	struct image *kernel;
 	struct image *initrd;
 	char *initrd_file;
@@ -346,10 +341,8 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 
 	case 0x0003: /* Run command */
 		{
-			userptr_t cmd_u = real_to_virt ( ix86->segs.es, ix86->regs.bx );
-			int len = strlen ( cmd_u );
-			char cmd[len + 1];
-			copy_from_user ( cmd, cmd_u, 0, len + 1 );
+			const char *cmd = real_to_virt ( ix86->segs.es,
+							 ix86->regs.bx );
 			DBG ( "COMBOOT: executing command '%s'\n", cmd );
 			system ( cmd );
 			DBG ( "COMBOOT: exiting after executing command...\n" );
@@ -370,11 +363,8 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 	case 0x0006: /* Open file */
 		{
 			int fd;
-			userptr_t file_u = real_to_virt ( ix86->segs.es, ix86->regs.si );
-			int len = strlen ( file_u );
-			char file[len + 1];
-
-			copy_from_user ( file, file_u, 0, len + 1 );
+			const char *file = real_to_virt ( ix86->segs.es,
+							  ix86->regs.si );
 
 			if ( file[0] == '\0' ) {
 				DBG ( "COMBOOT: attempted open with empty file name\n" );
@@ -484,12 +474,9 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 
 	case 0x0010: /* Resolve hostname */
 		{
-			userptr_t hostname_u = real_to_virt ( ix86->segs.es, ix86->regs.bx );
-			int len = strlen ( hostname_u );
-			char hostname[len];
+			const char *hostname = real_to_virt ( ix86->segs.es,
+							      ix86->regs.bx );
 			struct in_addr addr;
-
-			copy_from_user ( hostname, hostname_u, 0, len + 1 );
 
 			/* TODO:
 			 * "If the hostname does not contain a dot (.), the
@@ -550,15 +537,10 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 
 	case 0x0016: /* Run kernel image */
 		{
-			userptr_t file_u = real_to_virt ( ix86->segs.ds, ix86->regs.si );
-			userptr_t cmd_u = real_to_virt ( ix86->segs.es, ix86->regs.bx );
-			int file_len = strlen ( file_u );
-			int cmd_len = strlen ( cmd_u );
-			char file[file_len + 1];
-			char cmd[cmd_len + 1];
-
-			copy_from_user ( file, file_u, 0, file_len + 1 );
-			copy_from_user ( cmd, cmd_u, 0, cmd_len + 1 );
+			const char *file = real_to_virt ( ix86->segs.ds,
+							  ix86->regs.si );
+			char *cmd = real_to_virt ( ix86->segs.es,
+						   ix86->regs.bx );
 
 			DBG ( "COMBOOT: run kernel %s %s\n", file, cmd );
 			comboot_fetch_kernel ( file, cmd );
