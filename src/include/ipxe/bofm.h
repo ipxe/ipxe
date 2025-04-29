@@ -328,6 +328,9 @@ struct bofm_operations {
 #define __bofm_driver
 #endif
 
+/** Declare a BOFM test driver */
+#define __bofm_test_driver __table_entry ( BOFM_DRIVERS, 02 )
+
 /**
  * Initialise BOFM device
  *
