@@ -35,7 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/pccrc.h>
 #include <ipxe/sha256.h>
 #include <ipxe/sha512.h>
@@ -362,11 +361,10 @@ static void peerdist_info_okx ( struct peerdist_info_test *test,
 				const char *file, unsigned int line ) {
 
 	/* Parse content information */
-	okx ( peerdist_info ( virt_to_user ( test->data ), test->len,
-			      info ) == 0, file, line );
+	okx ( peerdist_info ( test->data, test->len, info ) == 0, file, line );
 
 	/* Verify content information */
-	okx ( info->raw.data == virt_to_user ( test->data ), file, line );
+	okx ( info->raw.data == test->data, file, line );
 	okx ( info->raw.len == test->len, file, line );
 	okx ( info->digest == test->expected_digest, file, line );
 	okx ( info->digestsize == test->expected_digestsize, file, line );

@@ -88,7 +88,7 @@ static int peerdist_info_get ( const struct peerdist_info *info, void *data,
 	}
 
 	/* Copy data */
-	copy_from_user ( data, info->raw.data, offset, len );
+	memcpy ( data, ( info->raw.data + offset ), len );
 
 	return 0;
 }
@@ -667,7 +667,8 @@ static struct peerdist_info_operations peerdist_info_v2_operations = {
  * @v info		Content information to fill in
  * @ret rc		Return status code
  */
-int peerdist_info ( userptr_t data, size_t len, struct peerdist_info *info ) {
+int peerdist_info ( const void *data, size_t len,
+		    struct peerdist_info *info ) {
 	union peerdist_info_version version;
 	int rc;
 
