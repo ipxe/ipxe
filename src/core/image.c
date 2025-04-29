@@ -447,6 +447,10 @@ int image_exec ( struct image *image ) {
 	if ( replacement )
 		assert ( replacement->flags & IMAGE_REGISTERED );
 
+	/* Clear any recorded replacement image */
+	image_put ( image->replacement );
+	image->replacement = NULL;
+
  err:
 	/* Unregister image if applicable */
 	if ( image->flags & IMAGE_AUTO_UNREGISTER )
