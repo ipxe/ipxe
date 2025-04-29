@@ -25,8 +25,6 @@ struct block_translator {
 
 	/** Data transfer buffer */
 	struct xfer_buffer xferbuf;
-	/** Data buffer */
-	void *buffer;
 	/** Block size */
 	size_t blksize;
 };

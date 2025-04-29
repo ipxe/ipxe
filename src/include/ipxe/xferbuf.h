@@ -35,41 +35,19 @@ struct xfer_buffer_operations {
 	 * @ret rc		Return status code
 	 */
 	int ( * realloc ) ( struct xfer_buffer *xferbuf, size_t len );
-	/** Write data to buffer
-	 *
-	 * @v xferbuf		Data transfer buffer
-	 * @v offset		Starting offset
-	 * @v data		Data to write
-	 * @v len		Length of data
-	 *
-	 * This call is simply a wrapper for the appropriate
-	 * memcpy()-like operation: the caller is responsible for
-	 * ensuring that the write does not exceed the buffer length.
-	 */
-	void ( * write ) ( struct xfer_buffer *xferbuf, size_t offset,
-			   const void *data, size_t len );
-	/** Read data from buffer
-	 *
-	 * @v xferbuf		Data transfer buffer
-	 * @v offset		Starting offset
-	 * @v data		Data to read
-	 * @v len		Length of data
-	 *
-	 * This call is simply a wrapper for the appropriate
-	 * memcpy()-like operation: the caller is responsible for
-	 * ensuring that the read does not exceed the buffer length.
-	 */
-	void ( * read ) ( struct xfer_buffer *xferbuf, size_t offset,
-			  void *data, size_t len );
 };
 
 extern struct xfer_buffer_operations xferbuf_malloc_operations;
 extern struct xfer_buffer_operations xferbuf_umalloc_operations;
+extern struct xfer_buffer_operations xferbuf_fixed_operations;
+extern struct xfer_buffer_operations xferbuf_void_operations;
 
 /**
  * Initialise malloc()-based data transfer buffer
  *
  * @v xferbuf		Data transfer buffer
+ *
+ * Data will be automatically allocated using malloc().
  */
 static inline __attribute__ (( always_inline )) void
 xferbuf_malloc_init ( struct xfer_buffer *xferbuf ) {
@@ -80,14 +58,45 @@ xferbuf_malloc_init ( struct xfer_buffer *xferbuf ) {
  * Initialise umalloc()-based data transfer buffer
  *
  * @v xferbuf		Data transfer buffer
- * @v data		User pointer
+ *
+ * Data will be automatically allocated using umalloc() (and may
+ * therefore alter the system memory map).
  */
 static inline __attribute__ (( always_inline )) void
-xferbuf_umalloc_init ( struct xfer_buffer *xferbuf, void **data ) {
-	xferbuf->data = data;
+xferbuf_umalloc_init ( struct xfer_buffer *xferbuf ) {
 	xferbuf->op = &xferbuf_umalloc_operations;
 }
 
+/**
+ * Initialise fixed-size data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ * @v data		Data buffer
+ * @v len		Length of data buffer
+ *
+ * Data will be never be automatically allocated.
+ */
+static inline __attribute__ (( always_inline )) void
+xferbuf_fixed_init ( struct xfer_buffer *xferbuf, void *data, size_t len ) {
+	xferbuf->data = data;
+	xferbuf->len = len;
+	xferbuf->op = &xferbuf_fixed_operations;
+}
+
+/**
+ * Initialise void data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ *
+ * No data will be allocated, but the length will be recorded.  This
+ * can be used to capture xfer_seek() results.
+ */
+static inline __attribute__ (( always_inline )) void
+xferbuf_void_init ( struct xfer_buffer *xferbuf ) {
+	xferbuf->op = &xferbuf_void_operations;
+}
+
+extern void xferbuf_detach ( struct xfer_buffer *xferbuf );
 extern void xferbuf_free ( struct xfer_buffer *xferbuf );
 extern int xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
 			   const void *data, size_t len );

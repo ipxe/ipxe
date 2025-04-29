@@ -39,91 +39,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/blocktrans.h>
 
 /**
- * Reallocate block device translator data buffer
- *
- * @v xferbuf		Data transfer buffer
- * @v len		New length (or zero to free buffer)
- * @ret rc		Return status code
- */
-static int blktrans_xferbuf_realloc ( struct xfer_buffer *xferbuf,
-				      size_t len ) {
-	struct block_translator *blktrans =
-		container_of ( xferbuf, struct block_translator, xferbuf );
-
-	/* Record length, if applicable */
-	if ( blktrans->buffer ) {
-
-		/* We have a (non-reallocatable) data buffer */
-		return -ENOTSUP;
-
-	} else {
-
-		/* Record length (for block device capacity) */
-		xferbuf->len = len;
-		return 0;
-	}
-}
-
-/**
- * Write data to block device translator data buffer
- *
- * @v xferbuf		Data transfer buffer
- * @v offset		Starting offset
- * @v data		Data to copy
- * @v len		Length of data
- */
-static void blktrans_xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
-				     const void *data, size_t len ) {
-	struct block_translator *blktrans =
-		container_of ( xferbuf, struct block_translator, xferbuf );
-
-	/* Write data to buffer, if applicable */
-	if ( blktrans->buffer ) {
-
-		/* Write data to buffer */
-		memcpy ( ( blktrans->buffer + offset ), data, len );
-
-	} else {
-
-		/* Sanity check */
-		assert ( len == 0 );
-	}
-}
-
-/**
- * Read data from block device translator data buffer
- *
- * @v xferbuf		Data transfer buffer
- * @v offset		Starting offset
- * @v data		Data to read
- * @v len		Length of data
- */
-static void blktrans_xferbuf_read ( struct xfer_buffer *xferbuf, size_t offset,
-				    void *data, size_t len ) {
-	struct block_translator *blktrans =
-		container_of ( xferbuf, struct block_translator, xferbuf );
-
-	/* Read data from buffer, if applicable */
-	if ( blktrans->buffer ) {
-
-		/* Read data from buffer */
-		memcpy ( data, ( blktrans->buffer + offset ), len );
-
-	} else {
-
-		/* Sanity check */
-		assert ( len == 0 );
-	}
-}
-
-/** Block device translator data transfer buffer operations */
-static struct xfer_buffer_operations blktrans_xferbuf_operations = {
-	.realloc = blktrans_xferbuf_realloc,
-	.write = blktrans_xferbuf_write,
-	.read = blktrans_xferbuf_read,
-};
-
-/**
  * Close block device translator
  *
  * @v blktrans		Block device translator
@@ -233,11 +148,10 @@ int block_translate ( struct interface *block, void *buffer, size_t size ) {
 	ref_init ( &blktrans->refcnt, NULL );
 	intf_init ( &blktrans->block, &blktrans_block_desc, &blktrans->refcnt );
 	intf_init ( &blktrans->xfer, &blktrans_xfer_desc, &blktrans->refcnt );
-	blktrans->xferbuf.op = &blktrans_xferbuf_operations;
-	blktrans->buffer = buffer;
 	if ( buffer ) {
-		blktrans->xferbuf.len = size;
+		xferbuf_fixed_init ( &blktrans->xferbuf, buffer, size );
 	} else {
+		xferbuf_void_init ( &blktrans->xferbuf );
 		blktrans->blksize = size;
 	}
 
