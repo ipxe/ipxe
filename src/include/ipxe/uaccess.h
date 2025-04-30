@@ -21,35 +21,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #endif
 
 /**
- * A pointer to a user buffer
- *
- */
-typedef void * userptr_t;
-
-/**
- * @defgroup uaccess_trivial Trivial user access API implementations
- *
- * User access API implementations that can be used by environments in
- * which virtual addresses allow access to all of memory.
- *
- * @{
- *
- */
-
-/**
- * Convert virtual address to user pointer
- *
- * @v addr		Virtual address
- * @ret userptr		User pointer
- */
-static inline __always_inline userptr_t
-trivial_virt_to_user ( volatile const void *addr ) {
-	return ( ( userptr_t ) addr );
-}
-
-/** @} */
-
-/**
  * Calculate static inline user access API function name
  *
  * @v _prefix		Subsystem prefix
@@ -88,24 +59,11 @@ UACCESS_INLINE ( flat, virt_to_phys ) ( volatile const void *virt ) {
 	return ( ( physaddr_t ) virt );
 }
 
-static inline __always_inline userptr_t
-UACCESS_INLINE ( flat, virt_to_user ) ( volatile const void *addr ) {
-	return trivial_virt_to_user ( addr );
-}
-
 /* Include all architecture-independent user access API headers */
 #include <ipxe/linux/linux_uaccess.h>
 
 /* Include all architecture-dependent user access API headers */
 #include <bits/uaccess.h>
-
-/**
- * Convert virtual address to user pointer
- *
- * @v addr		Virtual address
- * @ret userptr		User pointer
- */
-userptr_t virt_to_user ( volatile const void *addr );
 
 /**
  * Convert virtual address to a physical address

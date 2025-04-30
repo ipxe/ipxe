@@ -431,7 +431,6 @@ void setup_sipi ( unsigned int vector, uint32_t handler,
 
 PROVIDE_UACCESS_INLINE ( librm, phys_to_virt );
 PROVIDE_UACCESS_INLINE ( librm, virt_to_phys );
-PROVIDE_UACCESS_INLINE ( librm, virt_to_user );
 PROVIDE_IOMAP_INLINE ( pages, io_to_bus );
 PROVIDE_IOMAP ( pages, ioremap, ioremap_pages );
 PROVIDE_IOMAP ( pages, iounmap, iounmap_pages );

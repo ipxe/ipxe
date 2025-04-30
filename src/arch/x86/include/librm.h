@@ -126,11 +126,6 @@ UACCESS_INLINE ( librm, virt_to_phys ) ( volatile const void *virt ) {
 	return ( addr + virt_offset );
 }
 
-static inline __always_inline userptr_t
-UACCESS_INLINE ( librm, virt_to_user ) ( volatile const void *addr ) {
-	return trivial_virt_to_user ( addr );
-}
-
 /******************************************************************************
  *
  * Access to variables in .data16 and .text16

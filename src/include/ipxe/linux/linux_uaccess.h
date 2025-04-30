@@ -5,9 +5,6 @@
  *
  * iPXE user access API for Linux
  *
- * We run with no distinction between internal and external addresses,
- * so can use trivial_virt_to_user() et al.
- *
  * We have no concept of the underlying physical addresses, since
  * these are not exposed to userspace.  We provide a stub
  * implementation of virt_to_phys() since this is required by
@@ -55,11 +52,6 @@ UACCESS_INLINE ( linux, phys_to_virt ) ( physaddr_t phys ) {
 
 	/* For symmetry with the stub virt_to_phys() */
 	return ( ( void * ) phys );
-}
-
-static inline __always_inline userptr_t
-UACCESS_INLINE ( linux, virt_to_user ) ( volatile const void *addr ) {
-	return trivial_virt_to_user ( addr );
 }
 
 #endif /* _IPXE_LINUX_UACCESS_H */
