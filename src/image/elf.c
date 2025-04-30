@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <elf.h>
 #include <ipxe/segment.h>
 #include <ipxe/image.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/elf.h>
 
 /**

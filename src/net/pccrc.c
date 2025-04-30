@@ -25,7 +25,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <assert.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/sha256.h>
 #include <ipxe/sha512.h>
 #include <ipxe/hmac.h>

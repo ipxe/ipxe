@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/init.h>
 #include <ipxe/image.h>
 #include <ipxe/script.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_cmdline.h>
 

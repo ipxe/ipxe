@@ -17,7 +17,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/tables.h>
 #include <ipxe/uuid.h>
 #include <ipxe/netdevice.h>
-#include <ipxe/uaccess.h>
 
 struct interface;
 struct dhcp_options;

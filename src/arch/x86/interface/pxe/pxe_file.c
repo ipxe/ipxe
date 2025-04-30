@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/posix_io.h>
 #include <ipxe/features.h>
 #include <pxe.h>

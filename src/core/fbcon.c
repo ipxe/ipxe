@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/ansiesc.h>
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/console.h>
 #include <ipxe/fbcon.h>

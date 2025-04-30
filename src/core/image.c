@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <libgen.h>
 #include <syslog.h>
 #include <ipxe/list.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/uri.h>
 #include <ipxe/image.h>
