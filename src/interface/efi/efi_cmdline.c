@@ -58,6 +58,7 @@ static void efi_cmdline_free ( struct refcnt *refcnt ) {
 	struct image *image = container_of ( refcnt, struct image, refcnt );
 
 	DBGC ( image, "CMDLINE freeing command line\n" );
+	free_image ( refcnt );
 	free ( efi_cmdline_copy );
 }
 
@@ -65,6 +66,7 @@ static void efi_cmdline_free ( struct refcnt *refcnt ) {
 static struct image efi_cmdline_image = {
 	.refcnt = REF_INIT ( efi_cmdline_free ),
 	.name = "<CMDLINE>",
+	.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),
 	.type = &script_image_type,
 };
 

@@ -85,6 +85,7 @@ struct cms_test_keypair {
 		.image = {						\
 			.refcnt = REF_INIT ( ref_no_free ),		\
 			.name = #NAME,					\
+			.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),	\
 			.data = ( userptr_t ) ( NAME ## _data ),	\
 			.len = sizeof ( NAME ## _data ),		\
 		},							\
@@ -97,6 +98,7 @@ struct cms_test_keypair {
 		.image = {						\
 			.refcnt = REF_INIT ( ref_no_free ),		\
 			.name = #NAME,					\
+			.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),	\
 			.data = ( userptr_t ) ( NAME ## _data ),	\
 			.len = sizeof ( NAME ## _data ),		\
 		},							\
@@ -109,6 +111,7 @@ struct cms_test_keypair {
 		.image = {						\
 			.refcnt = REF_INIT ( ref_no_free ),		\
 			.name = #NAME,					\
+			.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),	\
 			.type = &der_image_type,			\
 			.data = ( userptr_t ) ( NAME ## _data ),	\
 			.len = sizeof ( NAME ## _data ),		\

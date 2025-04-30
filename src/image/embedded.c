@@ -31,8 +31,9 @@ EMBED_ALL
 /* Image structures for all embedded images */
 #undef EMBED
 #define EMBED( _index, _path, _name ) {					\
-	.refcnt = REF_INIT ( ref_no_free ),				\
+	.refcnt = REF_INIT ( free_image ),				\
 	.name = _name,							\
+	.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),			\
 	.data = ( userptr_t ) ( embedded_image_ ## _index ## _data ),	\
 	.len = ( size_t ) embedded_image_ ## _index ## _len,		\
 },

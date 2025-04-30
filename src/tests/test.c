@@ -162,6 +162,7 @@ static struct image_type test_image_type = {
 static struct image test_image = {
 	.refcnt = REF_INIT ( ref_no_free ),
 	.name = "<TESTS>",
+	.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),
 	.type = &test_image_type,
 };
 

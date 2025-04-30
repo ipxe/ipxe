@@ -76,22 +76,41 @@ static int require_trusted_images_permanent = 0;
  * Free executable image
  *
  * @v refcnt		Reference counter
+ *
+ * Image consumers must call image_put() rather than calling
+ * free_image() directly.  This function is exposed for use only by
+ * static images.
  */
-static void free_image ( struct refcnt *refcnt ) {
+void free_image ( struct refcnt *refcnt ) {
 	struct image *image = container_of ( refcnt, struct image, refcnt );
 	struct image_tag *tag;
 
+	/* Sanity check: free_image() should not be called directly on
+	 * dynamically allocated images.
+	 */
+	assert ( refcnt->count < 0 );
 	DBGC ( image, "IMAGE %s freed\n", image->name );
+
+	/* Clear any tag weak references */
 	for_each_table_entry ( tag, IMAGE_TAGS ) {
 		if ( tag->image == image )
 			tag->image = NULL;
 	}
-	free ( image->name );
+
+	/* Free dynamic allocations used by both static and dynamic images */
 	free ( image->cmdline );
 	uri_put ( image->uri );
-	ufree ( image->data );
 	image_put ( image->replacement );
-	free ( image );
+
+	/* Free image name, if dynamically allocated */
+	if ( ! ( image->flags & IMAGE_STATIC_NAME ) )
+		free ( image->name );
+
+	/* Free image data and image itself, if dynamically allocated */
+	if ( ! ( image->flags & IMAGE_STATIC ) ) {
+		ufree ( image->data );
+		free ( image );
+	}
 }
 
 /**
@@ -165,9 +184,13 @@ int image_set_name ( struct image *image, const char *name ) {
 	if ( ! name_copy )
 		return -ENOMEM;
 
+	/* Free existing name, if not statically allocated */
+	if ( ! ( image->flags & IMAGE_STATIC_NAME ) )
+		free ( image->name );
+
 	/* Replace existing name */
-	free ( image->name );
 	image->name = name_copy;
+	image->flags &= ~IMAGE_STATIC_NAME;
 
 	return 0;
 }
@@ -219,6 +242,10 @@ int image_set_cmdline ( struct image *image, const char *cmdline ) {
  */
 int image_set_len ( struct image *image, size_t len ) {
 	void *new;
+
+	/* Refuse to reallocate static images */
+	if ( image->flags & IMAGE_STATIC )
+		return -ENOTTY;
 
 	/* (Re)allocate image data */
 	new = urealloc ( image->data, len );
@@ -287,6 +314,13 @@ int register_image ( struct image *image ) {
 	static unsigned int imgindex = 0;
 	char name[8]; /* "imgXXXX" */
 	int rc;
+
+	/* Sanity checks */
+	if ( image->flags & IMAGE_STATIC ) {
+		assert ( ( image->name == NULL ) ||
+			 ( image->flags & IMAGE_STATIC_NAME ) );
+		assert ( image->cmdline == NULL );
+	}
 
 	/* Create image name if it doesn't already have one */
 	if ( ! image->name ) {

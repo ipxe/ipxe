@@ -30,14 +30,22 @@ struct image {
 
 	/** URI of image */
 	struct uri *uri;
-	/** Name */
+	/** Name
+	 *
+	 * If the @c IMAGE_STATIC_NAME flag is set, then this is a
+	 * statically allocated string.
+	 */
 	char *name;
 	/** Flags */
 	unsigned int flags;
 
 	/** Command line to pass to image */
 	char *cmdline;
-	/** Raw file image */
+	/** Raw file image
+	 *
+	 * If the @c IMAGE_STATIC flag is set, then this is a
+	 * statically allocated image.
+	 */
 	void *data;
 	/** Length of raw file image */
 	size_t len;
@@ -71,6 +79,12 @@ struct image {
 
 /** Image will be hidden from enumeration */
 #define IMAGE_HIDDEN 0x0008
+
+/** Image is statically allocated */
+#define IMAGE_STATIC 0x0010
+
+/** Image name is statically allocated */
+#define IMAGE_STATIC_NAME 0x0020
 
 /** An executable image type */
 struct image_type {
@@ -185,6 +199,7 @@ static inline struct image * first_image ( void ) {
 	return list_first_entry ( &images, struct image, list );
 }
 
+extern void free_image ( struct refcnt *refcnt );
 extern struct image * alloc_image ( struct uri *uri );
 extern int image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_name ( struct image *image, const char *name );
