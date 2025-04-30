@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <limits.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/hidemem.h>

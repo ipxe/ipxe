@@ -11,7 +11,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
-#include <string.h>
 #include <ipxe/api.h>
 #include <config/ioapi.h>
 
@@ -126,31 +125,5 @@ virt_to_phys ( volatile const void *virt );
  * This operation is not available under all memory models.
  */
 void * __attribute__ (( const )) phys_to_virt ( physaddr_t phys );
-
-/**
- * Copy data to user buffer
- *
- * @v dest		Destination
- * @v dest_off		Destination offset
- * @v src		Source
- * @v len		Length
- */
-static inline __always_inline void
-copy_to_user ( userptr_t dest, off_t dest_off, const void *src, size_t len ) {
-	memcpy ( ( dest + dest_off ), src, len );
-}
-
-/**
- * Copy data from user buffer
- *
- * @v dest		Destination
- * @v src		Source
- * @v src_off		Source offset
- * @v len		Length
- */
-static inline __always_inline void
-copy_from_user ( void *dest, userptr_t src, off_t src_off, size_t len ) {
-	memcpy ( dest, ( src + src_off ), len );
-}
 
 #endif /* _IPXE_UACCESS_H */

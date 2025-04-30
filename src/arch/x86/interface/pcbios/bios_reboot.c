@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+#include <string.h>
 #include <ipxe/reboot.h>
 #include <realmode.h>
 #include <bios.h>

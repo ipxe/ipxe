@@ -28,6 +28,7 @@
 FILE_LICENCE ( GPL2_ONLY );
 
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>

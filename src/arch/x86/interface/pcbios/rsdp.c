@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <stdint.h>
+#include <string.h>
 #include <realmode.h>
 #include <bios.h>
 #include <ipxe/acpi.h>

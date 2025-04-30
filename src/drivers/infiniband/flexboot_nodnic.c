@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <ipxe/pci.h>

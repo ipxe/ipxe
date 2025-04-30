@@ -1,3 +1,4 @@
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <realmode.h>

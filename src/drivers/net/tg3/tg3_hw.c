@@ -18,6 +18,7 @@
 FILE_LICENCE ( GPL2_ONLY );
 
 #include <mii.h>
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>

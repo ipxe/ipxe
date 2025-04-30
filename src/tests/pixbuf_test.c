@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Forcibly enable assertions */
 #undef NDEBUG
 
+#include <string.h>
 #include <assert.h>
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>

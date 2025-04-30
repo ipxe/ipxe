@@ -101,6 +101,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 #include <stdint.h>
+#include <string.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <stdio.h>

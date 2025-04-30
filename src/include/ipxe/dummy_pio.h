@@ -13,6 +13,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <string.h>
+
 #define DUMMY_INX( _prefix, _suffix, _type )				      \
 static inline __always_inline _type					      \
 IOAPI_INLINE ( _prefix, in ## _suffix ) ( volatile _type *io_addr __unused) { \

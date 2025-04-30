@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * common ELF-related functionality.
  */
 
+#include <string.h>
 #include <errno.h>
 #include <elf.h>
 #include <ipxe/segment.h>

@@ -21,6 +21,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <wchar.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_snp.h>

@@ -31,6 +31,7 @@
 
 FILE_LICENCE ( BSD2 );
 
+#include <string.h>
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>

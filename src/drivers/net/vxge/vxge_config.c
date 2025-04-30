@@ -16,6 +16,7 @@ FILE_LICENCE(GPL2_ONLY);
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
 #include <ipxe/iobuf.h>

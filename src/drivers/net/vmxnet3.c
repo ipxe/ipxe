@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
