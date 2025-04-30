@@ -63,10 +63,9 @@ static physaddr_t initrd_squash_high ( physaddr_t top ) {
 		/* Find the highest image not yet in its final position */
 		highest = NULL;
 		for_each_image ( initrd ) {
-			data = initrd->data;
-			if ( ( virt_to_phys ( data ) < current ) &&
+			if ( ( virt_to_phys ( initrd->data ) < current ) &&
 			     ( ( highest == NULL ) ||
-			       ( virt_to_phys ( data ) >
+			       ( virt_to_phys ( initrd->data ) >
 				 virt_to_phys ( highest->data ) ) ) ) {
 				highest = initrd;
 			}
@@ -144,9 +143,9 @@ static void initrd_swap ( struct image *low, struct image *high,
 
 		/* Swap fragments */
 		memcpy ( free, ( high->data + len ), frag_len );
-		memmove ( ( low->data + new_len ), ( low->data + len ),
+		memmove ( ( low->rwdata + new_len ), ( low->data + len ),
 			  low->len );
-		memcpy ( ( low->data + len ), free, frag_len );
+		memcpy ( ( low->rwdata + len ), free, frag_len );
 		len = new_len;
 	}
 
@@ -165,8 +164,8 @@ static void initrd_swap ( struct image *low, struct image *high,
 static int initrd_swap_any ( void *free, size_t free_len ) {
 	struct image *low;
 	struct image *high;
+	const void *adjacent;
 	size_t padded_len;
-	void *adjacent;
 
 	/* Find any pair of initrds that can be swapped */
 	for_each_image ( low ) {

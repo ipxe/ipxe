@@ -46,7 +46,12 @@ struct image {
 	 * If the @c IMAGE_STATIC flag is set, then this is a
 	 * statically allocated image.
 	 */
-	void *data;
+	union {
+		/** Read-only data */
+		const void *data;
+		/** Writable data */
+		void *rwdata;
+	};
 	/** Length of raw file image */
 	size_t len;
 

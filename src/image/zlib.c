@@ -65,7 +65,8 @@ int zlib_deflate ( enum deflate_format format, const void *data, size_t len,
 		deflate_init ( deflate, format );
 
 		/* Initialise output chunk */
-		deflate_chunk_init ( &out, extracted->data, 0, extracted->len );
+		deflate_chunk_init ( &out, extracted->rwdata, 0,
+				     extracted->len );
 
 		/* Decompress data */
 		if ( ( rc = deflate_inflate ( deflate, data, len,

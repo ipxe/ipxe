@@ -51,7 +51,7 @@ FEATURE ( FEATURE_IMAGE, "SDI", DHCP_EB_FEATURE_SDI, 1 );
  * @ret rc		Return status code
  */
 static int sdi_exec ( struct image *image ) {
-	struct sdi_header *sdi;
+	const struct sdi_header *sdi;
 	uint32_t sdiptr;
 
 	/* Sanity check */

@@ -113,7 +113,7 @@ static int efi_cmdline_init ( void ) {
 	DBGC ( colour, "CMDLINE using command line \"%s\"\n", cmdline );
 
 	/* Prepare and register image */
-	efi_cmdline_image.data = virt_to_user ( cmdline );
+	efi_cmdline_image.data = cmdline;
 	efi_cmdline_image.len = strlen ( cmdline );
 	if ( efi_cmdline_image.len &&
 	     ( ( rc = register_image ( &efi_cmdline_image ) ) != 0 ) ) {

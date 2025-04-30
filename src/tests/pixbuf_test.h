@@ -42,7 +42,7 @@ struct pixel_buffer_test {
 		.refcnt = REF_INIT ( ref_no_free ),			\
 		.name = #_name,						\
 		.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),		\
-		.data = ( userptr_t ) ( _name ## __file ),		\
+		.data = _name ## __file,				\
 		.len = sizeof ( _name ## __file ),			\
 	};								\
 	static struct pixel_buffer_test _name = {			\

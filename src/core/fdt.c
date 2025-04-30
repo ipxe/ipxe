@@ -734,7 +734,7 @@ static int fdt_parse_image ( struct fdt *fdt, struct image *image ) {
 	int rc;
 
 	/* Parse image */
-	if ( ( rc = fdt_parse ( fdt, image->data, image->len ) ) != 0 ) {
+	if ( ( rc = fdt_parse ( fdt, image->rwdata, image->len ) ) != 0 ) {
 		DBGC ( fdt, "FDT image \"%s\" is invalid: %s\n",
 		       image->name, strerror ( rc ) );
 		return rc;

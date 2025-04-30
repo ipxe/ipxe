@@ -1079,7 +1079,7 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	final_len = ( ( image->len && is_block_cipher ( cipher ) ) ?
 		      cipher->blocksize : 0 );
 	bulk_len = ( image->len - final_len );
-	cipher_decrypt ( cipher, ctx, image->data, image->data, bulk_len );
+	cipher_decrypt ( cipher, ctx, image->data, image->rwdata, bulk_len );
 
 	/* Decrypt final block */
 	cipher_decrypt ( cipher, ctx, ( image->data + bulk_len ), final,
@@ -1117,7 +1117,7 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	 * have to include include any error-handling code path to
 	 * reconstruct the block padding.
 	 */
-	memcpy ( ( image->data + bulk_len ), final, final_len );
+	memcpy ( ( image->rwdata + bulk_len ), final, final_len );
 	image->len -= pad_len;
 
 	/* Clear image type and re-register image, if applicable */
@@ -1137,7 +1137,7 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	 * containing the potentially invalid (and therefore
 	 * unreproducible) block padding.
 	 */
-	cipher_encrypt ( cipher, ctxdup, image->data, image->data, bulk_len );
+	cipher_encrypt ( cipher, ctxdup, image->data, image->rwdata, bulk_len );
 	if ( original_flags & IMAGE_REGISTERED ) {
 		register_image ( image ); /* Cannot fail on re-registration */
 		image_put ( image );
