@@ -80,6 +80,18 @@ struct cms_test_keypair {
 
 /** Define a test image */
 #define IMAGE( NAME, DATA )						\
+	static const uint8_t NAME ## _data[] = DATA;			\
+	static struct cms_test_image NAME = {				\
+		.image = {						\
+			.refcnt = REF_INIT ( ref_no_free ),		\
+			.name = #NAME,					\
+			.data = ( userptr_t ) ( NAME ## _data ),	\
+			.len = sizeof ( NAME ## _data ),		\
+		},							\
+	}
+
+/** Define a writable test image */
+#define IMAGE_RW( NAME, DATA )						\
 	static uint8_t NAME ## _data[] = DATA;				\
 	static struct cms_test_image NAME = {				\
 		.image = {						\
@@ -154,7 +166,7 @@ IMAGE ( hidden_code,
 	       0x68, 0x65, 0x6c, 0x6c, 0x0a ) );
 
 /** Code encrypted with AES-256-CBC */
-IMAGE ( hidden_code_cbc_dat,
+IMAGE_RW ( hidden_code_cbc_dat,
 	DATA ( 0xaa, 0x63, 0x9f, 0x12, 0xeb, 0x1e, 0xdd, 0x9b, 0xb6, 0x4d,
 	       0x81, 0xd5, 0xba, 0x2d, 0x86, 0x7a, 0x1c, 0x39, 0x10, 0x60,
 	       0x43, 0xac, 0x1b, 0x4e, 0x43, 0xb7, 0x50, 0x5a, 0x6d, 0x7a,
@@ -206,7 +218,7 @@ MESSAGE ( hidden_code_cbc_env,
 	       0xba, 0xcf ) );
 
 /** Code encrypted with AES-256-GCM (no block padding) */
-IMAGE ( hidden_code_gcm_dat,
+IMAGE_RW ( hidden_code_gcm_dat,
 	DATA ( 0x0c, 0x96, 0xa6, 0x54, 0x9a, 0xc2, 0x24, 0x89, 0x15, 0x00,
 	       0x90, 0xe1, 0x35, 0xca, 0x4a, 0x84, 0x8e, 0x0b, 0xc3, 0x5e,
 	       0xc0, 0x61, 0x61, 0xbd, 0x2e, 0x69, 0x84, 0x7a, 0x2f, 0xf6,
