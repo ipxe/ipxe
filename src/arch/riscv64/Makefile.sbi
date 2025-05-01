@@ -1,5 +1,13 @@
 # -*- makefile -*- : Force emacs to use Makefile mode
 
+# Set base virtual address to 0xffffffffeb000000
+#
+# This is aligned to a 2MB boundary and so allows 2MB megapages to be
+# used to map the iPXE binary.  The address pattern is also easily
+# recognisable if leaked to unexpected contexts.
+#
+LDFLAGS		+= --section-start=.prefix=0xffffffffeb000000
+
 # Include generic SBI Makefile
 #
 MAKEDEPS	+= arch/riscv/Makefile.sbi

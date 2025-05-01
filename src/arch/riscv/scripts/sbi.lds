@@ -5,10 +5,8 @@
 
 SECTIONS {
 
-    /* Start at virtual address zero */
-    . = 0;
-
     /* Weak symbols that need zero values if not otherwise defined */
+    saved_pos = .;
     .weak 0x0 : {
 	_weak = .;
 	*(.weak)
@@ -16,6 +14,7 @@ SECTIONS {
 	_eweak = .;
     }
     _assert = ASSERT ( ( _weak == _eweak ), ".weak is non-zero length" );
+    _assert = ASSERT ( ( . == saved_pos ), ".weak altered current position" );
 
     /* Prefix code */
     .prefix : {
@@ -105,7 +104,7 @@ SECTIONS {
     _ereloc = ( _reloc + __load_stop_reladyn - __load_start_reladyn );
 
     /* Length of initialised data */
-    _sbi_filesz = ABSOLUTE ( _ereloc );
+    _sbi_filesz = ( ABSOLUTE ( _ereloc ) - ABSOLUTE ( _prefix ) );
 
     /* Unwanted sections */
     /DISCARD/ : {
