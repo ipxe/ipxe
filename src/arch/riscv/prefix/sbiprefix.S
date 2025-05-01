@@ -41,17 +41,6 @@
 #define SBI_SRST_SYSTEM_RESET 0x00
 #define SBI_RESET_COLD 0x00000001
 
-/* Relative relocation type */
-#define R_RISCV_RELATIVE 3
-
-	/* Layout of a relocation record */
-	.struct 0
-rela_offset:	.space ( __riscv_xlen / 8 )
-rela_type:	.space ( __riscv_xlen / 8 )
-rela_addend:	.space ( __riscv_xlen / 8 )
-rela_len:
-	.previous
-
 	/*
 	 * Display progress message via debug console
 	 */
@@ -85,23 +74,7 @@ _sbi_start:
 	progress "\nSBI->iPXE"
 
 	/* Apply dynamic relocations */
-	la	t0, _reloc
-	la	t1, _ereloc
-	la	t2, _sbi_start
-1:	/* Read relocation record */
-	LOADN	t3, rela_offset(t0)
-	LOADN	t4, rela_type(t0)
-	LOADN	t5, rela_addend(t0)
-	/* Check relocation type */
-	addi	t4, t4, -R_RISCV_RELATIVE
-	bnez	t4, 2f
-	/* Apply relocation */
-	add	t3, t3, t2
-	add	t5, t5, t2
-	STOREN	t5, (t3)
-2:	/* Loop */
-	addi	t0, t0, rela_len
-	blt	t0, t1, 1b
+	call	apply_relocs
 	progress " .reloc"
 
 	/* Zero the bss */

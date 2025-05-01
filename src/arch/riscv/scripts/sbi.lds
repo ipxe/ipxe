@@ -87,6 +87,14 @@ SECTIONS {
 	}
     }
 
+    /* Absolute link-time address of _reloc
+     *
+     * The runtime relocator needs to know the link-time addresses.
+     * Since RISC-V uses .rela (rather than .rel), the only way to
+     * expose this to the relocator is via an absolute symbol.
+     */
+    _reloc_base = ABSOLUTE ( _reloc );
+
     /* Calculate end of relocations
      *
      * This cannot be done by placing "_ereloc = .;" inside the
