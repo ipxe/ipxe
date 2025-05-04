@@ -138,6 +138,9 @@ reloc_base:
 /** Number of page table entries */
 #define PTE_COUNT ( PAGE_SIZE / PTE_SIZE )
 
+/** Number of bits in a virtual or physical page number */
+#define VPPN_SHIFT ( PAGE_SHIFT - PTE_SIZE_LOG2 )
+
 /* Page table entry flags */
 #define PTE_V		0x00000001	/**< Page table entry is valid */
 #define PTE_R		0x00000002	/**< Page is readable */
@@ -146,20 +149,27 @@ reloc_base:
 #define PTE_A		0x00000040	/**< Page has been accessed */
 #define PTE_D		0x00000080	/**< Page is dirty */
 
-#define PTE_PPN4_LSB	46		/**< PPN[4] LSB (Sv57) */
-#define PTE_PPN3_LSB	37		/**< PPN[3] LSB (Sv57 and Sv48) */
-#define PTE_PPN2_LSB	28		/**< PPN[2] LSB (all levels) */
-#define PTE_PPN1_LSB	19		/**< PPN[1] LSB (all levels) */
-#define PTE_PPN0_LSB	10		/**< PPN[0] LSB (all levels) */
+/* Page table entry flags for our leaf pages */
+#define PTE_LEAF ( PTE_D | PTE_A | PTE_X | PTE_W | PTE_R | PTE_V )
+
+/** Physical page number LSB in PTE */
+#define PTE_PPN_LSB(x) ( 10 + (x) * VPPN_SHIFT )
+#define PTE_PPN4_LSB	PTE_PPN_LSB(4)	/**< PPN[4] LSB (Sv57) */
+#define PTE_PPN3_LSB	PTE_PPN_LSB(3)	/**< PPN[3] LSB (Sv57 & Sv48) */
+#define PTE_PPN2_LSB	PTE_PPN_LSB(2)	/**< PPN[2] LSB (Sv57, Sv48, & Sv39) */
+#define PTE_PPN1_LSB	PTE_PPN_LSB(1)	/**< PPN[1] LSB (all levels) */
+#define PTE_PPN0_LSB	PTE_PPN_LSB(0)	/**< PPN[0] LSB (all levels) */
 
 /** Page table entry physical page address shift */
 #define PTE_PPN_SHIFT ( PAGE_SHIFT - PTE_PPN0_LSB )
 
-#define VPN4_LSB	48		/**< VPN[4] LSB (Sv57) */
-#define VPN3_LSB	39		/**< VPN[3] LSB (Sv57 and Sv48) */
-#define VPN2_LSB	30		/**< VPN[2] LSB (all levels) */
-#define VPN1_LSB	21		/**< VPN[1] LSB (all levels) */
-#define VPN0_LSB	12		/**< VPN[0] LSB (all levels) */
+/** Virtual page number LSB */
+#define VPN_LSB(x) ( PAGE_SHIFT + (x) * VPPN_SHIFT )
+#define VPN4_LSB	VPN_LSB(4)	/**< VPN[4] LSB (Sv57) */
+#define VPN3_LSB	VPN_LSB(3)	/**< VPN[3] LSB (Sv57 & Sv48) */
+#define VPN2_LSB	VPN_LSB(2)	/**< VPN[2] LSB (Sv57, Sv48, & Sv39) */
+#define VPN1_LSB	VPN_LSB(1)	/**< VPN[1] LSB (all levels) */
+#define VPN0_LSB	VPN_LSB(0)	/**< VPN[0] LSB (all levels) */
 
 /* Paging modes */
 #define SATP_MODE_SV57	10		/**< Five-level paging (Sv57) */
@@ -176,6 +186,12 @@ reloc_base:
 
 	.globl	enable_paging
 	.equ	enable_paging, _C2 ( enable_paging_, __riscv_xlen )
+
+	/* Link-time address of _prefix */
+	.section ".rodata.prefix_virt", "a", @progbits
+prefix_virt:
+	.dword	_prefix
+	.size	prefix_virt, . - prefix_virt
 
 /*****************************************************************************
  *
@@ -285,7 +301,7 @@ enable_paging_64_loop:
 	/* Construct PTE[0-255] for identity map */
 	mv	a3, a2
 	li	t0, ( PTE_COUNT / 2 )
-	li	t1, ( PTE_D | PTE_A | PTE_X | PTE_W | PTE_R | PTE_V )
+	li	t1, PTE_LEAF
 1:	STOREN	t1, (a3)
 	addi	a3, a3, PTE_SIZE
 	add	t1, t1, a4
@@ -323,7 +339,7 @@ enable_paging_64_loop:
 	/* Construct PTE[x-y] for iPXE virtual address map */
 	la	t0, _prefix
 	srli	t0, t0, PTE_PPN_SHIFT
-	ori	t0, t0, ( PTE_D | PTE_A | PTE_X | PTE_W | PTE_R | PTE_V )
+	ori	t0, t0, PTE_LEAF
 	la	t1, _ebss
 	srli	t1, t1, PTE_PPN_SHIFT
 1:	STOREN	t0, (a3)
@@ -359,8 +375,116 @@ enable_paging_64_done:
 	ret
 	.size	enable_paging_64, . - enable_paging_64
 
-	/* Link-time address of _prefix */
-	.section ".rodata.prefix_virt", "a", @progbits
-prefix_virt:
-	.dword	_prefix
-	.size	prefix_virt, . - prefix_virt
+/*****************************************************************************
+ *
+ * Enable 32-bit paging
+ *
+ *****************************************************************************
+ *
+ * Construct a 32-bit page table to map the whole of the 32-bit
+ * address space with a fixed offset selected to map iPXE itself at
+ * its link-time address (which must be 4MB-aligned).
+ *
+ * This function must be called with flat physical addressing.  It
+ * does not require a valid stack pointer.
+ *
+ * Parameters:
+ *
+ *   a0 - Page table to fill in (4kB, must be aligned to a 4kB boundary)
+ *
+ * Returns:
+ *
+ *   a0 - Selected paging mode (0=no paging)
+ *   pc - Updated to a virtual address if paging enabled
+ *
+ * A 4kB 32-bit page table contains 1024 4-byte PTEs.  We choose to
+ * use these to produce a circular map of the 32-bit address space
+ * using 4MB "megapages", with a fixed offset to align the virtual and
+ * link-time addresses.
+ *
+ * To handle the transition from physical to virtual addresses, we
+ * temporarily adjust the PTE covering the current program counter to
+ * be a direct physical map (so that the program counter remains valid
+ * at the moment when paging is enabled), then jump to a virtual
+ * address, then restore the temporarily modified PTE.
+ */
+
+	.equ	enable_paging_32_xalign, 16
+
+	.section ".prefix.enable_paging_32", "ax", @progbits
+enable_paging_32:
+	/* Register usage:
+	 *
+	 * a0 - return value (enabled paging level)
+	 * a1 - virtual address offset
+	 * a2 - page table base address
+	 * a3 - PTE pointer
+	 * a4 - saved content of temporarily modified PTE
+	 */
+	mv	a2, a0
+
+	/* Calculate virtual address offset */
+	la	t0, prefix_virt
+	LOADN	t0, (t0)
+	la	t1, _prefix
+	sub	a1, t1, t0
+
+	/* Construct PTEs for circular map */
+	mv	a3, a2
+	li	t0, PTE_COUNT
+	mv	t1, a1
+	ori	t1, t1, ( PTE_LEAF << PTE_PPN_SHIFT )
+	li	t2, ( 1 << ( PTE_PPN1_LSB + PTE_PPN_SHIFT ) )
+1:	srli	t3, t1, PTE_PPN_SHIFT
+	STOREN	t3, (a3)
+	addi	a3, a3, PTE_SIZE
+	add	t1, t1, t2
+	addi	t0, t0, -1
+	bgtz	t0, 1b
+
+	/* Temporarily modify PTE for transition code to be an identity map */
+	la	t0, enable_paging_32_xstart
+	srli	t0, t0, VPN1_LSB
+	slli	t1, t0, PTE_SIZE_LOG2
+	add	a3, a2, t1
+	LOADN	a4, (a3)
+	slli	t0, t0, PTE_PPN1_LSB
+	ori	t0, t0, PTE_LEAF
+	STOREN	t0, (a3)
+
+	/* Attempt to enable paging, and read back active paging level */
+	la	t0, 1f
+	sub	t0, t0, a1
+	li	t1, ( SATP_MODE_SV32 << SATP_MODE_SHIFT )
+	srli	t2, a2, PAGE_SHIFT
+	or	t1, t1, t2
+	.balign	enable_paging_32_xalign
+	/* Start of transition code */
+enable_paging_32_xstart:
+	csrrw	zero, satp, t1
+	sfence.vma
+	csrrw	a0, satp, t1
+	beqz	a0, enable_paging_32_done
+	jr	t0
+1:	/* End of transition code */
+	.equ	enable_paging_32_xlen, . - enable_paging_32_xstart
+	li	a0, 1
+
+	/* Adjust PTE pointer to a virtual address */
+	sub	a3, a3, a1
+
+	/* Restore temporarily modified PTE */
+	STOREN	a4, (a3)
+	sfence.vma
+
+	/* Adjust return address */
+	sub	ra, ra, a1
+
+enable_paging_32_done:
+	/* Return, with or without paging enabled */
+	ret
+	.size	enable_paging_32, . - enable_paging_32
+
+	/* Ensure that transition code did not cross an alignment boundary */
+	.section ".bss.enable_paging_32_xcheck", "aw", @nobits
+	.org	. + enable_paging_32_xalign - enable_paging_32_xlen
