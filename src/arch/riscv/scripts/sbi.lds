@@ -117,6 +117,8 @@ SECTIONS {
 	*(.dynamic)
 	*(.dynsym)
 	*(.dynstr)
+	*(.hash)
+	*(.gnu.hash)
 	*(.einfo)
 	*(.einfo.*)
 	*(.discard)
