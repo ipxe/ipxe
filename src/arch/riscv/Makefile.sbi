@@ -5,7 +5,7 @@
 # prefix code.
 #
 CFLAGS		+= -mcmodel=medany -fpie
-LDFLAGS		+= -pie --no-dynamic-linker
+LDFLAGS		+= -pie --no-dynamic-linker -z combreloc
 
 # Linker script
 #

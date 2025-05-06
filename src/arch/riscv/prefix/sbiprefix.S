@@ -41,6 +41,9 @@
 #define SBI_SRST_SYSTEM_RESET 0x00
 #define SBI_RESET_COLD 0x00000001
 
+/* ELF machine type */
+#define EM_RISCV 243
+
 	/*
 	 * Display progress message via debug console
 	 */
@@ -127,5 +130,12 @@ _sbi_start:
 	.section ".zinfo", "a", @progbits
 	.ascii	"COPY"
 	.word	0
-	.word	_sbi_filesz
+	.word	_filesz
 	.word	1
+	.ascii	"BASE"
+	.word	0
+	.dword	_base
+	.ascii	"ZREL"
+	.word	_reloc_offset
+	.word	_reloc_filesz
+	.word	EM_RISCV

@@ -32,14 +32,23 @@
 	.section ".note.GNU-stack", "", @progbits
 	.text
 
+	/* Virtual address of _prefix
+	 *
+	 * This will be updated if runtime relocations are applied.
+	 */
+	.section ".rodata.prefix_virt", "a", @progbits
+prefix_virt:
+	.dword	_prefix
+	.size	prefix_virt, . - prefix_virt
+
 /*****************************************************************************
  *
- * Apply relocation records
+ * Apply compressed relocation records
  *
  *****************************************************************************
  *
- * Apply relocation records from .rel.dyn to fix up iPXE to run at its
- * current address.
+ * Apply compressed relocation records to fix up iPXE to run at its
+ * current virtual address.
  *
  * This function must run before .bss is zeroed (since the relocation
  * records are overlaid with .bss).  It does not require a valid stack
@@ -51,57 +60,62 @@
  *
  */
 
-/* Relative relocation type */
-#define R_RISCV_RELATIVE 3
-
-	/* Layout of a relocation record */
-	.struct 0
-rela_offset:	.space ( __riscv_xlen / 8 )
-rela_type:	.space ( __riscv_xlen / 8 )
-rela_addend:	.space ( __riscv_xlen / 8 )
-rela_len:
-	.previous
+/** Number of bits in a skip value */
+#define ZREL_SKIP_BITS 19
 
 	.section ".prefix.apply_relocs", "ax", @progbits
 	.globl	apply_relocs
 apply_relocs:
+	/* Register usage:
+	 *
+	 * a0 - relocation addend
+	 * a1 - current relocation target address
+	 * a2 - current relocation record pointer
+	 * a3 - current relocation record value
+	 * a4 - number of bits remaining in current relocation record
+	 */
+	la	a1, _prefix
+	la	a2, _edata
 
-	/* Get relocation records */
-	la	t0, _reloc
-	la	t1, _ereloc
+	/* Calculate relocation addend */
+	la	t0, prefix_virt
+	LOADN	a0, (t0)
+	sub	a0, a1, a0
 
-	/* Determine current location */
-	la	t2, reloc_base
-	LOADN	t2, (t2)
-	sub	t2, t0, t2
+	/* Skip applying relocations if addend is zero */
+	beqz	a0, apply_relocs_done
 
-1:	/* Read relocation record */
-	LOADN	t3, rela_offset(t0)
-	LOADN	t4, rela_type(t0)
-	LOADN	t5, rela_addend(t0)
+apply_relocs_loop:
+	/* Read new relocation record */
+	LOADN	a3, (a2)
+	addi	a2, a2, ( __riscv_xlen / 8 )
+	li	a4, ( __riscv_xlen - 1 )
 
-	/* Check relocation type */
-	addi	t4, t4, -R_RISCV_RELATIVE
-	bnez	t4, 2f
+	/* Consume and apply skip, if present (i.e. if MSB=0) */
+	bltz	a3, 1f
+	addi	a4, a4, -ZREL_SKIP_BITS
+	srli	t0, a3, ( __riscv_xlen - ( ZREL_SKIP_BITS + 1 ) )
+	slli	t0, t0, ( ( __riscv_xlen / 32 ) + 1 )
+	add	a1, a1, t0
+1:
+	/* Apply relocations corresponding to set bits in record */
+1:	andi	t0, a3, 1
+	beqz	t0, 2f
+	LOADN	t1, (a1)
+	add	t1, t1, a0
+	STOREN	t1, (a1)
+2:	addi	a1, a1, ( __riscv_xlen / 8 )
+	srli	a3, a3, 1
+	addi	a4, a4, -1
+	bnez	a4, 1b
 
-	/* Apply relocation */
-	add	t3, t3, t2
-	add	t5, t5, t2
-	STOREN	t5, (t3)
-2:
-	/* Loop until done */
-	addi	t0, t0, rela_len
-	blt	t0, t1, 1b
+	/* Loop until we have reached a terminator record (MSB=0, offset=0) */
+	bnez	a3, apply_relocs_loop
 
+apply_relocs_done:
 	/* Return to caller */
 	ret
 	.size	apply_relocs, . - apply_relocs
-
-	/* Link-time address of _reloc */
-	.section ".rodata", "a", @progbits
-reloc_base:
-	.dword	_reloc_base
-	.size	reloc_base, . - reloc_base
 
 /*****************************************************************************
  *
@@ -186,12 +200,6 @@ reloc_base:
 
 	.globl	enable_paging
 	.equ	enable_paging, _C2 ( enable_paging_, __riscv_xlen )
-
-	/* Link-time address of _prefix */
-	.section ".rodata.prefix_virt", "a", @progbits
-prefix_virt:
-	.dword	_prefix
-	.size	prefix_virt, . - prefix_virt
 
 /*****************************************************************************
  *
