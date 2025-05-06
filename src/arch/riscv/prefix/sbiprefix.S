@@ -49,7 +49,7 @@
 	 */
 	.macro	progress message
 #ifndef NDEBUG
-	.section ".prefix.data", "aw", @progbits
+	.section ".rodata", "a", @progbits
 progress_\@:
 	.ascii	"\message"
 	.equ	progress_\@_len, . - progress_\@
