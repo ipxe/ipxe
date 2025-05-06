@@ -32,10 +32,6 @@
 	.section ".note.GNU-stack", "", @progbits
 	.text
 
-/* SBI debug console extension */
-#define SBI_DBCN ( ( 'D' << 24 ) | ( 'B' << 16 ) | ( 'C' << 8 ) | 'N' )
-#define SBI_DBCN_WRITE 0x00
-
 /* SBI system reset extension */
 #define SBI_SRST ( ( 'S' << 24 ) | ( 'R' << 16 ) | ( 'S' << 8 ) | 'T' )
 #define SBI_SRST_SYSTEM_RESET 0x00
@@ -51,16 +47,11 @@
 #ifndef NDEBUG
 	.section ".rodata", "a", @progbits
 progress_\@:
-	.ascii	"\message"
-	.equ	progress_\@_len, . - progress_\@
+	.asciz	"\message"
 	.size	progress_\@, . - progress_\@
 	.previous
-	li	a7, SBI_DBCN
-	li	a6, SBI_DBCN_WRITE
-	li	a0, progress_\@_len
-	la	a1, progress_\@
-	mv	a2, zero
-	ecall
+	la	t0, progress_\@
+	call	print_message
 #endif
 	.endm
 

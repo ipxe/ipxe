@@ -43,6 +43,68 @@ prefix_virt:
 
 /*****************************************************************************
  *
+ * Print message to debug console
+ *
+ *****************************************************************************
+ *
+ * Print a NUL-terminated string to the debug console.
+ *
+ * This function prints one character at a time via the "write byte"
+ * call (rather than using "write string"), since this avoids any need
+ * to know the current virtual-physical address translation.  It does
+ * not require a valid stack.
+ *
+ * Note that the parameter is passed in register t0 (rather than a0)
+ * and all non-temporary registers are preserved.
+ *
+ * Parameters:
+ *
+ *   t0 - Pointer to string
+ *
+ * Returns: none
+ *
+ */
+
+/* SBI debug console extension */
+#define SBI_DBCN ( ( 'D' << 24 ) | ( 'B' << 16 ) | ( 'C' << 8 ) | 'N' )
+#define SBI_DBCN_WRITE_BYTE 0x02
+
+	.section ".prefix.print_message", "ax", @progbits
+	.globl	print_message
+print_message:
+	/* Register usage:
+	 *
+	 * t0 - character pointer
+	 * a0 - current character
+	 * t1 - preserved a0
+	 * t2 - preserved a1
+	 * t3 - preserved a6
+	 * t4 - preserved a7
+	 */
+	mv	t1, a0
+	mv	t2, a1
+	mv	t3, a6
+	mv	t4, a7
+
+1:	/* Print each character in turn */
+	lbu	a0, (t0)
+	addi	t0, t0, 1
+	beqz	a0, 2f
+	li	a7, SBI_DBCN
+	li	a6, SBI_DBCN_WRITE_BYTE
+	ecall
+	j	1b
+2:
+	/* Restore registers and return */
+	mv	a7, t4
+	mv	a6, t3
+	mv	a1, t2
+	mv	a0, t1
+	ret
+	.size	print_message, . - print_message
+
+/*****************************************************************************
+ *
  * Apply compressed relocation records
  *
  *****************************************************************************
