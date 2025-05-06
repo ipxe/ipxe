@@ -51,6 +51,8 @@ SECTIONS {
 	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
 	KEEP(*(.provided))
 	KEEP(*(.provided.*))
+	*(.got)
+	*(.got.plt)
 	_edata = .;
     }
 
