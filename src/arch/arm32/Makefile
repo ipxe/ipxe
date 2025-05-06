@@ -1,3 +1,7 @@
+# Specify compressor
+#
+ZBIN		= $(ZBIN32)
+
 # ARM32-specific directories containing source files
 #
 SRCDIRS		+= arch/arm32/core

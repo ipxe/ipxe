@@ -1,3 +1,7 @@
+# Specify compressor
+#
+ZBIN		= $(ZBIN32)
+
 # Force i386-only instructions
 #
 CFLAGS		+= -march=i386

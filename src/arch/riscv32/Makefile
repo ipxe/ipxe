@@ -1,3 +1,7 @@
+# Specify compressor
+#
+ZBIN		= $(ZBIN32)
+
 # RISCV32-specific directories containing source files
 #
 SRCDIRS		+= arch/riscv32/core

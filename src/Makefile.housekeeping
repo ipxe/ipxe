@@ -1449,10 +1449,15 @@ endif # defined(BIN)
 
 ZBIN_LDFLAGS := -llzma
 
-$(ZBIN) : util/zbin.c $(MAKEDEPS)
+$(ZBIN32) : util/zbin.c $(MAKEDEPS)
 	$(QM)$(ECHO) "  [HOSTCC] $@"
-	$(Q)$(HOST_CC) $(HOST_CFLAGS) $< $(ZBIN_LDFLAGS) -o $@
-CLEANUP += $(ZBIN)
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $< $(ZBIN_LDFLAGS) -DELF32 -o $@
+CLEANUP += $(ZBIN32)
+
+$(ZBIN64) : util/zbin.c $(MAKEDEPS)
+	$(QM)$(ECHO) "  [HOSTCC] $@"
+	$(Q)$(HOST_CC) $(HOST_CFLAGS) $< $(ZBIN_LDFLAGS) -DELF64 -o $@
+CLEANUP += $(ZBIN64)
 
 ###############################################################################
 #

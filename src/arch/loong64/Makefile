@@ -1,3 +1,7 @@
+# Specify compressor
+#
+ZBIN		= $(ZBIN64)
+
 # Assembler section type character
 #
 ASM_TCHAR	:= @
