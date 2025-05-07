@@ -114,13 +114,13 @@ static int com32_exec_loop ( struct image *image ) {
 			/* Restore registers */
 			"popal\n\t" )
 			:
-			: "r" ( avail_mem_top ),
-			  "r" ( virt_to_phys ( com32_cfarcall_wrapper ) ),
-			  "r" ( virt_to_phys ( com32_farcall_wrapper ) ),
-			  "r" ( get_fbms() * 1024 - ( COM32_BOUNCE_SEG << 4 ) ),
+			: "R" ( avail_mem_top ),
+			  "R" ( virt_to_phys ( com32_cfarcall_wrapper ) ),
+			  "R" ( virt_to_phys ( com32_farcall_wrapper ) ),
+			  "R" ( get_fbms() * 1024 - ( COM32_BOUNCE_SEG << 4 ) ),
 			  "i" ( COM32_BOUNCE_SEG << 4 ),
-			  "r" ( virt_to_phys ( com32_intcall_wrapper ) ),
-			  "r" ( virt_to_phys ( image->cmdline ?
+			  "R" ( virt_to_phys ( com32_intcall_wrapper ) ),
+			  "R" ( virt_to_phys ( image->cmdline ?
 					       image->cmdline : "" ) ),
 			  "i" ( COM32_START_PHYS )
 			: "memory" );

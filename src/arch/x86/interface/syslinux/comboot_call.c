@@ -514,8 +514,8 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 				"lret\n\t"
 			)
 			:
-			: "r" ( ix86->segs.ds ),
-			  "r" ( ix86->regs.ebp ),
+			: "R" ( ix86->segs.ds ),
+			  "R" ( ix86->regs.ebp ),
 			  "d" ( ix86->regs.ebx ),
 			  "S" ( ix86->regs.esi ) );
 

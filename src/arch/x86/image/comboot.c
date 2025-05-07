@@ -171,7 +171,7 @@ static int comboot_exec_loop ( struct image *image ) {
 				    "xorw %%di, %%di\n\t"
 				    "xorw %%bp, %%bp\n\t"
 				    "lret\n\t" )
-					 : : "r" ( COMBOOT_PSP_SEG ) : "eax" );
+					 : : "R" ( COMBOOT_PSP_SEG ) : "eax" );
 		DBGC ( image, "COMBOOT %p: returned\n", image );
 		break;
 

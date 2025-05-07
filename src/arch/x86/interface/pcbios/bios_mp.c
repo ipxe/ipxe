@@ -92,9 +92,9 @@ static void bios_mp_exec_boot ( mp_func_t func, void *opaque ) {
 					   "pushl %k1\n\t"
 					   "call *%k0\n\t"
 					   "addl $8, %%esp\n\t" )
-			       : : "r" ( mp_address ( mp_call ) ),
-				   "r" ( mp_address ( func ) ),
-				   "r" ( mp_address ( opaque ) ) );
+			       : : "R" ( mp_address ( mp_call ) ),
+				   "R" ( mp_address ( func ) ),
+				   "R" ( mp_address ( opaque ) ) );
 }
 
 /**
