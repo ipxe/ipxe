@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <registers.h>
+#include <librm.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/timer.h>
 #include <ipxe/msr.h>

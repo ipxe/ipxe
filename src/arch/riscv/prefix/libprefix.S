@@ -41,6 +41,13 @@ prefix_virt:
 	.dword	_prefix
 	.size	prefix_virt, . - prefix_virt
 
+	/* Current virtual address offset */
+	.section ".data.virt_offset", "aw", @progbits
+	.globl	virt_offset
+virt_offset:
+	.space	( __riscv_xlen / 8 )
+	.size	virt_offset, . - virt_offset
+
 /*****************************************************************************
  *
  * Print message to debug console

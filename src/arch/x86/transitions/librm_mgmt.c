@@ -429,8 +429,6 @@ void setup_sipi ( unsigned int vector, uint32_t handler,
 	copy_to_real ( ( vector << 8 ), 0, sipi, ( ( size_t ) sipi_len ) );
 }
 
-PROVIDE_UACCESS_INLINE ( librm, phys_to_virt );
-PROVIDE_UACCESS_INLINE ( librm, virt_to_phys );
 PROVIDE_IOMAP_INLINE ( pages, io_to_bus );
 PROVIDE_IOMAP ( pages, ioremap, ioremap_pages );
 PROVIDE_IOMAP ( pages, iounmap, iounmap_pages );

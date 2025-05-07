@@ -26,11 +26,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <errno.h>
 #include <elf.h>
+#include <librm.h>
 #include <ipxe/image.h>
 #include <ipxe/elf.h>
 #include <ipxe/features.h>
 #include <ipxe/init.h>
-#include <ipxe/uaccess.h>
 
 /**
  * @file

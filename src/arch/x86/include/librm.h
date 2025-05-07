@@ -64,12 +64,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #else /* ASSEMBLY */
 
-#ifdef UACCESS_LIBRM
-#define UACCESS_PREFIX_librm
-#else
-#define UACCESS_PREFIX_librm __librm_
-#endif
-
 /**
  * Call C function from real-mode code
  *
@@ -78,53 +72,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define VIRT_CALL( function )						\
 	"pushl $( " _S2 ( VIRTUAL ( function ) ) " )\n\t"		\
 	"call virt_call\n\t"
-
-/* Variables in librm.S */
-extern const unsigned long virt_offset;
-
-/**
- * Convert physical address to user pointer
- *
- * @v phys		Physical address
- * @ret virt		Virtual address
- */
-static inline __always_inline void *
-UACCESS_INLINE ( librm, phys_to_virt ) ( unsigned long phys ) {
-
-	/* In a 64-bit build, any valid physical address is directly
-	 * usable as a virtual address, since the low 4GB is
-	 * identity-mapped.
-	 */
-	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
-		return ( ( void * ) phys );
-
-	/* In a 32-bit build, subtract virt_offset */
-	return ( ( void * ) ( phys - virt_offset ) );
-}
-
-/**
- * Convert virtual address to physical address
- *
- * @v virt		Virtual address
- * @ret phys		Physical address
- */
-static inline __always_inline physaddr_t
-UACCESS_INLINE ( librm, virt_to_phys ) ( volatile const void *virt ) {
-	physaddr_t addr = ( ( physaddr_t ) virt );
-
-	/* In a 64-bit build, any virtual address in the low 4GB is
-	 * directly usable as a physical address, since the low 4GB is
-	 * identity-mapped.
-	 */
-	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
-	     ( addr <= 0xffffffffUL ) )
-		return addr;
-
-	/* In a 32-bit build or in a 64-bit build with a virtual
-	 * address above 4GB: add virt_offset
-	 */
-	return ( addr + virt_offset );
-}
 
 /******************************************************************************
  *

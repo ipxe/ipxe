@@ -60,6 +60,7 @@ UACCESS_INLINE ( flat, virt_to_phys ) ( volatile const void *virt ) {
 }
 
 /* Include all architecture-independent user access API headers */
+#include <ipxe/virt_offset.h>
 #include <ipxe/linux/linux_uaccess.h>
 
 /* Include all architecture-dependent user access API headers */
