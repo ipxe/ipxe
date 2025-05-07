@@ -77,8 +77,9 @@ print_message:
 print_message_alt:
 	/* Register usage:
 	 *
-	 * t0 - character pointer
 	 * a0 - current character
+	 * t0 - alternate link register
+	 * t1 - character pointer
 	 * t2 - preserved a0
 	 * t3 - preserved a1
 	 * t4 - preserved a6
@@ -118,6 +119,97 @@ progress_\@:
 	.previous
 	la	t1, progress_\@
 	jal	t0, print_message_alt
+#endif
+	.endm
+
+/*****************************************************************************
+ *
+ * Print hexadecimal value to debug console
+ *
+ *****************************************************************************
+ *
+ * Print a register value in hexadecimal to the debug console.
+ *
+ * This function does not require a valid stack.
+ *
+ * Note that the parameters are passed in registers t1 and t2 (rather
+ * than a0) and all non-temporary registers are preserved.
+ *
+ * Parameters:
+ *
+ *   t1 - Value to print
+ *   t2 - Number of bits to print (must be a multiple of 4)
+ *
+ * Returns: none
+ *
+ */
+	.section ".prefix.print_hex_value", "ax", @progbits
+	.globl	print_hex_value
+print_hex_value:
+	/* Handle alternate link register */
+	mv	t0, ra
+print_hex_value_alt:
+	/* Register usage:
+	 *
+	 * a0 - current digit / general temporary
+	 * t0 - alternate link register
+	 * t1 - current value
+	 * t2 - digit counter
+	 * t3 - preserved a0
+	 * t4 - preserved a1
+	 * t5 - preserved a6
+	 * t6 - preserved a7
+	 */
+	mv	t3, a0
+	mv	t4, a1
+	mv	t5, a6
+	mv	t6, a7
+
+	/* Skip any unprinted digits */
+	li	a0, __riscv_xlen
+	sub	a0, a0, t2
+	sll	t1, t1, a0
+
+1:	/* Print each digit in turn */
+	srli	a0, t1, ( __riscv_xlen - 4 )
+	addi	a0, a0, -10
+	bltz	a0, 2f
+	addi	a0, a0, ( 'a' - ( '0' + 10 ) )
+2:	addi	a0, a0, ( '0' + 10 )
+	li	a7, SBI_DBCN
+	li	a6, SBI_DBCN_WRITE_BYTE
+	ecall
+	slli	t1, t1, 4
+	addi	t2, t2, -4
+	bgtz	t2, 1b
+
+	/* Restore registers and return (via alternate link register) */
+	mv	a7, t6
+	mv	a6, t5
+	mv	a1, t4
+	mv	a0, t3
+	jr	t0
+	.size	print_hex_value, . - print_hex_value
+
+	/*
+	 * Display hexadecimal register value (if debugging is enabled)
+	 */
+	.macro	print_hex_reg reg, bits=__riscv_xlen
+#ifndef NDEBUG
+	mv	t1, \reg
+	li	t2, \bits
+	jal	t0, print_hex_value_alt
+#endif
+	.endm
+
+	/*
+	 * Display hexadecimal symbol address (if debugging is enabled)
+	 */
+	.macro	print_hex_addr sym
+#ifndef NDEBUG
+	la	t1, \sym
+	li	t2, __riscv_xlen
+	jal	t0, print_hex_value_alt
 #endif
 	.endm
 
