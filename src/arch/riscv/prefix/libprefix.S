@@ -164,6 +164,7 @@ apply_relocs:
 
 	/* Skip applying relocations if addend is zero */
 	beqz	a0, apply_relocs_done
+	progress " reloc"
 
 apply_relocs_loop:
 	/* Read new relocation record */
@@ -281,6 +282,33 @@ apply_relocs_done:
 	.globl	enable_paging
 	.equ	enable_paging, _C2 ( enable_paging_, __riscv_xlen )
 
+	/* Paging mode names (for debug messages) */
+	.section ".rodata.paging_mode_names", "a", @progbits
+paging_mode_names:
+	.asciz	"none"
+	.org	( paging_mode_names + 5 * SATP_MODE_SV32 )
+	.asciz	"Sv32"
+	.org	( paging_mode_names + 5 * SATP_MODE_SV39 )
+	.asciz	"Sv39"
+	.org	( paging_mode_names + 5 * SATP_MODE_SV48 )
+	.asciz	"Sv48"
+	.org	( paging_mode_names + 5 * SATP_MODE_SV57 )
+	.asciz	"Sv57"
+	.size	paging_mode_names, . - paging_mode_names
+
+	/*
+	 * Display paging mode name (if debugging is enabled)
+	 */
+	.macro	paging_mode_name reg
+#ifndef NDEBUG
+	slli	t0, \reg, 2
+	add	t0, t0, \reg
+	la	t1, paging_mode_names
+	add	t1, t1, t0
+	jal	t0, print_message_alt
+#endif
+	.endm
+
 /*****************************************************************************
  *
  * Enable 64-bit paging
@@ -368,6 +396,7 @@ enable_paging_64:
 	 * a3 - PTE pointer
 	 * a4 - PTE stride
 	 */
+	progress " paging:"
 	mv	a2, a0
 	li	a1, SATP_MODE_SV57
 enable_paging_64_loop:
@@ -460,6 +489,7 @@ enable_paging_64_loop:
 
 enable_paging_64_done:
 	/* Return, with or without paging enabled */
+	paging_mode_name a0
 	ret
 	.size	enable_paging_64, . - enable_paging_64
 
@@ -509,6 +539,7 @@ enable_paging_32:
 	 * a3 - PTE pointer
 	 * a4 - saved content of temporarily modified PTE
 	 */
+	progress " paging:"
 	mv	a2, a0
 
 	/* Calculate virtual address offset */
@@ -570,6 +601,7 @@ enable_paging_32_xstart:
 
 enable_paging_32_done:
 	/* Return, with or without paging enabled */
+	paging_mode_name a0
 	ret
 	.size	enable_paging_32, . - enable_paging_32
 
