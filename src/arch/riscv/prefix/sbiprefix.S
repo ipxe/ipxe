@@ -45,12 +45,12 @@
 	 */
 	.macro	progress message
 #ifndef NDEBUG
-	.section ".rodata", "a", @progbits
+	.section ".rodata.progress_\@", "a", @progbits
 progress_\@:
 	.asciz	"\message"
 	.size	progress_\@, . - progress_\@
 	.previous
-	la	t0, progress_\@
+	la	t1, progress_\@
 	call	print_message
 #endif
 	.endm

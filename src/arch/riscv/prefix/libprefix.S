@@ -54,12 +54,12 @@ prefix_virt:
  * to know the current virtual-physical address translation.  It does
  * not require a valid stack.
  *
- * Note that the parameter is passed in register t0 (rather than a0)
+ * Note that the parameter is passed in register t1 (rather than a0)
  * and all non-temporary registers are preserved.
  *
  * Parameters:
  *
- *   t0 - Pointer to string
+ *   t1 - Pointer to string
  *
  * Returns: none
  *
@@ -72,36 +72,54 @@ prefix_virt:
 	.section ".prefix.print_message", "ax", @progbits
 	.globl	print_message
 print_message:
+	/* Handle alternate link register */
+	mv	t0, ra
+print_message_alt:
 	/* Register usage:
 	 *
 	 * t0 - character pointer
 	 * a0 - current character
-	 * t1 - preserved a0
-	 * t2 - preserved a1
-	 * t3 - preserved a6
-	 * t4 - preserved a7
+	 * t2 - preserved a0
+	 * t3 - preserved a1
+	 * t4 - preserved a6
+	 * t5 - preserved a7
 	 */
-	mv	t1, a0
-	mv	t2, a1
-	mv	t3, a6
-	mv	t4, a7
+	mv	t2, a0
+	mv	t3, a1
+	mv	t4, a6
+	mv	t5, a7
 
 1:	/* Print each character in turn */
-	lbu	a0, (t0)
-	addi	t0, t0, 1
+	lbu	a0, (t1)
+	addi	t1, t1, 1
 	beqz	a0, 2f
 	li	a7, SBI_DBCN
 	li	a6, SBI_DBCN_WRITE_BYTE
 	ecall
 	j	1b
 2:
-	/* Restore registers and return */
-	mv	a7, t4
-	mv	a6, t3
-	mv	a1, t2
-	mv	a0, t1
-	ret
+	/* Restore registers and return (via alternate link register) */
+	mv	a7, t5
+	mv	a6, t4
+	mv	a1, t3
+	mv	a0, t2
+	jr	t0
 	.size	print_message, . - print_message
+
+	/*
+	 * Display progress message (if debugging is enabled)
+	 */
+	.macro	progress message
+#ifndef NDEBUG
+	.section ".rodata.progress_\@", "a", @progbits
+progress_\@:
+	.asciz	"\message"
+	.size	progress_\@, . - progress_\@
+	.previous
+	la	t1, progress_\@
+	jal	t0, print_message_alt
+#endif
+	.endm
 
 /*****************************************************************************
  *
