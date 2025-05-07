@@ -32,11 +32,6 @@
 	.section ".note.GNU-stack", "", @progbits
 	.text
 
-/* SBI system reset extension */
-#define SBI_SRST ( ( 'S' << 24 ) | ( 'R' << 16 ) | ( 'S' << 8 ) | 'T' )
-#define SBI_SRST_SYSTEM_RESET 0x00
-#define SBI_RESET_COLD 0x00000001
-
 /* ELF machine type */
 #define EM_RISCV 243
 
@@ -104,17 +99,7 @@ _sbi_start:
 	 * Attempt a system reset, since there is nothing else we can
 	 * viably do at this point.
 	 */
-	progress "\niPXE->SBI reset\n"
-	li	a7, SBI_SRST
-	li	a6, SBI_SRST_SYSTEM_RESET
-	li	a0, SBI_RESET_COLD
-	mv	a1, zero
-	ecall
-
-	/* If reset failed, lock the system */
-	progress "(reset failed)\n"
-1:	wfi
-	j	1b
+	j	reset_system
 	.size	_sbi_start, . - _sbi_start
 
 	/* File split information for the compressor */

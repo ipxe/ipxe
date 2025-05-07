@@ -608,3 +608,45 @@ enable_paging_32_done:
 	/* Ensure that transition code did not cross an alignment boundary */
 	.section ".bss.enable_paging_32_xcheck", "aw", @nobits
 	.org	. + enable_paging_32_xalign - enable_paging_32_xlen
+
+/*****************************************************************************
+ *
+ * Reset (or lock up) system
+ *
+ *****************************************************************************
+ *
+ * Reset via system via SBI, as a means of exiting from a prefix that
+ * has no other defined exit path.  If the reset fails, lock up the
+ * system since there is nothing else that can sensibly be done.
+ *
+ * This function does not require a valid stack pointer.
+ *
+ * Parameters: none
+ *
+ * Returns: n/a (does not return)
+ *
+ */
+
+/* SBI system reset extension */
+#define SBI_SRST ( ( 'S' << 24 ) | ( 'R' << 16 ) | ( 'S' << 8 ) | 'T' )
+#define SBI_SRST_SYSTEM_RESET 0x00
+#define SBI_RESET_COLD 0x00000001
+
+	.section ".prefix.reset_system", "ax", @progbits
+	.globl	reset_system
+reset_system:
+	/* Register usage: irrelevant (does not return) */
+	progress "\niPXE->SBI reset\n"
+
+	/* Attempt reset */
+	li	a7, SBI_SRST
+	li	a6, SBI_SRST_SYSTEM_RESET
+	li	a0, SBI_RESET_COLD
+	mv	a1, zero
+	ecall
+
+	/* If reset failed, lock the system */
+	progress "(reset failed)\n"
+1:	wfi
+	j	1b
+	.size	reset_system, . - reset_system
