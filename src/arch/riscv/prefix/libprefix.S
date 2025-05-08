@@ -312,7 +312,7 @@ apply_relocs_done:
  *
  * Returns:
  *
- *   a0 - Selected paging mode (0=no paging)
+ *   a0 - Virtual address offset
  *   pc - Updated to a virtual address if paging enabled
  *
  */
@@ -428,7 +428,7 @@ paging_mode_names:
  *
  * Returns:
  *
- *   a0 - Selected paging mode (0=no paging)
+ *   a0 - Virtual address offset
  *   pc - Updated to a virtual address if paging enabled
  *
  * A 4kB 64-bit page table contains 512 8-byte PTEs.  We choose to use
@@ -489,15 +489,23 @@ paging_mode_names:
 enable_paging_64:
 	/* Register usage:
 	 *
-	 * a0 - return value (enabled paging level)
+	 * a0 - return value (virtual address offset)
 	 * a1 - currently attempted paging level
-	 * a2 - page table base address
-	 * a3 - PTE pointer
-	 * a4 - PTE stride
+	 * a2 - enabled paging level
+	 * a3 - page table base address
+	 * a4 - PTE pointer
+	 * a5 - PTE stride
 	 */
 	progress " paging:"
-	mv	a2, a0
+	mv	a3, a0
 	li	a1, SATP_MODE_SV57
+
+	/* Calculate virtual address offset */
+	la	t0, prefix_virt
+	LOADN	t0, (t0)
+	la	t1, _prefix
+	sub	a0, t1, t0
+
 enable_paging_64_loop:
 
 	/* Calculate PTE stride for identity map at this paging level
@@ -506,35 +514,35 @@ enable_paging_64_loop:
 	 * a1 ==  9 == Sv48: PPN[3] LSB is PTE bit 37  =>  stride := 1 << 37
 	 * a1 ==  8 == Sv39: PPN[2] LSB is PTE bit 28  =>  stride := 1 << 28
 	 *
-	 * and so we calculate stride a4 := ( 1 << ( 9 * a1 - 44 ) )
+	 * and so we calculate stride a5 := ( 1 << ( 9 * a1 - 44 ) )
 	 */
-	slli	a4, a1, 3
-	add	a4, a4, a1
-	addi	a4, a4, -44
+	slli	a5, a1, 3
+	add	a5, a5, a1
+	addi	a5, a5, -44
 	li	t0, 1
-	sll	a4, t0, a4
+	sll	a5, t0, a5
 
 	/* Construct PTE[0-255] for identity map */
-	mv	a3, a2
+	mv	a4, a3
 	li	t0, ( PTE_COUNT / 2 )
 	li	t1, PTE_LEAF
-1:	STOREN	t1, (a3)
-	addi	a3, a3, PTE_SIZE
-	add	t1, t1, a4
+1:	STOREN	t1, (a4)
+	addi	a4, a4, PTE_SIZE
+	add	t1, t1, a5
 	addi	t0, t0, -1
 	bgtz	t0, 1b
 
 	/* Zero PTE[256-511] */
 	li	t0, ( PTE_COUNT / 2 )
-1:	STOREN	zero, (a3)
-	addi	a3, a3, PTE_SIZE
+1:	STOREN	zero, (a4)
+	addi	a4, a4, PTE_SIZE
 	addi	t0, t0, -1
 	bgtz	t0, 1b
 
 	/* Construct PTE[511] as next level page table pointer */
-	srli	t0, a2, PTE_PPN_SHIFT
+	srli	t0, a3, PTE_PPN_SHIFT
 	ori	t0, t0, PTE_V
-	STOREN	t0, -PTE_SIZE(a3)
+	STOREN	t0, -PTE_SIZE(a4)
 
 	/* Calculate PTE[x] address for iPXE virtual address map */
 	la	t0, prefix_virt
@@ -542,15 +550,15 @@ enable_paging_64_loop:
 	srli	t0, t0, VPN1_LSB
 	andi	t0, t0, ( PTE_COUNT - 1 )
 	slli	t0, t0, PTE_SIZE_LOG2
-	add	a3, a2, t0
+	add	a4, a3, t0
 
 	/* Calculate PTE stride for iPXE virtual address map
 	 *
 	 * PPN[1] LSB is PTE bit 19 in all paging modes, and so the
 	 * stride is always ( 1 << 19 )
 	 */
-	li	a4, 1
-	slli	a4, a4, PTE_PPN1_LSB
+	li	a5, 1
+	slli	a5, a5, PTE_PPN1_LSB
 
 	/* Construct PTE[x-y] for iPXE virtual address map */
 	la	t0, _prefix
@@ -558,37 +566,32 @@ enable_paging_64_loop:
 	ori	t0, t0, PTE_LEAF
 	la	t1, _ebss
 	srli	t1, t1, PTE_PPN_SHIFT
-1:	STOREN	t0, (a3)
-	addi	a3, a3, PTE_SIZE
-	add	t0, t0, a4
+1:	STOREN	t0, (a4)
+	addi	a4, a4, PTE_SIZE
+	add	t0, t0, a5
 	ble	t0, t1, 1b
 
 	/* Attempt to enable paging, and read back active paging level */
 	slli	t0, a1, SATP_MODE_SHIFT
-	srli	t1, a2, PAGE_SHIFT
+	srli	t1, a3, PAGE_SHIFT
 	or	t0, t0, t1
 	csrrw	zero, satp, t0
 	sfence.vma
-	csrrw	a0, satp, t0
-	srli	a0, a0, SATP_MODE_SHIFT
+	csrrw	a2, satp, t0
+	srli	a2, a2, SATP_MODE_SHIFT
 
 	/* Loop until we successfully enable paging, or run out of levels */
-	beq	a0, a1, 1f
+	beq	a2, a1, 1f
 	addi	a1, a1, -1
 	li	t0, SATP_MODE_SV39
 	bge	a1, t0, enable_paging_64_loop
-	j	enable_paging_64_done
+	mv	a0, zero
 1:
 	/* Adjust return address to a virtual address */
-	la	t0, _prefix
-	sub	ra, ra, t0
-	la	t0, prefix_virt
-	LOADN	t0, (t0)
-	add	ra, ra, t0
+	sub	ra, ra, a0
 
-enable_paging_64_done:
 	/* Return, with or without paging enabled */
-	paging_mode_name a0
+	paging_mode_name a2
 	ret
 	.size	enable_paging_64, . - enable_paging_64
 
@@ -611,7 +614,7 @@ enable_paging_64_done:
  *
  * Returns:
  *
- *   a0 - Selected paging mode (0=no paging)
+ *   a0 - Virtual address offset
  *   pc - Updated to a virtual address if paging enabled
  *
  * A 4kB 32-bit page table contains 1024 4-byte PTEs.  We choose to
@@ -632,8 +635,8 @@ enable_paging_64_done:
 enable_paging_32:
 	/* Register usage:
 	 *
-	 * a0 - return value (enabled paging level)
-	 * a1 - virtual address offset
+	 * a0 - return value (virtual address offset)
+	 * a1 - enabled paging level
 	 * a2 - page table base address
 	 * a3 - PTE pointer
 	 * a4 - saved content of temporarily modified PTE
@@ -645,12 +648,12 @@ enable_paging_32:
 	la	t0, prefix_virt
 	LOADN	t0, (t0)
 	la	t1, _prefix
-	sub	a1, t1, t0
+	sub	a0, t1, t0
 
 	/* Construct PTEs for circular map */
 	mv	a3, a2
 	li	t0, PTE_COUNT
-	mv	t1, a1
+	mv	t1, a0
 	ori	t1, t1, ( PTE_LEAF << PTE_PPN_SHIFT )
 	li	t2, ( 1 << ( PTE_PPN1_LSB + PTE_PPN_SHIFT ) )
 1:	srli	t3, t1, PTE_PPN_SHIFT
@@ -671,11 +674,11 @@ enable_paging_32:
 	STOREN	t0, (a3)
 
 	/* Adjust PTE pointer to a virtual address */
-	sub	a3, a3, a1
+	sub	a3, a3, a0
 
 	/* Attempt to enable paging, and read back active paging level */
 	la	t0, 1f
-	sub	t0, t0, a1
+	sub	t0, t0, a0
 	li	t1, ( SATP_MODE_SV32 << SATP_MODE_SHIFT )
 	srli	t2, a2, PAGE_SHIFT
 	or	t1, t1, t2
@@ -684,22 +687,25 @@ enable_paging_32:
 enable_paging_32_xstart:
 	csrrw	zero, satp, t1
 	sfence.vma
-	csrrw	a0, satp, t1
-	beqz	a0, enable_paging_32_done
+	csrrw	a1, satp, t1
+	beqz	a1, 2f
 	jr	t0
 1:	/* Restore temporarily modified PTE */
 	STOREN	a4, (a3)
 	sfence.vma
 	/* End of transition code */
 	.equ	enable_paging_32_xlen, . - enable_paging_32_xstart
-	li	a0, 1
+2:	srli	a1, a1, SATP_MODE_SHIFT
 
-	/* Adjust return address */
-	sub	ra, ra, a1
+	/* Clear virtual address offset if paging is not enabled */
+	bnez	a1, 1f
+	mv	a0, zero
+1:
+	/* Adjust return address to a virtual address */
+	sub	ra, ra, a0
 
-enable_paging_32_done:
 	/* Return, with or without paging enabled */
-	paging_mode_name a0
+	paging_mode_name a1
 	ret
 	.size	enable_paging_32, . - enable_paging_32
 
