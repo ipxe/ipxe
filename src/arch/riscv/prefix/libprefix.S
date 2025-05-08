@@ -410,6 +410,28 @@ paging_mode_names:
 
 /*****************************************************************************
  *
+ * Disable paging
+ *
+ *****************************************************************************
+ *
+ * This function may be called with either virtual or flat physical
+ * addressing.  It does not require a valid stack pointer.
+ *
+ * Parameters:
+ *
+ *   a0 - Virtual address offset
+ *
+ * Returns:
+ *
+ *   pc - Updated to a physical address
+ *
+ */
+
+	.globl	disable_paging
+	.equ	disable_paging, _C2 ( disable_paging_, __riscv_xlen )
+
+/*****************************************************************************
+ *
  * Enable 64-bit paging
  *
  *****************************************************************************
@@ -597,6 +619,50 @@ enable_paging_64_loop:
 
 /*****************************************************************************
  *
+ * Disable 64-bit paging
+ *
+ *****************************************************************************
+ *
+ * This function may be called with either virtual or flat physical
+ * addressing.  It does not require a valid stack pointer.
+ *
+ * Parameters:
+ *
+ *   a0 - Virtual address offset
+ *
+ * Returns:
+ *
+ *   pc - Updated to a physical address
+ *
+ */
+
+	.section ".prefix.disable_paging_64", "ax", @progbits
+disable_paging_64:
+	/* Register usage:
+	 *
+	 * a0 - virtual address offset
+	 */
+
+	/* Jump to physical address */
+	la	t0, 1f
+	bgez	t0, 1f
+	add	t0, t0, a0
+	jr	t0
+1:
+	/* Disable paging */
+	csrw	satp, zero
+	sfence.vma
+
+	/* Update return address to a physical address */
+	bgez	ra, 1f
+	add	ra, ra, a0
+1:
+	/* Return with paging disabled */
+	ret
+	.size	disable_paging_64, . - disable_paging_64
+
+/*****************************************************************************
+ *
  * Enable 32-bit paging
  *
  *****************************************************************************
@@ -712,6 +778,77 @@ enable_paging_32_xstart:
 	/* Ensure that transition code did not cross an alignment boundary */
 	.section ".bss.enable_paging_32_xcheck", "aw", @nobits
 	.org	. + enable_paging_32_xalign - enable_paging_32_xlen
+
+/*****************************************************************************
+ *
+ * Disable 32-bit paging
+ *
+ *****************************************************************************
+ *
+ * This function may be called with either virtual or flat physical
+ * addressing.  It does not require a valid stack pointer.
+ *
+ * Parameters:
+ *
+ *   a0 - Virtual address offset
+ *
+ * Returns:
+ *
+ *   pc - Updated to a physical address
+ *
+ */
+
+	.equ	disable_paging_32_xalign, 16
+
+	.section ".prefix.disable_paging_32", "ax", @progbits
+disable_paging_32:
+	/* Register usage:
+	 *
+	 * a0 - virtual address offset
+	 * a1 - page table address
+	 * a2 - transition PTE pointer
+	 * a3 - transition PTE content
+	 */
+
+	/* Get page table address, and exit if paging is already disabled */
+	csrr	a1, satp
+	beqz	a1, 99f
+	slli	a1, a1, PAGE_SHIFT
+	sub	a1, a1, a0
+
+	/* Prepare for modifying transition PTE */
+	la	t0, disable_paging_32_xstart
+	add	t0, t0, a0
+	srli	t0, t0, VPN1_LSB
+	slli	a2, t0, PTE_SIZE_LOG2
+	add	a2, a2, a1
+	slli	a3, t0, PTE_PPN1_LSB
+	ori	a3, a3, PTE_LEAF
+
+	/* Jump to physical address in transition PTE, and disable paging */
+	la	t0, 1f
+	add	t0, t0, a0
+	.balign	disable_paging_32_xalign
+	/* Start of transition code */
+disable_paging_32_xstart:
+	STOREN	a3, (a2)
+	sfence.vma
+	jr	t0
+1:	csrw	satp, zero
+	sfence.vma
+	/* End of transition code */
+	.equ	disable_paging_32_xlen, . - disable_paging_32_xstart
+
+	/* Update return address to a physical address */
+	add	ra, ra, a0
+
+99:	/* Return with paging disabled */
+	ret
+	.size	disable_paging_32, . - disable_paging_32
+
+	/* Ensure that transition code did not cross an alignment boundary */
+	.section ".bss.disable_paging_32_xcheck", "aw", @nobits
+	.org	. + disable_paging_32_xalign - disable_paging_32_xlen
 
 /*****************************************************************************
  *
