@@ -626,7 +626,7 @@ enable_paging_64_done:
  * address, then restore the temporarily modified PTE.
  */
 
-	.equ	enable_paging_32_xalign, 16
+	.equ	enable_paging_32_xalign, 32
 
 	.section ".prefix.enable_paging_32", "ax", @progbits
 enable_paging_32:
@@ -670,6 +670,9 @@ enable_paging_32:
 	ori	t0, t0, PTE_LEAF
 	STOREN	t0, (a3)
 
+	/* Adjust PTE pointer to a virtual address */
+	sub	a3, a3, a1
+
 	/* Attempt to enable paging, and read back active paging level */
 	la	t0, 1f
 	sub	t0, t0, a1
@@ -684,16 +687,12 @@ enable_paging_32_xstart:
 	csrrw	a0, satp, t1
 	beqz	a0, enable_paging_32_done
 	jr	t0
-1:	/* End of transition code */
-	.equ	enable_paging_32_xlen, . - enable_paging_32_xstart
-	li	a0, 1
-
-	/* Adjust PTE pointer to a virtual address */
-	sub	a3, a3, a1
-
-	/* Restore temporarily modified PTE */
+1:	/* Restore temporarily modified PTE */
 	STOREN	a4, (a3)
 	sfence.vma
+	/* End of transition code */
+	.equ	enable_paging_32_xlen, . - enable_paging_32_xstart
+	li	a0, 1
 
 	/* Adjust return address */
 	sub	ra, ra, a1
