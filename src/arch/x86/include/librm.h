@@ -365,7 +365,8 @@ extern char __text16_array ( sipi, [] );
 #define sipi __use_text16 ( sipi )
 
 /** Length of startup IPI real-mode handler */
-extern char sipi_len[];
+extern size_t ABS_SYMBOL ( sipi_len );
+#define sipi_len ABS_VALUE ( sipi_len )
 
 /** Startup IPI real-mode handler copy of real-mode data segment */
 extern uint16_t __text16 ( sipi_ds );

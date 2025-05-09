@@ -426,7 +426,7 @@ void setup_sipi ( unsigned int vector, uint32_t handler,
 	memcpy ( &sipi_regs, regs, sizeof ( sipi_regs ) );
 
 	/* Copy real-mode handler */
-	copy_to_real ( ( vector << 8 ), 0, sipi, ( ( size_t ) sipi_len ) );
+	copy_to_real ( ( vector << 8 ), 0, sipi, sipi_len );
 }
 
 PROVIDE_IOMAP_INLINE ( pages, io_to_bus );

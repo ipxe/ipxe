@@ -16,7 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef EMBED
 #define EMBED( _index, _path, _name )					\
 	extern char embedded_image_ ## _index ## _data[];		\
-	extern char embedded_image_ ## _index ## _len[];		\
+	extern size_t ABS_SYMBOL ( embedded_image_ ## _index ## _len );	\
 	__asm__ ( ".section \".data\", \"aw\", " PROGBITS "\n\t"	\
 		  "\nembedded_image_" #_index "_data:\n\t"		\
 		  ".incbin \"" _path "\"\n\t"				\
@@ -34,7 +34,7 @@ EMBED_ALL
 	.name = _name,							\
 	.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),			\
 	.rwdata = embedded_image_ ## _index ## _data,			\
-	.len = ( size_t ) embedded_image_ ## _index ## _len,		\
+	.len = ABS_VALUE_INIT ( embedded_image_ ## _index ## _len ),	\
 },
 static struct image embedded_images[] = {
 	EMBED_ALL

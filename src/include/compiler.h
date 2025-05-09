@@ -662,6 +662,97 @@ char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
 #define ARRAY_SIZE(array) ( sizeof (array) / sizeof ( (array)[0] ) )
 #endif /* ASSEMBLY */
 
+/** @defgroup abs Absolute symbols
+ * @{
+ */
+#ifndef ASSEMBLY
+
+/** Declare an absolute symbol (e.g. a value defined by a linker script)
+ *
+ * Use as e.g.:
+ *
+ *    extern int ABS_SYMBOL ( _my_symbol );
+ *
+ */
+#define ABS_SYMBOL( name ) name[]
+
+/** Get value of an absolute symbol for use in a static initializer
+ *
+ * Use as e.g.:
+ *
+ *    extern int ABS_SYMBOL ( _my_symbol );
+ *    static int my_symbol = ABS_VALUE_INIT ( _my_symbol );
+ *
+ * Note that the declared type must be at least as large as a pointer
+ * type, since the compiler sees the absolute symbol as being an
+ * address.
+ */
+#define ABS_VALUE_INIT( name ) ( ( typeof ( name[0] ) ) name )
+
+/** Get value of an absolute symbol
+ *
+ * In a position-dependent executable, where all addresses are fixed
+ * at link time, we can use the standard technique as documented by
+ * GNU ld, e.g.:
+ *
+ *    extern char _my_symbol[];
+ *
+ *    printf ( "Absolute symbol value is %x\n", ( ( int ) _my_symbol ) );
+ *
+ * This technique may not work in a position-independent executable.
+ * When dynamic relocations are applied, the runtime addresses will no
+ * longer be equal to the link-time addresses.  If the code to obtain
+ * the address of _my_symbol uses PC-relative addressing, then it
+ * will calculate the runtime "address" of the absolute symbol, which
+ * will no longer be equal the the link-time "address" (i.e. the
+ * correct value) of the absolute symbol.
+ *
+ * We can work around this by instead declaring a static variable to
+ * contain the absolute value, and returning the contents of this
+ * static variable:
+ *
+ *    extern char _my_symbol[];
+ *    static void * volatile my_symbol = _my_symbol;
+ *
+ *    printf ( "Absolute symbol value is %x\n", ( ( int ) my_symbol ) );
+ *
+ * The value of the static variable cannot possibly use PC-relative
+ * addressing (since there is no applicable program counter for
+ * non-code), and so will instead be filled in with the correct
+ * absolute value at link time.  (No dynamic relocation will be
+ * generated that might change its value, since the symbol providing
+ * the value is an absolute symbol.)
+ *
+ * This second technique will work for both position-dependent and
+ * position-independent code, but incurs the unnecssary overhead of an
+ * additional static variable in position-dependent code.  The
+ * ABS_VALUE() macro abstracts away these differences, using the most
+ * efficient available technique.  Use as e.g.:
+ *
+ *    extern int ABS_SYMBOL ( _my_symbol );
+ *    #define my_symbol ABS_VALUE ( _my_symbol )
+ *
+ *    printf ( "Absolute symbol value is %x\n", my_symbol );
+ *
+ * The ABS_VALUE() macro uses the (otherwise redundant) type declared
+ * on the ABS_SYMBOL() array to automatically determine the correct
+ * type for the ABS_VALUE() expression.
+ *
+ * Unlike ABS_VALUE_INIT(), there is no restriction that the type must
+ * be at least as large as a pointer type.
+ */
+#ifndef __pie__
+#define ABS_VALUE( name ) ( ( typeof ( name[0] ) ) ( intptr_t ) name )
+#else
+#define ABS_VALUE( name ) ( {						\
+	static void * volatile static_ ## name = name;			\
+	( ( typeof ( name[0] ) ) ( intptr_t ) static_ ## name );	\
+	} )
+#endif
+
+#endif /* ASSEMBLY */
+/** @} */
+
 /**
  * @defgroup licences Licence declarations
  *

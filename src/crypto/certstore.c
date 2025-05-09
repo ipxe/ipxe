@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef CERT
 #define CERT( _index, _path )						\
 	extern char stored_cert_ ## _index ## _data[];			\
-	extern char stored_cert_ ## _index ## _len[];			\
+	extern size_t ABS_SYMBOL ( stored_cert_ ## _index ## _len );	\
 	__asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"	\
 		  "\nstored_cert_" #_index "_data:\n\t"			\
 		  ".incbin \"" _path "\"\n\t"				\
@@ -59,7 +59,7 @@ CERT_ALL
 #undef CERT
 #define CERT( _index, _path ) {						\
 	.data = stored_cert_ ## _index ## _data,			\
-	.len = ( size_t ) stored_cert_ ## _index ## _len, 		\
+	.len = ABS_VALUE_INIT ( stored_cert_ ## _index ## _len ), 	\
 },
 static struct asn1_cursor certstore_raw[] = {
 	CERT_ALL

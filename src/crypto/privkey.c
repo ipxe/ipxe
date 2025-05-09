@@ -53,7 +53,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /* Raw private key data */
 extern char private_key_data[];
-extern char private_key_len[];
+extern size_t ABS_SYMBOL ( private_key_len );
 __asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"
 	  "\nprivate_key_data:\n\t"
 #ifdef PRIVATE_KEY
@@ -68,7 +68,7 @@ struct private_key private_key = {
 	.refcnt = REF_INIT ( ref_no_free ),
 	.builder = {
 		.data = private_key_data,
-		.len = ( ( size_t ) private_key_len ),
+		.len = ABS_VALUE_INIT ( private_key_len ),
 	},
 };
 

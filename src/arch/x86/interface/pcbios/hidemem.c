@@ -76,10 +76,10 @@ extern struct segoff __text16 ( int15_vector );
 /* The linker defines these symbols for us */
 extern char _textdata[];
 extern char _etextdata[];
-extern char _text16_memsz[];
-#define _text16_memsz ( ( size_t ) _text16_memsz )
-extern char _data16_memsz[];
-#define _data16_memsz ( ( size_t ) _data16_memsz )
+extern size_t ABS_SYMBOL ( _text16_memsz );
+#define _text16_memsz ABS_VALUE ( _text16_memsz )
+extern size_t ABS_SYMBOL ( _data16_memsz );
+#define _data16_memsz ABS_VALUE ( _data16_memsz )
 
 /**
  * Hide region of memory from system memory map

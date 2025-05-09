@@ -55,12 +55,12 @@ extern void pxe_int_1a ( void );
 static int int_1a_hooked = 0;
 
 /** Real-mode code segment size */
-extern char _text16_memsz[];
-#define _text16_memsz ( ( size_t ) _text16_memsz )
+extern size_t ABS_SYMBOL ( _text16_memsz );
+#define _text16_memsz ABS_VALUE ( _text16_memsz )
 
 /** Real-mode data segment size */
-extern char _data16_memsz[];
-#define _data16_memsz ( ( size_t ) _data16_memsz )
+extern size_t ABS_SYMBOL (_data16_memsz );
+#define _data16_memsz ABS_VALUE ( _data16_memsz )
 
 /** PXENV_UNDI_TRANSMIT API call profiler */
 static struct profiler pxe_api_tx_profiler __profiler =
