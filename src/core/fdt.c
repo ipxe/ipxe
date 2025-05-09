@@ -564,6 +564,111 @@ int fdt_u32 ( struct fdt *fdt, unsigned int offset, const char *name,
 }
 
 /**
+ * Get region cell size specification
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting (parent) node offset
+ * @v regs		Region cell size specification to fill in
+ *
+ * Note that #address-cells and #size-cells are defined on the
+ * immediate parent node, rather than on the node with the "reg"
+ * property itself.
+ */
+void fdt_reg_cells ( struct fdt *fdt, unsigned int offset,
+		     struct fdt_reg_cells *regs ) {
+	int rc;
+
+	/* Read #address-cells, if present */
+	if ( ( rc = fdt_u32 ( fdt, offset, "#address-cells",
+			      &regs->address_cells ) ) != 0 ) {
+		regs->address_cells = FDT_DEFAULT_ADDRESS_CELLS;
+	}
+
+	/* Read #size-cells, if present */
+	if ( ( rc = fdt_u32 ( fdt, offset, "#size-cells",
+			      &regs->size_cells ) ) != 0 ) {
+		regs->size_cells = FDT_DEFAULT_SIZE_CELLS;
+	}
+
+	/* Calculate stride */
+	regs->stride = ( regs->address_cells + regs->size_cells );
+}
+
+/**
+ * Get number of regions
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v regs		Region cell size specification
+ * @ret count		Number of regions, or negative error
+ */
+int fdt_reg_count ( struct fdt *fdt, unsigned int offset,
+		    struct fdt_reg_cells *regs ) {
+	struct fdt_descriptor desc;
+	const uint32_t *cell;
+	unsigned int count;
+	int rc;
+
+	/* Find property */
+	if ( ( rc = fdt_property ( fdt, offset, "reg", &desc ) ) != 0 )
+		return rc;
+
+	/* Determine number of regions */
+	count = ( desc.len / ( regs->stride * sizeof ( *cell ) ) );
+	return count;
+}
+
+/**
+ * Get region address
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v regs		Region cell size specification
+ * @v index		Region index
+ * @v address		Region starting address to fill in
+ * @ret rc		Return status code
+ */
+int fdt_reg_address ( struct fdt *fdt, unsigned int offset,
+		      struct fdt_reg_cells *regs, unsigned int index,
+		      uint64_t *address ) {
+	unsigned int cell = ( index * regs->stride );
+	int rc;
+
+	/* Read relevant portion of region array */
+	if ( ( rc = fdt_cells ( fdt, offset, "reg", cell, regs->address_cells,
+				address ) ) != 0 ) {
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Get region size
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v regs		Region cell size specification
+ * @v index		Region index
+ * @v size		Region size to fill in
+ * @ret rc		Return status code
+ */
+int fdt_reg_size ( struct fdt *fdt, unsigned int offset,
+		   struct fdt_reg_cells *regs, unsigned int index,
+		   uint64_t *size ) {
+	unsigned int cell = ( ( index * regs->stride ) + regs->address_cells );
+	int rc;
+
+	/* Read relevant portion of region array */
+	if ( ( rc = fdt_cells ( fdt, offset, "reg", cell, regs->size_cells,
+				size ) ) != 0 ) {
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Get MAC address from property
  *
  * @v fdt		Device tree

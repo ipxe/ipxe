@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/device.h>
 #include <ipxe/dma.h>
+#include <ipxe/fdt.h>
 
 /** A devicetree device */
 struct dt_device {
@@ -25,17 +26,9 @@ struct dt_device {
 	/** Driver-private data */
 	void *priv;
 
-	/** Number of address cells for child devices */
-	uint32_t address_cells;
-	/** Number of size cells for child devices */
-	uint32_t size_cells;
+	/** Register cell size specification */
+	struct fdt_reg_cells regs;
 };
-
-/** Default number of address cells, if not specified */
-#define DT_DEFAULT_ADDRESS_CELLS 2
-
-/** Default number of size cells, if not specified */
-#define DT_DEFAULT_SIZE_CELLS 1
 
 /** A devicetree driver */
 struct dt_driver {
