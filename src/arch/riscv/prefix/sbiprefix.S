@@ -79,8 +79,7 @@ _sbi_start:
 	progress " .stack"
 
 	/* Store boot hart */
-	la	t0, boot_hart
-	STOREN	s0, (t0)
+	STOREN	s0, boot_hart, t0
 
 	/* Register device tree */
 	la	a0, sysfdt

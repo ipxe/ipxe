@@ -257,8 +257,7 @@ apply_relocs:
 	la	a2, _edata
 
 	/* Calculate relocation addend */
-	la	t0, prefix_virt
-	LOADN	a0, (t0)
+	LOADN	a0, prefix_virt
 	sub	a0, a1, a0
 
 	/* Skip applying relocations if addend is zero */
@@ -523,8 +522,7 @@ enable_paging_64:
 	li	a1, SATP_MODE_SV57
 
 	/* Calculate virtual address offset */
-	la	t0, prefix_virt
-	LOADN	t0, (t0)
+	LOADN	t0, prefix_virt
 	la	t1, _prefix
 	sub	a0, t1, t0
 
@@ -567,8 +565,7 @@ enable_paging_64_loop:
 	STOREN	t0, -PTE_SIZE(a4)
 
 	/* Calculate PTE[x] address for iPXE virtual address map */
-	la	t0, prefix_virt
-	LOADN	t0, (t0)
+	LOADN	t0, prefix_virt
 	srli	t0, t0, VPN1_LSB
 	andi	t0, t0, ( PTE_COUNT - 1 )
 	slli	t0, t0, PTE_SIZE_LOG2
@@ -711,8 +708,7 @@ enable_paging_32:
 	mv	a2, a0
 
 	/* Calculate virtual address offset */
-	la	t0, prefix_virt
-	LOADN	t0, (t0)
+	LOADN	t0, prefix_virt
 	la	t1, _prefix
 	sub	a0, t1, t0
 
