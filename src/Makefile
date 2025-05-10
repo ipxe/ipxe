@@ -16,7 +16,8 @@ SYMBOL_PREFIX	:=
 #
 # Locations of tools
 #
-HOST_CC		:= gcc
+CC		?= gcc
+HOST_CC		:= $(CC)
 RM		:= rm -f
 TOUCH		:= touch
 MKDIR		:= mkdir
