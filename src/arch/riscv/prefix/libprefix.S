@@ -37,6 +37,7 @@
 	 * This will be updated if runtime relocations are applied.
 	 */
 	.section ".rodata.prefix_virt", "a", @progbits
+	.balign	( __riscv_xlen / 8 )
 prefix_virt:
 	.dword	_prefix
 	.size	prefix_virt, . - prefix_virt
