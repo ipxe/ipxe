@@ -23,12 +23,15 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <errno.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/image.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
+#include <ipxe/base16.h>
 #include <usr/imgmgmt.h>
 
 /** @file
@@ -37,16 +40,22 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
-/** "digest" options */
-struct digest_options {};
+ /** "digest" options */
+struct digest_options {
+	/** Hash */
+	char *hash;
+};
 
 /** "digest" option list */
-static struct option_descriptor digest_opts[] = {};
+static struct option_descriptor digest_opts[] = {
+	OPTION_DESC ( "sum", 's', required_argument,
+			struct digest_options, hash, parse_string ),
+};
 
 /** "digest" command descriptor */
 static struct command_descriptor digest_cmd =
-	COMMAND_DESC ( struct digest_options, digest_opts, 1, MAX_ARGUMENTS,
-		       "<image> [<image>...]" );
+COMMAND_DESC ( struct digest_options, digest_opts, 1, MAX_ARGUMENTS,
+	"<image> [<image>...]" );
 
 /**
  * The "digest" command
@@ -57,17 +66,17 @@ static struct command_descriptor digest_cmd =
  * @ret rc		Return status code
  */
 static int digest_exec ( int argc, char **argv,
-			 struct digest_algorithm *digest ) {
+	struct digest_algorithm *digest ) {
 	struct digest_options opts;
 	struct image *image;
 	uint8_t digest_ctx[digest->ctxsize];
 	uint8_t digest_out[digest->digestsize];
 	uint8_t buf[128];
+	char hash_buffer[digest->digestsize * 2 + 1];
 	size_t offset;
 	size_t len;
 	size_t frag_len;
 	int i;
-	unsigned j;
 	int rc;
 
 	/* Parse options */
@@ -95,10 +104,15 @@ static int digest_exec ( int argc, char **argv,
 		}
 		digest_final ( digest, digest_ctx, digest_out );
 
-		for ( j = 0 ; j < sizeof ( digest_out ) ; j++ )
-			printf ( "%02x", digest_out[j] );
+		hex_encode ( 0, digest_out, sizeof ( digest_out ) , 
+			hash_buffer, sizeof ( hash_buffer ) );
 
-		printf ( "  %s\n", image->name );
+		if ( opts.hash ) {
+			return ( ( strcmp ( hash_buffer, opts.hash ) == 0 ) ?
+				0 : -ERANGE );
+		}
+
+		printf ( "%s  %s\n", hash_buffer, image->name );
 	}
 
 	return 0;
@@ -112,6 +126,10 @@ static int sha1sum_exec ( int argc, char **argv ) {
 	return digest_exec ( argc, argv, &sha1_algorithm );
 }
 
+static int sha256sum_exec ( int argc, char **argv ) {
+	return digest_exec ( argc, argv, &sha256_algorithm );
+}
+
 struct command md5sum_command __command = {
 	.name = "md5sum",
 	.exec = md5sum_exec,
@@ -120,4 +138,9 @@ struct command md5sum_command __command = {
 struct command sha1sum_command __command = {
 	.name = "sha1sum",
 	.exec = sha1sum_exec,
+};
+
+struct command sha256sum_command __command = {
+	.name = "sha256sum",
+	.exec = sha256sum_exec,
 };
