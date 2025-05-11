@@ -401,6 +401,14 @@ paging_mode_names:
 #endif
 	.endm
 
+	/* Maximum physical alignment
+	 *
+	 * We align to a "megapage" boundary to simplify the task of
+	 * setting up page table mappings.
+	 */
+	.globl	_max_align
+	.equ	_max_align, ( 1 << VPN1_LSB )
+
 /*****************************************************************************
  *
  * Disable paging

@@ -87,6 +87,9 @@ SECTIONS {
 	}
     }
 
+    /* End virtual address */
+    _end = .;
+
     /* Base virtual address */
     _base = ABSOLUTE ( _prefix );
 
@@ -96,6 +99,9 @@ SECTIONS {
 
     /* Length of initialised data */
     _filesz = ( ABSOLUTE ( _edata ) - ABSOLUTE ( _prefix ) );
+
+    /* Length of in-memory image */
+    _memsz = ( ABSOLUTE ( _end ) - ABSOLUTE ( _prefix ) );
 
     /* Unwanted sections */
     /DISCARD/ : {

@@ -76,6 +76,14 @@ struct fdt_prop {
 /** Maximum alignment of any block */
 #define FDT_MAX_ALIGN 8
 
+/** A memory reservation */
+struct fdt_reservation {
+	/** Starting address */
+	uint64_t start;
+	/** Length of reservation */
+	uint64_t size;
+} __attribute__ (( packed ));
+
 /** A device tree */
 struct fdt {
 	/** Tree data */
@@ -142,6 +150,23 @@ struct fdt_reg_cells {
 
 extern struct image_tag fdt_image __image_tag;
 extern struct fdt sysfdt;
+
+/**
+ * Get memory reservations
+ *
+ * @v fdt		Device tree
+ * @ret rsv		Memory reservations
+ */
+static inline const struct fdt_reservation *
+fdt_reservations ( struct fdt *fdt ) {
+
+	return ( fdt->raw + fdt->reservations );
+}
+
+/** Iterate over memory reservations */
+#define for_each_fdt_reservation( rsv, fdt )			\
+	for ( rsv = fdt_reservations ( (fdt) ) ;		\
+	      ( (rsv)->start || (rsv)->size ) ; rsv++ )
 
 extern int fdt_describe ( struct fdt *fdt, unsigned int offset,
 			  struct fdt_descriptor *desc );
