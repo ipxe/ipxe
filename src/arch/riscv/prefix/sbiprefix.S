@@ -57,6 +57,9 @@ progress_\@:
 	.org 0
 	.globl	_sbi_start
 _sbi_start:
+	/* Initialise virtual address offset */
+	mv	tp, zero
+
 	/* Preserve arguments */
 	mv	s0, a0
 	mv	s1, a1

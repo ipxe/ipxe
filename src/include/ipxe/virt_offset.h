@@ -54,24 +54,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * This is defined to be the value to be added to an address within
  * iPXE's own image in order to obtain its physical address, as
  * described above.
- *
- * Note that if iPXE's image is not yet writable (i.e. during early
- * startup, prior to physical relocation), then this value may not yet
- * be valid.  Under these circumstances, callers must use
- * offset_phys_to_virt() and offset_virt_to_phys() instead (and so
- * provide the virtual address offset as a function parameter).
  */
 extern const unsigned long virt_offset;
+
+/** Allow for architecture-specific overrides of virt_offset */
+#include <bits/virt_offset.h>
 
 /**
  * Convert physical address to virtual address
  *
  * @v phys		Physical address
- * @v offset		Virtual address offset
  * @ret virt		Virtual address
  */
 static inline __always_inline void *
-offset_phys_to_virt ( unsigned long phys, unsigned long offset ) {
+UACCESS_INLINE ( offset, phys_to_virt ) ( unsigned long phys ) {
 
 	/* In a 64-bit build, any valid physical address is directly
 	 * usable as a virtual address, since physical addresses are
@@ -81,18 +77,17 @@ offset_phys_to_virt ( unsigned long phys, unsigned long offset ) {
 		return ( ( void * ) phys );
 
 	/* In a 32-bit build: subtract virt_offset */
-	return ( ( void * ) ( phys - offset ) );
+	return ( ( void * ) ( phys - virt_offset ) );
 }
 
 /**
  * Convert virtual address to physical address
  *
  * @v virt		Virtual address
- * @v offset		Virtual address offset
  * @ret phys		Physical address
  */
 static inline __always_inline physaddr_t
-offset_virt_to_phys ( volatile const void *virt, unsigned long offset ) {
+UACCESS_INLINE ( offset, virt_to_phys ) ( volatile const void *virt ) {
 	physaddr_t addr = ( ( physaddr_t ) virt );
 
 	/* In a 64-bit build, any valid virtual address with the MSB
@@ -110,31 +105,7 @@ offset_virt_to_phys ( volatile const void *virt, unsigned long offset ) {
 	/* In a 32-bit build or in a 64-bit build with a virtual
 	 * address with the MSB set: add virt_offset
 	 */
-	return ( addr + offset );
-}
-
-/**
- * Convert physical address to virtual address
- *
- * @v phys		Physical address
- * @ret virt		Virtual address
- */
-static inline __always_inline void *
-UACCESS_INLINE ( offset, phys_to_virt ) ( unsigned long phys ) {
-
-	return offset_phys_to_virt ( phys, virt_offset );
-}
-
-/**
- * Convert virtual address to physical address
- *
- * @v virt		Virtual address
- * @ret phys		Physical address
- */
-static inline __always_inline physaddr_t
-UACCESS_INLINE ( offset, virt_to_phys ) ( volatile const void *virt ) {
-
-	return offset_virt_to_phys ( virt, virt_offset );
+	return ( addr + virt_offset );
 }
 
 #endif /* _IPXE_VIRT_OFFSET_H */

@@ -29,6 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <byteswap.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/image.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/fdt.h>
 
@@ -734,8 +735,9 @@ int fdt_parse ( struct fdt *fdt, struct fdt_header *hdr, size_t max_len ) {
 		       fdt->len, max_len );
 		goto err;
 	}
-	DBGC ( fdt, "FDT version %d at %p+%#04zx\n",
-	       be32_to_cpu ( hdr->version ), fdt->hdr, fdt->len );
+	DBGC ( fdt, "FDT version %d at %p+%#04zx (phys %#08lx)\n",
+	       be32_to_cpu ( hdr->version ), fdt->hdr, fdt->len,
+	       virt_to_phys ( hdr ) );
 
 	/* Check signature */
 	if ( hdr->magic != cpu_to_be32 ( FDT_MAGIC ) ) {
