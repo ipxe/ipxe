@@ -227,7 +227,9 @@ print_hex_value_alt:
  * records are overlaid with .bss).  It does not require a valid stack
  * pointer.
  *
- * Parameters: none (address is implicit in the program counter)
+ * Parameters: none
+ *
+ *   a0 - Relocation records
  *
  * Returns: none
  *
@@ -241,27 +243,26 @@ print_hex_value_alt:
 apply_relocs:
 	/* Register usage:
 	 *
-	 * a0 - relocation addend
+	 * a0 - current relocation record pointer
 	 * a1 - current relocation target address
-	 * a2 - current relocation record pointer
+	 * a2 - relocation addend
 	 * a3 - current relocation record value
 	 * a4 - number of bits remaining in current relocation record
 	 */
 	la	a1, _prefix
-	la	a2, _edata
 
 	/* Calculate relocation addend */
-	LOADN	a0, prefix_virt
-	sub	a0, a1, a0
+	LOADN	a2, prefix_virt
+	sub	a2, a1, a2
 
 	/* Skip applying relocations if addend is zero */
-	beqz	a0, apply_relocs_done
+	beqz	a2, apply_relocs_done
 	progress " reloc"
 
 apply_relocs_loop:
 	/* Read new relocation record */
-	LOADN	a3, (a2)
-	addi	a2, a2, ( __riscv_xlen / 8 )
+	LOADN	a3, (a0)
+	addi	a0, a0, ( __riscv_xlen / 8 )
 	li	a4, ( __riscv_xlen - 1 )
 
 	/* Consume and apply skip, if present (i.e. if MSB=0) */
@@ -275,7 +276,7 @@ apply_relocs_loop:
 1:	andi	t0, a3, 1
 	beqz	t0, 2f
 	LOADN	t1, (a1)
-	add	t1, t1, a0
+	add	t1, t1, a2
 	STOREN	t1, (a1)
 2:	addi	a1, a1, ( __riscv_xlen / 8 )
 	srli	a3, a3, 1

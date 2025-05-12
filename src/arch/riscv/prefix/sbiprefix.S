@@ -66,6 +66,7 @@ _sbi_start:
 	progress "\nSBI->iPXE"
 
 	/* Apply dynamic relocations */
+	la	a0, _edata
 	call	apply_relocs
 	progress " .reloc"
 
