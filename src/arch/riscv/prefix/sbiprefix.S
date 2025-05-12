@@ -32,23 +32,8 @@
 	.section ".note.GNU-stack", "", @progbits
 	.text
 
-/* ELF machine type */
-#define EM_RISCV 243
-
-	/*
-	 * Display progress message via debug console
-	 */
-	.macro	progress message
-#ifndef NDEBUG
-	.section ".rodata.progress_\@", "a", @progbits
-progress_\@:
-	.asciz	"\message"
-	.size	progress_\@, . - progress_\@
-	.previous
-	la	t1, progress_\@
-	call	print_message
-#endif
-	.endm
+/* Page size */
+#define PAGE_SIZE 4096
 
 	/*
 	 * SBI entry point
@@ -57,42 +42,21 @@ progress_\@:
 	.org 0
 	.globl	_sbi_start
 _sbi_start:
-	/* Initialise virtual address offset */
-	mv	tp, zero
+	/* Identify temporary page table and stack space
+	 *
+	 * Assume that there is sufficient writable memory (~8kB)
+	 * directly below the device tree.
+	 */
+	li	t0, ~( PAGE_SIZE - 1 )
+	and	sp, a1, t0
+	li	t0, PAGE_SIZE
+	sub	sp, sp, t0
+	mv	a2, sp
 
-	/* Preserve arguments */
-	mv	s0, a0
-	mv	s1, a1
-	progress "\nSBI->iPXE"
-
-	/* Apply dynamic relocations */
-	la	a0, _edata
-	call	apply_relocs
-	progress " .reloc"
-
-	/* Zero the bss */
-	la	t0, _bss
-	la	t1, _ebss
-1:	STOREN	zero, (t0)
-	addi	t0, t0, ( __riscv_xlen / 8 )
-	blt	t0, t1, 1b
-	progress " .bss"
-
-	/* Set up stack */
-	la	sp, _estack
-	progress " .stack"
-
-	/* Store boot hart */
-	STOREN	s0, boot_hart, t0
-
-	/* Register device tree */
-	la	a0, sysfdt
-	mv	a1, s1
-	li	a2, -1
-	call	fdt_parse
+	/* Install iPXE */
+	call	install
 
 	/* Call main program */
-	progress "\n\n"
 	call	main
 
 	/* We have no return path, since the M-mode SBI implementation
@@ -104,17 +68,3 @@ _sbi_start:
 	 */
 	j	reset_system
 	.size	_sbi_start, . - _sbi_start
-
-	/* File split information for the compressor */
-	.section ".zinfo", "a", @progbits
-	.ascii	"COPY"
-	.word	0
-	.word	_filesz
-	.word	1
-	.ascii	"BASE"
-	.word	0
-	.dword	_base
-	.ascii	"ZREL"
-	.word	_reloc_offset
-	.word	_reloc_filesz
-	.word	EM_RISCV

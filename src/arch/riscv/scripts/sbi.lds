@@ -53,6 +53,8 @@ SECTIONS {
 	KEEP(*(.provided.*))
 	*(.got)
 	*(.got.plt)
+	/* Ensure compressed relocations end up aligned */
+	. = ALIGN ( 16 );
 	_edata = .;
     }
 

@@ -224,6 +224,17 @@ print_hex_value_alt:
 #endif
 	.endm
 
+	/*
+	 * Display hexadecimal data value (if debugging is enabled)
+	 */
+	.macro	print_hex_data sym
+#ifndef NDEBUG
+	LOADN	t1, \sym
+	li	t2, __riscv_xlen
+	jal	t0, print_hex_value_alt
+#endif
+	.endm
+
 /*****************************************************************************
  *
  * Apply compressed relocation records
@@ -296,8 +307,20 @@ apply_relocs_loop:
 	/* Loop until we have reached a terminator record (MSB=0, offset=0) */
 	bnez	a3, apply_relocs_loop
 
+	/* Check that relocations were applied successfully
+	 *
+	 * Failure to apply relocations (if relocations were needed)
+	 * is a fatal error.
+	 */
+	la	t0, _prefix
+	LOADN	t1, prefix_virt
+	beq	t0, t1, apply_relocs_done
+	progress " failed\n"
+	j	reset_system
+
 apply_relocs_done:
 	/* Return to caller */
+	progress " ok\n"
 	ret
 	.size	apply_relocs, . - apply_relocs
 
@@ -423,6 +446,21 @@ paging_mode_names:
 	 */
 	.globl	_max_align
 	.equ	_max_align, ( 1 << VPN1_LSB )
+
+	/* Space for page table
+	 *
+	 * This can be used only once .bss is known to be writable.
+	 */
+	.section ".bss.page_table", "a", @nobits
+	.balign	PAGE_SIZE
+page_table:
+	.space	PAGE_SIZE
+	.size	page_table, . - page_table
+
+	/* Convert physical address to virtual address */
+	.macro	phys_to_virt rd, rs:vararg
+	_C2 ( phys_to_virt_, __riscv_xlen ) \rd, \rs
+	.endm
 
 /*****************************************************************************
  *
@@ -643,6 +681,13 @@ enable_paging_64_loop:
 	ret
 	.size	enable_paging_64, . - enable_paging_64
 
+	/* Convert 64-bit physical address to virtual address */
+	.macro	phys_to_virt_64 rd, rs:vararg
+	.ifnb	\rs
+	mv	\rd, \rs
+	.endif
+	.endm
+
 /*****************************************************************************
  *
  * Disable 64-bit paging
@@ -807,6 +852,15 @@ enable_paging_32_xstart:
 	.section ".bss.enable_paging_32_xcheck", "aw", @nobits
 	.org	. + enable_paging_32_xalign - enable_paging_32_xlen
 
+	/* Convert 32-bit physical address to virtual address */
+	.macro	phys_to_virt_32 rd, rs:vararg
+	.ifnb	\rs
+	sub	\rd, \rs, tp
+	.else
+	sub	\rd, \rd, tp
+	.endif
+	.endm
+
 /*****************************************************************************
  *
  * Disable 32-bit paging
@@ -882,6 +936,126 @@ disable_paging_32_xstart:
 
 /*****************************************************************************
  *
+ * Install iPXE to a suitable runtime address
+ *
+ *****************************************************************************
+ *
+ * Identify a suitable runtime address for iPXE, relocate there, and
+ * set up for running normal C code.
+ *
+ * A valid temporary stack pointer is required.  A 4kB space for a
+ * temporary page table may be provided, and must be provided if the
+ * iPXE image is running from read-only memory.
+ *
+ * Note that this function does not preserve the callee-save registers.
+ *
+ * Parameters:
+ *
+ *   a0 - Boot hart ID
+ *   a1 - Device tree physical address
+ *   a2 - Optional temporary page table space (4kB, aligned to a 4kB boundary)
+ *   sp - Valid temporary stack pointer
+ *
+ * Returns:
+ *
+ *   pc - Updated to be within the relocated iPXE
+ *   sp - Top of internal stack
+ *   tp - Virtual address offset
+ *
+ */
+
+	.section ".prefix.install", "ax", @progbits
+	.globl	install
+install:
+	/* Register usage:
+	 *
+	 * s0 - boot hart ID
+	 * s1 - device tree physical address
+	 * s2 - saved return address
+	 * s3 - relocation records physical address
+	 * s4 - accessible physical address limit
+	 * s5 - relocation physical address
+	 * s6 - relocation offset
+	 * tp - virtual address offset
+	 */
+	progress "\nSBI->iPXE hart:"
+	print_hex_reg a0
+	progress " temp:"
+	print_hex_reg a2
+	progress " fdt:"
+	print_hex_reg a1
+	progress "\nSBI->iPXE phys:"
+	print_hex_addr _prefix
+	progress " virt:"
+	print_hex_data prefix_virt
+	mv	s0, a0
+	mv	s1, a1
+	mv	s2, ra
+	la	s3, _edata
+
+	/* Initialise virtual address offset */
+	mv	tp, zero
+
+	/* Attempt to enable paging, if we have temporary page table space */
+	mv	a0, a2
+	beqz	a2, 1f
+	call	enable_paging
+1:	mv	s4, a0
+
+	/* Apply relocations, if still needed after enabling paging */
+	mv	a0, s3
+	call	apply_relocs
+
+	/* Find a suitable address for relocation (using temporary stack) */
+	phys_to_virt a0, s1
+	mv	a1, s4
+	phys_to_virt sp
+	call	fdtmem_relocate
+	mv	s5, a0
+	progress "SBI->iPXE dest:"
+	print_hex_reg a0
+
+	/* Disable paging */
+	call	disable_paging
+
+	/* Determine relocation offset */
+	la	s6, _prefix
+	sub	s6, s5, s6
+
+	/* Jump to relocated copy */
+	la	t0, 1f
+	add	t0, t0, s6
+	jr	t0
+1:
+	/* Attempt to re-enable paging */
+	la	a0, page_table
+	call	enable_paging
+
+	/* Reapply relocations, if still needed after enabling paging */
+	phys_to_virt a0, s3
+	call	apply_relocs
+
+	/* Load stack pointer */
+	la	sp, _estack
+
+	/* Store boot hart */
+	STOREN	s0, boot_hart, t0
+
+	/* Register copy of device tree as system device tree */
+	la	a0, sysfdt
+	la	a1, _end
+	li	a2, -1
+	call	fdt_parse
+
+	/* Return to a virtual address in the relocated copy */
+	add	ra, s2, s6
+	sub	ra, ra, tp
+	progress "\n"
+	ret
+	.size	install, . - install
+
+/*****************************************************************************
+ *
  * Reset (or lock up) system
  *
  *****************************************************************************
@@ -921,3 +1095,30 @@ reset_system:
 1:	wfi
 	j	1b
 	.size	reset_system, . - reset_system
+
+/*****************************************************************************
+ *
+ * File split information for the compressor
+ *
+ *****************************************************************************
+ */
+
+/* ELF machine type */
+#define EM_RISCV 243
+
+	.section ".zinfo", "a", @progbits
+	.org	0
+	/* Copy initialised-data portion of image */
+	.ascii	"COPY"
+	.word	0
+	.word	_filesz
+	.word	1
+	/* Notify compressor of link-time base address */
+	.ascii	"BASE"
+	.word	0
+	.dword	_base
+	/* Construct compressed relocation records */
+	.ascii	"ZREL"
+	.word	_reloc_offset
+	.word	_reloc_filesz
+	.word	EM_RISCV

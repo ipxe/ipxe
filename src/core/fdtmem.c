@@ -41,6 +41,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Start address of the iPXE image */
 extern char _prefix[];
 
+/** Initialised-data size of the iPXE image (defined by linker) */
+extern size_t ABS_SYMBOL ( _filesz );
+static size_t filesz = ABS_VALUE_INIT ( _filesz );
+
 /** In-memory size of the iPXE image (defined by linker) */
 extern size_t ABS_SYMBOL ( _memsz );
 static size_t memsz = ABS_VALUE_INIT ( _memsz );
@@ -275,6 +279,7 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
 	physaddr_t new;
 	physaddr_t try;
 	size_t len;
+	void *dest;
 	int rc;
 
 	/* Sanity check */
@@ -294,7 +299,6 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
 	/* Determine required length */
 	assert ( memsz > 0 );
 	assert ( ( memsz % FDT_MAX_ALIGN ) == 0 );
-	assert ( ( fdt.len % FDT_MAX_ALIGN ) == 0 );
 	len = ( memsz + fdt.len );
 	assert ( len > 0 );
 	DBGC ( colour, "FDTMEM requires %#zx + %#zx => %#zx bytes for "
@@ -349,6 +353,14 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
 		region.start = ( region.end + 1 );
 		if ( ! region.start )
 			break;
+	}
+
+	/* Copy iPXE and device tree to new location */
+	if ( new != old ) {
+		dest = phys_to_virt ( new );
+		memset ( dest, 0, len );
+		memcpy ( dest, _prefix, filesz );
+		memcpy ( ( dest + memsz ), hdr, fdt.len );
 	}
 
 	DBGC ( colour, "FDTMEM relocating %#08lx => [%#08lx,%#08lx]\n",
