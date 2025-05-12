@@ -32,6 +32,16 @@
 	.section ".note.GNU-stack", "", @progbits
 	.text
 
+	/* Link-time base address of _prefix
+	 *
+	 * This will be not be updated if runtime relocations are applied.
+	 */
+	.section ".rodata.prefix_link", "a", @progbits
+	.balign	( __riscv_xlen / 8 )
+prefix_link:
+	.dword	_base
+	.size	prefix_link, . - prefix_link
+
 	/* Virtual address of _prefix
 	 *
 	 * This will be updated if runtime relocations are applied.
@@ -531,7 +541,7 @@ enable_paging_64:
 	li	a1, SATP_MODE_SV57
 
 	/* Calculate virtual address offset */
-	LOADN	t0, prefix_virt
+	LOADN	t0, prefix_link
 	la	t1, _prefix
 	sub	tp, t1, t0
 
@@ -582,7 +592,7 @@ enable_paging_64_loop:
 	STOREN	t0, -PTE_SIZE(a3)
 
 	/* Calculate PTE[x] address for iPXE virtual address map */
-	LOADN	t0, prefix_virt
+	LOADN	t0, prefix_link
 	srli	t0, t0, VPN1_LSB
 	andi	t0, t0, ( PTE_COUNT - 1 )
 	slli	t0, t0, PTE_SIZE_LOG2
@@ -729,7 +739,7 @@ enable_paging_32:
 	progress " paging:"
 
 	/* Calculate virtual address offset */
-	LOADN	t0, prefix_virt
+	LOADN	t0, prefix_link
 	la	t1, _prefix
 	sub	tp, t1, t0
 
