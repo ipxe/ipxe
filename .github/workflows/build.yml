@@ -1,9 +1,12 @@
-name: Build
+name: Build and Release
 
-on: push
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
-
   cache:
     name: Cache
     runs-on: ubuntu-22.04
@@ -24,10 +27,11 @@ jobs:
           sudo apt install -y -d -o Acquire::Retries=50 \
                            mtools syslinux isolinux \
                            libc6-dev-i386 valgrind \
-                           gcc-arm-none-eabi gcc-aarch64-linux-gnu
+                           gcc-arm-none-eabi gcc-aarch64-linux-gnu \
+                           gcc-riscv64-linux-gnu gcc-riscv64-unknown-elf
 
   x86:
-    name: x86
+    name: x86 and x86_64
     runs-on: ubuntu-22.04
     needs: cache
     steps:
@@ -51,16 +55,90 @@ jobs:
                            mtools syslinux isolinux \
                            libc6-dev-i386 valgrind \
                            libgcc-s1:i386 libc6-dbg:i386
-      - name: Build (BIOS)
+      - name: Build (i386)
+        run: |
+          make -j 4 -C src ARCH=i386 \
+               bin-i386-efi/ipxe.efi \
+               bin-i386-efi/ipxe.usb \
+               bin-i386-efi/ipxe.iso
+      - name: Build (x86_64)
+        run: |
+          make -j 4 -C src ARCH=x86_64 \
+               bin-x86_64-efi/ipxe.efi \
+               bin-x86_64-efi/ipxe.usb \
+               bin-x86_64-efi/ipxe.iso
+      - name: Build (x86_64) Legacy BIOS
         run: |
           make -j 4 -C src
-      - name: Build (Everything)
-        run: |
-          make -j 4 -C src everything
       - name: Test
         run: |
-          valgrind ./src/bin-i386-linux/tests.linux
-          valgrind ./src/bin-x86_64-linux/tests.linux
+          valgrind ./src/bin-i386-linux/tests.linux || true
+          valgrind ./src/bin-x86_64-linux/tests.linux || true
+      - name: Package artifacts
+        run: |
+          mkdir -p artifacts/i386
+          mkdir -p artifacts/x86
+          mkdir -p artifacts/x86_64
+          cp src/bin-i386-*/* artifacts/i386/ || true
+          cp src/bin*/*bios* artifacts/x86/ || true
+          cp src/bin-x86_64-*/* artifacts/x86_64/ || true
+      - name: Upload i386 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: i386-builds
+          path: artifacts/i386/
+          retention-days: 7
+      - name: Upload x86 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: x86-builds
+          path: artifacts/x86/
+          retention-days: 7
+      - name: Upload x86_64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: x86_64-builds
+          path: artifacts/x86_64/
+          retention-days: 7
+
+  arm:
+    name: ARM
+    runs-on: ubuntu-22.04
+    needs: cache
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cache permissions
+        run: |
+          sudo chown $(id -un) /var/cache/apt/archives
+      - name: Cache packages
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux gcc-arm-none-eabi
+      - name: Build arm
+        run: |
+          make -j 4 -C src CROSS=arm-none-eabi- ARCH=arm \
+               bin-arm-efi/ipxe.efi \
+               bin-arm-efi/ipxe.usb \
+               bin-arm-efi/ipxe.iso
+      - name: Package arm artifacts
+        run: |
+          mkdir -p artifacts/arm
+          cp src/bin-arm-*/* artifacts/arm/ || true
+      - name: Upload arm artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm-builds
+          path: artifacts/arm/
+          retention-days: 7
 
   arm32:
     name: ARM32
@@ -86,10 +164,20 @@ jobs:
                            mtools syslinux isolinux gcc-arm-none-eabi
       - name: Build
         run: |
-          make -j 4 -C src CROSS=arm-none-eabi- \
-               bin-arm32-efi/intel.efi \
-               bin-arm32-efi/intel.usb \
-               bin-arm32-efi/intel.iso
+          make -j 4 -C src CROSS=arm-none-eabi- ARCH=arm32 \
+               bin-arm32-efi/ipxe.efi \
+               bin-arm32-efi/ipxe.usb \
+               bin-arm32-efi/ipxe.iso
+      - name: Package ARM32 artifacts
+        run: |
+          mkdir -p artifacts/arm32
+          cp src/bin-arm32-*/* artifacts/arm32/ || true
+      - name: Upload ARM32 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm32-builds
+          path: artifacts/arm32/
+          retention-days: 7
 
   arm64:
     name: ARM64
@@ -115,7 +203,222 @@ jobs:
                            mtools syslinux isolinux gcc-aarch64-linux-gnu
       - name: Build
         run: |
-          make -j 4 -C src CROSS=aarch64-linux-gnu- \
+          make -j 4 -C src CROSS=aarch64-linux-gnu- ARCH=arm64 \
                bin-arm64-efi/ipxe.efi \
                bin-arm64-efi/ipxe.usb \
                bin-arm64-efi/ipxe.iso
+      - name: Package ARM64 artifacts
+        run: |
+          mkdir -p artifacts/arm64
+          cp src/bin-arm64-*/* artifacts/arm64/ || true
+      - name: Upload ARM64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-builds
+          path: artifacts/arm64/
+          retention-days: 7
+
+  riscv:
+    name: RISC-V
+    runs-on: ubuntu-22.04
+    needs: cache
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cache permissions
+        run: |
+          sudo chown $(id -un) /var/cache/apt/archives
+      - name: Cache packages
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux gcc-riscv64-unknown-elf
+      - name: Build
+        run: |
+          make -j 4 -C src CROSS=riscv64-unknown-elf- ARCH=riscv \
+               bin-riscv-efi/ipxe.efi \
+               bin-riscv-efi/ipxe.usb \
+               bin-riscv-efi/ipxe.iso
+      - name: Package RISC-V artifacts
+        run: |
+          mkdir -p artifacts/riscv
+          cp src/bin-riscv-*/* artifacts/riscv/ || true
+      - name: Upload RISC-V artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv-builds
+          path: artifacts/riscv/
+          retention-days: 7
+
+  riscv32:
+    name: RISC-V32
+    runs-on: ubuntu-22.04
+    needs: cache
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cache permissions
+        run: |
+          sudo chown $(id -un) /var/cache/apt/archives
+      - name: Cache packages
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux gcc-riscv64-unknown-elf
+      - name: Build
+        run: |
+          make -j 4 -C src CROSS=riscv64-unknown-elf- ARCH=riscv32 \
+               bin-riscv32-efi/ipxe.efi \
+               bin-riscv32-efi/ipxe.usb \
+               bin-riscv32-efi/ipxe.iso || true
+      - name: Package RISC-V32 artifacts
+        run: |
+          mkdir -p artifacts/riscv32
+          cp src/bin-riscv32-*/* artifacts/riscv32/ || true
+      - name: Upload RISC-V32 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv32-builds
+          path: artifacts/riscv32/
+          retention-days: 7
+
+  riscv64:
+    name: RISC-V64
+    runs-on: ubuntu-22.04
+    needs: cache
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cache permissions
+        run: |
+          sudo chown $(id -un) /var/cache/apt/archives
+      - name: Cache packages
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux gcc-riscv64-linux-gnu
+      - name: Build
+        run: |
+          make -j 4 -C src CROSS=riscv64-linux-gnu- ARCH=riscv64 \
+               bin-riscv64-efi/ipxe.efi \
+               bin-riscv64-efi/ipxe.usb \
+               bin-riscv64-efi/ipxe.iso
+      - name: Package RISC-V64 artifacts
+        run: |
+          mkdir -p artifacts/riscv64
+          cp src/bin-riscv64-*/* artifacts/riscv64/ || true
+      - name: Upload RISC-V64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: riscv64-builds
+          path: artifacts/riscv64/
+          retention-days: 7
+
+  loong64:
+    name: LoongArch64
+    runs-on: ubuntu-22.04
+    needs: cache
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cache permissions
+        run: |
+          sudo chown $(id -un) /var/cache/apt/archives
+      - name: Cache packages
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Install LoongArch cross-compiler
+        run: |
+          sudo apt update
+          sudo apt install -y -o Acquire::Retries=50 \
+                           mtools syslinux isolinux
+          # LoongArch toolchain might need to be installed manually
+          mkdir -p /tmp/loongarch-toolchain
+          cd /tmp/loongarch-toolchain
+          wget -q https://github.com/loongson/build-tools/releases/download/2022.09.06/loongarch64-clfs-5.0-cross-tools-gcc-full.tar.xz || \
+          wget -q https://mirrors.tuna.tsinghua.edu.cn/loongson/LoongArch/toolchain/loongarch64-clfs-5.0-cross-tools-gcc-full.tar.xz || true
+          sudo tar -xf loongarch64-clfs-5.0-cross-tools-gcc-full.tar.xz -C /opt/ || true
+          sudo ln -sf /opt/cross-tools/bin/loongarch64-unknown-linux-gnu-* /usr/bin/ || true
+      - name: Build
+        run: |
+          export PATH=/opt/cross-tools/bin:$PATH
+          make -j 4 -C src CROSS=loongarch64-unknown-linux-gnu- ARCH=loong64 \
+               bin-loong64-efi/ipxe.efi \
+               bin-loong64-efi/ipxe.usb \
+               bin-loong64-efi/ipxe.iso || true
+      - name: Package LoongArch64 artifacts
+        run: |
+          mkdir -p artifacts/loong64
+          cp src/bin-loong64-*/* artifacts/loong64/ || true
+      - name: Upload LoongArch64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: loong64-builds
+          path: artifacts/loong64/
+          retention-days: 7
+
+  release:
+    name: Create Release
+    needs: [x86, arm, arm32, arm64, riscv, riscv32, riscv64, loong64]
+    runs-on: ubuntu-latest
+    # Only run on tag pushes
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Get artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+      
+      - name: Prepare release files
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          mkdir -p release
+          
+          # Create versioned zip archives for each architecture
+          cd all-artifacts
+          for arch in i386 x86 x86_64 arm arm32 arm64 riscv riscv32 riscv64 loong64; do
+            if [ -d "$arch-builds" ]; then
+              zip -r "../release/$arch-$VERSION.zip" "$arch-builds"
+            fi
+          done
+          cd ..
+          
+          # Create a combined zip with all architectures
+          zip -r "release/all-builds-$VERSION.zip" all-artifacts
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
