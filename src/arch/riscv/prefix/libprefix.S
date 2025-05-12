@@ -305,6 +305,7 @@ apply_relocs_done:
  *
  * Returns:
  *
+ *   a0 - Size of accessible physical address space (or zero for no limit)
  *   tp - Virtual address offset
  *   pc - Updated to a virtual address if paging enabled
  *
@@ -322,11 +323,14 @@ apply_relocs_done:
 /** Size of a page table entry */
 #define PTE_SIZE ( 1 << PTE_SIZE_LOG2 )
 
+/** Number of page table entries (log2) */
+#define PTE_COUNT_LOG2 ( PAGE_SHIFT - PTE_SIZE_LOG2 )
+
 /** Number of page table entries */
-#define PTE_COUNT ( PAGE_SIZE / PTE_SIZE )
+#define PTE_COUNT ( 1 << PTE_COUNT_LOG2 )
 
 /** Number of bits in a virtual or physical page number */
-#define VPPN_SHIFT ( PAGE_SHIFT - PTE_SIZE_LOG2 )
+#define VPPN_SHIFT PTE_COUNT_LOG2
 
 /* Page table entry flags */
 #define PTE_V		0x00000001	/**< Page table entry is valid */
@@ -452,6 +456,7 @@ paging_mode_names:
  *
  * Returns:
  *
+ *   a0 - Size of accessible physical address space (or zero for no limit)
  *   tp - Virtual address offset
  *   pc - Updated to a virtual address if paging enabled
  *
@@ -519,6 +524,7 @@ enable_paging_64:
 	 * a2 - enabled paging level
 	 * a3 - PTE pointer
 	 * a4 - PTE stride
+	 * a5 - size of accessible physical address space
 	 */
 	progress " paging:"
 	li	a1, SATP_MODE_SV57
@@ -543,6 +549,14 @@ enable_paging_64_loop:
 	addi	a4, a4, -44
 	li	t0, 1
 	sll	a4, t0, a4
+
+	/* Calculate size of accessible physical address space
+	 *
+	 * The identity map comprises only the lower half of the PTEs,
+	 * since virtual addresses for the higher half must have all
+	 * high bits set, and so cannot form part of an identity map.
+	 */
+	slli	a5, a4, ( PTE_PPN_SHIFT + ( PTE_COUNT_LOG2 - 1 ) )
 
 	/* Construct PTE[0-255] for identity map */
 	mv	a3, a0
@@ -607,12 +621,14 @@ enable_paging_64_loop:
 	li	t0, SATP_MODE_SV39
 	bge	a1, t0, enable_paging_64_loop
 	mv	tp, zero
+	mv	a5, zero
 1:
 	/* Adjust return address to a virtual address */
 	sub	ra, ra, tp
 
 	/* Return, with or without paging enabled */
 	paging_mode_name a2
+	mv	a0, a5
 	ret
 	.size	enable_paging_64, . - enable_paging_64
 
@@ -681,6 +697,7 @@ disable_paging_64:
  *
  * Returns:
  *
+ *   a0 - Size of accessible physical address space (or zero for no limit)
  *   tp - Virtual address offset
  *   pc - Updated to a virtual address if paging enabled
  *
@@ -771,6 +788,7 @@ enable_paging_32_xstart:
 
 	/* Return, with or without paging enabled */
 	paging_mode_name a1
+	mv	a0, zero
 	ret
 	.size	enable_paging_32, . - enable_paging_32
 
