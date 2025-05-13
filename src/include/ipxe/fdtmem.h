@@ -13,5 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/fdt.h>
 
 extern physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit );
+extern int fdtmem_register ( struct fdt_header *hdr );
 
 #endif /* _IPXE_FDTMEM_H */

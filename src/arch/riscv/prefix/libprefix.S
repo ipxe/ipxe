@@ -1023,6 +1023,21 @@ install:
 	la	s6, _prefix
 	sub	s6, s5, s6
 
+	/* Copy iPXE image to new location and zero .bss */
+	mv	t0, s5
+	la	t1, _prefix
+	la	t2, _edata
+1:	LOADN	t3, (t1)
+	STOREN	t3, (t0)
+	addi	t0, t0, ( __riscv_xlen / 8 )
+	addi	t1, t1, ( __riscv_xlen / 8 )
+	blt	t1, t2, 1b
+	la	t1, _ebss
+	add	t1, t1, s6
+2:	STOREN	zero, (t0)
+	addi	t0, t0, ( __riscv_xlen / 8 )
+	blt	t0, t1, 2b
+
 	/* Jump to relocated copy */
 	la	t0, 1f
 	add	t0, t0, s6
@@ -1042,11 +1057,9 @@ install:
 	/* Store boot hart */
 	STOREN	s0, boot_hart, t0
 
-	/* Register copy of device tree as system device tree */
-	la	a0, sysfdt
-	la	a1, _end
-	li	a2, -1
-	call	fdt_parse
+	/* Copy and register system device tree */
+	phys_to_virt a0, s1
+	call	fdtmem_register
 
 	/* Return to a virtual address in the relocated copy */
 	add	ra, s2, s6

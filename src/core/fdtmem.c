@@ -41,20 +41,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Start address of the iPXE image */
 extern char _prefix[];
 
-/** Initialised-data size of the iPXE image (defined by linker) */
-extern size_t ABS_SYMBOL ( _filesz );
-static size_t filesz = ABS_VALUE_INIT ( _filesz );
-
-/** In-memory size of the iPXE image (defined by linker) */
-extern size_t ABS_SYMBOL ( _memsz );
-static size_t memsz = ABS_VALUE_INIT ( _memsz );
+/** End address of the iPXE image */
+extern char _end[];
 
 /** Relocation required alignment (defined by prefix or linker) */
 extern physaddr_t ABS_SYMBOL ( _max_align );
 static physaddr_t max_align = ABS_VALUE_INIT ( _max_align );
 
 /** Colour for debug messages */
-#define colour &memsz
+#define colour &_prefix[0]
 
 /** A memory region descriptor */
 struct fdtmem_region {
@@ -278,8 +273,8 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
 	physaddr_t old;
 	physaddr_t new;
 	physaddr_t try;
+	size_t memsz;
 	size_t len;
-	void *dest;
 	int rc;
 
 	/* Sanity check */
@@ -297,6 +292,7 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
 	}
 
 	/* Determine required length */
+	memsz = ( _end - _prefix );
 	assert ( memsz > 0 );
 	assert ( ( memsz % FDT_MAX_ALIGN ) == 0 );
 	len = ( memsz + fdt.len );
@@ -355,15 +351,39 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
 			break;
 	}
 
-	/* Copy iPXE and device tree to new location */
-	if ( new != old ) {
-		dest = phys_to_virt ( new );
-		memset ( dest, 0, len );
-		memcpy ( dest, _prefix, filesz );
-		memcpy ( ( dest + memsz ), hdr, fdt.len );
-	}
-
 	DBGC ( colour, "FDTMEM relocating %#08lx => [%#08lx,%#08lx]\n",
 	       old, new, ( ( physaddr_t ) ( new + len - 1 ) ) );
 	return new;
+}
+
+/**
+ * Copy and register system device tree
+ *
+ * @v hdr		FDT header
+ * @ret rc		Return status code
+ */
+int fdtmem_register ( struct fdt_header *hdr ) {
+	struct fdt_header *copy;
+	struct fdt fdt;
+	int rc;
+
+	/* Parse FDT to obtain length */
+	if ( ( rc = fdt_parse ( &fdt, hdr, -1UL ) ) != 0 ) {
+		DBGC ( colour, "FDTMEM could not parse FDT: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Copy device tree to end of iPXE image */
+	copy = ( ( void * ) _end );
+	memcpy ( copy, hdr, fdt.len );
+
+	/* Register copy as system device tree */
+	if ( ( rc = fdt_parse ( &sysfdt, copy, -1UL ) ) != 0 ) {
+		DBGC ( colour, "FDTMEM could not register FDT: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
