@@ -14,3 +14,4 @@ LDSCRIPT	= arch/riscv/scripts/sbi.lds
 # Media types
 #
 MEDIA		+= sbi
+MEDIA		+= lkrn

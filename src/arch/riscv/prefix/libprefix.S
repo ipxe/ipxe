@@ -452,6 +452,7 @@ paging_mode_names:
 	 * This can be used only once .bss is known to be writable.
 	 */
 	.section ".bss.page_table", "a", @nobits
+	.globl	page_table
 	.balign	PAGE_SIZE
 page_table:
 	.space	PAGE_SIZE
