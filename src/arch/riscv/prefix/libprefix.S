@@ -280,6 +280,23 @@ apply_relocs:
 	beqz	a2, apply_relocs_done
 	progress " reloc"
 
+	/* Test writability
+	 *
+	 * We do this to avoid accidentally sending an undefined
+	 * sequence of commands to a flash device, if we are started
+	 * from read-only memory with no paging support.
+	 *
+	 * We attempt to write an all-ones pattern, on the basis that
+	 * this pattern will harmlessly cause any flash device
+	 * conforming to the CFI01 specification to enter the default
+	 * "read array" state.
+	 */
+	la	t0, apply_relocs_test
+	li	t1, -1
+	STOREN	t1, (t0)
+	LOADN	t2, (t0)
+	bne	t1, t2, apply_relocs_failed
+
 apply_relocs_loop:
 	/* Read new relocation record */
 	LOADN	a3, (a0)
@@ -307,22 +324,34 @@ apply_relocs_loop:
 	/* Loop until we have reached a terminator record (MSB=0, offset=0) */
 	bnez	a3, apply_relocs_loop
 
-	/* Check that relocations were applied successfully
-	 *
-	 * Failure to apply relocations (if relocations were needed)
-	 * is a fatal error.
-	 */
+	/* Check that relocations were applied successfully */
 	la	t0, _prefix
 	LOADN	t1, prefix_virt
-	beq	t0, t1, apply_relocs_done
-	progress " failed\n"
-	j	reset_system
+	bne	t0, t1, apply_relocs_failed
 
 apply_relocs_done:
 	/* Return to caller */
 	progress " ok\n"
 	ret
+
+apply_relocs_failed:
+	/* Failure to apply relocations (if relocations were needed)
+	 * is a fatal error.
+	 */
+	progress " failed\n"
+	j	reset_system
 	.size	apply_relocs, . - apply_relocs
+
+	/* Writability test
+	 *
+	 * Placed within .data rather than .bss, since we need this to
+	 * be within the range of the stored iPXE image.
+	 */
+	.section ".data.apply_relocs_test", "aw", @progbits
+	.balign	( __riscv_xlen / 8 )
+apply_relocs_test:
+	.space	( __riscv_xlen / 8 )
+	.size	apply_relocs_test, . - apply_relocs_test
 
 /*****************************************************************************
  *
