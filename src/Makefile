@@ -26,6 +26,7 @@ PRINTF		:= printf
 PERL		:= perl
 PYTHON		:= python
 TRUE		:= true
+TRUNCATE	:= truncate
 CC		= $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AS		= $(CROSS_COMPILE)as
