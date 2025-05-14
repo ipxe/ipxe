@@ -525,7 +525,7 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 	u8 drop;
 
 	dump_rx_bd ( rx_cmp, rx_cmp_hi, desc_idx );
-	assert ( !iob );
+	assert ( iob );
 	drop = bnxt_rx_drop ( bp, iob, rx_cmp, rx_cmp_hi, rx_cmp->len );
 	dbg_rxp ( iob->data, rx_cmp->len, drop );
 	if ( drop )
@@ -2375,7 +2375,7 @@ static int bnxt_init_one ( struct pci_device *pci )
 	bnxt_get_pci_info ( bp );
 
 	/* Allocate and Initialise device specific parameters */
-	if ( bnxt_alloc_mem ( bp ) != 0 ) {
+	if ( ( err = bnxt_alloc_mem ( bp ) ) != 0 ) {
 		DBGP ( "- %s (  ): bnxt_alloc_mem Failed\n", __func__ );
 		goto err_down_pci;
 	}
@@ -2383,16 +2383,19 @@ static int bnxt_init_one ( struct pci_device *pci )
 	/* Get device specific information */
 	if ( bnxt_up_chip ( bp ) != 0 ) {
 		DBGP ( "- %s (  ): bnxt_up_chip Failed\n", __func__ );
+		err = -ENODEV;
 		goto err_down_chip;
 	}
 
 	/* Register Network device */
-	if ( register_netdev ( netdev ) != 0 ) {
+	if ( ( err = register_netdev ( netdev ) ) != 0 ) {
 		DBGP ( "- %s (  ): register_netdev Failed\n", __func__ );
 		goto err_down_chip;
 	}
 
 	return 0;
+
+	unregister_netdev ( netdev );
 
 err_down_chip:
 	bnxt_down_chip (bp);
