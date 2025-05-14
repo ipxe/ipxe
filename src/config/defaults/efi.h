@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define CONSOLE_EFI
 #define TIMER_EFI
 #define UMALLOC_EFI
+#define MEMMAP_NULL
 #define SMBIOS_EFI
 #define SANBOOT_EFI
 #define BOFM_EFI

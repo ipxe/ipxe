@@ -19,6 +19,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define CONSOLE_SBI
 #define REBOOT_SBI
 #define UMALLOC_SBI
+#define MEMMAP_NULL
 
 #define ACPI_NULL
 #define MPAPI_NULL
