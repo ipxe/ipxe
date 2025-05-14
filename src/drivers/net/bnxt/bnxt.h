@@ -25,13 +25,6 @@
 #define __be32  u32
 #define __be64  u64
 
-#define dma_addr_t unsigned long
-
-union dma_addr64_t {
-	dma_addr_t addr;
-	u64 as_u64;
-};
-
 #include "bnxt_hsi.h"
 
 #define DRV_MODULE_NAME              "bnxt"
@@ -182,6 +175,13 @@ union dma_addr64_t {
 #define STAT_CTX_ID ((bp->vf || FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS)) ? bp->stat_ctx_id : 0)
 #define TX_AVAIL(r)                      (r - 1)
 #define TX_IN_USE(a, b, c) ((a - b) & (c - 1))
+#define NQ_DMA_ADDR(bp)		( dma ( &bp->nq_mapping, bp->nq.bd_virt ) )
+#define CQ_DMA_ADDR(bp)		( dma ( &bp->cq_mapping, bp->cq.bd_virt ) )
+#define TX_DMA_ADDR(bp)		( dma ( &bp->tx_mapping, bp->tx.bd_virt ) )
+#define RX_DMA_ADDR(bp)		( dma ( &bp->rx_mapping, bp->rx.bd_virt ) )
+#define REQ_DMA_ADDR(bp)	( dma ( &bp->req_mapping, bp->hwrm_addr_req ) )
+#define RESP_DMA_ADDR(bp)	( dma ( &bp->resp_mapping, bp->hwrm_addr_resp ) )
+#define DMA_DMA_ADDR(bp)	( dma ( &bp->dma_mapped, bp->hwrm_addr_dma ) )
 #define NO_MORE_NQ_BD_TO_SERVICE         1
 #define SERVICE_NEXT_NQ_BD               0
 #define NO_MORE_CQ_BD_TO_SERVICE         1
@@ -472,7 +472,7 @@ struct tx_bd_short {
 #define TX_BD_SHORT_FLAGS_COAL_NOW          0x8000UL
 	u16 len;
 	u32 opaque;
-	union dma_addr64_t dma;
+	physaddr_t dma;
 };
 
 struct tx_cmpl {
@@ -879,7 +879,7 @@ struct rx_prod_pkt_bd {
 #define RX_PROD_PKT_BD_FLAGS_BUFFERS_SFT  8
 	u16  len;
 	u32  opaque;
-	union dma_addr64_t dma;
+	physaddr_t dma;
 };
 
 struct rx_info {
@@ -933,9 +933,15 @@ struct bnxt {
 	void                      *hwrm_addr_req;
 	void                      *hwrm_addr_resp;
 	void                      *hwrm_addr_dma;
-	dma_addr_t                req_addr_mapping;
-	dma_addr_t                resp_addr_mapping;
-	dma_addr_t                dma_addr_mapping;
+	struct dma_device         *dma;
+	struct dma_mapping        req_mapping;
+	struct dma_mapping        resp_mapping;
+	struct dma_mapping        dma_mapped;
+	struct dma_mapping        tx_mapping;
+	struct dma_mapping        rx_mapping;
+	struct dma_mapping        cq_mapping;
+	struct dma_mapping        nq_mapping;
+
 	struct tx_info            tx; /* Tx info. */
 	struct rx_info            rx; /* Rx info. */
 	struct cmp_info           cq; /* completion info. */
