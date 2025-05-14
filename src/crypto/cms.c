@@ -450,6 +450,8 @@ static int cms_parse_participants ( struct cms_message *cms,
 		if ( ! part )
 			return -ENOMEM;
 		list_add ( &part->list, &cms->participants );
+		part->digest = &digest_null;
+		part->pubkey = &pubkey_null;
 
 		/* Allocate certificate chain */
 		part->chain = x509_alloc_chain();
@@ -1046,12 +1048,6 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	int pad_len;
 	int rc;
 
-	/* Sanity checks */
-	if ( ! cipher ) {
-		rc = -ENOTTY;
-		goto err_no_cipher;
-	}
-
 	/* Check block size */
 	if ( ( image->len & ( cipher->blocksize - 1 ) ) != 0 ) {
 		DBGC ( cms, "CMS %p invalid length %zd\n", cms, image->len );
@@ -1145,6 +1141,5 @@ int cms_decrypt ( struct cms_message *cms, struct image *image,
 	image->flags = original_flags;
  err_cipher:
  err_blocksize:
- err_no_cipher:
 	return rc;
 }
