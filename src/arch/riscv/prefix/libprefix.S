@@ -1088,6 +1088,7 @@ install:
 
 	/* Copy and register system device tree */
 	phys_to_virt a0, s1
+	mv	a1, s4
 	call	fdtmem_register
 
 	/* Return to a virtual address in the relocated copy */

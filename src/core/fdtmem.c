@@ -66,6 +66,9 @@ struct fdtmem_region {
 /** Region is usable as RAM */
 #define FDTMEM_RAM 0x0001
 
+/** Size of accessible physical address space (or zero for no limit) */
+static size_t fdtmem_limit;
+
 /**
  * Update memory region descriptor
  *
@@ -360,12 +363,16 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
  * Copy and register system device tree
  *
  * @v hdr		FDT header
+ * @v limit		Size of accessible physical address space (or zero)
  * @ret rc		Return status code
  */
-int fdtmem_register ( struct fdt_header *hdr ) {
+int fdtmem_register ( struct fdt_header *hdr, size_t limit ) {
 	struct fdt_header *copy;
 	struct fdt fdt;
 	int rc;
+
+	/* Record size of accessible physical address space */
+	fdtmem_limit = limit;
 
 	/* Parse FDT to obtain length */
 	if ( ( rc = fdt_parse ( &fdt, hdr, -1UL ) ) != 0 ) {
