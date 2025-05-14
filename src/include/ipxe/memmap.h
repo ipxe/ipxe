@@ -124,6 +124,7 @@ struct used_region {
 
 /* Include all architecture-independent ACPI API headers */
 #include <ipxe/null_memmap.h>
+#include <ipxe/fdtmem.h>
 
 /* Include all architecture-dependent ACPI API headers */
 #include <bits/memmap.h>

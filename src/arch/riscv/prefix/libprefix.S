@@ -1003,7 +1003,7 @@ install:
 	 * s1 - device tree physical address
 	 * s2 - saved return address
 	 * s3 - relocation records physical address
-	 * s4 - accessible physical address limit
+	 * s4 - maximum accessible physical address
 	 * s5 - relocation physical address
 	 * s6 - relocation offset
 	 * tp - virtual address offset
@@ -1030,7 +1030,7 @@ install:
 	mv	a0, a2
 	beqz	a2, 1f
 	call	enable_paging
-1:	mv	s4, a0
+1:	addi	s4, a0, -1
 
 	/* Apply relocations, if still needed after enabling paging */
 	mv	a0, s3

@@ -29,6 +29,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <assert.h>
 #include <byteswap.h>
 #include <ipxe/uaccess.h>
+#include <ipxe/memmap.h>
+#include <ipxe/io.h>
 #include <ipxe/fdt.h>
 #include <ipxe/fdtmem.h>
 
@@ -44,85 +46,21 @@ extern char _prefix[];
 /** End address of the iPXE image */
 extern char _end[];
 
+/** Total in-memory size (calculated by linker) */
+extern size_t ABS_SYMBOL ( _memsz );
+static size_t memsz = ABS_VALUE_INIT ( _memsz );
+
 /** Relocation required alignment (defined by prefix or linker) */
-extern physaddr_t ABS_SYMBOL ( _max_align );
-static physaddr_t max_align = ABS_VALUE_INIT ( _max_align );
+extern size_t ABS_SYMBOL ( _max_align );
+static size_t max_align = ABS_VALUE_INIT ( _max_align );
 
-/** Colour for debug messages */
-#define colour &_prefix[0]
-
-/** A memory region descriptor */
-struct fdtmem_region {
-	/** Region start address */
-	physaddr_t start;
-	/** Region end address */
-	physaddr_t end;
-	/** Region flags */
-	int flags;
-	/** Region name (for debug messages) */
-	const char *name;
+/** In-use memory region for iPXE and system device tree copy */
+struct used_region fdtmem_used __used_region = {
+	.name = "iPXE/FDT",
 };
 
-/** Region is usable as RAM */
-#define FDTMEM_RAM 0x0001
-
-/** Size of accessible physical address space (or zero for no limit) */
-static size_t fdtmem_limit;
-
-/**
- * Update memory region descriptor
- *
- * @v region		Memory region of interest to be updated
- * @v start		Start address of this region
- * @v size		Size of this region
- * @v flags		Region flags
- * @v name		Region name (for debugging)
- */
-static void fdtmem_update ( struct fdtmem_region *region, uint64_t start,
-			    uint64_t size, int flags, const char *name ) {
-	uint64_t end;
-
-	/* Ignore empty regions */
-	if ( ! size )
-		return;
-
-	/* Calculate end address (and truncate if necessary) */
-	end = ( start + size - 1 );
-	if ( end < start ) {
-		end = ~( ( uint64_t ) 0 );
-		DBGC ( colour, "FDTMEM [%#08llx,%#08llx] %s truncated "
-		       "(invalid size %#08llx)\n",
-		       ( ( unsigned long long ) start ),
-		       ( ( unsigned long long ) end ), name,
-		       ( ( unsigned long long ) size ) );
-	}
-
-	/* Ignore regions entirely below the region of interest */
-	if ( end < region->start )
-		return;
-
-	/* Ignore regions entirely above the region of interest */
-	if ( start > region->end )
-		return;
-
-	/* Update region of interest as applicable */
-	if ( start <= region->start ) {
-
-		/* This region covers the region of interest */
-		region->flags = flags;
-		if ( DBG_LOG )
-			region->name = name;
-
-		/* Update end address if no closer boundary exists */
-		if ( end < region->end )
-			region->end = end;
-
-	} else if ( start < region->end ) {
-
-		/* Update end address if no closer boundary exists */
-		region->end = ( start - 1 );
-	}
-}
+/** Maximum accessible physical address */
+static physaddr_t fdtmem_max;
 
 /**
  * Update memory region descriptor based on device tree node
@@ -134,9 +72,9 @@ static void fdtmem_update ( struct fdtmem_region *region, uint64_t start,
  * @v flags		Region flags
  * @ret rc		Return status code
  */
-static int fdtmem_update_node ( struct fdtmem_region *region, struct fdt *fdt,
+static int fdtmem_update_node ( struct memmap_region *region, struct fdt *fdt,
 				unsigned int offset, const char *match,
-				int flags ) {
+				unsigned int flags ) {
 	struct fdt_descriptor desc;
 	struct fdt_reg_cells regs;
 	const char *devtype;
@@ -155,7 +93,7 @@ static int fdtmem_update_node ( struct fdtmem_region *region, struct fdt *fdt,
 
 		/* Describe token */
 		if ( ( rc = fdt_describe ( fdt, offset, &desc ) ) != 0 ) {
-			DBGC ( colour, "FDTMEM has malformed node: %s\n",
+			DBGC ( region, "FDTMEM has malformed node: %s\n",
 			       strerror ( rc ) );
 			return rc;
 		}
@@ -182,7 +120,7 @@ static int fdtmem_update_node ( struct fdtmem_region *region, struct fdt *fdt,
 		count = fdt_reg_count ( fdt, desc.offset, &regs );
 		if ( count < 0 ) {
 			rc = count;
-			DBGC ( colour, "FDTMEM has malformed region %s: %s\n",
+			DBGC ( region, "FDTMEM has malformed region %s: %s\n",
 			       desc.name, strerror ( rc ) );
 			continue;
 		}
@@ -193,21 +131,21 @@ static int fdtmem_update_node ( struct fdtmem_region *region, struct fdt *fdt,
 			/* Get region starting address and size */
 			if ( ( rc = fdt_reg_address ( fdt, desc.offset, &regs,
 						      index, &start ) ) != 0 ){
-				DBGC ( colour, "FDTMEM %s region %d has "
+				DBGC ( region, "FDTMEM %s region %d has "
 				       "malformed start address: %s\n",
 				       desc.name, index, strerror ( rc ) );
 				break;
 			}
 			if ( ( rc = fdt_reg_size ( fdt, desc.offset, &regs,
 						   index, &size ) ) != 0 ) {
-				DBGC ( colour, "FDTMEM %s region %d has "
+				DBGC ( region, "FDTMEM %s region %d has "
 				       "malformed size: %s\n",
 				       desc.name, index, strerror ( rc ) );
 				break;
 			}
 
 			/* Update memory region descriptor */
-			fdtmem_update ( region, start, size, flags,
+			memmap_update ( region, start, size, flags,
 					desc.name );
 		}
 	}
@@ -222,7 +160,7 @@ static int fdtmem_update_node ( struct fdtmem_region *region, struct fdt *fdt,
  * @v fdt		Device tree
  * @ret rc		Return status code
  */
-static int fdtmem_update_tree ( struct fdtmem_region *region,
+static int fdtmem_update_tree ( struct memmap_region *region,
 				struct fdt *fdt ) {
 	const struct fdt_reservation *rsv;
 	unsigned int offset;
@@ -230,35 +168,80 @@ static int fdtmem_update_tree ( struct fdtmem_region *region,
 
 	/* Update based on memory regions in the root node */
 	if ( ( rc = fdtmem_update_node ( region, fdt, 0, "memory",
-					 FDTMEM_RAM ) ) != 0 )
+					 MEMMAP_FL_MEMORY ) ) != 0 )
 		return rc;
 
 	/* Update based on memory reservations block */
 	for_each_fdt_reservation ( rsv, fdt ) {
-		fdtmem_update ( region, be64_to_cpu ( rsv->start ),
-				be64_to_cpu ( rsv->size ), 0, "<rsv>" );
+		memmap_update ( region, be64_to_cpu ( rsv->start ),
+				be64_to_cpu ( rsv->size ), MEMMAP_FL_RESERVED,
+				NULL );
 	}
 
 	/* Locate reserved-memory node */
 	if ( ( rc = fdt_path ( fdt, "/reserved-memory", &offset ) ) != 0 ) {
-		DBGC ( colour, "FDTMEM could not locate /reserved-memory: "
+		DBGC ( region, "FDTMEM could not locate /reserved-memory: "
 		       "%s\n", strerror ( rc ) );
 		return rc;
 	}
 
 	/* Update based on memory regions in the reserved-memory node */
 	if ( ( rc = fdtmem_update_node ( region, fdt, offset, NULL,
-					 0 ) ) != 0 )
+					 MEMMAP_FL_RESERVED ) ) != 0 )
 		return rc;
 
 	return 0;
 }
 
 /**
+ * Describe memory region
+ *
+ * @v addr		Address within region
+ * @v fdt		Device tree
+ * @v max		Maximum accessible physical address
+ * @v region		Region descriptor to fill in
+ */
+static void fdtmem_describe ( uint64_t addr, struct fdt *fdt, physaddr_t max,
+			      struct memmap_region *region ) {
+	uint64_t inaccessible = ( ( ( uint64_t ) max ) + 1 );
+
+	/* Initialise region */
+	memmap_init ( addr, region );
+
+	/* Update region based on device tree */
+	fdtmem_update_tree ( region, fdt );
+
+	/* Treat inaccessible physical memory as such */
+	memmap_update ( region, inaccessible, -inaccessible,
+			MEMMAP_FL_INACCESSIBLE, NULL );
+}
+
+/**
+ * Get length for copy of iPXE and device tree
+ *
+ * @v fdt		Device tree
+ * @ret len		Total length
+ */
+static size_t fdtmem_len ( struct fdt *fdt ) {
+	size_t len;
+
+	/* Calculate total length and check device tree alignment */
+	len = ( memsz + fdt->len );
+	assert ( ( memsz % FDT_MAX_ALIGN ) == 0 );
+
+	/* Align length.  Not technically necessary, but keeps the
+	 * resulting memory maps looking relatively sane.
+	 */
+	len = ( ( len + PAGE_SIZE - 1 ) & ~( PAGE_SIZE - 1 ) );
+
+	return len;
+}
+
+/**
  * Find a relocation address for iPXE
  *
  * @v hdr		FDT header
- * @v limit		Size of accessible physical address space (or zero)
+ * @v max		Maximum accessible physical address
  * @ret new		New physical address for relocation
  *
  * Find a suitably aligned address towards the top of existent memory
@@ -270,13 +253,14 @@ static int fdtmem_update_tree ( struct fdtmem_region *region,
  * nor any function that it calls may write to or rely upon the zero
  * initialisation of any static variables.
  */
-physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
+physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 	struct fdt fdt;
-	struct fdtmem_region region;
+	struct memmap_region region;
+	physaddr_t addr;
+	physaddr_t next;
 	physaddr_t old;
 	physaddr_t new;
 	physaddr_t try;
-	size_t memsz;
 	size_t len;
 	int rc;
 
@@ -288,73 +272,46 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
 
 	/* Parse FDT */
 	if ( ( rc = fdt_parse ( &fdt, hdr, -1UL ) ) != 0 ) {
-		DBGC ( colour, "FDTMEM could not parse FDT: %s\n",
+		DBGC ( &region, "FDTMEM could not parse FDT: %s\n",
 		       strerror ( rc ) );
 		/* Refuse relocation if we have no FDT */
 		return old;
 	}
 
 	/* Determine required length */
-	memsz = ( _end - _prefix );
-	assert ( memsz > 0 );
-	assert ( ( memsz % FDT_MAX_ALIGN ) == 0 );
-	len = ( memsz + fdt.len );
+	len = fdtmem_len ( &fdt );
 	assert ( len > 0 );
-	DBGC ( colour, "FDTMEM requires %#zx + %#zx => %#zx bytes for "
+	DBGC ( &region, "FDTMEM requires %#zx + %#zx => %#zx bytes for "
 	       "relocation\n", memsz, fdt.len, len );
 
 	/* Construct memory map and choose a relocation address */
-	region.start = 0;
 	new = old;
-	while ( 1 ) {
+	for ( addr = 0, next = 1 ; next ; addr = next ) {
 
-		/* Initialise region */
-		region.end = ~( ( physaddr_t ) 0 );
-		region.flags = 0;
-		region.name = "<empty>";
-
-		/* Update region based on device tree */
-		if ( ( rc = fdtmem_update_tree ( &region, &fdt ) ) != 0 )
-			break;
-
-		/* Treat existing iPXE image as reserved */
-		fdtmem_update ( &region, old, memsz, 0, "iPXE" );
-
-		/* Treat existing device tree as reserved */
-		fdtmem_update ( &region, virt_to_phys ( hdr ), fdt.len, 0,
-				"FDT" );
-
-		/* Treat inaccessible physical memory as reserved */
-		if ( limit ) {
-			fdtmem_update ( &region, limit, -limit, 0,
-					"<inaccessible>" );
-		}
+		/* Describe region and in-use memory */
+		fdtmem_describe ( addr, &fdt, max, &region );
+		memmap_update ( &region, old, memsz, MEMMAP_FL_USED, "iPXE" );
+		memmap_update ( &region, virt_to_phys ( hdr ), fdt.len,
+				MEMMAP_FL_RESERVED, "FDT" );
+		next = ( region.last + 1 );
 
 		/* Dump region descriptor (for debugging) */
-		DBGC ( colour, "FDTMEM [%#08lx,%#08lx] %s\n",
-		       region.start, region.end, region.name );
-		assert ( region.end >= region.start );
+		memmap_dump ( &region );
+		assert ( region.last >= region.addr );
 
 		/* Use highest possible region */
-		if ( ( region.flags & FDTMEM_RAM ) &&
-		     ( ( region.end - region.start ) > len ) ) {
+		if ( memmap_is_usable ( &region ) && ( next >= len ) ) {
 
 			/* Determine candidate address after alignment */
-			try = ( ( region.end - len - 1 ) &
-				~( max_align - 1 ) );
+			try = ( ( next - len ) & ~( max_align - 1 ) );
 
 			/* Use this address if within region */
-			if ( try >= region.start )
+			if ( try >= addr )
 				new = try;
 		}
-
-		/* Move to next region */
-		region.start = ( region.end + 1 );
-		if ( ! region.start )
-			break;
 	}
 
-	DBGC ( colour, "FDTMEM relocating %#08lx => [%#08lx,%#08lx]\n",
+	DBGC ( &region, "FDTMEM relocating %#08lx => [%#08lx,%#08lx]\n",
 	       old, new, ( ( physaddr_t ) ( new + len - 1 ) ) );
 	return new;
 }
@@ -363,20 +320,20 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, size_t limit ) {
  * Copy and register system device tree
  *
  * @v hdr		FDT header
- * @v limit		Size of accessible physical address space (or zero)
+ * @v max		Maximum accessible physical address
  * @ret rc		Return status code
  */
-int fdtmem_register ( struct fdt_header *hdr, size_t limit ) {
+int fdtmem_register ( struct fdt_header *hdr, physaddr_t max ) {
 	struct fdt_header *copy;
 	struct fdt fdt;
 	int rc;
 
-	/* Record size of accessible physical address space */
-	fdtmem_limit = limit;
+	/* Record maximum accessible physical address */
+	fdtmem_max = max;
 
 	/* Parse FDT to obtain length */
 	if ( ( rc = fdt_parse ( &fdt, hdr, -1UL ) ) != 0 ) {
-		DBGC ( colour, "FDTMEM could not parse FDT: %s\n",
+		DBGC ( hdr, "FDTMEM could not parse FDT: %s\n",
 		       strerror ( rc ) );
 		return rc;
 	}
@@ -385,12 +342,41 @@ int fdtmem_register ( struct fdt_header *hdr, size_t limit ) {
 	copy = ( ( void * ) _end );
 	memcpy ( copy, hdr, fdt.len );
 
+	/* Update in-use memory region */
+	memmap_use ( &fdtmem_used, virt_to_phys ( _prefix ),
+		     fdtmem_len ( &fdt ) );
+
 	/* Register copy as system device tree */
 	if ( ( rc = fdt_parse ( &sysfdt, copy, -1UL ) ) != 0 ) {
-		DBGC ( colour, "FDTMEM could not register FDT: %s\n",
+		DBGC ( hdr, "FDTMEM could not register FDT: %s\n",
 		       strerror ( rc ) );
 		return rc;
 	}
+	assert ( sysfdt.len == fdt.len );
+
+	/* Dump system memory map (for debugging) */
+	memmap_dump_all ( 1 );
 
 	return 0;
 }
+
+/**
+ * Describe memory region from system memory map
+ *
+ * @v addr		Address within region
+ * @v hide		Hide in-use regions from the memory map
+ * @v region		Region descriptor to fill in
+ */
+static void fdtmem_describe_region ( uint64_t addr, int hide,
+				     struct memmap_region *region ) {
+
+	/* Describe memory region based on device tree */
+	fdtmem_describe ( addr, &sysfdt, fdtmem_max, region );
+
+	/* Update memory region based on in-use regions, if applicable */
+	if ( hide )
+		memmap_update_used ( region );
+}
+
+PROVIDE_MEMMAP ( fdt, memmap_describe, fdtmem_describe_region );
+PROVIDE_MEMMAP_INLINE ( fdt, memmap_sync );
