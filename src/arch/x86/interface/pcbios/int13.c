@@ -31,12 +31,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/blockdev.h>
-#include <ipxe/io.h>
 #include <ipxe/acpi.h>
 #include <ipxe/sanboot.h>
 #include <ipxe/device.h>
 #include <ipxe/pci.h>
 #include <ipxe/eltorito.h>
+#include <ipxe/memmap.h>
 #include <realmode.h>
 #include <bios.h>
 #include <biosint.h>
@@ -1523,7 +1523,6 @@ static int int13_load_eltorito ( unsigned int drive, struct segoff *address ) {
  */
 static int int13_boot ( unsigned int drive,
 			struct san_boot_config *config __unused ) {
-	struct memory_map memmap;
 	struct segoff address;
 	int rc;
 
@@ -1537,7 +1536,7 @@ static int int13_boot ( unsigned int drive,
 	 * many problems that turn out to be memory-map related that
 	 * it's worth doing.
 	 */
-	get_memmap ( &memmap );
+	memmap_dump_all ( 1 );
 
 	/* Jump to boot sector */
 	if ( ( rc = call_bootsector ( address.segment, address.offset,

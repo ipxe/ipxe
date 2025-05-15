@@ -164,20 +164,19 @@ void int15_intercept ( int intercept ) {
  * returned by the BIOS.
  */
 static void hide_etherboot ( void ) {
-	struct memory_map memmap;
 	unsigned int rm_ds_top;
 	unsigned int rm_cs_top;
 	unsigned int fbms;
 
 	/* Dump memory map before mangling */
 	DBG ( "Hiding iPXE from system memory map\n" );
-	get_memmap ( &memmap );
+	memmap_dump_all ( 1 );
 
 	/* Hook in fake E820 map, if we're testing one */
 	if ( FAKE_E820 ) {
 		DBG ( "Hooking in fake E820 map\n" );
 		fake_e820();
-		get_memmap ( &memmap );
+		memmap_dump_all ( 1 );
 	}
 
 	/* Initialise the hidden regions */
@@ -210,7 +209,7 @@ static void hide_etherboot ( void ) {
 
 	/* Dump memory map after mangling */
 	DBG ( "Hidden iPXE from system memory map\n" );
-	get_memmap ( &memmap );
+	memmap_dump_all ( 1 );
 }
 
 /**
@@ -220,7 +219,6 @@ static void hide_etherboot ( void ) {
  * possible.
  */
 static void unhide_etherboot ( int flags __unused ) {
-	struct memory_map memmap;
 	int rc;
 
 	/* If we have more than one hooked interrupt at this point, it
@@ -251,7 +249,7 @@ static void unhide_etherboot ( int flags __unused ) {
 
 	/* Dump memory map after unhiding */
 	DBG ( "Unhidden iPXE from system memory map\n" );
-	get_memmap ( &memmap );
+	memmap_dump_all ( 1 );
 }
 
 /** Hide Etherboot startup function */
