@@ -564,6 +564,8 @@ int15_88:
 int15:
 	/* See if we want to intercept this call */
 	pushfw
+	cmpb	$0, %cs:int15_intercept_flag
+	je	3f
 	cmpw	$0xe820, %ax
 	jne	1f
 	cmpl	$SMAP, %edx
@@ -587,3 +589,9 @@ int15:
 int15_vector:
 	.long 0
 	.size int15_vector, . - int15_vector
+
+	.section ".text16.data", "aw", @progbits
+	.globl int15_intercept_flag
+int15_intercept_flag:
+	.byte 1
+	.size int15_intercept_flag, . - int15_intercept_flag

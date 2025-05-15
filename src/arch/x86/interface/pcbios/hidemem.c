@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <fakee820.h>
 #include <ipxe/init.h>
 #include <ipxe/io.h>
+#include <ipxe/memmap.h>
 #include <ipxe/hidemem.h>
 
 /** Set to true if you want to test a fake E820 map */
@@ -72,6 +73,10 @@ extern void int15();
 /** Vector for storing original INT 15 handler */
 extern struct segoff __text16 ( int15_vector );
 #define int15_vector __use_text16 ( int15_vector )
+
+/** INT 15 interception flag */
+extern uint8_t __text16 ( int15_intercept_flag );
+#define int15_intercept_flag __use_text16 ( int15_intercept_flag )
 
 /* The linker defines these symbols for us */
 extern char _textdata[];
@@ -129,6 +134,17 @@ void hide_umalloc ( physaddr_t start, physaddr_t end ) {
 void hide_textdata ( void ) {
 	hide_region ( &hidemem_textdata, virt_to_phys ( _textdata ),
 		      virt_to_phys ( _etextdata ) );
+}
+
+/**
+ * Set INT 15 interception flag
+ *
+ * @v intercept		Intercept INT 15 calls to modify memory map
+ */
+void int15_intercept ( int intercept ) {
+
+	/* Set flag for INT 15 handler */
+	int15_intercept_flag = intercept;
 }
 
 /**

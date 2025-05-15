@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <assert.h>
+#include <ipxe/io.h>
 #include <ipxe/memmap.h>
 
 /** @file
@@ -107,6 +108,30 @@ void memmap_update_used ( struct memmap_region *region ) {
 	for_each_table_entry ( used, USED_REGIONS ) {
 		memmap_update ( region, used->start, used->size,
 				MEMMAP_FL_USED, used->name );
+	}
+}
+
+/**
+ * Get legacy system memory map
+ *
+ * @v memmap		Legacy memory map to fill in
+ */
+void get_memmap ( struct memory_map *memmap ) {
+	struct memmap_region region;
+	struct memory_region *usable;
+
+	/* Clear legacy memory map */
+	memmap->count = 0;
+
+	/* Populate legacy memory map */
+	for_each_memmap ( &region, 1 ) {
+		if ( memmap_is_usable ( &region ) ) {
+			usable = &memmap->regions[memmap->count++];
+			usable->start = region.addr;
+			usable->end = ( region.last + 1 );
+			if ( memmap->count == MAX_MEMORY_REGIONS )
+				break;
+		}
 	}
 }
 

@@ -26,10 +26,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 #include <realmode.h>
 #include <bios.h>
 #include <memsizes.h>
 #include <ipxe/io.h>
+#include <ipxe/memmap.h>
 
 /**
  * @file
@@ -152,7 +154,7 @@ static unsigned int extmemsize_88 ( void ) {
  * @ret extmem		Extended memory size, in kB
  *
  * Note that this is only an approximation; for an accurate picture,
- * use the E820 memory map obtained via get_memmap();
+ * use the E820 memory map obtained via memmap_describe();
  */
 unsigned int extmemsize ( void ) {
 	unsigned int extmem_e801;
@@ -167,12 +169,13 @@ unsigned int extmemsize ( void ) {
 /**
  * Get e820 memory map
  *
- * @v memmap		Memory map to fill in
+ * @v region		Memory region of interest to be updated
  * @ret rc		Return status code
  */
-static int meme820 ( struct memory_map *memmap ) {
-	struct memory_region *region = memmap->regions;
-	struct memory_region *prev_region = NULL;
+static int meme820 ( struct memmap_region *region ) {
+	unsigned int count = 0;
+	uint64_t start = 0;
+	uint64_t len = 0;
 	uint32_t next = 0;
 	uint32_t smap;
 	uint32_t size;
@@ -226,13 +229,6 @@ static int meme820 ( struct memory_map *memmap ) {
 			break;
 		}
 
-		/* If first region is not RAM, assume map is invalid */
-		if ( ( memmap->count == 0 ) &&
-		     ( e820buf.type != E820_TYPE_RAM ) ) {
-		       DBG ( "INT 15,e820 failed, first entry not RAM\n" );
-		       return -EINVAL;
-		}
-
 		DBG ( "INT 15,e820 region [%llx,%llx) type %d",
 		      e820buf.start, ( e820buf.start + e820buf.len ),
 		      ( int ) e820buf.type );
@@ -259,27 +255,36 @@ static int meme820 ( struct memory_map *memmap ) {
 				continue;
 		}
 
-		region->start = e820buf.start;
-		region->end = e820buf.start + e820buf.len;
-
 		/* Check for adjacent regions and merge them */
-		if ( prev_region && ( region->start == prev_region->end ) ) {
-			prev_region->end = region->end;
+		if ( e820buf.start == ( start + len ) ) {
+			len += e820buf.len;
 		} else {
-			prev_region = region;
-			region++;
-			memmap->count++;
+			start = e820buf.start;
+			len = e820buf.len;
 		}
 
-		if ( memmap->count >= ( sizeof ( memmap->regions ) /
-					sizeof ( memmap->regions[0] ) ) ) {
-			DBG ( "INT 15,e820 too many regions returned\n" );
-			/* Not a fatal error; what we've got so far at
-			 * least represents valid regions of memory,
-			 * even if we couldn't get them all.
-			 */
-			break;
+		/* Sanity check: first region (base memory) should
+		 * start at address zero.
+		 */
+		if ( ( count == 0 ) && ( start != 0 ) ) {
+			DBG ( "INT 15,e820 region 0 starts at %llx (expected "
+			      "0); assuming insane\n", start );
+			return -EINVAL;
 		}
+
+		/* Sanity check: second region (extended memory)
+		 * should start at address 0x100000.
+		 */
+		if ( ( count == 1 ) && ( start != 0x100000 ) ) {
+			DBG ( "INT 15,e820 region 1 starts at %llx (expected "
+			      "100000); assuming insane\n", start );
+			return -EINVAL;
+		}
+
+		/* Update region of interest */
+		memmap_update ( region, start, len, MEMMAP_FL_MEMORY, "e820" );
+		count++;
+
 	} while ( next != 0 );
 
 	/* Sanity checks.  Some BIOSes report complete garbage via INT
@@ -288,19 +293,9 @@ static int meme820 ( struct memory_map *memmap ) {
 	 * region (starting at 0) and at least one high memory region
 	 * (starting at 0x100000).
 	 */
-	if ( memmap->count < 2 ) {
+	if ( count < 2 ) {
 		DBG ( "INT 15,e820 returned only %d regions; assuming "
-		      "insane\n", memmap->count );
-		return -EINVAL;
-	}
-	if ( memmap->regions[0].start != 0 ) {
-		DBG ( "INT 15,e820 region 0 starts at %llx (expected 0); "
-		      "assuming insane\n", memmap->regions[0].start );
-		return -EINVAL;
-	}
-	if ( memmap->regions[1].start != 0x100000 ) {
-		DBG ( "INT 15,e820 region 1 starts at %llx (expected 100000); "
-		      "assuming insane\n", memmap->regions[0].start );
+		      "insane\n", count );
 		return -EINVAL;
 	}
 
@@ -308,37 +303,52 @@ static int meme820 ( struct memory_map *memmap ) {
 }
 
 /**
- * Get memory map
+ * Describe memory region from system memory map
  *
- * @v memmap		Memory map to fill in
+ * @v addr		Address within region
+ * @v hide		Hide in-use regions from the memory map
+ * @v region		Region descriptor to fill in
  */
-void x86_get_memmap ( struct memory_map *memmap ) {
-	unsigned int basemem, extmem;
+static void int15_describe ( uint64_t addr, int hide,
+			     struct memmap_region *region ) {
+	unsigned int basemem;
+	unsigned int extmem;
+	uint64_t inaccessible;
 	int rc;
 
-	DBG ( "Fetching system memory map\n" );
+	/* Initialise region */
+	memmap_init ( addr, region );
 
-	/* Clear memory map */
-	memset ( memmap, 0, sizeof ( *memmap ) );
+	/* Mark addresses above 4GB as inaccessible: we have no way to
+	 * access them either in a 32-bit build or in a 64-bit build
+	 * (since the 64-bit build identity-maps only the 32-bit
+	 * address space).
+	 */
+	inaccessible = ( 1ULL << 32 );
+	memmap_update ( region, inaccessible, -inaccessible,
+			MEMMAP_FL_INACCESSIBLE, NULL );
 
-	/* Get base and extended memory sizes */
-	basemem = basememsize();
-	DBG ( "FBMS base memory size %d kB [0,%x)\n",
-	      basemem, ( basemem * 1024 ) );
-	extmem = extmemsize();
-	
-	/* Try INT 15,e820 first */
-	if ( ( rc = meme820 ( memmap ) ) == 0 ) {
+	/* Enable/disable INT 15 interception as applicable */
+	int15_intercept ( hide );
+
+	/* Try INT 15,e820 first, falling back to constructing a map
+	 * from basemem and extmem sizes
+	 */
+	if ( ( rc = meme820 ( region ) ) == 0 ) {
 		DBG ( "Obtained system memory map via INT 15,e820\n" );
-		return;
+	} else {
+		basemem = basememsize();
+		DBG ( "FBMS base memory size %d kB [0,%x)\n",
+		      basemem, ( basemem * 1024 ) );
+		extmem = extmemsize();
+		memmap_update ( region, 0, ( basemem * 1024 ),
+				MEMMAP_FL_MEMORY, "basemem" );
+		memmap_update ( region, 0x100000, ( extmem * 1024 ),
+				MEMMAP_FL_MEMORY, "extmem" );
 	}
 
-	/* Fall back to constructing a map from basemem and extmem sizes */
-	DBG ( "INT 15,e820 failed; constructing map\n" );
-	memmap->regions[0].end = ( basemem * 1024 );
-	memmap->regions[1].start = 0x100000;
-	memmap->regions[1].end = 0x100000 + ( extmem * 1024 );
-	memmap->count = 2;
+	/* Restore INT 15 interception */
+	int15_intercept ( 1 );
 }
 
-PROVIDE_IOAPI ( x86, get_memmap, x86_get_memmap );
+PROVIDE_MEMMAP ( int15, memmap_describe, int15_describe );
