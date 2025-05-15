@@ -34,9 +34,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/uaccess.h>
-#include <ipxe/hidemem.h>
 #include <ipxe/io.h>
 #include <ipxe/memblock.h>
+#include <ipxe/memmap.h>
 #include <ipxe/umalloc.h>
 
 /** Maximum usable address for external allocated memory */
@@ -61,6 +61,22 @@ static void *bottom = NULL;
 
 /** Remaining space on heap */
 static size_t heap_size;
+
+/** In-use memory region */
+struct used_region umalloc_used __used_region = {
+	.name = "umalloc",
+};
+
+/**
+ * Hide umalloc() region
+ *
+ * @v start		Start of region
+ * @v end		End of region
+ */
+static void hide_umalloc ( physaddr_t start, physaddr_t end ) {
+
+	memmap_use ( &umalloc_used, start, ( end - start ) );
+}
 
 /**
  * Find largest usable memory region

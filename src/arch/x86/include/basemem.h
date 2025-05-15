@@ -27,9 +27,4 @@ static inline unsigned int get_fbms ( void ) {
 
 extern void set_fbms ( unsigned int new_fbms );
 
-/* Actually in hidemem.c, but putting it here avoids polluting the
- * architecture-independent include/hidemem.h.
- */
-extern void hide_basemem ( void );
-
 #endif /* _BASEMEM_H */

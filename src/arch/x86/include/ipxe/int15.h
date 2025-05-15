@@ -16,5 +16,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #endif
 
 extern void int15_intercept ( int intercept );
+extern void hide_basemem ( void );
 
 #endif /* _IPXE_INT15_H */

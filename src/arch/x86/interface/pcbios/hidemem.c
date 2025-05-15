@@ -31,7 +31,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/init.h>
 #include <ipxe/io.h>
 #include <ipxe/memmap.h>
-#include <ipxe/hidemem.h>
 
 /** Set to true if you want to test a fake E820 map */
 #define FAKE_E820 0
@@ -119,21 +118,32 @@ void hide_basemem ( void ) {
 }
 
 /**
- * Hide umalloc() region
- *
- */
-void hide_umalloc ( physaddr_t start, physaddr_t end ) {
-	assert ( end <= virt_to_phys ( _textdata ) );
-	hide_region ( &hidemem_umalloc, start, end );
-}
-
-/**
  * Hide .text and .data
  *
  */
 void hide_textdata ( void ) {
 	hide_region ( &hidemem_textdata, virt_to_phys ( _textdata ),
 		      virt_to_phys ( _etextdata ) );
+}
+
+/**
+ * Synchronise in-use regions with the externally visible system memory map
+ *
+ */
+static void int15_sync ( void ) {
+	physaddr_t start;
+	size_t size;
+
+	/* Besides our fixed base memory and textdata regions, we
+	 * support hiding only a single in-use memory region (the
+	 * umalloc region), which must be placed before the hidden
+	 * textdata region (even if zero-length).
+	 */
+	start = umalloc_used.start;
+	size = umalloc_used.size;
+	if ( ! size )
+		start = virt_to_phys ( _textdata );
+	hide_region ( &hidemem_umalloc, start, ( start + size ) );
 }
 
 /**
@@ -172,8 +182,8 @@ static void hide_etherboot ( void ) {
 
 	/* Initialise the hidden regions */
 	hide_basemem();
-	hide_umalloc ( virt_to_phys ( _textdata ), virt_to_phys ( _textdata ) );
 	hide_textdata();
+	int15_sync();
 
 	/* Some really moronic BIOSes bring up the PXE stack via the
 	 * UNDI loader entry point and then don't bother to unload it
@@ -250,3 +260,5 @@ struct startup_fn hide_etherboot_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.startup = hide_etherboot,
 	.shutdown = unhide_etherboot,
 };
+
+PROVIDE_MEMMAP ( int15, memmap_sync, int15_sync );
