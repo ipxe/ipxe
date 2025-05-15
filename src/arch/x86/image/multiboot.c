@@ -38,7 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <multiboot.h>
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
-#include <ipxe/io.h>
+#include <ipxe/memmap.h>
 #include <ipxe/elf.h>
 #include <ipxe/init.h>
 #include <ipxe/features.h>
@@ -58,6 +58,9 @@ FEATURE ( FEATURE_IMAGE, "MBOOT", DHCP_EB_FEATURE_MULTIBOOT, 1 );
  *
  */
 #define MAX_MODULES 8
+
+/** Maximum number of memory map entries */
+#define MAX_MEMMAP 8
 
 /**
  * Maximum combined length of command lines
@@ -106,32 +109,43 @@ static void multiboot_build_memmap ( struct image *image,
 				     struct multiboot_info *mbinfo,
 				     struct multiboot_memory_map *mbmemmap,
 				     unsigned int limit ) {
-	struct memory_map memmap;
-	unsigned int i;
-
-	/* Get memory map */
-	get_memmap ( &memmap );
+	struct memmap_region region;
+	unsigned int remaining;
 
 	/* Translate into multiboot format */
 	memset ( mbmemmap, 0, sizeof ( *mbmemmap ) );
-	for ( i = 0 ; i < memmap.count ; i++ ) {
-		if ( i >= limit ) {
+	remaining = limit;
+	for_each_memmap ( &region, 0 ) {
+
+		/* Ignore any non-memory regions */
+		if ( ! ( region.flags & MEMMAP_FL_MEMORY ) )
+			continue;
+		memmap_dump ( &region );
+
+		/* Check Multiboot memory map limit */
+		if ( ! remaining ) {
 			DBGC ( image, "MULTIBOOT %s limit of %d memmap "
 			       "entries reached\n", image->name, limit );
 			break;
 		}
-		mbmemmap[i].size = ( sizeof ( mbmemmap[i] ) -
-				     sizeof ( mbmemmap[i].size ) );
-		mbmemmap[i].base_addr = memmap.regions[i].start;
-		mbmemmap[i].length = ( memmap.regions[i].end -
-				       memmap.regions[i].start );
-		mbmemmap[i].type = MBMEM_RAM;
-		mbinfo->mmap_length += sizeof ( mbmemmap[i] );
-		if ( memmap.regions[i].start == 0 )
-			mbinfo->mem_lower = ( memmap.regions[i].end / 1024 );
-		if ( memmap.regions[i].start == 0x100000 )
-			mbinfo->mem_upper = ( ( memmap.regions[i].end -
-						0x100000 ) / 1024 );
+
+		/* Populate Multiboot memory map entry */
+		mbmemmap->size = ( sizeof ( *mbmemmap ) -
+				   sizeof ( mbmemmap->size ) );
+		mbmemmap->base_addr = region.addr;
+		mbmemmap->length = memmap_size ( &region );
+		mbmemmap->type = MBMEM_RAM;
+
+		/* Update Multiboot information */
+		mbinfo->mmap_length += sizeof ( *mbmemmap );
+		if ( mbmemmap->base_addr == 0 )
+			mbinfo->mem_lower = ( mbmemmap->length / 1024 );
+		if ( mbmemmap->base_addr == 0x100000 )
+			mbinfo->mem_upper = ( mbmemmap->length / 1024 );
+
+		/* Move to next Multiboot memory map entry */
+		mbmemmap++;
+		remaining--;
 	}
 }
 
@@ -247,8 +261,7 @@ static char __bss16_array ( mb_bootloader_name, [32] );
 #define mb_bootloader_name __use_data16 ( mb_bootloader_name )
 
 /** The multiboot memory map */
-static struct multiboot_memory_map
-	__bss16_array ( mbmemmap, [MAX_MEMORY_REGIONS] );
+static struct multiboot_memory_map __bss16_array ( mbmemmap, [MAX_MEMMAP] );
 #define mbmemmap __use_data16 ( mbmemmap )
 
 /** The multiboot module list */
