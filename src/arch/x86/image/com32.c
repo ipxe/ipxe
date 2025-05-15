@@ -39,7 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/image.h>
 #include <ipxe/segment.h>
 #include <ipxe/init.h>
-#include <ipxe/io.h>
+#include <ipxe/memmap.h>
 #include <ipxe/console.h>
 
 /**
@@ -49,8 +49,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * @ret rc		Return status code
  */
 static int com32_exec_loop ( struct image *image ) {
-	struct memory_map memmap;
-	unsigned int i;
+	struct memmap_region region;
 	int state;
 	uint32_t avail_mem_top;
 
@@ -59,21 +58,12 @@ static int com32_exec_loop ( struct image *image ) {
 	switch ( state ) {
 	case 0: /* First time through; invoke COM32 program */
 
-		/* Get memory map */
-		get_memmap ( &memmap );
-
 		/* Find end of block covering COM32 image loading area */
-		for ( i = 0, avail_mem_top = 0 ; i < memmap.count ; i++ ) {
-			if ( (memmap.regions[i].start <= COM32_START_PHYS) &&
-			     (memmap.regions[i].end > COM32_START_PHYS + image->len) ) {
-				avail_mem_top = memmap.regions[i].end;
-				break;
-			}
-		}
-
+		memmap_describe ( COM32_START_PHYS, 1, &region );
+		assert ( memmap_is_usable ( &region ) );
+		avail_mem_top = ( COM32_START_PHYS + memmap_size ( &region ) );
 		DBGC ( image, "COM32 %p: available memory top = 0x%x\n",
 		       image, avail_mem_top );
-
 		assert ( avail_mem_top != 0 );
 
 		/* Hook COMBOOT API interrupts */
