@@ -111,29 +111,5 @@ void memmap_update_used ( struct memmap_region *region ) {
 	}
 }
 
-/**
- * Get legacy system memory map
- *
- * @v memmap		Legacy memory map to fill in
- */
-void get_memmap ( struct memory_map *memmap ) {
-	struct memmap_region region;
-	struct memory_region *usable;
-
-	/* Clear legacy memory map */
-	memmap->count = 0;
-
-	/* Populate legacy memory map */
-	for_each_memmap ( &region, 1 ) {
-		if ( memmap_is_usable ( &region ) ) {
-			usable = &memmap->regions[memmap->count++];
-			usable->start = region.addr;
-			usable->end = ( region.last + 1 );
-			if ( memmap->count == MAX_MEMORY_REGIONS )
-				break;
-		}
-	}
-}
-
 PROVIDE_MEMMAP_INLINE ( null, memmap_describe );
 PROVIDE_MEMMAP_INLINE ( null, memmap_sync );

@@ -484,30 +484,4 @@ void mb ( void );
 #define rmb()	mb()
 #define wmb()	mb()
 
-/** A usable memory region */
-struct memory_region {
-	/** Physical start address */
-	uint64_t start;
-	/** Physical end address */
-	uint64_t end;
-};
-
-/** Maximum number of memory regions we expect to encounter */
-#define MAX_MEMORY_REGIONS 8
-
-/** A memory map */
-struct memory_map {
-	/** Memory regions */
-	struct memory_region regions[MAX_MEMORY_REGIONS];
-	/** Number of used regions */
-	unsigned int count;
-};
-
-/**
- * Get memory map
- *
- * @v memmap		Memory map to fill in
- */
-void get_memmap ( struct memory_map *memmap );
-
 #endif /* _IPXE_IO_H */
