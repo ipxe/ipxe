@@ -7,9 +7,9 @@
  *
  * We have no concept of the underlying physical addresses, since
  * these are not exposed to userspace.  We provide a stub
- * implementation of virt_to_phys() since this is required by
- * alloc_memblock().  We provide a matching stub implementation of
- * phys_to_virt().
+ * implementation of virt_to_phys() since this is required by the heap
+ * allocator to determine physical address alignment.  We provide a
+ * matching stub implementation of phys_to_virt().
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
@@ -31,11 +31,11 @@ UACCESS_INLINE ( linux, virt_to_phys ) ( volatile const void *virt ) {
 
 	/* We do not know the real underlying physical address.  We
 	 * provide this stub implementation only because it is
-	 * required by alloc_memblock() (which allocates memory with
-	 * specified physical address alignment).  We assume that the
-	 * low-order bits of virtual addresses match the low-order
-	 * bits of physical addresses, and so simply returning the
-	 * virtual address will suffice for the purpose of determining
+	 * required in order to allocate memory with a specified
+	 * physical address alignment.  We assume that the low-order
+	 * bits of virtual addresses match the low-order bits of
+	 * physical addresses, and so simply returning the virtual
+	 * address will suffice for the purpose of determining
 	 * alignment.
 	 */
 	return ( ( physaddr_t ) virt );
