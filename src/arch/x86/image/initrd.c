@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/image.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/init.h>
-#include <ipxe/memblock.h>
+#include <ipxe/memmap.h>
 #include <ipxe/cpio.h>
 
 /** @file
@@ -287,7 +287,6 @@ int initrd_reshuffle_check ( size_t len, physaddr_t bottom ) {
  *
  */
 static void initrd_startup ( void ) {
-	void *bottom;
 	size_t len;
 
 	/* Record largest memory block available.  Do this after any
@@ -297,9 +296,10 @@ static void initrd_startup ( void ) {
 	 * but before any allocations for downloaded images (which we
 	 * can safely reuse when rearranging).
 	 */
-	len = largest_memblock ( &bottom );
-	initrd_bottom = virt_to_phys ( bottom );
+	len = memmap_largest ( &initrd_bottom );
 	initrd_top = ( initrd_bottom + len );
+	DBGC ( &images, "INITRD largest memory block is [%#08lx,%#08lx)\n",
+	       initrd_bottom, initrd_top );
 }
 
 /** initrd startup function */

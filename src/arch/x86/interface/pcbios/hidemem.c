@@ -139,8 +139,8 @@ static void int15_sync ( void ) {
 	 * umalloc region), which must be placed before the hidden
 	 * textdata region (even if zero-length).
 	 */
-	start = umalloc_used.start;
-	size = umalloc_used.size;
+	start = uheap_used.start;
+	size = uheap_used.size;
 	if ( ! size )
 		start = virt_to_phys ( _textdata );
 	hide_region ( &hidemem_umalloc, start, ( start + size ) );

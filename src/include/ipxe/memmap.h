@@ -228,7 +228,7 @@ static inline void memmap_dump_all ( int hide ) {
 		memmap_dump ( &region );
 }
 
-extern struct used_region umalloc_used __used_region;
+extern struct used_region uheap_used __used_region;
 
 extern void memmap_update ( struct memmap_region *region, uint64_t start,
 			    uint64_t size, unsigned int flags,
