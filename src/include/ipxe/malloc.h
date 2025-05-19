@@ -45,6 +45,11 @@ struct heap {
 	/** List of free memory blocks */
 	struct list_head blocks;
 
+	/** Alignment for free memory blocks */
+	size_t align;
+	/** Alignment for size-tracked allocations */
+	size_t ptr_align;
+
 	/** Total amount of free memory */
 	size_t freemem;
 	/** Total amount of used memory */

@@ -26,7 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <strings.h>
 #include <ipxe/io.h>
 #include <ipxe/list.h>
 #include <ipxe/init.h>
@@ -59,9 +58,12 @@ struct memory_block {
 	struct list_head list;
 };
 
-/** Physical address alignment maintained for free blocks of memory */
-#define MEMBLOCK_ALIGN \
-	( ( size_t ) ( 1 << ( fls ( sizeof ( struct memory_block ) - 1 ) ) ) )
+/** Physical address alignment maintained for free blocks of memory
+ *
+ * We keep memory blocks aligned on a power of two that is at least
+ * large enough to hold a @c struct @c memory_block.
+ */
+#define MIN_MEMBLOCK_ALIGN ( 4 * sizeof ( void * ) )
 
 /** A block of allocated memory complete with size information */
 struct autosized_block {
@@ -72,14 +74,17 @@ struct autosized_block {
 };
 
 /**
- * Heap size
+ * Heap area size
  *
  * Currently fixed at 512kB.
  */
 #define HEAP_SIZE ( 512 * 1024 )
 
+/** Heap area alignment */
+#define HEAP_ALIGN MIN_MEMBLOCK_ALIGN
+
 /** The heap area */
-static char heap_area[HEAP_SIZE];
+static char __attribute__ (( aligned ( HEAP_ALIGN ) )) heap_area[HEAP_SIZE];
 
 /**
  * Mark all blocks in free list as defined
@@ -188,14 +193,14 @@ static inline void check_blocks ( struct heap *heap ) {
 
 		/* Check alignment */
 		assert ( ( virt_to_phys ( block ) &
-			   ( MEMBLOCK_ALIGN - 1 ) ) == 0 );
+			   ( heap->align - 1 ) ) == 0 );
 
 		/* Check that list structure is intact */
 		list_check ( &block->list );
 
 		/* Check that block size is not too small */
 		assert ( block->size >= sizeof ( *block ) );
-		assert ( block->size >= MEMBLOCK_ALIGN );
+		assert ( block->size >= heap->align );
 
 		/* Check that block does not wrap beyond end of address space */
 		assert ( ( ( void * ) block + block->size ) >
@@ -276,13 +281,16 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 	valgrind_make_blocks_defined ( heap );
 	check_blocks ( heap );
 
+	/* Limit offset to requested alignment */
+	offset &= ( align ? ( align - 1 ) : 0 );
+
 	/* Calculate offset of memory block */
-	actual_offset = ( offset & ~( MEMBLOCK_ALIGN - 1 ) );
+	actual_offset = ( offset & ~( heap->align - 1 ) );
 	assert ( actual_offset <= offset );
 
 	/* Calculate size of memory block */
-	actual_size = ( ( size + offset - actual_offset + MEMBLOCK_ALIGN - 1 )
-			& ~( MEMBLOCK_ALIGN - 1 ) );
+	actual_size = ( ( size + offset - actual_offset + heap->align - 1 )
+			& ~( heap->align - 1 ) );
 	if ( ! actual_size ) {
 		/* The requested size is not permitted to be zero.  A
 		 * zero result at this point indicates that either the
@@ -295,7 +303,7 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 	assert ( actual_size >= size );
 
 	/* Calculate alignment mask */
-	align_mask = ( ( align - 1 ) | ( MEMBLOCK_ALIGN - 1 ) );
+	align_mask = ( ( align - 1 ) | ( heap->align - 1 ) );
 
 	DBGC2 ( heap, "HEAP allocating %#zx (aligned %#zx+%#zx)\n",
 		size, align, offset );
@@ -324,7 +332,9 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 			 * the free list.
 			 */
 			if ( post_size ) {
-				assert ( post_size >= MEMBLOCK_ALIGN );
+				assert ( post_size >= sizeof ( *block ) );
+				assert ( ( post_size &
+					   ( heap->align - 1 ) ) == 0 );
 				VALGRIND_MAKE_MEM_UNDEFINED ( post,
 							      sizeof ( *post ));
 				post->size = post_size;
@@ -343,7 +353,9 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 				VALGRIND_MAKE_MEM_NOACCESS ( pre,
 							     sizeof ( *pre ) );
 			} else {
-				assert ( pre_size >= MEMBLOCK_ALIGN );
+				assert ( pre_size >= sizeof ( *block ) );
+				assert ( ( pre_size &
+					   ( heap->align - 1 ) ) == 0 );
 			}
 			/* Update memory usage statistics */
 			heap->freemem -= actual_size;
@@ -413,10 +425,10 @@ static void heap_free_block ( struct heap *heap, void *ptr, size_t size ) {
 	 * have allocated.
 	 */
 	assert ( size != 0 );
-	sub_offset = ( virt_to_phys ( ptr ) & ( MEMBLOCK_ALIGN - 1) );
+	sub_offset = ( virt_to_phys ( ptr ) & ( heap->align - 1 ) );
 	freeing = ( ptr - sub_offset );
-	actual_size = ( ( size + sub_offset + MEMBLOCK_ALIGN - 1 ) &
-			~( MEMBLOCK_ALIGN - 1 ) );
+	actual_size = ( ( size + sub_offset + heap->align - 1 ) &
+			~( heap->align - 1 ) );
 	DBGC2 ( heap, "HEAP freeing [%p,%p) within [%p,%p)\n",
 		ptr, ( ptr + size ), freeing,
 		( ( ( void * ) freeing ) + actual_size ) );
@@ -537,7 +549,8 @@ void * heap_realloc ( struct heap *heap, void *old_ptr, size_t new_size ) {
 		new_total_size = ( new_size + offset );
 		if ( new_total_size < new_size )
 			return NULL;
-		new_block = heap_alloc_block ( heap, new_total_size, 1, 0 );
+		new_block = heap_alloc_block ( heap, new_total_size,
+					       heap->ptr_align, -offset );
 		if ( ! new_block )
 			return NULL;
 		new_block->size = new_total_size;
@@ -545,6 +558,8 @@ void * heap_realloc ( struct heap *heap, void *old_ptr, size_t new_size ) {
 					     sizeof ( new_block->size ) );
 		new_ptr = &new_block->data;
 		VALGRIND_MALLOCLIKE_BLOCK ( new_ptr, new_size, 0, 0 );
+		assert ( ( ( ( intptr_t ) new_ptr ) &
+			   ( heap->ptr_align - 1 ) ) == 0 );
 	}
 
 	/* Copy across relevant part of the old data region (if any),
@@ -576,6 +591,8 @@ void * heap_realloc ( struct heap *heap, void *old_ptr, size_t new_size ) {
 /** The global heap */
 static struct heap heap = {
 	.blocks = LIST_HEAD_INIT ( heap.blocks ),
+	.align = MIN_MEMBLOCK_ALIGN,
+	.ptr_align = sizeof ( void * ),
 	.grow = discard_cache,
 };
 
@@ -715,22 +732,14 @@ void free_phys ( void *ptr, size_t size ) {
  * @v start		Start address
  * @v len		Length of memory
  *
- * Adds a block of memory to the allocation pool.
+ * Adds a block of memory to the allocation pool.  The memory must be
+ * aligned to the heap's required free memory block alignment.
  */
 void heap_populate ( struct heap *heap, void *start, size_t len ) {
-	size_t skip;
 
-	/* Align start of block */
-	skip = ( ( -virt_to_phys ( start ) ) & ( MEMBLOCK_ALIGN - 1 ) );
-	if ( skip > len )
-		return;
-	start += skip;
-	len -= skip;
-
-	/* Align end of block */
-	len &= ~( MEMBLOCK_ALIGN - 1 );
-	if ( ! len )
-		return;
+	/* Sanity checks */
+	assert ( ( virt_to_phys ( start ) & ( heap->align - 1 ) ) == 0 );
+	assert ( ( len & ( heap->align - 1 ) ) == 0 );
 
 	/* Add to allocation pool */
 	heap_free_block ( heap, start, len );
@@ -744,6 +753,11 @@ void heap_populate ( struct heap *heap, void *start, size_t len ) {
  *
  */
 static void init_heap ( void ) {
+
+	/* Sanity check */
+	build_assert ( MIN_MEMBLOCK_ALIGN >= sizeof ( struct memory_block ) );
+
+	/* Populate heap */
 	VALGRIND_MAKE_MEM_NOACCESS ( heap_area, sizeof ( heap_area ) );
 	VALGRIND_MAKE_MEM_NOACCESS ( &heap.blocks, sizeof ( heap.blocks ) );
 	heap_populate ( &heap, heap_area, sizeof ( heap_area ) );
