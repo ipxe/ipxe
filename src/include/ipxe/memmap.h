@@ -234,5 +234,6 @@ extern void memmap_update ( struct memmap_region *region, uint64_t start,
 			    uint64_t size, unsigned int flags,
 			    const char *name );
 extern void memmap_update_used ( struct memmap_region *region );
+extern size_t memmap_largest ( physaddr_t *start );
 
 #endif /* _IPXE_MEMMAP_H */

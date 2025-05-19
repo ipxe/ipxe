@@ -111,5 +111,34 @@ void memmap_update_used ( struct memmap_region *region ) {
 	}
 }
 
+/**
+ * Find largest usable memory region
+ *
+ * @v start		Start address to fill in
+ * @ret len		Length of region
+ */
+size_t memmap_largest ( physaddr_t *start ) {
+	struct memmap_region region;
+	size_t largest;
+	size_t size;
+
+	/* Find largest usable region */
+	DBGC ( &region, "MEMMAP finding largest usable region\n" );
+	*start = 0;
+	largest = 0;
+	for_each_memmap ( &region, 1 ) {
+		memmap_dump ( &region );
+		if ( ! memmap_is_usable ( &region ) )
+			continue;
+		size = memmap_size ( &region );
+		if ( size > largest ) {
+			DBGC ( &region, "...new largest region found\n" );
+			largest = size;
+			*start = region.addr;
+		}
+	}
+	return largest;
+}
+
 PROVIDE_MEMMAP_INLINE ( null, memmap_describe );
 PROVIDE_MEMMAP_INLINE ( null, memmap_sync );
