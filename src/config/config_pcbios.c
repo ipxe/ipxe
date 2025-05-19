@@ -22,6 +22,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/console.h>
+#include <config/general.h>
 
 /** @file
  *
@@ -47,4 +48,14 @@ REQUIRE_OBJECT ( vesafb );
 #endif
 #ifdef CONSOLE_INT13
 REQUIRE_OBJECT ( int13con );
+#endif
+
+/*
+ * Drag in all requested image types
+ *
+ */
+
+/* Allow IMAGE_LKRN to be a synonynm for IMAGE_BZIMAGE */
+#ifdef IMAGE_LKRN
+REQUIRE_OBJECT ( bzimage );
 #endif
