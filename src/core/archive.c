@@ -119,9 +119,14 @@ int image_extract_exec ( struct image *image ) {
 	/* Set auto-unregister flag */
 	extracted->flags |= IMAGE_AUTO_UNREGISTER;
 
-	/* Tail-recurse into extracted image */
-	return image_exec ( extracted );
+	/* Replace current image */
+	if ( ( rc = image_replace ( extracted ) ) != 0 )
+		goto err_replace;
 
+	/* Return to allow replacement image to be executed */
+	return 0;
+
+ err_replace:
  err_set_cmdline:
 	unregister_image ( extracted );
  err_extract:
