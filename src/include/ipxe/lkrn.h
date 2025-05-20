@@ -56,6 +56,40 @@ struct lkrn_context {
 	physaddr_t fdt;
 };
 
+/** Compressed kernel image header */
+struct zimg_header {
+	/** Reserved */
+	uint8_t reserved_a[4];
+	/** Magic */
+	uint32_t magic;
+	/** Offset to payload */
+	uint32_t offset;
+	/** Length of payload */
+	uint32_t len;
+	/** Reserved */
+	uint8_t reserved_b[8];
+	/** Compression type */
+	uint32_t type;
+} __attribute__ (( packed ));
+
+/** Compressed kernel image magic value */
+#define ZIMG_MAGIC LKRN_MAGIC ( 'z', 'i', 'm', 'g' )
+
+/** Compressed kernel image context */
+struct zimg_context {
+	/** Offset to compressed data */
+	size_t offset;
+	/** Length of compressed data */
+	size_t len;
+	/** Compression type */
+	union {
+		/** Raw type */
+		uint32_t raw;
+		/** Printable string */
+		char string[5];
+	} type;
+};
+
 #include <bits/lkrn.h>
 
 /**

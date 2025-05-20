@@ -252,3 +252,105 @@ struct image_type lkrn_image_type __image_type ( PROBE_NORMAL ) = {
 	.probe = lkrn_probe,
 	.exec = lkrn_exec,
 };
+
+/**
+ * Parse compressed kernel image
+ *
+ * @v image		Compressed kernel image
+ * @v zctx		Compressed kernel image context
+ * @ret rc		Return status code
+ */
+static int zimg_parse ( struct image *image, struct zimg_context *zctx ) {
+	const struct zimg_header *zhdr;
+
+	/* Initialise context */
+	memset ( zctx, 0, sizeof ( *zctx ) );
+
+	/* Parse header */
+	if ( image->len < sizeof ( *zhdr ) ) {
+		DBGC ( image, "ZIMG %s too short for header\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+	zhdr = image->data;
+
+	/* Check magic value */
+	if ( zhdr->magic != cpu_to_le32 ( ZIMG_MAGIC ) ) {
+		DBGC ( image, "ZIMG %s bad magic value %#08x\n",
+		       image->name, le32_to_cpu ( zhdr->magic ) );
+		return -ENOEXEC;
+	}
+
+	/* Record and check offset and length */
+	zctx->offset = le32_to_cpu ( zhdr->offset );
+	zctx->len = le32_to_cpu ( zhdr->len );
+	if ( ( zctx->offset > image->len ) ||
+	     ( zctx->len > ( image->len - zctx->offset ) ) ) {
+		DBGC ( image, "ZIMG %s bad range [+%#zx,+%#zx)/%#zx\n",
+		       image->name, zctx->offset,
+		       (zctx->offset + zctx->len ), image->len );
+		return -ENOEXEC;
+	}
+
+	/* Record compression type */
+	zctx->type.raw = zhdr->type;
+
+	return 0;
+}
+
+/**
+ * Extract compresed kernel image
+ *
+ * @v image		Compressed kernel image
+ * @v extracted		Extracted image
+ * @ret rc		Return status code
+ */
+static int zimg_extract ( struct image *image, struct image *extracted ) {
+	struct zimg_context zctx;
+	const void *payload;
+	int rc;
+
+	/* Parse header */
+	if ( ( rc = zimg_parse ( image, &zctx ) ) != 0 )
+		return rc;
+	DBGC ( image, "ZIMG %s has %s-compressed payload at [+%#zx,+%#zx)\n",
+	       image->name, zctx.type.string, zctx.offset,
+	       ( zctx.offset + zctx.len ) );
+
+	/* Extract compressed payload */
+	payload = ( image->data + zctx.offset );
+	if ( ( rc = image_set_data ( extracted, payload, zctx.len ) ) != 0 ) {
+		DBGC ( image, "ZIMG %s could not extract: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Probe compressed kernel image
+ *
+ * @v image		Compressed kernel image
+ * @ret rc		Return status code
+ */
+static int zimg_probe ( struct image *image ) {
+	struct zimg_context zctx;
+	int rc;
+
+	/* Parse header */
+	if ( ( rc = zimg_parse ( image, &zctx ) ) != 0 )
+		return rc;
+
+	DBGC ( image, "ZIMG %s is a %s-compressed Linux kernel\n",
+	       image->name, zctx.type.string );
+	return 0;
+}
+
+/** Linux kernel compressed image type */
+struct image_type zimg_image_type __image_type ( PROBE_NORMAL ) = {
+	.name = "zimg",
+	.probe = zimg_probe,
+	.extract = zimg_extract,
+	.exec = image_extract_exec,
+};
