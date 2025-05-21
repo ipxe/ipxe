@@ -153,7 +153,7 @@ static int lkrn_fdt ( struct image *image, struct lkrn_context *ctx ) {
 	int rc;
 
 	/* Build device tree (which may change system memory map) */
-	if ( ( rc = fdt_create ( &fdt, image->cmdline ) ) != 0 )
+	if ( ( rc = fdt_create ( &fdt, image->cmdline, 0, 0 ) ) != 0 )
 		goto err_create;
 	len = be32_to_cpu ( fdt->totalsize );
 

@@ -114,7 +114,7 @@ int efi_fdt_install ( const char *cmdline ) {
 	int rc;
 
 	/* Create device tree */
-	if ( ( rc = fdt_create ( &efi_fdt_installed, cmdline ) ) != 0 ) {
+	if ( ( rc = fdt_create ( &efi_fdt_installed, cmdline, 0, 0 ) ) != 0 ) {
 		DBGC ( &efi_fdt, "EFI_FDT could not install: %s\n",
 		       strerror ( rc ) );
 		goto err_create;

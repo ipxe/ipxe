@@ -1055,18 +1055,17 @@ static int fdt_ensure_child ( struct fdt *fdt, unsigned int offset,
 }
 
 /**
- * Ensure property exists with specified value
+ * Set property value
  *
  * @v fdt		Device tree
  * @v offset		Starting node offset
  * @v name		Property name
- * @v data		Property data
+ * @v data		Property data, or NULL to delete property
  * @v len		Length of property data
  * @ret rc		Return status code
  */
-static int fdt_ensure_property ( struct fdt *fdt, unsigned int offset,
-				 const char *name, const void *data,
-				 size_t len ) {
+static int fdt_set ( struct fdt *fdt, unsigned int offset, const char *name,
+		     const void *data, size_t len ) {
 	struct fdt_descriptor desc;
 	struct {
 		fdt_token_t token;
@@ -1111,6 +1110,10 @@ static int fdt_ensure_property ( struct fdt *fdt, unsigned int offset,
 		/* Calculate insertion length */
 		insert = ( sizeof ( *hdr ) + len );
 	}
+
+	/* Leave property erased if applicable */
+	if ( ! data )
+		return 0;
 
 	/* Insert space */
 	if ( ( rc = fdt_insert_nop ( fdt, desc.offset, insert ) ) != 0 )
@@ -1166,10 +1169,15 @@ static int fdt_urealloc ( struct fdt *fdt, size_t len ) {
  *
  * @v fdt		Device tree
  * @v cmdline		Command line, or NULL
+ * @v initrd		Initial ramdisk address (or 0 for no initrd)
+ * @v initrd_len	Initial ramdisk length (or 0 for no initrd)
  * @ret rc		Return status code
  */
-static int fdt_bootargs ( struct fdt *fdt, const char *cmdline ) {
+static int fdt_bootargs ( struct fdt *fdt, const char *cmdline,
+			  physaddr_t initrd, size_t initrd_len ) {
 	unsigned int chosen;
+	physaddr_t addr;
+	const void *data;
 	size_t len;
 	int rc;
 
@@ -1177,14 +1185,25 @@ static int fdt_bootargs ( struct fdt *fdt, const char *cmdline ) {
 	if ( ( rc = fdt_ensure_child ( fdt, 0, "chosen", &chosen ) ) != 0 )
 		return rc;
 
-	/* Use empty command line if none specified */
-	if ( ! cmdline )
-		cmdline = "";
+	/* Set or clear "bootargs" property */
+	len = ( cmdline ? ( strlen ( cmdline ) + 1 /* NUL */ ) : 0 );
+	if ( ( rc = fdt_set ( fdt, chosen, "bootargs", cmdline, len ) ) != 0 )
+		return rc;
 
-	/* Ensure "bootargs" property exists */
-	len = ( strlen ( cmdline ) + 1 /* NUL */ );
-	if ( ( rc = fdt_ensure_property ( fdt, chosen, "bootargs", cmdline,
-					  len ) ) != 0 )
+	/* Set or clear initrd properties */
+	data = ( initrd_len ? &addr : NULL );
+	len = ( initrd_len ? sizeof ( addr ) : 0 );
+	addr = initrd;
+	addr = ( ( sizeof ( addr ) == sizeof ( uint64_t ) ) ?
+		 cpu_to_be64 ( addr ) : cpu_to_be32 ( addr ) );
+	if ( ( rc = fdt_set ( fdt, chosen, "linux,initrd-start", data,
+			      len ) ) != 0 )
+		return rc;
+	addr = ( initrd + initrd_len );
+	addr = ( ( sizeof ( addr ) == sizeof ( uint64_t ) ) ?
+		 cpu_to_be64 ( addr ) : cpu_to_be32 ( addr ) );
+	if ( ( rc = fdt_set ( fdt, chosen, "linux,initrd-end", data,
+			      len ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -1195,9 +1214,12 @@ static int fdt_bootargs ( struct fdt *fdt, const char *cmdline ) {
  *
  * @v hdr		Device tree header to fill in (may be set to NULL)
  * @v cmdline		Command line, or NULL
+ * @v initrd		Initial ramdisk address (or 0 for no initrd)
+ * @v initrd_len	Initial ramdisk length (or 0 for no initrd)
  * @ret rc		Return status code
  */
-int fdt_create ( struct fdt_header **hdr, const char *cmdline ) {
+int fdt_create ( struct fdt_header **hdr, const char *cmdline,
+		 physaddr_t initrd, size_t initrd_len ) {
 	struct image *image;
 	struct fdt fdt;
 	void *copy;
@@ -1228,7 +1250,7 @@ int fdt_create ( struct fdt_header **hdr, const char *cmdline ) {
 	fdt.realloc = fdt_urealloc;
 
 	/* Populate boot arguments */
-	if ( ( rc = fdt_bootargs ( &fdt, cmdline ) ) != 0 )
+	if ( ( rc = fdt_bootargs ( &fdt, cmdline, initrd, initrd_len ) ) != 0 )
 		goto err_bootargs;
 
  no_fdt:
