@@ -1,5 +1,5 @@
-#ifndef _INITRD_H
-#define _INITRD_H
+#ifndef _IPXE_INITRD_H
+#define _IPXE_INITRD_H
 
 /** @file
  *
@@ -20,4 +20,4 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 extern void initrd_reshuffle ( physaddr_t bottom );
 extern int initrd_reshuffle_check ( size_t len, physaddr_t bottom );
 
-#endif /* _INITRD_H */
+#endif /* _IPXE_INITRD_H */
