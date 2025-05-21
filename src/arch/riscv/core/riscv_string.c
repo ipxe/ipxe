@@ -195,42 +195,13 @@ void riscv_memset ( void *dest, size_t len, int character ) {
 }
 
 /**
- * Copy (possibly overlapping) memory region forwards
+ * Copy (possibly overlapping) memory region
  *
  * @v dest		Destination region
  * @v src		Source region
  * @v len		Length
  */
-void riscv_memmove_forwards ( void *dest, const void *src, size_t len ) {
-	unsigned long discard_data;
-
-	/* Do nothing if length is zero */
-	if ( ! len )
-		return;
-
-	/* Assume memmove() is not performance-critical, and perform a
-	 * bytewise copy for simplicity.
-	 */
-	__asm__ __volatile__ ( "\n1:\n\t"
-			       "lb %2, (%1)\n\t"
-			       "sb %2, (%0)\n\t"
-			       "addi %1, %1, 1\n\t"
-			       "addi %0, %0, 1\n\t"
-			       "bne %0, %3, 1b\n\t"
-			       : "+r" ( dest ), "+r" ( src ),
-				 "=&r" ( discard_data )
-			       : "r" ( dest + len )
-			       : "memory" );
-}
-
-/**
- * Copy (possibly overlapping) memory region backwards
- *
- * @v dest		Destination region
- * @v src		Source region
- * @v len		Length
- */
-void riscv_memmove_backwards ( void *dest, const void *src, size_t len ) {
+void riscv_memmove ( void *dest, const void *src, size_t len ) {
 	void *orig_dest = dest;
 	unsigned long discard_data;
 
@@ -238,8 +209,14 @@ void riscv_memmove_backwards ( void *dest, const void *src, size_t len ) {
 	if ( ! len )
 		return;
 
+	/* Use memcpy() if copy direction is forwards */
+	if ( dest <= src ) {
+		memcpy ( dest, src, len );
+		return;
+	}
+
 	/* Assume memmove() is not performance-critical, and perform a
-	 * bytewise copy for simplicity.
+	 * bytewise copy backwards for simplicity.
 	 */
 	dest += len;
 	src += len;
@@ -253,20 +230,4 @@ void riscv_memmove_backwards ( void *dest, const void *src, size_t len ) {
 				 "=&r" ( discard_data )
 			       : "r" ( orig_dest )
 			       : "memory" );
-}
-
-/**
- * Copy (possibly overlapping) memory region
- *
- * @v dest		Destination region
- * @v src		Source region
- * @v len		Length
- */
-void riscv_memmove ( void *dest, const void *src, size_t len ) {
-
-	if ( dest <= src ) {
-		riscv_memmove_forwards ( dest, src, len );
-	} else {
-		riscv_memmove_backwards ( dest, src, len );
-	}
 }
