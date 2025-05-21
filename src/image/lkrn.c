@@ -153,8 +153,10 @@ static int lkrn_fdt ( struct image *image, struct lkrn_context *ctx ) {
 	int rc;
 
 	/* Build device tree (which may change system memory map) */
-	if ( ( rc = fdt_create ( &fdt, image->cmdline, 0, 0 ) ) != 0 )
+	if ( ( rc = fdt_create ( &fdt, image->cmdline, ctx->initrd,
+				 ctx->initrd_len ) ) != 0 ) {
 		goto err_create;
+	}
 	len = be32_to_cpu ( fdt->totalsize );
 
 	/* Place device tree after kernel, rounded up to a page boundary */
@@ -197,6 +199,7 @@ static int lkrn_fdt ( struct image *image, struct lkrn_context *ctx ) {
  */
 static int lkrn_exec ( struct image *image ) {
 	struct lkrn_context ctx;
+	struct image *initrd;
 	int rc;
 
 	/* Parse header */
@@ -206,6 +209,15 @@ static int lkrn_exec ( struct image *image ) {
 	/* Locate start of RAM */
 	if ( ( rc = lkrn_ram ( image, &ctx ) ) != 0 )
 		return rc;
+
+	/* Locate initrd image, if any */
+	if ( ( initrd = first_image() ) != NULL ) {
+		ctx.initrd = virt_to_phys ( initrd->data );
+		ctx.initrd_len = initrd->len;
+		DBGC ( image, "LKRN %s initrd %s at [%#08lx,%#08lx)\n",
+		       image->name, initrd->name, ctx.initrd,
+		       ( ctx.initrd + ctx.initrd_len ) );
+	}
 
 	/* Create device tree (which may change system memory map) */
 	if ( ( rc = lkrn_fdt ( image, &ctx ) ) != 0 )
