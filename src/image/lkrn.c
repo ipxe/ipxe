@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/segment.h>
 #include <ipxe/io.h>
 #include <ipxe/fdt.h>
+#include <ipxe/init.h>
 #include <ipxe/lkrn.h>
 
 /** @file
@@ -226,6 +227,9 @@ static int lkrn_exec ( struct image *image ) {
 	/* Load kernel image (after all allocations are finished) */
 	if ( ( rc = lkrn_load ( image, &ctx ) ) != 0 )
 		return rc;
+
+	/* Shut down ready for boot */
+	shutdown_boot();
 
 	/* Jump to kernel entry point */
 	DBGC ( image, "LKRN %s jumping to kernel at %#08lx\n",
