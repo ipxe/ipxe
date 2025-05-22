@@ -38,27 +38,29 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Maximum address available for initrd */
-static physaddr_t initrd_top;
+/** End of reshuffle region */
+static physaddr_t initrd_end;
 
 /**
  * Squash initrds as high as possible in memory
  *
- * @v top		Highest possible physical address
+ * @v start		Start of reshuffle region
+ * @v end		End of reshuffle region
  */
-static void initrd_squash_high ( physaddr_t top ) {
-	physaddr_t current = top;
+static void initrd_squash_high ( physaddr_t start, physaddr_t end ) {
+	physaddr_t current = end;
 	struct image *initrd;
 	struct image *highest;
 	void *data;
 
-	/* Squash up any initrds already within or below the region */
+	/* Squash up any initrds already within the region */
 	while ( 1 ) {
 
 		/* Find the highest image not yet in its final position */
 		highest = NULL;
 		for_each_image ( initrd ) {
-			if ( ( virt_to_phys ( initrd->data ) < current ) &&
+			if ( ( virt_to_phys ( initrd->data ) >= start ) &&
+			     ( virt_to_phys ( initrd->data ) < current ) &&
 			     ( ( highest == NULL ) ||
 			       ( virt_to_phys ( initrd->data ) >
 				 virt_to_phys ( highest->data ) ) ) ) {
@@ -71,7 +73,7 @@ static void initrd_squash_high ( physaddr_t top ) {
 		/* Calculate final position */
 		current -= initrd_align ( highest->len );
 		if ( current <= virt_to_phys ( highest->data ) ) {
-			/* Already at (or crossing) top of region */
+			/* Already at (or crossing) end of region */
 			current = virt_to_phys ( highest->data );
 			continue;
 		}
@@ -85,21 +87,6 @@ static void initrd_squash_high ( physaddr_t top ) {
 		data = phys_to_virt ( current );
 		memmove ( data, highest->data, highest->len );
 		highest->data = data;
-	}
-
-	/* Copy any remaining initrds (e.g. embedded images) to the region */
-	for_each_image ( initrd ) {
-		if ( virt_to_phys ( initrd->data ) >= top ) {
-			current -= initrd_align ( initrd->len );
-			DBGC ( &images, "INITRD copying %s [%#08lx,%#08lx)->"
-			       "[%#08lx,%#08lx)\n", initrd->name,
-			       virt_to_phys ( initrd->data ),
-			       ( virt_to_phys ( initrd->data ) + initrd->len ),
-			       current, ( current + initrd->len ) );
-			data = phys_to_virt ( current );
-			memcpy ( data, initrd->data, initrd->len );
-			initrd->data = data;
-		}
 	}
 }
 
@@ -161,21 +148,34 @@ static void initrd_swap ( struct image *low, struct image *high ) {
 /**
  * Swap position of any two adjacent initrds not currently in the correct order
  *
+ * @v start		Start of reshuffle region
+ * @v end		End of reshuffle region
  * @ret swapped		A pair of initrds was swapped
  */
-static int initrd_swap_any ( void ) {
+static int initrd_swap_any ( physaddr_t start, physaddr_t end ) {
 	struct image *low;
 	struct image *high;
 	const void *adjacent;
+	physaddr_t addr;
 
 	/* Find any pair of initrds that can be swapped */
 	for_each_image ( low ) {
+
+		/* Ignore images wholly outside the reshuffle region */
+		addr = virt_to_phys ( low->data );
+		if ( ( addr < start ) || ( addr >= end ) )
+			continue;
 
 		/* Calculate location of adjacent image (if any) */
 		adjacent = ( low->data + initrd_align ( low->len ) );
 
 		/* Search for adjacent image */
 		for_each_image ( high ) {
+
+			/* Ignore images wholly outside the reshuffle region */
+			addr = virt_to_phys ( high->data );
+			if ( ( addr < start ) || ( addr >= end ) )
+				continue;
 
 			/* Stop search if all remaining potential
 			 * adjacent images are already in the correct
@@ -227,19 +227,21 @@ static void initrd_dump ( void ) {
  * permitted.
  */
 void initrd_reshuffle ( void ) {
-	physaddr_t top;
+	physaddr_t start;
+	physaddr_t end;
 
-	/* Calculate limits of available space for initrds */
-	top = ( initrd_top ? initrd_top : uheap_end );
+	/* Calculate limits of reshuffle region */
+	start = uheap_limit;
+	end = ( initrd_end ? initrd_end : uheap_end );
 
 	/* Debug */
 	initrd_dump();
 
 	/* Squash initrds as high as possible in memory */
-	initrd_squash_high ( top );
+	initrd_squash_high ( start, end );
 
 	/* Bubble-sort initrds into desired order */
-	while ( initrd_swap_any() ) {}
+	while ( initrd_swap_any ( start, end ) ) {}
 
 	/* Debug */
 	initrd_dump();
@@ -355,7 +357,7 @@ int initrd_region ( size_t len, struct memmap_region *region ) {
 
 	/* Calculate limits of available space for initrds */
 	min = uheap_limit;
-	available = ( ( initrd_top ? initrd_top : uheap_end ) - min );
+	available = ( ( initrd_end ? initrd_end : uheap_end ) - min );
 	if ( available < len )
 		return -ENOSPC;
 	DBGC ( &images, "INITRD post-reshuffle region is [%#08lx,%#08lx)\n",
@@ -383,10 +385,10 @@ static void initrd_startup ( void ) {
 	 * of rearranging if a SAN device is hooked), then we must not
 	 * overwrite these allocations during reshuffling.
 	 */
-	initrd_top = uheap_start;
-	if ( initrd_top ) {
+	initrd_end = uheap_start;
+	if ( initrd_end ) {
 		DBGC ( &images, "INITRD limiting reshuffling to below "
-		       "%#08lx\n", initrd_top );
+		       "%#08lx\n", initrd_end );
 	}
 }
 
