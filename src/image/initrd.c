@@ -51,7 +51,6 @@ static void initrd_squash_high ( physaddr_t top ) {
 	struct image *initrd;
 	struct image *highest;
 	void *data;
-	size_t len;
 
 	/* Squash up any initrds already within or below the region */
 	while ( 1 ) {
@@ -70,9 +69,7 @@ static void initrd_squash_high ( physaddr_t top ) {
 			break;
 
 		/* Move this image to its final position */
-		len = ( ( highest->len + INITRD_ALIGN - 1 ) &
-			~( INITRD_ALIGN - 1 ) );
-		current -= len;
+		current -= initrd_align ( highest->len );
 		DBGC ( &images, "INITRD squashing %s [%#08lx,%#08lx)->"
 		       "[%#08lx,%#08lx)\n", highest->name,
 		       virt_to_phys ( highest->data ),
@@ -86,9 +83,7 @@ static void initrd_squash_high ( physaddr_t top ) {
 	/* Copy any remaining initrds (e.g. embedded images) to the region */
 	for_each_image ( initrd ) {
 		if ( virt_to_phys ( initrd->data ) >= top ) {
-			len = ( ( initrd->len + INITRD_ALIGN - 1 ) &
-				~( INITRD_ALIGN - 1 ) );
-			current -= len;
+			current -= initrd_align ( initrd->len );
 			DBGC ( &images, "INITRD copying %s [%#08lx,%#08lx)->"
 			       "[%#08lx,%#08lx)\n", initrd->name,
 			       virt_to_phys ( initrd->data ),
@@ -139,8 +134,8 @@ static void initrd_swap ( struct image *low, struct image *high ) {
 	       ( virt_to_phys ( high->data ) + high->len ), high->name );
 
 	/* Calculate padded lengths */
-	low_len = ( ( low->len + INITRD_ALIGN - 1 ) & ~( INITRD_ALIGN - 1 ) );
-	high_len = ( ( high->len + INITRD_ALIGN - 1 ) & ~( INITRD_ALIGN - 1 ));
+	low_len = initrd_align ( low->len );
+	high_len = initrd_align ( high->len );
 	len = ( low_len + high_len );
 	data = low->rwdata;
 	assert ( high->data == ( data + low_len ) );
@@ -165,15 +160,12 @@ static int initrd_swap_any ( void ) {
 	struct image *low;
 	struct image *high;
 	const void *adjacent;
-	size_t padded_len;
 
 	/* Find any pair of initrds that can be swapped */
 	for_each_image ( low ) {
 
 		/* Calculate location of adjacent image (if any) */
-		padded_len = ( ( low->len + INITRD_ALIGN - 1 ) &
-			       ~( INITRD_ALIGN - 1 ) );
-		adjacent = ( low->data + padded_len );
+		adjacent = ( low->data + initrd_align ( low->len ) );
 
 		/* Search for adjacent image */
 		for_each_image ( high ) {

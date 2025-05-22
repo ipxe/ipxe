@@ -39,6 +39,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <wchar.h>
 #include <ipxe/image.h>
 #include <ipxe/cpio.h>
+#include <ipxe/initrd.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleFileSystem.h>
 #include <ipxe/efi/Protocol/BlockIo.h>

@@ -60,9 +60,6 @@ struct cpio_header {
 /** CPIO header length alignment */
 #define CPIO_ALIGN 4
 
-/** Alignment for CPIO archives within an initrd */
-#define INITRD_ALIGN 4096
-
 /**
  * Get CPIO image name
  *

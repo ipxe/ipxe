@@ -317,17 +317,6 @@ static void bzimage_set_cmdline ( struct image *image,
 }
 
 /**
- * Align initrd length
- *
- * @v len		Length
- * @ret len		Length rounded up to INITRD_ALIGN
- */
-static inline size_t bzimage_align ( size_t len ) {
-
-	return ( ( len + INITRD_ALIGN - 1 ) & ~( INITRD_ALIGN - 1 ) );
-}
-
-/**
  * Load initrd
  *
  * @v image		bzImage image
@@ -407,7 +396,7 @@ static int bzimage_check_initrds ( struct image *image,
 
 		/* Calculate length */
 		len += bzimage_load_initrd ( image, initrd, NULL );
-		len = bzimage_align ( len );
+		len = initrd_align ( len );
 
 		DBGC ( image, "bzImage %s initrd %s from [%#08lx,%#08lx)%s%s\n",
 		       image->name, initrd->name, virt_to_phys ( initrd->data ),
@@ -467,7 +456,7 @@ static void bzimage_load_initrds ( struct image *image,
 	for_each_image ( initrd ) {
 		if ( virt_to_phys ( initrd->data ) >= top ) {
 			top = ( virt_to_phys ( initrd->data ) +
-				bzimage_align ( initrd->len ) );
+				initrd_align ( initrd->len ) );
 		}
 	}
 
@@ -491,7 +480,7 @@ static void bzimage_load_initrds ( struct image *image,
 			if ( other == initrd )
 				offset = 0;
 			offset += bzimage_load_initrd ( image, other, NULL );
-			offset = bzimage_align ( offset );
+			offset = initrd_align ( offset );
 		}
 
 		/* Load initrd at this address */
