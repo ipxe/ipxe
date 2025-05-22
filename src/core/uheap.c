@@ -100,8 +100,8 @@ static void uheap_find ( void ) {
 	DBGC ( &uheap, "UHEAP largest region is [%#08lx,%#08lx)\n",
 	       start, end );
 
-	/* Align start and end addresses */
-	after = ( end & ( UHEAP_ALIGN - 1 ) );
+	/* Align start and end addresses, and prevent overflow to zero */
+	after = ( end ? ( end & ( UHEAP_ALIGN - 1 ) ) : UHEAP_ALIGN );
 	before = ( ( -start ) & ( UHEAP_ALIGN - 1 ) );
 	strip = ( before + after );
 	if ( strip > size )
