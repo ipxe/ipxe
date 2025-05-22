@@ -50,13 +50,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 static struct heap uheap;
 
+/** Minimum possible start of external heap */
+physaddr_t uheap_limit;
+
+/** Start of external heap */
+physaddr_t uheap_start;
+
+/** End of external heap */
+physaddr_t uheap_end;
+
 /** In-use memory region */
 struct used_region uheap_used __used_region = {
 	.name = "uheap",
 };
-
-/** External heap maximum size */
-static size_t uheap_max;
 
 /**
  * Adjust size of external heap in-use memory region
@@ -64,17 +70,18 @@ static size_t uheap_max;
  * @v delta		Size change
  */
 static void uheap_resize ( ssize_t delta ) {
-	physaddr_t top;
 
 	/* Update in-use memory region */
-	assert ( ( uheap_used.start & ( UHEAP_ALIGN - 1 ) ) == 0 );
-	assert ( ( uheap_used.size & ( UHEAP_ALIGN - 1 ) ) == 0 );
 	assert ( ( delta & ( UHEAP_ALIGN - 1 ) ) == 0 );
-	memmap_use ( &uheap_used, ( uheap_used.start - delta ),
-		     ( uheap_used.size + delta ) );
-	top = ( uheap_used.start + uheap_used.size );
-	DBGC ( &uheap, "UHEAP now at [%#08lx,%#08lx)\n",
-	       uheap_used.start, top );
+	uheap_start -= delta;
+	assert ( uheap_limit <= uheap_start );
+	assert ( uheap_start <= uheap_end );
+	assert ( ( uheap_limit & ( UHEAP_ALIGN - 1 ) ) == 0 );
+	assert ( ( uheap_start & ( UHEAP_ALIGN - 1 ) ) == 0 );
+	assert ( ( uheap_end & ( UHEAP_ALIGN - 1 ) ) == 0 );
+	memmap_use ( &uheap_used, uheap_start, ( uheap_end - uheap_start ) );
+	DBGC ( &uheap, "UHEAP now at (%#08lx)...[%#08lx,%#08lx)\n",
+	       uheap_limit, uheap_start, uheap_end );
 	memmap_dump_all ( 1 );
 }
 
@@ -91,8 +98,9 @@ static void uheap_find ( void ) {
 	size_t size;
 
 	/* Sanity checks */
+	assert ( uheap_start == uheap_end );
+	assert ( uheap_limit == uheap_end );
 	assert ( uheap_used.size == 0 );
-	assert ( uheap_max == 0 );
 
 	/* Find the largest region within the system memory map */
 	size = memmap_largest ( &start );
@@ -112,12 +120,10 @@ static void uheap_find ( void ) {
 	assert ( ( end - start ) == size );
 
 	/* Record region */
-	assert ( ( start & ( UHEAP_ALIGN - 1 ) ) == 0 );
-	assert ( ( size & ( UHEAP_ALIGN - 1 ) ) == 0 );
-	assert ( ( end & ( UHEAP_ALIGN - 1 ) ) == 0 );
-	uheap_max = size;
-	uheap_used.start = end;
-	DBGC ( &uheap, "UHEAP grows downwards from %#08lx\n", end );
+	uheap_limit = start;
+	uheap_start = end;
+	uheap_end = end;
+	uheap_resize ( 0 );
 }
 
 /**
@@ -130,15 +136,15 @@ static unsigned int uheap_grow ( size_t size ) {
 	void *new;
 
 	/* Initialise heap, if it does not yet exist */
-	if ( ! uheap_max )
+	if ( uheap_limit == uheap_end )
 		uheap_find();
 
 	/* Fail if insufficient space remains */
-	if ( size > ( uheap_max - uheap_used.size ) )
+	if ( size > ( uheap_start - uheap_limit ) )
 		return 0;
 
 	/* Grow heap */
-	new = ( phys_to_virt ( uheap_used.start ) - size );
+	new = ( phys_to_virt ( uheap_start ) - size );
 	heap_populate ( &uheap, new, size );
 	uheap_resize ( size );
 
@@ -155,7 +161,7 @@ static unsigned int uheap_grow ( size_t size ) {
 static unsigned int uheap_shrink ( void *ptr, size_t size ) {
 
 	/* Do nothing unless this is the lowest block in the heap */
-	if ( virt_to_phys ( ptr ) != uheap_used.start )
+	if ( virt_to_phys ( ptr ) != uheap_start )
 		return 0;
 
 	/* Shrink heap */

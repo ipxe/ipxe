@@ -28,8 +28,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/image.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/init.h>
-#include <ipxe/memmap.h>
 #include <ipxe/cpio.h>
+#include <ipxe/uheap.h>
 #include <ipxe/initrd.h>
 
 /** @file
@@ -40,9 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Maximum address available for initrd */
 static physaddr_t initrd_top;
-
-/** Minimum address available for initrd */
-static physaddr_t initrd_bottom;
 
 /**
  * Squash initrds as high as possible in memory
@@ -236,9 +233,8 @@ void initrd_reshuffle ( physaddr_t bottom ) {
 	size_t free_len;
 
 	/* Calculate limits of available space for initrds */
-	top = initrd_top;
-	if ( initrd_bottom > bottom )
-		bottom = initrd_bottom;
+	top = ( initrd_top ? initrd_top : uheap_end );
+	assert ( bottom >= uheap_limit );
 
 	/* Debug */
 	DBGC ( &images, "INITRD region [%#08lx,%#08lx)\n", bottom, top );
@@ -270,9 +266,8 @@ int initrd_reshuffle_check ( size_t len, physaddr_t bottom ) {
 	size_t available;
 
 	/* Calculate limits of available space for initrds */
-	top = initrd_top;
-	if ( initrd_bottom > bottom )
-		bottom = initrd_bottom;
+	top = ( initrd_top ? initrd_top : uheap_end );
+	assert ( bottom >= uheap_limit );
 	available = ( top - bottom );
 
 	/* Allow for a sensible minimum amount of free space */
@@ -287,19 +282,19 @@ int initrd_reshuffle_check ( size_t len, physaddr_t bottom ) {
  *
  */
 static void initrd_startup ( void ) {
-	size_t len;
 
-	/* Record largest memory block available.  Do this after any
-	 * allocations made during driver startup (e.g. large host
-	 * memory blocks for Infiniband devices, which may still be in
-	 * use at the time of rearranging if a SAN device is hooked)
-	 * but before any allocations for downloaded images (which we
-	 * can safely reuse when rearranging).
+	/* Record address above which reshuffling cannot take place.
+	 * If any external heap allocations have been made during
+	 * driver startup (e.g. large host memory blocks for
+	 * Infiniband devices, which may still be in use at the time
+	 * of rearranging if a SAN device is hooked), then we must not
+	 * overwrite these allocations during reshuffling.
 	 */
-	len = memmap_largest ( &initrd_bottom );
-	initrd_top = ( initrd_bottom + len );
-	DBGC ( &images, "INITRD largest memory block is [%#08lx,%#08lx)\n",
-	       initrd_bottom, initrd_top );
+	initrd_top = uheap_start;
+	if ( initrd_top ) {
+		DBGC ( &images, "INITRD limiting reshuffling to below "
+		       "%#08lx\n", initrd_top );
+	}
 }
 
 /** initrd startup function */

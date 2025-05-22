@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <fakee820.h>
 #include <ipxe/init.h>
 #include <ipxe/io.h>
+#include <ipxe/uheap.h>
 #include <ipxe/memmap.h>
 
 /** Set to true if you want to test a fake E820 map */
@@ -132,18 +133,18 @@ void hide_textdata ( void ) {
  */
 static void int15_sync ( void ) {
 	physaddr_t start;
-	size_t size;
+	physaddr_t end;
 
 	/* Besides our fixed base memory and textdata regions, we
 	 * support hiding only a single in-use memory region (the
 	 * umalloc region), which must be placed before the hidden
 	 * textdata region (even if zero-length).
 	 */
-	start = uheap_used.start;
-	size = uheap_used.size;
-	if ( ! size )
-		start = virt_to_phys ( _textdata );
-	hide_region ( &hidemem_umalloc, start, ( start + size ) );
+	start = uheap_start;
+	end = uheap_end;
+	if ( start == end )
+		start = end = virt_to_phys ( _textdata );
+	hide_region ( &hidemem_umalloc, start, end );
 }
 
 /**
