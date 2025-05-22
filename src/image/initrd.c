@@ -45,9 +45,8 @@ static physaddr_t initrd_top;
  * Squash initrds as high as possible in memory
  *
  * @v top		Highest possible physical address
- * @ret used		Lowest physical address used by initrds
  */
-static physaddr_t initrd_squash_high ( physaddr_t top ) {
+static void initrd_squash_high ( physaddr_t top ) {
 	physaddr_t current = top;
 	struct image *initrd;
 	struct image *highest;
@@ -100,8 +99,25 @@ static physaddr_t initrd_squash_high ( physaddr_t top ) {
 			initrd->data = data;
 		}
 	}
+}
 
-	return current;
+/**
+ * Reverse aligned memory region
+ *
+ * @v data		Memory region
+ * @v len		Length of region
+ */
+static void initrd_reverse ( void *data, size_t len ) {
+	unsigned long *low = data;
+	unsigned long *high = ( data + len );
+	unsigned long tmp;
+
+	/* Reverse region */
+	for ( high-- ; low < high ; low++, high-- ) {
+		tmp = *low;
+		*low = *high;
+		*high = tmp;
+	}
 }
 
 /**
@@ -109,14 +125,12 @@ static physaddr_t initrd_squash_high ( physaddr_t top ) {
  *
  * @v low		Lower initrd
  * @v high		Higher initrd
- * @v free		Free space
- * @v free_len		Length of free space
  */
-static void initrd_swap ( struct image *low, struct image *high,
-			  void *free, size_t free_len ) {
-	size_t len = 0;
-	size_t frag_len;
-	size_t new_len;
+static void initrd_swap ( struct image *low, struct image *high ) {
+	size_t low_len;
+	size_t high_len;
+	size_t len;
+	void *data;
 
 	DBGC ( &images, "INITRD swapping %s [%#08lx,%#08lx)<->[%#08lx,%#08lx) "
 	       "%s\n", low->name, virt_to_phys ( low->data ),
@@ -124,41 +138,30 @@ static void initrd_swap ( struct image *low, struct image *high,
 	       virt_to_phys ( high->data ),
 	       ( virt_to_phys ( high->data ) + high->len ), high->name );
 
-	/* Round down length of free space */
-	free_len &= ~( INITRD_ALIGN - 1 );
-	assert ( free_len > 0 );
-
-	/* Swap image data */
-	while ( len < high->len ) {
-
-		/* Calculate maximum fragment length */
-		frag_len = ( high->len - len );
-		if ( frag_len > free_len )
-			frag_len = free_len;
-		new_len = ( ( len + frag_len + INITRD_ALIGN - 1 ) &
-			    ~( INITRD_ALIGN - 1 ) );
-
-		/* Swap fragments */
-		memcpy ( free, ( high->data + len ), frag_len );
-		memmove ( ( low->rwdata + new_len ), ( low->data + len ),
-			  low->len );
-		memcpy ( ( low->rwdata + len ), free, frag_len );
-		len = new_len;
-	}
+	/* Calculate padded lengths */
+	low_len = ( ( low->len + INITRD_ALIGN - 1 ) & ~( INITRD_ALIGN - 1 ) );
+	high_len = ( ( high->len + INITRD_ALIGN - 1 ) & ~( INITRD_ALIGN - 1 ));
+	len = ( low_len + high_len );
+	data = low->rwdata;
+	assert ( high->data == ( data + low_len ) );
 
 	/* Adjust data pointers */
-	high->data = low->data;
-	low->data += len;
+	high->data -= low_len;
+	low->data += high_len;
+	assert ( high->data == data );
+
+	/* Swap content via triple reversal */
+	initrd_reverse ( data, len );
+	initrd_reverse ( low->rwdata, low_len );
+	initrd_reverse ( high->rwdata, high_len );
 }
 
 /**
  * Swap position of any two adjacent initrds not currently in the correct order
  *
- * @v free		Free space
- * @v free_len		Length of free space
  * @ret swapped		A pair of initrds was swapped
  */
-static int initrd_swap_any ( void *free, size_t free_len ) {
+static int initrd_swap_any ( void ) {
 	struct image *low;
 	struct image *high;
 	const void *adjacent;
@@ -184,7 +187,7 @@ static int initrd_swap_any ( void *free, size_t free_len ) {
 
 			/* If we have found the adjacent image, swap and exit */
 			if ( high->data == adjacent ) {
-				initrd_swap ( low, high, free, free_len );
+				initrd_swap ( low, high );
 				return 1;
 			}
 		}
@@ -228,9 +231,6 @@ static void initrd_dump ( void ) {
  */
 void initrd_reshuffle ( physaddr_t bottom ) {
 	physaddr_t top;
-	physaddr_t used;
-	void *free;
-	size_t free_len;
 
 	/* Calculate limits of available space for initrds */
 	top = ( initrd_top ? initrd_top : uheap_end );
@@ -241,14 +241,10 @@ void initrd_reshuffle ( physaddr_t bottom ) {
 	initrd_dump();
 
 	/* Squash initrds as high as possible in memory */
-	used = initrd_squash_high ( top );
-
-	/* Calculate available free space */
-	free = phys_to_virt ( bottom );
-	free_len = ( used - bottom );
+	initrd_squash_high ( top );
 
 	/* Bubble-sort initrds into desired order */
-	while ( initrd_swap_any ( free, free_len ) ) {}
+	while ( initrd_swap_any() ) {}
 
 	/* Debug */
 	initrd_dump();
@@ -269,9 +265,6 @@ int initrd_reshuffle_check ( size_t len, physaddr_t bottom ) {
 	top = ( initrd_top ? initrd_top : uheap_end );
 	assert ( bottom >= uheap_limit );
 	available = ( top - bottom );
-
-	/* Allow for a sensible minimum amount of free space */
-	len += INITRD_MIN_FREE_LEN;
 
 	/* Check for available space */
 	return ( ( len < available ) ? 0 : -ENOBUFS );
