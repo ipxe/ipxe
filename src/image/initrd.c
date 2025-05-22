@@ -68,8 +68,15 @@ static void initrd_squash_high ( physaddr_t top ) {
 		if ( ! highest )
 			break;
 
-		/* Move this image to its final position */
+		/* Calculate final position */
 		current -= initrd_align ( highest->len );
+		if ( current <= virt_to_phys ( highest->data ) ) {
+			/* Already at (or crossing) top of region */
+			current = virt_to_phys ( highest->data );
+			continue;
+		}
+
+		/* Move this image to its final position */
 		DBGC ( &images, "INITRD squashing %s [%#08lx,%#08lx)->"
 		       "[%#08lx,%#08lx)\n", highest->name,
 		       virt_to_phys ( highest->data ),
