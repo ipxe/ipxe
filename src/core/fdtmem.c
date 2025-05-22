@@ -300,7 +300,8 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 		assert ( region.last >= region.addr );
 
 		/* Use highest possible region */
-		if ( memmap_is_usable ( &region ) && ( next >= len ) ) {
+		if ( memmap_is_usable ( &region ) &&
+		     ( ( next == 0 ) || ( next >= len ) ) ) {
 
 			/* Determine candidate address after alignment */
 			try = ( ( next - len ) & ~( max_align - 1 ) );
