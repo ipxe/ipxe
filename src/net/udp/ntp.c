@@ -92,6 +92,10 @@ static int ntp_request ( struct ntp_client *ntp ) {
 	hdr.transmit.seconds = htonl ( time ( NULL ) + NTP_EPOCH );
 	hdr.transmit.fraction = htonl ( NTP_FRACTION_MAGIC );
 
+	DBGC ( ntp, "NTP %p local time (epoch) %lld seconds "
+			"(when adding NTP_EPOCH 0x%08x)\n",
+			ntp, time ( NULL ), hdr.transmit.seconds );
+
 	/* Send request */
 	if ( ( rc = xfer_deliver_raw ( &ntp->xfer, &hdr,
 				       sizeof ( hdr ) ) ) != 0 ) {
@@ -115,7 +119,7 @@ static int ntp_deliver ( struct ntp_client *ntp, struct io_buffer *iobuf,
 			 struct xfer_metadata *meta ) {
 	struct ntp_header *hdr;
 	struct sockaddr_tcpip *st_src;
-	int32_t delta;
+	int64_t delta;
 	int rc;
 
 	/* Check source port */
@@ -156,10 +160,18 @@ static int ntp_deliver ( struct ntp_client *ntp, struct io_buffer *iobuf,
 		goto close;
 	}
 
-	/* Calculate clock delta */
-	delta = ( ntohl ( hdr->receive.seconds ) -
-		  ntohl ( hdr->originate.seconds ) );
-	DBGC ( ntp, "NTP %p delta %d seconds\n", ntp, delta );
+	int64_t receive   = ntohl( hdr->receive.seconds  );
+	int64_t originate = ntohl( hdr->originate.seconds );
+
+	int64_t receive_epoch   = receive   - NTP_EPOCH;
+	int64_t originate_epoch = originate - NTP_EPOCH;
+
+	DBGC ( ntp, "NTP %p answered 'receive' %lld (0x%08llx) and 'originate' %lld (0x%08llx)\n",
+			ntp, receive_epoch, receive_epoch, originate_epoch, originate_epoch );
+
+	/* Calculate clock delta on 64-bits signed integer */
+	delta = receive - originate;
+	DBGC ( ntp, "NTP %p delta %lld seconds (0x%016llx)\n", ntp, delta, delta );
 
 	/* Adjust system clock */
 	time_adjust ( delta );
