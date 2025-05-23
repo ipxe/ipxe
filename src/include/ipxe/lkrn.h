@@ -52,12 +52,10 @@ struct lkrn_context {
 	physaddr_t ram;
 	/** Entry point */
 	physaddr_t entry;
-	/** Device tree */
-	physaddr_t fdt;
 	/** Initial ramdisk (if any) */
 	physaddr_t initrd;
-	/** Length of initial ramdisk (if any) */
-	size_t initrd_len;
+	/** Device tree */
+	physaddr_t fdt;
 };
 
 /** Compressed kernel image header */

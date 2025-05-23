@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/memmap.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/segment.h>
+#include <ipxe/initrd.h>
 #include <ipxe/io.h>
 #include <ipxe/fdt.h>
 #include <ipxe/init.h>
@@ -71,6 +72,11 @@ static int lkrn_parse ( struct image *image, struct lkrn_context *ctx ) {
 
 	/* Record load offset */
 	ctx->offset = le64_to_cpu ( hdr->text_offset );
+	if ( ctx->offset & ( ctx->offset - 1 ) ) {
+		DBGC ( image, "LKRN %s offset %#zx is not a power of two\n",
+		       image->name, ctx->offset );
+		return -ENOEXEC;
+	}
 
 	/* Record and check image size */
 	ctx->filesz = image->len;
@@ -110,126 +116,107 @@ static int lkrn_ram ( struct image *image, struct lkrn_context *ctx ) {
 }
 
 /**
- * Load kernel image
- *
- * @v image		Kernel image
- * @v ctx		Kernel image context
- * @ret rc		Return status code
- */
-static int lkrn_load ( struct image *image, struct lkrn_context *ctx ) {
-	void *dest;
-	int rc;
-
-	/* Record entry point */
-	ctx->entry = ( ctx->ram + ctx->offset );
-	dest = phys_to_virt ( ctx->entry );
-	DBGC ( image, "LKRN %s loading to [%#08lx,%#08lx,%#08lx)\n",
-	       image->name, ctx->entry, ( ctx->entry + ctx->filesz ),
-	       ( ctx->entry + ctx->memsz ) );
-
-	/* Prepare segment */
-	if ( ( rc = prep_segment ( dest, ctx->filesz, ctx->memsz ) ) != 0 ) {
-		DBGC ( image, "LKRN %s could not prepare kernel "
-		       "segment: %s\n", image->name, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Copy to segment */
-	memcpy ( dest, image->data, ctx->filesz );
-
-	return 0;
-}
-
-/**
- * Construct device tree
- *
- * @v image		Kernel image
- * @v ctx		Kernel image context
- * @ret rc		Return status code
- */
-static int lkrn_fdt ( struct image *image, struct lkrn_context *ctx ) {
-	struct fdt_header *fdt;
-	void *dest;
-	size_t len;
-	int rc;
-
-	/* Build device tree (which may change system memory map) */
-	if ( ( rc = fdt_create ( &fdt, image->cmdline, ctx->initrd,
-				 ctx->initrd_len ) ) != 0 ) {
-		goto err_create;
-	}
-	len = be32_to_cpu ( fdt->totalsize );
-
-	/* Place device tree after kernel, rounded up to a page boundary */
-	ctx->fdt = ( ( ctx->ram + ctx->offset + ctx->memsz + PAGE_SIZE - 1 ) &
-		     ~( PAGE_SIZE - 1 ) );
-	dest = phys_to_virt ( ctx->fdt );
-	DBGC ( image, "LKRN %s FDT at [%#08lx,%#08lx)\n",
-	       image->name, ctx->fdt, ( ctx->fdt + len ) );
-
-	/*
-	 * No further allocations are permitted after this point,
-	 * since we are about to start loading segments.
-	 *
-	 */
-
-	/* Prepare segment */
-	if ( ( rc = prep_segment ( dest, len, len ) ) != 0 ) {
-		DBGC ( image, "LKRN %s could not prepare FDT segment: %s\n",
-		       image->name, strerror ( rc ) );
-		goto err_segment;
-	}
-
-	/* Copy to segment */
-	memcpy ( dest, fdt, len );
-
-	/* Success */
-	rc = 0;
-
- err_segment:
-	fdt_remove ( fdt );
- err_create:
-	return rc;
-}
-
-/**
  * Execute kernel image
  *
  * @v image		Kernel image
  * @ret rc		Return status code
  */
 static int lkrn_exec ( struct image *image ) {
+	static struct image fdtimg = {
+		.refcnt = REF_INIT ( free_image ),
+		.name = "<FDT>",
+		.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),
+	};
 	struct lkrn_context ctx;
-	struct image *initrd;
+	struct memmap_region region;
+	struct fdt_header *fdt;
+	size_t initrdsz;
+	size_t totalsz;
+	void *dest;
 	int rc;
 
 	/* Parse header */
 	if ( ( rc = lkrn_parse ( image, &ctx ) ) != 0 )
-		return rc;
+		goto err_parse;
 
 	/* Locate start of RAM */
 	if ( ( rc = lkrn_ram ( image, &ctx ) ) != 0 )
-		return rc;
+		goto err_ram;
 
-	/* Locate initrd image, if any */
-	if ( ( initrd = first_image() ) != NULL ) {
-		ctx.initrd = virt_to_phys ( initrd->data );
-		ctx.initrd_len = initrd->len;
-		DBGC ( image, "LKRN %s initrd %s at [%#08lx,%#08lx)\n",
-		       image->name, initrd->name, ctx.initrd,
-		       ( ctx.initrd + ctx.initrd_len ) );
+	/* Place kernel at specified address from start of RAM */
+	ctx.entry = ( ctx.ram + ctx.offset );
+	DBGC ( image, "LKRN %s loading to [%#08lx,%#08lx,%#08lx)\n",
+	       image->name, ctx.entry, ( ctx.entry + ctx.filesz ),
+	       ( ctx.entry + ctx.memsz ) );
+
+	/* Place initrd after kernel, aligned to the kernel's image offset */
+	ctx.initrd = ( ctx.ram + initrd_align ( ctx.offset + ctx.memsz ) );
+	ctx.initrd = ( ( ctx.initrd + ctx.offset - 1 ) & ~( ctx.offset - 1 ) );
+	initrdsz = initrd_len();
+	if ( initrdsz ) {
+		DBGC ( image, "LKRN %s initrd at [%#08lx,%#08lx)\n",
+		       image->name, ctx.initrd, ( ctx.initrd + initrdsz ) );
 	}
 
-	/* Create device tree (which may change system memory map) */
-	if ( ( rc = lkrn_fdt ( image, &ctx ) ) != 0 )
-		return rc;
+	/* Place device tree after initrd */
+	ctx.fdt = ( ctx.initrd + initrd_align ( initrdsz ) );
 
-	/* Load kernel image (after all allocations are finished) */
-	if ( ( rc = lkrn_load ( image, &ctx ) ) != 0 )
-		return rc;
+	/* Construct device tree and post-initrd image */
+	if ( ( rc = fdt_create ( &fdt, image->cmdline, ctx.initrd,
+				 initrdsz ) ) != 0 ) {
+		goto err_fdt;
+	}
+	fdtimg.data = fdt;
+	fdtimg.len = be32_to_cpu ( fdt->totalsize );
+	list_add_tail ( &fdtimg.list, &images );
+	DBGC ( image, "LKRN %s FDT at [%08lx,%08lx)\n",
+	       image->name, ctx.fdt, ( ctx.fdt + fdtimg.len ) );
+
+	/* Find post-reshuffle region */
+	if ( ( rc = initrd_region ( initrdsz, &region ) ) != 0 ) {
+		DBGC ( image, "LKRN %s no available region: %s\n",
+		       image->name, strerror ( rc ) );
+		goto err_region;
+	}
+
+	/* Check that everything can be placed at its target addresses */
+	totalsz = ( ctx.fdt + fdtimg.len - ctx.ram );
+	if ( ( ctx.entry >= region.addr ) &&
+	     ( ( ctx.offset + totalsz ) <= memmap_size ( &region ) ) ) {
+		/* Target addresses are within the reshuffle region */
+		DBGC ( image, "LKRN %s fits within reshuffle region\n",
+		       image->name );
+	} else {
+		/* Target addresses are outside the reshuffle region */
+		if ( ( rc = prep_segment ( phys_to_virt ( ctx.entry ),
+					   totalsz, totalsz ) ) != 0 ) {
+			DBGC ( image, "LKRN %s could not prepare segment: "
+			       "%s\n", image->name, strerror ( rc ) );
+			goto err_segment;
+		}
+	}
+
+	/* This is the point of no return: we are about to reshuffle
+	 * and thereby destroy the external heap.  No errors are
+	 * allowed to occur after this point.
+	 */
 
 	/* Shut down ready for boot */
 	shutdown_boot();
+
+	/* Prepend kernel to reshuffle list, reshuffle, and remove kernel */
+	list_add ( &image->list, &images );
+	initrd_reshuffle();
+	list_del ( &image->list );
+
+	/* Load kernel to entry point and zero bss */
+	dest = phys_to_virt ( ctx.entry );
+	memmove ( dest, image->data, ctx.filesz );
+	memset ( ( dest + ctx.filesz ), 0, ( ctx.memsz - ctx.filesz ) );
+
+	/* Load initrds and device tree */
+	dest = phys_to_virt ( ctx.initrd );
+	initrd_load_all ( dest );
 
 	/* Jump to kernel entry point */
 	DBGC ( image, "LKRN %s jumping to kernel at %#08lx\n",
@@ -242,6 +229,15 @@ static int lkrn_exec ( struct image *image ) {
 	assert ( 0 );
 
 	return -ECANCELED; /* -EIMPOSSIBLE */
+
+ err_segment:
+ err_region:
+	list_del ( &fdtimg.list );
+	fdt_remove ( fdt );
+ err_fdt:
+ err_ram:
+ err_parse:
+	return rc;
 }
 
 /**
