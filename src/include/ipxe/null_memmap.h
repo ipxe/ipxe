@@ -20,16 +20,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Describe memory region from system memory map
  *
- * @v addr		Address within region
+ * @v min		Minimum address
  * @v hide		Hide in-use regions from the memory map
  * @v region		Region descriptor to fill in
  */
 static inline __attribute__ (( always_inline )) void
-MEMMAP_INLINE ( null, memmap_describe ) ( uint64_t addr, int hide __unused,
+MEMMAP_INLINE ( null, memmap_describe ) ( uint64_t min, int hide __unused,
 					  struct memmap_region *region ) {
 
 	/* Initialise region as empty */
-	memmap_init ( addr, region );
+	memmap_init ( min, region );
 }
 
 /**

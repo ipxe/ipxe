@@ -46,54 +46,54 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 void memmap_update ( struct memmap_region *region, uint64_t start,
 		     uint64_t size, unsigned int flags, const char *name ) {
-	uint64_t last;
+	uint64_t max;
 
 	/* Sanity check */
-	assert ( region->last >= region->addr );
+	assert ( region->max >= region->min );
 
 	/* Ignore empty regions */
 	if ( ! size )
 		return;
 
-	/* Calculate last addresses (and truncate if necessary) */
-	last = ( start + size - 1 );
-	if ( last < start ) {
-		last = ~( ( uint64_t ) 0 );
+	/* Calculate max addresses (and truncate if necessary) */
+	max = ( start + size - 1 );
+	if ( max < start ) {
+		max = ~( ( uint64_t ) 0 );
 		DBGC ( region, "MEMMAP [%#08llx,%#08llx] %s truncated "
 		       "(invalid size %#08llx)\n",
 		       ( ( unsigned long long ) start ),
-		       ( ( unsigned long long ) last ), name,
+		       ( ( unsigned long long ) max ), name,
 		       ( ( unsigned long long ) size ) );
 	}
 
 	/* Ignore regions entirely below the region of interest */
-	if ( last < region->addr )
+	if ( max < region->min )
 		return;
 
 	/* Ignore regions entirely above the region of interest */
-	if ( start > region->last )
+	if ( start > region->max )
 		return;
 
 	/* Update region of interest as applicable */
-	if ( start <= region->addr ) {
+	if ( start <= region->min ) {
 
 		/* Record this region as covering the region of interest */
 		region->flags |= flags;
 		if ( name )
 			region->name = name;
 
-		/* Update last address if no closer boundary exists */
-		if ( last < region->last )
-			region->last = last;
+		/* Update max address if no closer boundary exists */
+		if ( max < region->max )
+			region->max = max;
 
-	} else if ( start < region->last ) {
+	} else if ( start < region->max ) {
 
-		/* Update last address if no closer boundary exists */
-		region->last = ( start - 1 );
+		/* Update max address if no closer boundary exists */
+		region->max = ( start - 1 );
 	}
 
 	/* Sanity check */
-	assert ( region->last >= region->addr );
+	assert ( region->max >= region->min );
 }
 
 /**
@@ -134,7 +134,7 @@ size_t memmap_largest ( physaddr_t *start ) {
 		if ( size > largest ) {
 			DBGC ( &region, "...new largest region found\n" );
 			largest = size;
-			*start = region.addr;
+			*start = region.min;
 		}
 	}
 	return largest;

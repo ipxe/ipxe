@@ -364,8 +364,8 @@ int initrd_region ( size_t len, struct memmap_region *region ) {
 	       min, ( min + available ) );
 
 	/* Populate region descriptor */
-	region->addr = min;
-	region->last = ( min + available - 1 );
+	region->min = min;
+	region->max = ( min + available - 1 );
 	region->flags = MEMMAP_FL_MEMORY;
 	region->name = "initrd";
 

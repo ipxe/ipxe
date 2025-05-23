@@ -81,11 +81,11 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 		 * stage.
 		 */
 		memmap_dump ( &region );
-		if ( region.addr > max ) {
+		if ( region.min > max ) {
 			DBGC ( &region, "...starts after max=%#08lx\n", max );
 			break;
 		}
-		r_start = region.addr;
+		r_start = region.min;
 		if ( ! memmap_is_usable ( &region ) ) {
 			DBGC ( &region, "...not usable\n" );
 			continue;

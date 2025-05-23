@@ -105,7 +105,7 @@ static int lkrn_ram ( struct image *image, struct lkrn_context *ctx ) {
 		memmap_dump ( &region );
 		if ( ! ( region.flags & MEMMAP_FL_MEMORY ) )
 			continue;
-		ctx->ram = region.addr;
+		ctx->ram = region.min;
 		DBGC ( image, "LKRN %s RAM starts at %#08lx\n",
 		       image->name, ctx->ram );
 		return 0;
@@ -181,7 +181,7 @@ static int lkrn_exec ( struct image *image ) {
 
 	/* Check that everything can be placed at its target addresses */
 	totalsz = ( ctx.fdt + fdtimg.len - ctx.ram );
-	if ( ( ctx.entry >= region.addr ) &&
+	if ( ( ctx.entry >= region.min ) &&
 	     ( ( ctx.offset + totalsz ) <= memmap_size ( &region ) ) ) {
 		/* Target addresses are within the reshuffle region */
 		DBGC ( image, "LKRN %s fits within reshuffle region\n",

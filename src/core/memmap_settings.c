@@ -175,9 +175,9 @@ static int memmap_settings_fetch ( struct settings *settings,
 
 		/* Extract results from this region */
 		if ( include_start ) {
-			result += region.addr;
+			result += region.min;
 			DBGC ( settings, "MEMMAP %d start %#08llx\n", index,
-			       ( ( unsigned long long ) region.addr ) );
+			       ( ( unsigned long long ) region.min ) );
 		}
 		if ( include_length ) {
 			result += memmap_size ( &region );

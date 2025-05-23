@@ -347,11 +347,11 @@ static int bzimage_check_initrds ( struct image *image,
 
 	/* Limit region to avoiding kernel itself */
 	min = virt_to_phys ( bzimg->pm_kernel + bzimg->pm_sz );
-	if ( min < region.addr )
-		min = region.addr;
+	if ( min < region.min )
+		min = region.min;
 
 	/* Limit region to kernel's memory limit */
-	max = region.last;
+	max = region.max;
 	if ( max > bzimg->mem_limit )
 		max = bzimg->mem_limit;
 

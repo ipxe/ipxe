@@ -196,22 +196,23 @@ static int fdtmem_update_tree ( struct memmap_region *region,
 /**
  * Describe memory region
  *
- * @v addr		Address within region
- * @v fdt		Device tree
+ * @v min		Minimum address
  * @v max		Maximum accessible physical address
+ * @v fdt		Device tree
  * @v region		Region descriptor to fill in
  */
-static void fdtmem_describe ( uint64_t addr, struct fdt *fdt, physaddr_t max,
+static void fdtmem_describe ( uint64_t min, uint64_t max, struct fdt *fdt,
 			      struct memmap_region *region ) {
-	uint64_t inaccessible = ( ( ( uint64_t ) max ) + 1 );
+	uint64_t inaccessible;
 
 	/* Initialise region */
-	memmap_init ( addr, region );
+	memmap_init ( min, region );
 
 	/* Update region based on device tree */
 	fdtmem_update_tree ( region, fdt );
 
 	/* Treat inaccessible physical memory as such */
+	inaccessible = ( max + 1 );
 	memmap_update ( region, inaccessible, -inaccessible,
 			MEMMAP_FL_INACCESSIBLE, NULL );
 }
@@ -289,15 +290,15 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 	for ( addr = 0, next = 1 ; next ; addr = next ) {
 
 		/* Describe region and in-use memory */
-		fdtmem_describe ( addr, &fdt, max, &region );
+		fdtmem_describe ( addr, max, &fdt, &region );
 		memmap_update ( &region, old, memsz, MEMMAP_FL_USED, "iPXE" );
 		memmap_update ( &region, virt_to_phys ( hdr ), fdt.len,
 				MEMMAP_FL_RESERVED, "FDT" );
-		next = ( region.last + 1 );
+		next = ( region.max + 1 );
 
 		/* Dump region descriptor (for debugging) */
 		memmap_dump ( &region );
-		assert ( region.last >= region.addr );
+		assert ( region.max >= region.min );
 
 		/* Use highest possible region */
 		if ( memmap_is_usable ( &region ) &&
@@ -364,15 +365,15 @@ int fdtmem_register ( struct fdt_header *hdr, physaddr_t max ) {
 /**
  * Describe memory region from system memory map
  *
- * @v addr		Address within region
+ * @v min		Minimum address
  * @v hide		Hide in-use regions from the memory map
  * @v region		Region descriptor to fill in
  */
-static void fdtmem_describe_region ( uint64_t addr, int hide,
+static void fdtmem_describe_region ( uint64_t min, int hide,
 				     struct memmap_region *region ) {
 
 	/* Describe memory region based on device tree */
-	fdtmem_describe ( addr, &sysfdt, fdtmem_max, region );
+	fdtmem_describe ( min, fdtmem_max, &sysfdt, region );
 
 	/* Update memory region based on in-use regions, if applicable */
 	if ( hide )

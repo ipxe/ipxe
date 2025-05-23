@@ -305,11 +305,11 @@ static int meme820 ( struct memmap_region *region ) {
 /**
  * Describe memory region from system memory map
  *
- * @v addr		Address within region
+ * @v min		Minimum address
  * @v hide		Hide in-use regions from the memory map
  * @v region		Region descriptor to fill in
  */
-static void int15_describe ( uint64_t addr, int hide,
+static void int15_describe ( uint64_t min, int hide,
 			     struct memmap_region *region ) {
 	unsigned int basemem;
 	unsigned int extmem;
@@ -317,7 +317,7 @@ static void int15_describe ( uint64_t addr, int hide,
 	int rc;
 
 	/* Initialise region */
-	memmap_init ( addr, region );
+	memmap_init ( min, region );
 
 	/* Mark addresses above 4GB as inaccessible: we have no way to
 	 * access them either in a 32-bit build or in a 64-bit build
