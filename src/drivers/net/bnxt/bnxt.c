@@ -2160,8 +2160,6 @@ static void bnxt_tx_adjust_pkt ( struct bnxt *bp, struct io_buffer *iob )
 	if ( iob_len ( iob ) != prev_len )
 		prev_len = iob_len ( iob );
 
-	iob_pad ( iob, ETH_ZLEN );
-	dbg_tx_pad ( prev_len, iob_len ( iob ) );
 }
 
 static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )

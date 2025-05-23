@@ -537,12 +537,6 @@ void dbg_tx_vlan(struct bnxt *bp, char *src, u16 plen, u16 len)
 	dbg_prn(" old len %d new len %d\n", plen, len);
 }
 
-void dbg_tx_pad(u16 plen, u16 len)
-{
-	if (len != plen)
-		dbg_prn("- Tx padded(0) old len %d new len %d\n", plen, len);
-}
-
 void dump_tx_stat(struct bnxt *bp)
 {
 	dbg_prn("  TX stats cnt %d req_cnt %d", bp->tx.cnt, bp->tx.cnt_req);
