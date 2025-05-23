@@ -77,9 +77,9 @@ struct bzimage_context {
 	/** Memory limit */
 	uint64_t mem_limit;
 	/** Initrd address */
-	physaddr_t ramdisk_image;
+	void *initrd;
 	/** Initrd size */
-	physaddr_t ramdisk_size;
+	physaddr_t initrd_size;
 };
 
 /**
@@ -226,8 +226,8 @@ static void bzimage_update_header ( struct image *image,
 
 	/* Set initrd address */
 	if ( bzimg->version >= 0x0200 ) {
-		bzhdr->ramdisk_image = bzimg->ramdisk_image;
-		bzhdr->ramdisk_size = bzimg->ramdisk_size;
+		bzhdr->ramdisk_image = virt_to_phys ( bzimg->initrd );
+		bzhdr->ramdisk_size = bzimg->initrd_size;
 	}
 }
 
@@ -317,67 +317,6 @@ static void bzimage_set_cmdline ( struct image *image,
 }
 
 /**
- * Load initrd
- *
- * @v image		bzImage image
- * @v initrd		initrd image
- * @v address		Address at which to load, or NULL
- * @ret len		Length of loaded image, excluding zero-padding
- */
-static size_t bzimage_load_initrd ( struct image *image,
-				    struct image *initrd,
-				    void *address ) {
-	const char *filename = cpio_name ( initrd );
-	struct cpio_header cpio;
-	size_t offset;
-	size_t cpio_len;
-	size_t pad_len;
-	size_t len;
-	unsigned int i;
-
-	/* Skip hidden images */
-	if ( initrd->flags & IMAGE_HIDDEN )
-		return 0;
-
-	/* Determine length of cpio headers for non-prebuilt images */
-	len = 0;
-	for ( i = 0 ; ( cpio_len = cpio_header ( initrd, i, &cpio ) ) ; i++ )
-		len += ( cpio_len + cpio_pad_len ( cpio_len ) );
-
-	/* Copy in initrd image body and construct any cpio headers */
-	if ( address ) {
-		memmove ( ( address + len ), initrd->data, initrd->len );
-		memset ( address, 0, len );
-		offset = 0;
-		for ( i = 0 ; ( cpio_len = cpio_header ( initrd, i, &cpio ) ) ;
-		      i++ ) {
-			memcpy ( ( address + offset ), &cpio,
-				 sizeof ( cpio ) );
-			memcpy ( ( address + offset + sizeof ( cpio ) ),
-				 filename, ( cpio_len - sizeof ( cpio ) ) );
-			offset += ( cpio_len + cpio_pad_len ( cpio_len ) );
-		}
-		assert ( offset == len );
-		DBGC ( image, "bzImage %s initrd %s [%#08lx,%#08lx,%#08lx)"
-		       "%s%s\n", image->name, initrd->name,
-		       virt_to_phys ( address ),
-		       ( virt_to_phys ( address ) + offset ),
-		       ( virt_to_phys ( address ) + offset + initrd->len ),
-		       ( filename ? " " : "" ), ( filename ? filename : "" ) );
-		DBGC2_MD5A ( image, ( virt_to_phys ( address ) + offset ),
-			     ( address + offset ), initrd->len );
-	}
-	len += initrd->len;
-
-	/* Zero-pad to next INITRD_ALIGN boundary */
-	pad_len = ( ( -len ) & ( INITRD_ALIGN - 1 ) );
-	if ( address )
-		memset ( ( address + len ), 0, pad_len );
-
-	return len;
-}
-
-/**
  * Check that initrds can be loaded
  *
  * @v image		bzImage image
@@ -386,48 +325,52 @@ static size_t bzimage_load_initrd ( struct image *image,
  */
 static int bzimage_check_initrds ( struct image *image,
 				   struct bzimage_context *bzimg ) {
-	struct image *initrd;
-	physaddr_t bottom;
-	size_t len = 0;
+	struct memmap_region region;
+	physaddr_t min;
+	physaddr_t max;
+	physaddr_t dest;
 	int rc;
 
 	/* Calculate total loaded length of initrds */
-	for_each_image ( initrd ) {
+	bzimg->initrd_size = initrd_len();
 
-		/* Calculate length */
-		len += bzimage_load_initrd ( image, initrd, NULL );
-		len = initrd_align ( len );
+	/* Succeed if there are no initrds */
+	if ( ! bzimg->initrd_size )
+		return 0;
 
-		DBGC ( image, "bzImage %s initrd %s from [%#08lx,%#08lx)%s%s\n",
-		       image->name, initrd->name, virt_to_phys ( initrd->data ),
-		       ( virt_to_phys ( initrd->data ) + initrd->len ),
-		       ( initrd->cmdline ? " " : "" ),
-		       ( initrd->cmdline ? initrd->cmdline : "" ) );
-		DBGC2_MD5A ( image, virt_to_phys ( initrd->data ),
-			     initrd->data, initrd->len );
-	}
-
-	/* Calculate lowest usable address */
-	bottom = virt_to_phys ( bzimg->pm_kernel + bzimg->pm_sz );
-
-	/* Check that total length fits within space available for
-	 * reshuffling.  This is a conservative check, since CPIO
-	 * headers are not present during reshuffling, but this
-	 * doesn't hurt and keeps the code simple.
-	 */
-	if ( ( rc = initrd_reshuffle_check ( len, bottom ) ) != 0 ) {
-		DBGC ( image, "bzImage %s failed reshuffle check: %s\n",
+	/* Calculate available load region after reshuffling */
+	if ( ( rc = initrd_region ( bzimg->initrd_size, &region ) ) != 0 ) {
+		DBGC ( image, "bzImage %s no region for initrds: %s\n",
 		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
-	/* Check that total length fits within kernel's memory limit */
-	if ( ( bottom + len ) > bzimg->mem_limit ) {
+	/* Limit region to avoiding kernel itself */
+	min = virt_to_phys ( bzimg->pm_kernel + bzimg->pm_sz );
+	if ( min < region.addr )
+		min = region.addr;
+
+	/* Limit region to kernel's memory limit */
+	max = region.last;
+	if ( max > bzimg->mem_limit )
+		max = bzimg->mem_limit;
+
+	/* Calculate installation address */
+	if ( max < ( bzimg->initrd_size - 1 ) ) {
 		DBGC ( image, "bzImage %s not enough space for initrds\n",
 		       image->name );
 		return -ENOBUFS;
 	}
+	dest = ( ( max + 1 - bzimg->initrd_size ) & ~( INITRD_ALIGN - 1 ) );
+	if ( dest < min ) {
+		DBGC ( image, "bzImage %s not enough space for initrds\n",
+		       image->name );
+		return -ENOBUFS;
+	}
+	bzimg->initrd = phys_to_virt ( dest );
 
+	DBGC ( image, "bzImage %s loading initrds from %#08lx downwards\n",
+	       image->name, max );
 	return 0;
 }
 
@@ -439,63 +382,21 @@ static int bzimage_check_initrds ( struct image *image,
  */
 static void bzimage_load_initrds ( struct image *image,
 				   struct bzimage_context *bzimg ) {
-	struct image *initrd;
-	struct image *other;
-	physaddr_t bottom;
-	physaddr_t top;
-	physaddr_t dest;
-	size_t offset;
 	size_t len;
 
-	/* Reshuffle initrds into desired order */
-	bottom = virt_to_phys ( bzimg->pm_kernel + bzimg->pm_sz );
-	initrd_reshuffle ( bottom );
-
-	/* Find highest usable address */
-	top = 0;
-	for_each_image ( initrd ) {
-		if ( virt_to_phys ( initrd->data ) >= top ) {
-			top = ( virt_to_phys ( initrd->data ) +
-				initrd_align ( initrd->len ) );
-		}
-	}
-
 	/* Do nothing if there are no initrds */
-	if ( ! top )
+	if ( ! bzimg->initrd )
 		return;
-	if ( ( top - 1UL ) > bzimg->mem_limit ) {
-		top = ( ( bzimg->mem_limit + 1 ) & ~( INITRD_ALIGN - 1 ) );
-	}
-	DBGC ( image, "bzImage %s loading initrds from %#08lx downwards\n",
-	       image->name, ( top - 1UL ) );
 
-	/* Load initrds in order */
-	for_each_image ( initrd ) {
+	/* Reshuffle initrds into desired order */
+	initrd_reshuffle();
 
-		/* Calculate cumulative length of following
-		 * initrds (including padding).
-		 */
-		offset = 0;
-		for_each_image ( other ) {
-			if ( other == initrd )
-				offset = 0;
-			offset += bzimage_load_initrd ( image, other, NULL );
-			offset = initrd_align ( offset );
-		}
-
-		/* Load initrd at this address */
-		dest = ( top - offset );
-		len = bzimage_load_initrd ( image, initrd,
-					    phys_to_virt ( dest ) );
-
-		/* Record initrd location */
-		if ( ! bzimg->ramdisk_image )
-			bzimg->ramdisk_image = dest;
-		bzimg->ramdisk_size = ( dest + len - bzimg->ramdisk_image );
-	}
+	/* Load initrds */
 	DBGC ( image, "bzImage %s initrds at [%#08lx,%#08lx)\n",
-	       image->name, bzimg->ramdisk_image,
-	       ( bzimg->ramdisk_image + bzimg->ramdisk_size ) );
+	       image->name, virt_to_phys ( bzimg->initrd ),
+	       ( virt_to_phys ( bzimg->initrd ) + bzimg->initrd_size ) );
+	len = initrd_load_all ( bzimg->initrd );
+	assert ( len == bzimg->initrd_size );
 }
 
 /**
