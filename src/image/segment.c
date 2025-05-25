@@ -65,11 +65,11 @@ int prep_segment ( void *segment, size_t filesz, size_t memsz ) {
 	physaddr_t end = ( start + memsz );
 	physaddr_t max;
 
-	DBGC ( &region, "SEGMENT [%#08lx,%#08lx,%#08lx)\n", start, mid, end );
+	DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx)\n", start, mid, end );
 
 	/* Check for malformed lengths */
 	if ( filesz > memsz ) {
-		DBGC ( &region, "SEGMENT [%#08lx,%#08lx,%#08lx) is "
+		DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx) is "
 		       "malformed\n", start, mid, end );
 		return -EINVAL;
 	}
@@ -81,18 +81,18 @@ int prep_segment ( void *segment, size_t filesz, size_t memsz ) {
 
 	/* Check for address space overflow */
 	if ( max < start ) {
-		DBGC ( &region, "SEGMENT [%#08lx,%#08lx,%#08lx) wraps "
+		DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx) wraps "
 		       "around\n", start, mid, end );
 		return -EINVAL;
 	}
 
 	/* Describe region containing this segment */
 	memmap_describe ( start, 1, &region );
-	memmap_dump ( &region );
+	DBGC_MEMMAP ( segment, &region );
 
 	/* Fail unless region is usable and sufficiently large */
 	if ( ( ! memmap_is_usable ( &region ) ) || ( region.max < max ) ) {
-		DBGC ( &region, "SEGMENT [%#08lx,%#08lx,%#08lx) does not fit "
+		DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx) does not fit "
 		       "into available memory\n", start, mid, end );
 		return -ERANGE_SEGMENT;
 	}

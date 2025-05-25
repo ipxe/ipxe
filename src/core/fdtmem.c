@@ -273,7 +273,7 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 
 	/* Parse FDT */
 	if ( ( rc = fdt_parse ( &fdt, hdr, -1UL ) ) != 0 ) {
-		DBGC ( &region, "FDTMEM could not parse FDT: %s\n",
+		DBGC ( hdr, "FDTMEM could not parse FDT: %s\n",
 		       strerror ( rc ) );
 		/* Refuse relocation if we have no FDT */
 		return old;
@@ -282,7 +282,7 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 	/* Determine required length */
 	len = fdtmem_len ( &fdt );
 	assert ( len > 0 );
-	DBGC ( &region, "FDTMEM requires %#zx + %#zx => %#zx bytes for "
+	DBGC ( hdr, "FDTMEM requires %#zx + %#zx => %#zx bytes for "
 	       "relocation\n", memsz, fdt.len, len );
 
 	/* Construct memory map and choose a relocation address */
@@ -297,7 +297,7 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 		next = ( region.max + 1 );
 
 		/* Dump region descriptor (for debugging) */
-		memmap_dump ( &region );
+		DBGC_MEMMAP ( hdr, &region );
 		assert ( region.max >= region.min );
 
 		/* Use highest possible region */
@@ -313,7 +313,7 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 		}
 	}
 
-	DBGC ( &region, "FDTMEM relocating %#08lx => [%#08lx,%#08lx]\n",
+	DBGC ( hdr, "FDTMEM relocating %#08lx => [%#08lx,%#08lx]\n",
 	       old, new, ( ( physaddr_t ) ( new + len - 1 ) ) );
 	return new;
 }

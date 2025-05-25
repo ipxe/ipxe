@@ -127,7 +127,7 @@ size_t memmap_largest ( physaddr_t *start ) {
 	*start = 0;
 	largest = 0;
 	for_each_memmap ( &region, 1 ) {
-		memmap_dump ( &region );
+		DBGC_MEMMAP ( &region, &region );
 		if ( ! memmap_is_usable ( &region ) )
 			continue;
 		size = memmap_size ( &region );

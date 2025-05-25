@@ -102,7 +102,7 @@ static int lkrn_ram ( struct image *image, struct lkrn_context *ctx ) {
 
 	/* Locate start of RAM */
 	for_each_memmap ( &region, 0 ) {
-		memmap_dump ( &region );
+		DBGC_MEMMAP ( image, &region );
 		if ( ! ( region.flags & MEMMAP_FL_MEMORY ) )
 			continue;
 		ctx->ram = region.min;

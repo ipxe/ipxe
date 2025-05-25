@@ -183,26 +183,29 @@ memmap_use ( struct used_region *used, physaddr_t start, size_t size ) {
 #define for_each_memmap( region, hide )					\
 	for_each_memmap_from ( (region), 0, (hide) )
 
+#define DBG_MEMMAP_IF( level, region ) do {				\
+	const char *name = (region)->name;				\
+	unsigned int flags = (region)->flags;				\
+									\
+	DBG_IF ( level, "MEMMAP (%s%s%s%s) [%#08llx,%#08llx]%s%s\n",	\
+		 ( ( flags & MEMMAP_FL_MEMORY ) ? "M" : "-" ),		\
+		 ( ( flags & MEMMAP_FL_RESERVED ) ? "R" : "-" ),	\
+		 ( ( flags & MEMMAP_FL_USED ) ? "U" : "-" ),		\
+		 ( ( flags & MEMMAP_FL_INACCESSIBLE ) ? "X" : "-" ),	\
+		 ( ( unsigned long long ) (region)->min ),		\
+		 ( ( unsigned long long ) (region)->max ),		\
+		 ( name ? " " : "" ), ( name ? name : "" ) );		\
+	} while ( 0 )
 
-/**
- * Dump memory region descriptor (for debugging)
- *
- * @v region		Region descriptor
- */
-static inline void memmap_dump ( const struct memmap_region *region ) {
-	const char *name = region->name;
-	unsigned int flags = region->flags;
+#define DBGC_MEMMAP_IF( level, id, ... ) do {				\
+		DBG_AC_IF ( level, id );				\
+		DBG_MEMMAP_IF ( level, __VA_ARGS__ );			\
+		DBG_DC_IF ( level );					\
+	} while ( 0 )
 
-	/* Dump region information */
-	DBGC ( region, "MEMMAP (%s%s%s%s) [%#08llx,%#08llx]%s%s\n",
-	       ( ( flags & MEMMAP_FL_MEMORY ) ? "M" : "-" ),
-	       ( ( flags & MEMMAP_FL_RESERVED ) ? "R" : "-" ),
-	       ( ( flags & MEMMAP_FL_USED ) ? "U" : "-" ),
-	       ( ( flags & MEMMAP_FL_INACCESSIBLE ) ? "X" : "-" ),
-	       ( ( unsigned long long ) region->min ),
-	       ( ( unsigned long long ) region->max ),
-	       ( name ? " " : "" ), ( name ? name : "" ) );
-}
+#define DBGC_MEMMAP( ... )	DBGC_MEMMAP_IF ( LOG, ##__VA_ARGS__ )
+#define DBGC2_MEMMAP( ... )	DBGC_MEMMAP_IF ( EXTRA, ##__VA_ARGS__ )
+#define DBGCP_MEMMAP( ... )	DBGC_MEMMAP_IF ( PROFILE, ##__VA_ARGS__ )
 
 /**
  * Dump system memory map (for debugging)
@@ -217,10 +220,10 @@ static inline void memmap_dump_all ( int hide ) {
 		return;
 
 	/* Describe all memory regions */
-	DBGC ( &region, "MEMMAP with in-use regions %s:\n",
+	DBGC ( &memmap_describe, "MEMMAP with in-use regions %s:\n",
 	       ( hide ? "hidden" : "ignored" ) );
 	for_each_memmap ( &region, hide )
-		memmap_dump ( &region );
+		DBGC_MEMMAP ( &memmap_describe, &region );
 }
 
 extern void memmap_update ( struct memmap_region *region, uint64_t start,
