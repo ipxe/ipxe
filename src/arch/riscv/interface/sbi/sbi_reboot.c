@@ -53,6 +53,10 @@ static void sbi_reboot ( int flags ) {
 	rc = -ESBI ( ret.error );
 	DBGC ( SBI_SRST, "SBI %s reset failed: %s\n",
 	       ( warm ? "warm" : "cold" ), strerror ( rc ) );
+
+	/* Try a legacy shutdown */
+	sbi_legacy_ecall_0 ( SBI_LEGACY_SHUTDOWN );
+	DBGC ( SBI_SRST, "SBI legacy shutdown failed\n" );
 }
 
 /**
@@ -71,6 +75,11 @@ static int sbi_poweroff ( void ) {
 	/* Any return is an error */
 	rc = -ESBI ( ret.error );
 	DBGC ( SBI_SRST, "SBI shutdown failed: %s\n", strerror ( rc ) );
+
+	/* Try a legacy shutdown */
+	sbi_legacy_ecall_0 ( SBI_LEGACY_SHUTDOWN );
+	DBGC ( SBI_SRST, "SBI legacy shutdown failed\n" );
+
 	return rc;
 }
 

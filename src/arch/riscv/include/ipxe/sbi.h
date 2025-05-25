@@ -73,7 +73,7 @@ sbi_ecall_0 ( int eid, int fid ) {
  *
  * @v eid		Extension ID
  * @v fid		Function ID
- * @v param0		Parameter 0
+ * @v p0		Parameter 0
  * @ret ret		Return value
  */
 static inline __attribute__ (( always_inline )) struct sbi_return
@@ -98,8 +98,8 @@ sbi_ecall_1 ( int eid, int fid, unsigned long p0 ) {
  *
  * @v eid		Extension ID
  * @v fid		Function ID
- * @v param0		Parameter 0
- * @v param1		Parameter 1
+ * @v p0		Parameter 0
+ * @v p1		Parameter 1
  * @ret ret		Return value
  */
 static inline __attribute__ (( always_inline )) struct sbi_return
@@ -124,9 +124,9 @@ sbi_ecall_2 ( int eid, int fid, unsigned long p0, unsigned long p1 ) {
  *
  * @v eid		Extension ID
  * @v fid		Function ID
- * @v param0		Parameter 0
- * @v param1		Parameter 1
- * @v param2		Parameter 2
+ * @v p0		Parameter 0
+ * @v p1		Parameter 1
+ * @v p2		Parameter 2
  * @ret ret		Return value
  */
 static inline __attribute__ (( always_inline )) struct sbi_return
@@ -148,8 +148,50 @@ sbi_ecall_3 ( int eid, int fid, unsigned long p0, unsigned long p1,
 	return ret;
 }
 
+/**
+ * Call supervisor with no parameters
+ *
+ * @v fid		Legacy function ID
+ * @ret ret		Return value
+ */
+static inline __attribute__ (( always_inline )) long
+sbi_legacy_ecall_0 ( int fid ) {
+	register unsigned long a7 asm ( "a7" ) = ( ( long ) fid );
+	register unsigned long a0 asm ( "a0" );
+
+	__asm__ __volatile__ ( "ecall"
+			       : "=r" ( a0 )
+			       : "r" ( a7 )
+			       : "memory" );
+	return a0;
+}
+
+/**
+ * Call supervisor with one parameter
+ *
+ * @v fid		Legacy function ID
+ * @v p0		Parameter 0
+ * @ret ret		Return value
+ */
+static inline __attribute__ (( always_inline )) long
+sbi_legacy_ecall_1 ( int fid, unsigned long p0 ) {
+	register unsigned long a7 asm ( "a7" ) = ( ( long ) fid );
+	register unsigned long a0 asm ( "a0" ) = p0;
+
+	__asm__ __volatile__ ( "ecall"
+			       : "+r" ( a0 )
+			       : "r" ( a7 )
+			       : "memory" );
+	return a0;
+}
+
 /** Convert an SBI error code to an iPXE status code */
 #define ESBI( error ) EPLATFORM ( EINFO_EPLATFORM, error )
+
+/** Legacy extensions */
+#define SBI_LEGACY_PUTCHAR 0x01		/**< Console Put Character */
+#define SBI_LEGACY_GETCHAR 0x02		/**< Console Get Character */
+#define SBI_LEGACY_SHUTDOWN 0x08	/**< System Shutdown */
 
 /** System reset extension */
 #define SBI_SRST SBI_EID ( 'S', 'R', 'S', 'T' )
