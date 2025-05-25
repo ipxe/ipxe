@@ -119,6 +119,10 @@ static int fdtmem_update_node ( struct memmap_region *region, struct fdt *fdt,
 		/* Count regions */
 		count = fdt_reg_count ( fdt, desc.offset, &regs );
 		if ( count < 0 ) {
+			if ( flags & MEMMAP_FL_RESERVED ) {
+				/* Assume this is a non-fixed reservation */
+				continue;
+			}
 			rc = count;
 			DBGC ( region, "FDTMEM has malformed region %s: %s\n",
 			       desc.name, strerror ( rc ) );
