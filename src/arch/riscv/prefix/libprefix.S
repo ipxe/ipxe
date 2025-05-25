@@ -351,14 +351,14 @@ apply_relocs_loop:
 
 apply_relocs_done:
 	/* Return to caller */
-	progress " ok\n"
+	progress " ok\r\n"
 	ret
 
 apply_relocs_failed:
 	/* Failure to apply relocations (if relocations were needed)
 	 * is a fatal error.
 	 */
-	progress " failed\n"
+	progress " failed\r\n"
 	j	reset_system
 	.size	apply_relocs, . - apply_relocs
 
@@ -1028,13 +1028,13 @@ install:
 	 * s6 - relocation offset
 	 * tp - virtual address offset
 	 */
-	progress "\nSBI->iPXE hart:"
+	progress "\r\nSBI->iPXE hart:"
 	print_hex_reg a0
 	progress " temp:"
 	print_hex_reg a2
 	progress " fdt:"
 	print_hex_reg a1
-	progress "\nSBI->iPXE phys:"
+	progress "\r\nSBI->iPXE phys:"
 	print_hex_addr _prefix
 	progress " virt:"
 	print_hex_data prefix_virt
@@ -1114,7 +1114,7 @@ install:
 	/* Return to a virtual address in the relocated copy */
 	add	ra, s2, s6
 	sub	ra, ra, tp
-	progress "\n"
+	progress "\r\n"
 	ret
 	.size	install, . - install
 
@@ -1148,7 +1148,7 @@ install:
 	.globl	reset_system
 reset_system:
 	/* Register usage: irrelevant (does not return) */
-	progress "\niPXE->SBI reset\n"
+	progress "\r\niPXE->SBI reset\r\n"
 
 	/* Attempt reset */
 	li	a7, SBI_SRST
@@ -1156,12 +1156,12 @@ reset_system:
 	li	a0, SBI_RESET_COLD
 	mv	a1, zero
 	ecall
-	progress "(reset failed)\n"
+	progress "(reset failed)\r\n"
 
 	/* Attempt legacy shutdown */
 	li	a7, SBI_LEGACY_SHUTDOWN
 	ecall
-	progress "(legacy shutdown failed)\n"
+	progress "(legacy shutdown failed)\r\n"
 
 	/* If reset failed, lock the system */
 1:	wfi
