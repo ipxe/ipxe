@@ -108,8 +108,8 @@ static void comboot_init_psp ( struct image * image, void *seg ) {
 	 * kilobytes; x * 1024 / 16 == x * 64 == x << 6 */
 	psp->first_non_free_para = get_fbms() << 6;
 
-	DBGC ( image, "COMBOOT %p: first non-free paragraph = 0x%x\n",
-	       image, psp->first_non_free_para );
+	DBGC ( image, "COMBOOT %s: first non-free paragraph = 0x%x\n",
+	       image->name, psp->first_non_free_para );
 
 	/* Copy the command line to the PSP */
 	comboot_copy_cmdline ( image, seg );
@@ -172,22 +172,22 @@ static int comboot_exec_loop ( struct image *image ) {
 				    "xorw %%bp, %%bp\n\t"
 				    "lret\n\t" )
 					 : : "R" ( COMBOOT_PSP_SEG ) : "eax" );
-		DBGC ( image, "COMBOOT %p: returned\n", image );
+		DBGC ( image, "COMBOOT %s: returned\n", image->name );
 		break;
 
 	case COMBOOT_EXIT:
-		DBGC ( image, "COMBOOT %p: exited\n", image );
+		DBGC ( image, "COMBOOT %s: exited\n", image->name );
 		break;
 
 	case COMBOOT_EXIT_RUN_KERNEL:
 		assert ( image->replacement );
-		DBGC ( image, "COMBOOT %p: exited to run kernel %s\n",
-		       image, image->replacement->name );
+		DBGC ( image, "COMBOOT %s: exited to run kernel %s\n",
+		       image->name, image->replacement->name );
 		break;
 
 	case COMBOOT_EXIT_COMMAND:
-		DBGC ( image, "COMBOOT %p: exited after executing command\n",
-		       image );
+		DBGC ( image, "COMBOOT %s: exited after executing command\n",
+		       image->name );
 		break;
 
 	default:
@@ -213,16 +213,16 @@ static int comboot_identify ( struct image *image ) {
 	ext = strrchr( image->name, '.' );
 
 	if ( ! ext ) {
-		DBGC ( image, "COMBOOT %p: no extension\n",
-		       image );
+		DBGC ( image, "COMBOOT %s: no extension\n",
+		       image->name );
 		return -ENOEXEC;
 	}
 
 	++ext;
 
 	if ( strcasecmp( ext, "cbt" ) ) {
-		DBGC ( image, "COMBOOT %p: unrecognized extension %s\n",
-		       image, ext );
+		DBGC ( image, "COMBOOT %s: unrecognized extension %s\n",
+		       image->name, ext );
 		return -ENOEXEC;
 	}
 
@@ -251,8 +251,8 @@ static int comboot_prepare_segment ( struct image *image )
 
 	/* Prepare, verify, and load the real-mode segment */
 	if ( ( rc = prep_segment ( seg, filesz, memsz ) ) != 0 ) {
-		DBGC ( image, "COMBOOT %p: could not prepare segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "COMBOOT %s: could not prepare segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -274,9 +274,6 @@ static int comboot_prepare_segment ( struct image *image )
 static int comboot_probe ( struct image *image ) {
 	int rc;
 
-	DBGC ( image, "COMBOOT %p: name '%s'\n",
-	       image, image->name );
-
 	/* Check if this is a COMBOOT image */
 	if ( ( rc = comboot_identify ( image ) ) != 0 ) {
 
@@ -297,8 +294,8 @@ static int comboot_exec ( struct image *image ) {
 
 	/* Sanity check for filesize */
 	if( image->len >= 0xFF00 ) {
-		DBGC( image, "COMBOOT %p: image too large\n",
-		      image );
+		DBGC( image, "COMBOOT %s: image too large\n",
+		      image->name );
 		return -ENOEXEC;
 	}
 

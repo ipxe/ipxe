@@ -125,8 +125,8 @@ static void cpio_parse_cmdline ( struct image *image, unsigned int *mode,
 	if ( ( arg = image_argument ( image, "mode=" ) ) ) {
 		*mode = strtoul ( arg, &end, 8 /* Octal for file mode */ );
 		if ( *end && ( *end != ' ' ) ) {
-			DBGC ( image, "CPIO %p strange \"mode=\" "
-			       "terminator '%c'\n", image, *end );
+			DBGC ( image, "CPIO %s strange \"mode=\" "
+			       "terminator '%c'\n", image->name, *end );
 		}
 	}
 
@@ -134,8 +134,8 @@ static void cpio_parse_cmdline ( struct image *image, unsigned int *mode,
 	if ( ( arg = image_argument ( image, "mkdir=" ) ) ) {
 		*count += strtoul ( arg, &end, 10 );
 		if ( *end && ( *end != ' ' ) ) {
-			DBGC ( image, "CPIO %p strange \"mkdir=\" "
-			       "terminator '%c'\n", image, *end );
+			DBGC ( image, "CPIO %s strange \"mkdir=\" "
+			       "terminator '%c'\n", image->name, *end );
 		}
 	}
 

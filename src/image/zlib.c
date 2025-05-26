@@ -71,15 +71,15 @@ int zlib_deflate ( enum deflate_format format, const void *data, size_t len,
 		/* Decompress data */
 		if ( ( rc = deflate_inflate ( deflate, data, len,
 					      &out ) ) != 0 ) {
-			DBGC ( extracted, "ZLIB %p could not decompress: %s\n",
-			       extracted, strerror ( rc ) );
+			DBGC ( extracted, "ZLIB %s could not decompress: %s\n",
+			       extracted->name, strerror ( rc ) );
 			goto err_inflate;
 		}
 
 		/* Check that decompression is valid */
 		if ( ! deflate_finished ( deflate ) ) {
-			DBGC ( extracted, "ZLIB %p decompression incomplete\n",
-			       extracted );
+			DBGC ( extracted, "ZLIB %s decompression incomplete\n",
+			       extracted->name );
 			rc = -EINVAL;
 			goto err_unfinished;
 		}
@@ -90,8 +90,8 @@ int zlib_deflate ( enum deflate_format format, const void *data, size_t len,
 
 		/* Otherwise, resize output image and retry */
 		if ( ( rc = image_set_len ( extracted, out.offset ) ) != 0 ) {
-			DBGC ( extracted, "ZLIB %p could not resize: %s\n",
-			       extracted, strerror ( rc ) );
+			DBGC ( extracted, "ZLIB %s could not resize: %s\n",
+			       extracted->name, strerror ( rc ) );
 			goto err_set_size;
 		}
 	}
@@ -136,14 +136,14 @@ static int zlib_probe ( struct image *image ) {
 
 	/* Sanity check */
 	if ( image->len < sizeof ( *magic ) ) {
-		DBGC ( image, "ZLIB %p image too short\n", image );
+		DBGC ( image, "ZLIB %s image too short\n", image->name );
 		return -ENOEXEC;
 	}
 	magic = image->data;
 
 	/* Check magic header */
 	if ( ! zlib_magic_is_valid ( magic ) ) {
-		DBGC ( image, "ZLIB %p invalid magic data\n", image );
+		DBGC ( image, "ZLIB %s invalid magic data\n", image->name );
 		return -ENOEXEC;
 	}
 

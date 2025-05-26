@@ -60,8 +60,8 @@ static int pxe_exec ( struct image *image ) {
 
 	/* Verify and prepare segment */
 	if ( ( rc = prep_segment ( buffer, image->len, image->len ) ) != 0 ) {
-		DBGC ( image, "IMAGE %p could not prepare segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "IMAGE %s could not prepare segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -70,8 +70,8 @@ static int pxe_exec ( struct image *image ) {
 
 	/* Arbitrarily pick the most recently opened network device */
 	if ( ( netdev = last_opened_netdev() ) == NULL ) {
-		DBGC ( image, "IMAGE %p could not locate PXE net device\n",
-		       image );
+		DBGC ( image, "IMAGE %s could not locate PXE net device\n",
+		       image->name );
 		return -ENODEV;
 	}
 	netdev_get ( netdev );
@@ -155,8 +155,8 @@ int pxe_probe_no_mz ( struct image *image ) {
 	if ( image->len >= sizeof ( *magic ) ) {
 		magic = image->data;
 		if ( *magic == cpu_to_le16 ( EFI_IMAGE_DOS_SIGNATURE ) ) {
-			DBGC ( image, "IMAGE %p may be an EFI image\n",
-			       image );
+			DBGC ( image, "IMAGE %s may be an EFI image\n",
+			       image->name );
 			return -ENOTTY;
 		}
 	}

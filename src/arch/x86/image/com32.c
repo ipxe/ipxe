@@ -62,8 +62,8 @@ static int com32_exec_loop ( struct image *image ) {
 		memmap_describe ( COM32_START_PHYS, 1, &region );
 		assert ( memmap_is_usable ( &region ) );
 		avail_mem_top = ( COM32_START_PHYS + memmap_size ( &region ) );
-		DBGC ( image, "COM32 %p: available memory top = 0x%x\n",
-		       image, avail_mem_top );
+		DBGC ( image, "COM32 %s: available memory top = 0x%x\n",
+		       image->name, avail_mem_top );
 		assert ( avail_mem_top != 0 );
 
 		/* Hook COMBOOT API interrupts */
@@ -114,22 +114,22 @@ static int com32_exec_loop ( struct image *image ) {
 					       image->cmdline : "" ) ),
 			  "i" ( COM32_START_PHYS )
 			: "memory" );
-		DBGC ( image, "COM32 %p: returned\n", image );
+		DBGC ( image, "COM32 %s: returned\n", image->name );
 		break;
 
 	case COMBOOT_EXIT:
-		DBGC ( image, "COM32 %p: exited\n", image );
+		DBGC ( image, "COM32 %s: exited\n", image->name );
 		break;
 
 	case COMBOOT_EXIT_RUN_KERNEL:
 		assert ( image->replacement );
-		DBGC ( image, "COM32 %p: exited to run kernel %s\n",
-		       image, image->replacement->name );
+		DBGC ( image, "COM32 %s: exited to run kernel %s\n",
+		       image->name, image->replacement->name );
 		break;
 
 	case COMBOOT_EXIT_COMMAND:
-		DBGC ( image, "COM32 %p: exited after executing command\n",
-		       image );
+		DBGC ( image, "COM32 %s: exited after executing command\n",
+		       image->name );
 		break;
 
 	default:
@@ -159,8 +159,8 @@ static int com32_identify ( struct image *image ) {
 		 * B8 FF 4C CD 21
 		 */
 		if ( memcmp ( image->data, magic, sizeof ( magic) ) == 0 ) {
-			DBGC ( image, "COM32 %p: found magic number\n",
-			       image );
+			DBGC ( image, "COM32 %s: found magic number\n",
+			       image->name );
 			return 0;
 		}
 	}
@@ -170,16 +170,16 @@ static int com32_identify ( struct image *image ) {
 	ext = strrchr( image->name, '.' );
 
 	if ( ! ext ) {
-		DBGC ( image, "COM32 %p: no extension\n",
-		       image );
+		DBGC ( image, "COM32 %s: no extension\n",
+		       image->name );
 		return -ENOEXEC;
 	}
 
 	++ext;
 
 	if ( strcasecmp( ext, "c32" ) ) {
-		DBGC ( image, "COM32 %p: unrecognized extension %s\n",
-		       image, ext );
+		DBGC ( image, "COM32 %s: unrecognized extension %s\n",
+		       image->name, ext );
 		return -ENOEXEC;
 	}
 
@@ -201,8 +201,8 @@ static int com32_load_image ( struct image *image ) {
 	memsz = filesz;
 	buffer = phys_to_virt ( COM32_START_PHYS );
 	if ( ( rc = prep_segment ( buffer, filesz, memsz ) ) != 0 ) {
-		DBGC ( image, "COM32 %p: could not prepare segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "COM32 %s: could not prepare segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -230,8 +230,8 @@ static int com32_prepare_bounce_buffer ( struct image * image ) {
 
 	/* Prepare, verify, and load the real-mode segment */
 	if ( ( rc = prep_segment ( seg, filesz, memsz ) ) != 0 ) {
-		DBGC ( image, "COM32 %p: could not prepare bounce buffer segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "COM32 %s: could not prepare bounce buffer segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -246,8 +246,6 @@ static int com32_prepare_bounce_buffer ( struct image * image ) {
  */
 static int com32_probe ( struct image *image ) {
 	int rc;
-
-	DBGC ( image, "COM32 %p: name '%s'\n", image, image->name );
 
 	/* Check if this is a COMBOOT image */
 	if ( ( rc = com32_identify ( image ) ) != 0 ) {

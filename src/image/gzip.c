@@ -76,8 +76,8 @@ static int gzip_extract ( struct image *image, struct image *extracted ) {
 	/* Skip extra header, if present */
 	if ( header->flags & GZIP_FL_EXTRA ) {
 		if ( len < sizeof ( *extra ) ) {
-			DBGC ( image, "GZIP %p overlength extra header\n",
-			       image );
+			DBGC ( image, "GZIP %s overlength extra header\n",
+			       image->name );
 			return -EINVAL;
 		}
 		extra = data;
@@ -85,8 +85,8 @@ static int gzip_extract ( struct image *image, struct image *extracted ) {
 		len -= sizeof ( *extra );
 		extra_len = le16_to_cpu ( extra->len );
 		if ( len < extra_len ) {
-			DBGC ( image, "GZIP %p overlength extra header\n",
-			       image );
+			DBGC ( image, "GZIP %s overlength extra header\n",
+			       image->name );
 			return -EINVAL;
 		}
 		data += extra_len;
@@ -102,8 +102,8 @@ static int gzip_extract ( struct image *image, struct image *extracted ) {
 	while ( strings-- ) {
 		string_len = strnlen ( data, len );
 		if ( string_len == len ) {
-			DBGC ( image, "GZIP %p overlength name/comment\n",
-			       image );
+			DBGC ( image, "GZIP %s overlength name/comment\n",
+			       image->name );
 			return -EINVAL;
 		}
 		data += ( string_len + 1 /* NUL */ );
@@ -113,8 +113,8 @@ static int gzip_extract ( struct image *image, struct image *extracted ) {
 	/* Skip CRC, if present */
 	if ( header->flags & GZIP_FL_HCRC ) {
 		if ( len < sizeof ( *crc ) ) {
-			DBGC ( image, "GZIP %p overlength CRC header\n",
-			       image );
+			DBGC ( image, "GZIP %s overlength CRC header\n",
+			       image->name );
 			return -EINVAL;
 		}
 		data += sizeof ( *crc );
@@ -124,16 +124,16 @@ static int gzip_extract ( struct image *image, struct image *extracted ) {
 	/* Presize extracted image */
 	if ( ( rc = image_set_len ( extracted,
 				    le32_to_cpu ( footer->len ) ) ) != 0 ) {
-		DBGC ( image, "GZIP %p could not presize: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "GZIP %s could not presize: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Decompress image (expanding if necessary) */
 	if ( ( rc = zlib_deflate ( DEFLATE_RAW, data, len,
 				   extracted ) ) != 0 ) {
-		DBGC ( image, "GZIP %p could not decompress: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "GZIP %s could not decompress: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -152,14 +152,14 @@ static int gzip_probe ( struct image *image ) {
 
 	/* Sanity check */
 	if ( image->len < ( sizeof ( *header ) + sizeof ( *footer ) ) ) {
-		DBGC ( image, "GZIP %p image too short\n", image );
+		DBGC ( image, "GZIP %s image too short\n", image->name );
 		return -ENOEXEC;
 	}
 	header = image->data;
 
 	/* Check magic header */
 	if ( header->magic != cpu_to_be16 ( GZIP_MAGIC ) ) {
-		DBGC ( image, "GZIP %p invalid magic\n", image );
+		DBGC ( image, "GZIP %s invalid magic\n", image->name );
 		return -ENOEXEC;
 	}
 
