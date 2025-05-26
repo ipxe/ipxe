@@ -54,6 +54,64 @@ prefix_virt:
 
 /*****************************************************************************
  *
+ * Print character via debug console extension
+ *
+ *****************************************************************************
+ *
+ * Print a single character via the SBI DBCN extension.
+ *
+ * Parameters:
+ *
+ *   a0 - Character to print
+ *
+ * Returns:
+ *
+ *   a0 - Zero if character printed successfully
+ *   a1 - Overwritten
+ *   a6 - Overwritten
+ *   a7 - Overwritten
+ *
+ */
+
+/* SBI debug console extension */
+#define SBI_DBCN ( ( 'D' << 24 ) | ( 'B' << 16 ) | ( 'C' << 8 ) | 'N' )
+#define SBI_DBCN_WRITE_BYTE 0x02
+
+	.macro	print_char_dbcn
+	li	a7, SBI_DBCN
+	li	a6, SBI_DBCN_WRITE_BYTE
+	ecall
+	.endm
+
+/*****************************************************************************
+ *
+ * Print character via legacy extension
+ *
+ *****************************************************************************
+ *
+ * Print a single character via the SBI putchar legacy extension.
+ *
+ * Parameters:
+ *
+ *   a0 - Character to print
+ *
+ * Returns:
+ *
+ *   a0 - Overwritten
+ *   a7 - Overwritten
+ *
+ */
+
+/* SBI legacy console putchar */
+#define SBI_LEGACY_PUTCHAR 0x01
+
+	.macro	print_char_legacy
+	li	a7, SBI_LEGACY_PUTCHAR
+	ecall
+	.endm
+
+/*****************************************************************************
+ *
  * Print message to debug console
  *
  *****************************************************************************
@@ -75,13 +133,6 @@ prefix_virt:
  * Returns: none
  *
  */
-
-/* SBI debug console extension */
-#define SBI_DBCN ( ( 'D' << 24 ) | ( 'B' << 16 ) | ( 'C' << 8 ) | 'N' )
-#define SBI_DBCN_WRITE_BYTE 0x02
-
-/* SBI legacy console putchar */
-#define SBI_LEGACY_PUTCHAR 0x01
 
 	.section ".prefix.print_message", "ax", @progbits
 	.globl	print_message
@@ -108,13 +159,10 @@ print_message_alt:
 	lbu	a0, (t1)
 	addi	t1, t1, 1
 	beqz	a0, 2f
-	li	a7, SBI_DBCN
-	li	a6, SBI_DBCN_WRITE_BYTE
-	ecall
+	print_char_dbcn
 	beqz	a0, 1b
 	lbu	a0, -1(t1)
-	li	a7, SBI_LEGACY_PUTCHAR
-	ecall
+	print_char_legacy
 	j	1b
 2:
 	/* Restore registers and return (via alternate link register) */
@@ -202,14 +250,11 @@ print_hex_value_alt:
 1:	/* Print each digit in turn */
 	srli	a0, t1, ( __riscv_xlen - 4 )
 	nibble_to_ascii a0
-	li	a7, SBI_DBCN
-	li	a6, SBI_DBCN_WRITE_BYTE
-	ecall
+	print_char_dbcn
 	beqz	a0, 2f
 	srli	a0, t1, ( __riscv_xlen - 4 )
 	nibble_to_ascii a0
-	li	a7, SBI_LEGACY_PUTCHAR
-	ecall
+	print_char_legacy
 2:	slli	t1, t1, 4
 	addi	t2, t2, -4
 	bgtz	t2, 1b
