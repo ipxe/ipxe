@@ -32,7 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <errno.h>
 #include <ipxe/fdt.h>
-#include <ipxe/hart.h>
+#include <ipxe/csr.h>
 #include <ipxe/timer.h>
 
 /** Timer increment per microsecond */
@@ -145,10 +145,10 @@ static int zicntr_probe ( void ) {
 	} u;
 	int rc;
 
-	/* Check if Zicntr extension is supported */
-	if ( ( rc = hart_supported ( "_zicntr" ) ) != 0 ) {
-		DBGC ( colour, "ZICNTR not supported: %s\n", strerror ( rc ) );
-		return rc;
+	/* Check if time CSR can be read */
+	if ( ! csr_can_read ( "time" ) ) {
+		DBGC ( colour, "ZICNTR cannot read TIME CSR\n" );
+		return -ENOTSUP;
 	}
 
 	/* Get timer frequency */
