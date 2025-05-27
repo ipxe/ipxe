@@ -29,6 +29,8 @@
  *
  */
 
+#include <config/serial.h>
+
 	.section ".note.GNU-stack", "", @progbits
 	.text
 
@@ -112,6 +114,81 @@ prefix_virt:
 
 /*****************************************************************************
  *
+ * Print character via early UART
+ *
+ *****************************************************************************
+ *
+ * Print a single character via a UART.
+ *
+ * For devices without a functional SBI console, a UART at a hardcoded
+ * address can be used as a last resort mechanism for obtaining debug
+ * output from the prefix.
+ *
+ * Parameters:
+ *
+ *   a0 - Character to print
+ *
+ * Returns:
+ *
+ *   a0 - Preserved
+ *   a1 - May be overwritten
+ *   a6 - May be overwritten
+ *   a7 - May be overwritten
+ *
+ */
+
+/* Default to no UART, if not specified */
+#ifndef EARLY_UART_MODEL
+#define EARLY_UART_MODEL none
+#endif
+
+/* Default to a register shift of zero, if not specified */
+#ifndef EARLY_UART_REG_SHIFT
+#define EARLY_UART_REG_SHIFT 0
+#endif
+
+#define print_char_uart _C2 ( print_char_uart_, EARLY_UART_MODEL )
+
+	/* Print character via nonexistent UART */
+	.macro	print_char_uart_none
+	.endm
+
+/*****************************************************************************
+ *
+ * Print character via 8250-compatible early UART
+ *
+ *****************************************************************************
+ *
+ * Print a single character via an 8250- or 16550-compatible UART.
+ *
+ * Parameters:
+ *
+ *   a0 - Character to print
+ *
+ * Returns:
+ *
+ *   a0 - Preserved
+ *   a1 - Overwritten
+ *   a7 - Overwritten
+ *
+ */
+
+/* 8250-compatible UART transmit registers */
+#define EARLY_UART_8250_TX		( 0 << EARLY_UART_REG_SHIFT )
+#define EARLY_UART_8250_LSR		( 5 << EARLY_UART_REG_SHIFT )
+#define EARLY_UART_8250_LSR_THRE	0x20
+
+	.macro	print_char_uart_8250
+	li	a7, EARLY_UART_REG_BASE
+	sb	a0, EARLY_UART_8250_TX(a7)
+uart_wait_\@:
+	lbu	a1, EARLY_UART_8250_LSR(a7)
+	andi	a1, a1, EARLY_UART_8250_LSR_THRE
+	beqz	a1, uart_wait_\@
+	.endm
+
+/*****************************************************************************
+ *
  * Print message to debug console
  *
  *****************************************************************************
@@ -159,6 +236,7 @@ print_message_alt:
 	lbu	a0, (t1)
 	addi	t1, t1, 1
 	beqz	a0, 2f
+	print_char_uart
 	print_char_dbcn
 	beqz	a0, 1b
 	lbu	a0, -1(t1)
@@ -250,6 +328,7 @@ print_hex_value_alt:
 1:	/* Print each digit in turn */
 	srli	a0, t1, ( __riscv_xlen - 4 )
 	nibble_to_ascii a0
+	print_char_uart
 	print_char_dbcn
 	beqz	a0, 2f
 	srli	a0, t1, ( __riscv_xlen - 4 )
