@@ -204,10 +204,41 @@ early_uart_reg_base_64_done_\@:
 	.macro	print_char_uart_8250
 	early_uart_reg_base a7
 	sb	a0, EARLY_UART_8250_TX(a7)
-uart_wait_\@:
+early_uart_8250_wait_\@:
 	lbu	a1, EARLY_UART_8250_LSR(a7)
 	andi	a1, a1, EARLY_UART_8250_LSR_THRE
-	beqz	a1, uart_wait_\@
+	beqz	a1, early_uart_8250_wait_\@
+	.endm
+
+/*****************************************************************************
+ *
+ * Print character via SiFive-compatible early UART
+ *
+ *****************************************************************************
+ *
+ * Print a single character via a SiFive-compatible UART.
+ *
+ * Parameters:
+ *
+ *   a0 - Character to print
+ *
+ * Returns:
+ *
+ *   a0 - Preserved
+ *   a1 - Overwritten
+ *   a7 - Overwritten
+ *
+ */
+
+/* SiFive-compatible UART transmit registers */
+#define EARLY_UART_SIFIVE_TXFIFO	( 0 << EARLY_UART_REG_SHIFT )
+
+	.macro	print_char_uart_sifive
+	early_uart_reg_base a7
+	sw	a0, EARLY_UART_SIFIVE_TXFIFO(a7)
+early_uart_sifive_wait_\@:
+	lw	a1, EARLY_UART_SIFIVE_TXFIFO(a7)
+	bltz	a1, early_uart_sifive_wait_\@
 	.endm
 
 /*****************************************************************************
