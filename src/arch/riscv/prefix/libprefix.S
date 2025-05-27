@@ -149,8 +149,31 @@ prefix_virt:
 
 #define print_char_uart _C2 ( print_char_uart_, EARLY_UART_MODEL )
 
+#define early_uart_reg_base _C2 ( early_uart_reg_base_, __riscv_xlen )
+
 	/* Print character via nonexistent UART */
 	.macro	print_char_uart_none
+	.endm
+
+	/*
+	 * Get UART base address (64-bit addressing)
+	 */
+	.macro	early_uart_reg_base_64 reg
+	csrr	\reg, satp
+	beqz	\reg, early_uart_reg_base_64_nonpaged_\@
+	LOADN	\reg, early_uart_reg_base_64_virt
+	j	early_uart_reg_base_64_done_\@
+early_uart_reg_base_64_nonpaged_\@:
+	li	\reg, EARLY_UART_REG_BASE
+early_uart_reg_base_64_done_\@:
+	.endm
+
+	/*
+	 * Get UART base address (32-bit addressing)
+	 */
+	.macro	early_uart_reg_base_32 reg
+	li	\reg, EARLY_UART_REG_BASE
+	sub	\reg, \reg, tp
 	.endm
 
 /*****************************************************************************
@@ -179,7 +202,7 @@ prefix_virt:
 #define EARLY_UART_8250_LSR_THRE	0x20
 
 	.macro	print_char_uart_8250
-	li	a7, EARLY_UART_REG_BASE
+	early_uart_reg_base a7
 	sb	a0, EARLY_UART_8250_TX(a7)
 uart_wait_\@:
 	lbu	a1, EARLY_UART_8250_LSR(a7)
@@ -749,6 +772,7 @@ enable_paging_64:
 	 * a4 - PTE stride
 	 * a5 - size of accessible physical address space
 	 */
+
 	progress " paging:"
 	li	a1, SATP_MODE_SV57
 
@@ -818,6 +842,14 @@ enable_paging_64_loop:
 	li	a4, 1
 	slli	a4, a4, PTE_PPN1_LSB
 
+	/* Construct PTE[x-1] for early UART, if applicable */
+#ifdef EARLY_UART_REG_BASE
+	li	t0, ( EARLY_UART_REG_BASE & ~( ( 1 << VPN1_LSB ) - 1 ) )
+	srli	t0, t0, PTE_PPN_SHIFT
+	ori	t0, t0, PTE_LEAF
+	STOREN	t0, -PTE_SIZE(a3)
+#endif
+
 	/* Construct PTE[x-y] for iPXE virtual address map */
 	la	t0, _prefix
 	srli	t0, t0, PTE_PPN_SHIFT
@@ -861,6 +893,20 @@ enable_paging_64_loop:
 	mv	\rd, \rs
 	.endif
 	.endm
+
+	/* Early UART base address when 64-bit paging is enabled
+	 *
+	 * When an early UART is in use, we choose to use the 2MB
+	 * "megapage" immediately below iPXE itself to map the UART.
+	 */
+#ifdef EARLY_UART_REG_BASE
+	.section ".rodata.early_uart_reg_base_64_virt", "a", @progbits
+	.balign	8
+early_uart_reg_base_64_virt:
+	.dword	( _base - ( 1 << VPN1_LSB ) + \
+	          ( EARLY_UART_REG_BASE & ( ( 1 << VPN1_LSB ) - 1 ) ) )
+	.size	early_uart_reg_base_64_virt, . - early_uart_reg_base_64_virt
+#endif
 
 /*****************************************************************************
  *
@@ -1152,6 +1198,7 @@ install:
 	 * s6 - relocation offset
 	 * tp - virtual address offset
 	 */
+	mv	tp, zero
 	progress "\r\nSBI->iPXE hart:"
 	print_hex_reg a0
 	progress " temp:"
@@ -1166,9 +1213,6 @@ install:
 	mv	s1, a1
 	mv	s2, ra
 	la	s3, _edata
-
-	/* Initialise virtual address offset */
-	mv	tp, zero
 
 	/* Attempt to enable paging, if we have temporary page table space */
 	mv	a0, a2
