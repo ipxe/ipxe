@@ -170,6 +170,8 @@ fdt_reservations ( struct fdt *fdt ) {
 
 extern int fdt_describe ( struct fdt *fdt, unsigned int offset,
 			  struct fdt_descriptor *desc );
+extern int fdt_parent ( struct fdt *fdt, unsigned int offset,
+			unsigned int *parent );
 extern int fdt_path ( struct fdt *fdt, const char *path,
 		      unsigned int *offset );
 extern int fdt_alias ( struct fdt *fdt, const char *name,

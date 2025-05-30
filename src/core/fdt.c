@@ -181,7 +181,7 @@ static int fdt_next ( struct fdt *fdt, struct fdt_descriptor *desc ) {
  * @ret rc		Return status code
  */
 static int fdt_enter ( struct fdt *fdt, unsigned int offset,
-		struct fdt_descriptor *desc ) {
+		       struct fdt_descriptor *desc ) {
 	int rc;
 
 	/* Find begin node token */
@@ -210,6 +210,100 @@ static int fdt_enter ( struct fdt *fdt, unsigned int offset,
 			return -EINVAL;
 		}
 	}
+}
+
+/**
+ * Find node relative depth
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v target		Target node offset
+ * @ret depth		Depth, or negative error
+ */
+static int fdt_depth ( struct fdt *fdt, unsigned int offset,
+		       unsigned int target ) {
+	struct fdt_descriptor desc;
+	int depth;
+	int rc;
+
+	/* Enter node */
+	if ( ( rc = fdt_enter ( fdt, offset, &desc ) ) != 0 )
+		return rc;
+
+	/* Find target node */
+	for ( depth = 0 ; depth >= 0 ; depth += desc.depth ) {
+
+		/* Describe token */
+		if ( ( rc = fdt_next ( fdt, &desc ) ) != 0 ) {
+			DBGC ( fdt, "FDT +%#04x has malformed node: %s\n",
+			       offset, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Check for target node */
+		if ( desc.offset == target ) {
+			DBGC2 ( fdt, "FDT +%#04x has descendant node +%#04x "
+				"at depth +%d\n", offset, target, depth );
+			return depth;
+		}
+	}
+
+	DBGC ( fdt, "FDT +#%04x has no descendant node +%#04x\n",
+	       offset, target );
+	return -ENOENT;
+}
+
+/**
+ * Find parent node
+ *
+ * @v fdt		Device tree
+ * @v offset		Starting node offset
+ * @v parent		Parent node offset to fill in
+ * @ret rc		Return status code
+ */
+int fdt_parent ( struct fdt *fdt, unsigned int offset, unsigned int *parent ) {
+	struct fdt_descriptor desc;
+	int pdepth;
+	int depth;
+	int rc;
+
+	/* Find depth from root of tree */
+	depth = fdt_depth ( fdt, 0, offset );
+	if ( depth < 0 ) {
+		rc = depth;
+		return rc;
+	}
+	pdepth = ( depth - 1 );
+
+	/* Enter root node */
+	if ( ( rc = fdt_enter ( fdt, 0, &desc ) ) != 0 )
+		return rc;
+	*parent = desc.offset;
+
+	/* Find parent node */
+	for ( depth = 0 ; depth >= 0 ; depth += desc.depth ) {
+
+		/* Describe token */
+		if ( ( rc = fdt_next ( fdt, &desc ) ) != 0 ) {
+			DBGC ( fdt, "FDT +%#04x has malformed node: %s\n",
+			       offset, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Record possible parent node */
+		if ( ( depth == pdepth ) && desc.name && ( ! desc.data ) )
+			*parent = desc.offset;
+
+		/* Check for target node */
+		if ( desc.offset == offset ) {
+			DBGC2 ( fdt, "FDT +%#04x has parent node at +%#04x\n",
+				offset, *parent );
+			return 0;
+		}
+	}
+
+	DBGC ( fdt, "FDT +#%04x has no parent node\n", offset );
+	return -ENOENT;
 }
 
 /**

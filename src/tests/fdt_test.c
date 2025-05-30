@@ -263,6 +263,18 @@ static void fdt_test_exec ( void ) {
 	ok ( strcmp ( desc.data, "memory" ) == 0 );
 	ok ( desc.depth == 0 );
 
+	/* Verify parent lookup */
+	ok ( fdt_path ( &fdt, "/soc/ethernet@10090000/ethernet-phy@0",
+			&offset ) == 0 );
+	ok ( fdt_parent ( &fdt, offset, &offset ) == 0 );
+	ok ( fdt_describe ( &fdt, offset, &desc ) == 0 );
+	ok ( strcmp ( desc.name, "ethernet@10090000" ) == 0 );
+	ok ( fdt_parent ( &fdt, offset, &offset ) == 0 );
+	ok ( fdt_describe ( &fdt, offset, &desc ) == 0 );
+	ok ( strcmp ( desc.name, "soc" ) == 0 );
+	ok ( fdt_parent ( &fdt, offset, &offset ) == 0 );
+	ok ( offset == 0 );
+
 	/* Verify device tree creation */
 	image = image_memory ( "test.dtb", sifive_u, sizeof ( sifive_u ) );
 	ok ( image != NULL );
