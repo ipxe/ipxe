@@ -25,9 +25,6 @@ struct dt_device {
 	struct dt_driver *driver;
 	/** Driver-private data */
 	void *priv;
-
-	/** Register cell size specification */
-	struct fdt_reg_cells regs;
 };
 
 /** A devicetree driver */

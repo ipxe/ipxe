@@ -54,16 +54,25 @@ static void dt_remove_children ( struct dt_device *parent );
  */
 void * dt_ioremap ( struct dt_device *dt, unsigned int offset,
 		    unsigned int index, size_t len ) {
-	struct dt_device *parent =
-		container_of ( dt->dev.parent, struct dt_device, dev );
-	struct fdt_reg_cells *regs = &parent->regs;
+	struct fdt_reg_cells regs;
+	unsigned int parent;
 	uint64_t address;
 	uint64_t size;
 	void *io_addr;
 	int rc;
 
+	/* Get parent node */
+	if ( ( rc = fdt_parent ( &sysfdt, offset, &parent ) ) != 0 ) {
+		DBGC ( dt, "DT %s could not locate parent: %s\n",
+		       dt->path, strerror ( rc ) );
+		return NULL;
+	}
+
+	/* Read #address-cells and #size-cells, if present */
+	fdt_reg_cells ( &sysfdt, parent, &regs );
+
 	/* Read address */
-	if ( ( rc = fdt_reg_address ( &sysfdt, offset, regs, index,
+	if ( ( rc = fdt_reg_address ( &sysfdt, offset, &regs, index,
 				      &address ) ) != 0 ) {
 		DBGC ( dt, "DT %s could not read region %d address: %s\n",
 		       dt->path, index, strerror ( rc ) );
@@ -72,8 +81,8 @@ void * dt_ioremap ( struct dt_device *dt, unsigned int offset,
 
 	/* Read size (or assume sufficient, if tree specifies no sizes) */
 	size = len;
-	if ( regs->size_cells &&
-	     ( ( rc = fdt_reg_size ( &sysfdt, offset, regs, index,
+	if ( regs.size_cells &&
+	     ( ( rc = fdt_reg_size ( &sysfdt, offset, &regs, index,
 				     &size ) ) != 0 ) ) {
 		DBGC ( dt, "DT %s could not read region %d size: %s\n",
 		       dt->path, index, strerror ( rc ) );
@@ -221,9 +230,6 @@ static int dt_probe_node ( struct dt_device *parent, unsigned int offset,
 	dt->dev.parent = ( parent ? &parent->dev : &dt_root_device.dev );
 	INIT_LIST_HEAD ( &dt->dev.children );
 	list_add_tail ( &dt->dev.siblings, &dt->dev.parent->children );
-
-	/* Read #address-cells and #size-cells, if present */
-	fdt_reg_cells ( &sysfdt, offset, &dt->regs );
 
 	/* Probe device */
 	if ( ( rc = dt_probe ( dt, offset ) ) != 0 )
