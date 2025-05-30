@@ -34,6 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <ipxe/fdt.h>
+#include <ipxe/image.h>
 #include <ipxe/test.h>
 
 /** Simplified QEMU sifive_u device tree blob */
@@ -164,6 +165,7 @@ static void fdt_test_exec ( void ) {
 	struct fdt_header *hdr;
 	struct fdt fdt;
 	const char *string;
+	struct image *image;
 	uint32_t u32;
 	uint64_t u64;
 	unsigned int count;
@@ -260,6 +262,22 @@ static void fdt_test_exec ( void ) {
 	ok ( strcmp ( desc.name, "device_type" ) == 0 );
 	ok ( strcmp ( desc.data, "memory" ) == 0 );
 	ok ( desc.depth == 0 );
+
+	/* Verify device tree creation */
+	image = image_memory ( "test.dtb", sifive_u, sizeof ( sifive_u ) );
+	ok ( image != NULL );
+	image_tag ( image, &fdt_image );
+	ok ( fdt_create ( &hdr, "hello world", 0xabcd0000, 0x00001234 ) == 0 );
+	ok ( fdt_parse ( &fdt, hdr, -1UL ) == 0 );
+	ok ( fdt_path ( &fdt, "/chosen", &offset ) == 0 );
+	ok ( ( string = fdt_string ( &fdt, offset, "bootargs" ) ) != NULL );
+	ok ( strcmp ( string, "hello world" ) == 0 );
+	ok ( fdt_u64 ( &fdt, offset, "linux,initrd-start", &u64 ) == 0 );
+	ok ( u64 == 0xabcd0000 );
+	ok ( fdt_u64 ( &fdt, offset, "linux,initrd-end", &u64 ) == 0 );
+	ok ( u64 == 0xabcd1234 );
+	fdt_remove ( hdr );
+	unregister_image ( image );
 }
 
 /** FDT self-test */
