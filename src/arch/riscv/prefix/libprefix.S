@@ -879,7 +879,7 @@ enable_paging_64_loop:
 #ifdef EARLY_UART_REG_BASE
 	li	t0, ( EARLY_UART_REG_BASE & ~( ( 1 << VPN1_LSB ) - 1 ) )
 	srli	t0, t0, PTE_PPN_SHIFT
-	ori	t0, t0, PTE_LEAF
+	ori	t0, t0, ( PTE_LEAF & ~PTE_X )
 	STOREN	t0, -PTE_SIZE(a3)
 #endif
 
