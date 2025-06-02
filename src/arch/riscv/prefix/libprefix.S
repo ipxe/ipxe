@@ -896,13 +896,14 @@ enable_paging_64_loop:
 	slli	t0, a1, SATP_MODE_SHIFT
 	srli	t1, a0, PAGE_SHIFT
 	or	t0, t0, t1
-	csrrw	zero, satp, t0
+	csrw	satp, t0
 	sfence.vma
-	csrrw	a2, satp, t0
+	csrr	a2, satp
 	srli	a2, a2, SATP_MODE_SHIFT
 
 	/* Loop until we successfully enable paging, or run out of levels */
 	beq	a2, a1, 1f
+	csrw	satp, zero
 	addi	a1, a1, -1
 	li	t0, SATP_MODE_SV39
 	bge	a1, t0, enable_paging_64_loop
@@ -1074,9 +1075,9 @@ enable_paging_32:
 	.balign	enable_paging_32_xalign
 	/* Start of transition code */
 enable_paging_32_xstart:
-	csrrw	zero, satp, t1
+	csrw	satp, t1
 	sfence.vma
-	csrrw	a1, satp, t1
+	csrr	a1, satp
 	beqz	a1, 2f
 	jr	t0
 1:	/* Restore temporarily modified PTE */
@@ -1086,8 +1087,9 @@ enable_paging_32_xstart:
 	.equ	enable_paging_32_xlen, . - enable_paging_32_xstart
 2:	srli	a1, a1, SATP_MODE_SHIFT
 
-	/* Clear virtual address offset if paging is not enabled */
+	/* Zero SATP and virtual address offset if paging is not enabled */
 	bnez	a1, 1f
+	csrw	satp, zero
 	mv	tp, zero
 1:
 	/* Adjust return address to a virtual address */
