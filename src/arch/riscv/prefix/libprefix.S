@@ -793,6 +793,33 @@ page_table:
  *      use only a single physical 4kB page table.
  */
 
+/** SBI base extension */
+#define SBI_BASE 0x10
+#define SBI_BASE_MVENDORID 0x04
+
+/** Non-standard T-Head page table entry additional flags
+ *
+ * T-Head processors such as the C910 use the high bits of the PTE in
+ * a very non-standard way that is incompatible with the RISC-V
+ * specification.
+ *
+ * As per the "Memory Attribute Extension (XTheadMae)", bits 62 and 61
+ * represent cacheability and "bufferability" (i.e. write-back
+ * cacheability) respectively.  If we do not enable these bits, then
+ * the processor gets incredibly confused at the point that paging is
+ * enabled.  The symptom is that cache lines will occasionally fail to
+ * fill, and so reads from any address may return unrelated data from
+ * a previously read cache line for a different address.
+ */
+#define THEAD_PTE_MAEE ( 0x60 << ( __riscv_xlen - 8 ) )
+
+/** T-Head vendor ID */
+#define THEAD_MVENDORID 0x5b7
+
+/** T-Head "sxstatus" CSR */
+#define THEAD_CSR_SXSTATUS 0x5c0
+#define THEAD_CSR_SXSTATUS_MAEE	0x00200000	/**< XTheadMae enabled */
+
 	.section ".prefix.enable_paging_64", "ax", @progbits
 enable_paging_64:
 	/* Register usage:
@@ -805,15 +832,39 @@ enable_paging_64:
 	 * a4 - PTE stride
 	 * a5 - size of accessible physical address space
 	 */
-
 	progress " paging:"
-	li	a1, SATP_MODE_SV57
 
 	/* Calculate virtual address offset */
 	LOADN	t0, prefix_link
 	la	t1, _prefix
 	sub	tp, t1, t0
 
+	/* Construct base page table entry for address zero */
+	li	t0, PTE_LEAF
+	STOREN	t0, (a0)
+
+	/* Check for broken T-Head paging extensions */
+	mv	a3, a0
+	li	a7, SBI_BASE
+	li	a6, SBI_BASE_MVENDORID
+	ecall
+	bnez	a0, 1f
+	li	t0, THEAD_MVENDORID
+	bne	a1, t0, 1f
+	progress "thead-"
+	csrr	t0, THEAD_CSR_SXSTATUS
+	li	t1, THEAD_CSR_SXSTATUS_MAEE
+	and	t0, t0, t1
+	beqz	t0, 1f
+	progress "mae-"
+	LOADN	t0, (a3)
+	li	t1, THEAD_PTE_MAEE
+	or	t0, t0, t1
+	STOREN	t0, (a3)
+1:	mv	a0, a3
+
+	/* Find highest supported paging level */
+	li	a1, SATP_MODE_SV57
 enable_paging_64_loop:
 
 	/* Calculate PTE stride for identity map at this paging level
@@ -841,7 +892,7 @@ enable_paging_64_loop:
 	/* Construct PTE[0-255] for identity map */
 	mv	a3, a0
 	li	t0, ( PTE_COUNT / 2 )
-	li	t1, PTE_LEAF
+	LOADN	t1, (a0)
 1:	STOREN	t1, (a3)
 	addi	a3, a3, PTE_SIZE
 	add	t1, t1, a4
@@ -886,13 +937,14 @@ enable_paging_64_loop:
 	/* Construct PTE[x-y] for iPXE virtual address map */
 	la	t0, _prefix
 	srli	t0, t0, PTE_PPN_SHIFT
-	ori	t0, t0, PTE_LEAF
-	la	t1, _ebss
-	srli	t1, t1, PTE_PPN_SHIFT
+	LOADN	t1, (a0)
+	or	t0, t0, t1
+	la	t2, _ebss
+	srli	t2, t2, PTE_PPN_SHIFT
 1:	STOREN	t0, (a3)
 	addi	a3, a3, PTE_SIZE
 	add	t0, t0, a4
-	ble	t0, t1, 1b
+	ble	t0, t2, 1b
 
 	/* Attempt to enable paging, and read back active paging level */
 	slli	t0, a1, SATP_MODE_SHIFT
