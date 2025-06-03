@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 #include <ipxe/list.h>
 #include <ipxe/linux.h>
 #include <ipxe/malloc.h>
@@ -55,6 +55,10 @@ struct tap_nic {
 	/** File descriptor of the opened tap device */
 	int fd;
 };
+
+/** Default MAC address */
+static const uint8_t tap_default_mac[ETH_ALEN] =
+	{ 0x52, 0x54, 0x00, 0x12, 0x34, 0x56 };
 
 /** Open the TAP device */
 static int tap_open(struct net_device * netdev)
@@ -202,6 +206,7 @@ static int tap_probe(struct linux_device *device, struct linux_device_request *r
 	nic = netdev->priv;
 	linux_set_drvdata(device, netdev);
 	netdev->dev = &device->dev;
+	memcpy ( netdev->hw_addr, tap_default_mac, ETH_ALEN );
 	memset(nic, 0, sizeof(*nic));
 
 	/* Look for the mandatory if setting */
@@ -231,9 +236,9 @@ static int tap_probe(struct linux_device *device, struct linux_device_request *r
 
 	return 0;
 
-err_settings:
 	unregister_netdev(netdev);
 err_register:
+err_settings:
 	netdev_nullify(netdev);
 	netdev_put(netdev);
 	return rc;

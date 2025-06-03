@@ -1,0 +1,14 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Starting virtual address
+#
+LDFLAGS += -Ttext=0x10000
+
+# Compiler flags for building host API wrapper
+#
+LINUX_CFLAGS += -march=rv32gc -mabi=ilp32d
+
+# Include generic Linux Makefile
+#
+MAKEDEPS += arch/riscv/Makefile.linux
+include arch/riscv/Makefile.linux

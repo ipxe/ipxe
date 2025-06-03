@@ -116,7 +116,7 @@ static const uint8_t oid_basic_response_type[] = { ASN1_OID_OCSP_BASIC };
 
 /** OCSP basic response type cursor */
 static struct asn1_cursor oid_basic_response_type_cursor =
-	ASN1_OID_CURSOR ( oid_basic_response_type );
+	ASN1_CURSOR ( oid_basic_response_type );
 
 /**
  * Free OCSP check
@@ -284,7 +284,7 @@ int ocsp_check ( struct x509_certificate *cert,
 	/* Sanity checks */
 	assert ( cert != NULL );
 	assert ( issuer != NULL );
-	assert ( x509_is_valid ( issuer ) );
+	assert ( issuer->root != NULL );
 
 	/* Allocate and initialise check */
 	*ocsp = zalloc ( sizeof ( **ocsp ) );
@@ -833,18 +833,6 @@ int ocsp_response ( struct ocsp_check *ocsp, const void *data, size_t len ) {
 }
 
 /**
- * OCSP dummy root certificate store
- *
- * OCSP validation uses no root certificates, since it takes place
- * only when there already exists a validated issuer certificate.
- */
-static struct x509_root ocsp_root = {
-	.digest = &ocsp_digest_algorithm,
-	.count = 0,
-	.fingerprints = NULL,
-};
-
-/**
  * Check OCSP response signature
  *
  * @v ocsp		OCSP check
@@ -856,10 +844,9 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
 	struct ocsp_response *response = &ocsp->response;
 	struct digest_algorithm *digest = response->algorithm->digest;
 	struct pubkey_algorithm *pubkey = response->algorithm->pubkey;
-	struct x509_public_key *public_key = &signer->subject.public_key;
+	struct asn1_cursor *key = &signer->subject.public_key.raw;
 	uint8_t digest_ctx[ digest->ctxsize ];
 	uint8_t digest_out[ digest->digestsize ];
-	uint8_t pubkey_ctx[ pubkey->ctxsize ];
 	int rc;
 
 	/* Generate digest */
@@ -868,30 +855,18 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
 			response->tbs.len );
 	digest_final ( digest, digest_ctx, digest_out );
 
-	/* Initialise public-key algorithm */
-	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx, public_key->raw.data,
-				  public_key->raw.len ) ) != 0 ) {
-		DBGC ( ocsp, "OCSP %p \"%s\" could not initialise public key: "
-		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
-		goto err_init;
-	}
-
 	/* Verify digest */
-	if ( ( rc = pubkey_verify ( pubkey, pubkey_ctx, digest, digest_out,
+	if ( ( rc = pubkey_verify ( pubkey, key, digest, digest_out,
 				    response->signature.data,
 				    response->signature.len ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" signature verification failed: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
-		goto err_verify;
+		return rc;
 	}
 
 	DBGC2 ( ocsp, "OCSP %p \"%s\" signature is correct\n",
 		ocsp, x509_name ( ocsp->cert ) );
-
- err_verify:
-	pubkey_final ( pubkey, pubkey_ctx );
- err_init:
-	return rc;
+	return 0;
 }
 
 /**
@@ -927,7 +902,7 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 		 */
 		x509_invalidate ( signer );
 		if ( ( rc = x509_validate ( signer, ocsp->issuer, time,
-					    &ocsp_root ) ) != 0 ) {
+					    ocsp->issuer->root ) ) != 0 ) {
 			DBGC ( ocsp, "OCSP %p \"%s\" could not validate ",
 			       ocsp, x509_name ( ocsp->cert ) );
 			DBGC ( ocsp, "signer \"%s\": %s\n",
@@ -973,7 +948,7 @@ int ocsp_validate ( struct ocsp_check *ocsp, time_t time ) {
 
 	/* Validate certificate against issuer */
 	if ( ( rc = x509_validate ( ocsp->cert, ocsp->issuer, time,
-				    &ocsp_root ) ) != 0 ) {
+				    ocsp->issuer->root ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" could not validate certificate: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
 		return rc;

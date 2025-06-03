@@ -46,6 +46,20 @@ struct parameters;
  *   scheme = "ftp", user = "joe", password = "secret",
  *   host = "insecure.org", port = "8081", path = "/hidden/path/to",
  *   query = "what=is", fragment = "this"
+ *
+ * The URI syntax includes a percent-encoding mechanism that can be
+ * used to represent characters that would otherwise not be possible,
+ * such as a '/' character within the password field.  These encodings
+ * are decoded during the URI parsing stage, thereby allowing protocol
+ * implementations to consume the raw field values directly without
+ * further decoding.
+ *
+ * Some protocols (such as HTTP) communicate using URI-encoded values.
+ * For these protocols, the original encoded substring must be
+ * retained verbatim since the choice of whether or not to encode a
+ * particular character may have significance to the receiving
+ * application.  We therefore retain the originally-encoded substrings
+ * for the path, query, and fragment fields.
  */
 struct uri {
 	/** Reference count */
@@ -62,13 +76,15 @@ struct uri {
 	const char *host;
 	/** Port number */
 	const char *port;
-	/** Path */
+	/** Path (after URI decoding) */
 	const char *path;
-	/** Query */
-	const char *query;
-	/** Fragment */
-	const char *fragment;
-	/** Form parameters */
+	/** Path (with original URI encoding) */
+	const char *epath;
+	/** Query (with original URI encoding) */
+	const char *equery;
+	/** Fragment (with original URI encoding) */
+	const char *efragment;
+	/** Request parameters */
 	struct parameters *params;
 } __attribute__ (( packed ));
 
@@ -100,8 +116,9 @@ enum uri_fields {
 	URI_HOST = URI_FIELD ( host ),
 	URI_PORT = URI_FIELD ( port ),
 	URI_PATH = URI_FIELD ( path ),
-	URI_QUERY = URI_FIELD ( query ),
-	URI_FRAGMENT = URI_FIELD ( fragment ),
+	URI_EPATH = URI_FIELD ( epath ),
+	URI_EQUERY = URI_FIELD ( equery ),
+	URI_EFRAGMENT = URI_FIELD ( efragment ),
 	URI_FIELDS
 };
 

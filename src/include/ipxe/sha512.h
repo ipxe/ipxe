@@ -72,6 +72,9 @@ struct sha512_context {
 /** SHA-512 context size */
 #define SHA512_CTX_SIZE sizeof ( struct sha512_context )
 
+/** SHA-512 block size */
+#define SHA512_BLOCK_SIZE sizeof ( union sha512_block )
+
 /** SHA-512 digest size */
 #define SHA512_DIGEST_SIZE sizeof ( struct sha512_digest )
 

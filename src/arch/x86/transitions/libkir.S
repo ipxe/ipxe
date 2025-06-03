@@ -31,10 +31,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 /* Breakpoint for when debugging under bochs */
 #define BOCHSBP xchgw %bx, %bx
 
-	.text
+	.section ".note.GNU-stack", "", @progbits
+	.code16
 	.arch i386
 	.section ".text16", "awx", @progbits
-	.code16
 	
 /****************************************************************************
  * init_libkir (real-mode or 16:xx protected-mode far call)

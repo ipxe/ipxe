@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/pci.h>
 #include <ipxe/acpi.h>
@@ -63,27 +64,123 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Open EFI PCI root bridge I/O protocol
+ * Find closest bus:dev.fn address range within a root bridge
  *
- * @v pci		PCI device
- * @ret handle		EFI PCI root bridge handle
- * @ret root		EFI PCI root bridge I/O protocol, or NULL if not found
+ * @v pci		Starting PCI device
+ * @v handle		EFI PCI root bridge handle
+ * @v range		PCI bus:dev.fn address range to fill in
  * @ret rc		Return status code
  */
-static int efipci_root_open ( struct pci_device *pci, EFI_HANDLE *handle,
-			      EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL **root ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_HANDLE *handles;
-	UINTN num_handles;
+static int efipci_discover_one ( struct pci_device *pci, EFI_HANDLE handle,
+				 struct pci_range *range ) {
+	EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
 	union {
-		void *interface;
-		EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *root;
-	} u;
+		union acpi_resource *res;
+		void *raw;
+	} acpi;
+	uint32_t best = 0;
+	uint32_t start;
+	uint32_t count;
+	uint32_t index;
+	unsigned int tag;
 	EFI_STATUS efirc;
-	UINTN i;
 	int rc;
 
-	/* Enumerate all handles */
+	/* Return empty range on error */
+	range->start = 0;
+	range->count = 0;
+
+	/* Open root bridge I/O protocol */
+	if ( ( rc = efi_open ( handle, &efi_pci_root_bridge_io_protocol_guid,
+			       &root ) ) != 0 ) {
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot open %s: %s\n",
+		       PCI_ARGS ( pci ), efi_handle_name ( handle ),
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	/* Get ACPI resource descriptors */
+	if ( ( efirc = root->Configuration ( root, &acpi.raw ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot get configuration for "
+		       "%s: %s\n", PCI_ARGS ( pci ),
+		       efi_handle_name ( handle ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Parse resource descriptors */
+	for ( ; ( ( tag = acpi_resource_tag ( acpi.res ) ) !=
+		  ACPI_END_RESOURCE ) ;
+	      acpi.res = acpi_resource_next ( acpi.res ) ) {
+
+		/* Ignore anything other than a bus number range descriptor */
+		if ( tag != ACPI_QWORD_ADDRESS_SPACE_RESOURCE )
+			continue;
+		if ( acpi.res->qword.type != ACPI_ADDRESS_TYPE_BUS )
+			continue;
+
+		/* Get range for this descriptor */
+		start = PCI_BUSDEVFN ( root->SegmentNumber,
+				       le64_to_cpu ( acpi.res->qword.min ),
+				       0, 0 );
+		count = PCI_BUSDEVFN ( 0, le64_to_cpu ( acpi.res->qword.len ),
+				       0, 0 );
+		DBGC2 ( pci, "EFIPCI " PCI_FMT " found %04x:[%02x-%02x] via "
+			"%s\n", PCI_ARGS ( pci ), root->SegmentNumber,
+			PCI_BUS ( start ), PCI_BUS ( start + count - 1 ),
+			efi_handle_name ( handle ) );
+
+		/* Check for a matching or new closest range */
+		index = ( pci->busdevfn - start );
+		if ( ( index < count ) || ( index > best ) ) {
+			range->start = start;
+			range->count = count;
+			best = index;
+		}
+
+		/* Stop if this range contains the target bus:dev.fn address */
+		if ( index < count )
+			break;
+	}
+
+	/* If no range descriptors were seen, assume that the root
+	 * bridge has a single bus.
+	 */
+	if ( ! range->count ) {
+		range->start = PCI_BUSDEVFN ( root->SegmentNumber, 0, 0, 0 );
+		range->count = PCI_BUSDEVFN ( 0, 1, 0, 0 );
+	}
+
+	return 0;
+}
+
+/**
+ * Find closest bus:dev.fn address range within any root bridge
+ *
+ * @v pci		Starting PCI device
+ * @v range		PCI bus:dev.fn address range to fill in
+ * @v handle		PCI root bridge I/O handle to fill in
+ * @ret rc		Return status code
+ */
+static int efipci_discover_any ( struct pci_device *pci,
+				 struct pci_range *range,
+				 EFI_HANDLE *handle ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	uint32_t best = 0;
+	uint32_t index;
+	struct pci_range tmp;
+	EFI_HANDLE *handles;
+	UINTN num_handles;
+	UINTN i;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Return an empty range and no handle on error */
+	range->start = 0;
+	range->count = 0;
+	*handle = NULL;
+
+	/* Enumerate all root bridge I/O protocol handles */
 	if ( ( efirc = bs->LocateHandleBuffer ( ByProtocol,
 			&efi_pci_root_bridge_io_protocol_guid,
 			NULL, &num_handles, &handles ) ) != 0 ) {
@@ -93,48 +190,87 @@ static int efipci_root_open ( struct pci_device *pci, EFI_HANDLE *handle,
 		goto err_locate;
 	}
 
-	/* Look for matching root bridge I/O protocol */
+	/* Iterate over all root bridge I/O protocols */
 	for ( i = 0 ; i < num_handles ; i++ ) {
-		*handle = handles[i];
-		if ( ( efirc = bs->OpenProtocol ( *handle,
-				&efi_pci_root_bridge_io_protocol_guid,
-				&u.interface, efi_image_handle, *handle,
-				EFI_OPEN_PROTOCOL_GET_PROTOCOL ) ) != 0 ) {
-			rc = -EEFI ( efirc );
-			DBGC ( pci, "EFIPCI " PCI_FMT " cannot open %s: %s\n",
-			       PCI_ARGS ( pci ), efi_handle_name ( *handle ),
-			       strerror ( rc ) );
-			continue;
-		}
-		if ( u.root->SegmentNumber == PCI_SEG ( pci->busdevfn ) ) {
-			*root = u.root;
-			bs->FreePool ( handles );
-			return 0;
-		}
-		bs->CloseProtocol ( *handle,
-				    &efi_pci_root_bridge_io_protocol_guid,
-				    efi_image_handle, *handle );
-	}
-	DBGC ( pci, "EFIPCI " PCI_FMT " found no root bridge\n",
-	       PCI_ARGS ( pci ) );
-	rc = -ENOENT;
 
+		/* Get matching or closest range for this root bridge */
+		if ( ( rc = efipci_discover_one ( pci, handles[i],
+						  &tmp ) ) != 0 )
+			continue;
+
+		/* Check for a matching or new closest range */
+		index = ( pci->busdevfn - tmp.start );
+		if ( ( index < tmp.count ) || ( index > best ) ) {
+			range->start = tmp.start;
+			range->count = tmp.count;
+			best = index;
+		}
+
+		/* Stop if this range contains the target bus:dev.fn address */
+		if ( index < tmp.count ) {
+			*handle = handles[i];
+			break;
+		}
+	}
+
+	/* Check for a range containing the target bus:dev.fn address */
+	if ( ! *handle ) {
+		rc = -ENOENT;
+		goto err_range;
+	}
+
+	/* Success */
+	rc = 0;
+
+ err_range:
 	bs->FreePool ( handles );
  err_locate:
 	return rc;
 }
 
 /**
- * Close EFI PCI root bridge I/O protocol
+ * Find next PCI bus:dev.fn address range in system
  *
- * @v handle		EFI PCI root bridge handle
+ * @v busdevfn		Starting PCI bus:dev.fn address
+ * @v range		PCI bus:dev.fn address range to fill in
  */
-static void efipci_root_close ( EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+static void efipci_discover ( uint32_t busdevfn, struct pci_range *range ) {
+	struct pci_device pci;
+	EFI_HANDLE handle;
 
-	/* Close protocol */
-	bs->CloseProtocol ( handle, &efi_pci_root_bridge_io_protocol_guid,
-			    efi_image_handle, handle );
+	/* Find range */
+	memset ( &pci, 0, sizeof ( pci ) );
+	pci_init ( &pci, busdevfn );
+	efipci_discover_any ( &pci, range, &handle );
+}
+
+/**
+ * Open EFI PCI root bridge I/O protocol for ephemeral use
+ *
+ * @v pci		PCI device
+ * @ret handle		EFI PCI root bridge handle
+ * @ret root		EFI PCI root bridge I/O protocol, or NULL if not found
+ * @ret rc		Return status code
+ */
+static int efipci_root_open ( struct pci_device *pci, EFI_HANDLE *handle,
+			      EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL **root ) {
+	struct pci_range tmp;
+	int rc;
+
+	/* Find matching root bridge I/O protocol handle */
+	if ( ( rc = efipci_discover_any ( pci, &tmp, handle ) ) != 0 )
+		return rc;
+
+	/* Open PCI root bridge I/O protocol */
+	if ( ( rc = efi_open ( *handle, &efi_pci_root_bridge_io_protocol_guid,
+			       root ) ) != 0 ) {
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot open %s: %s\n",
+		       PCI_ARGS ( pci ), efi_handle_name ( *handle ),
+		       strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -170,7 +306,7 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
 
 	/* Open root bridge */
 	if ( ( rc = efipci_root_open ( pci, &handle, &root ) ) != 0 )
-		goto err_root;
+		return rc;
 
 	/* Read from configuration space */
 	if ( ( efirc = root->Pci.Read ( root, EFIPCI_WIDTH ( location ),
@@ -180,13 +316,10 @@ int efipci_read ( struct pci_device *pci, unsigned long location,
 		DBGC ( pci, "EFIPCI " PCI_FMT " config read from offset %02lx "
 		       "failed: %s\n", PCI_ARGS ( pci ),
 		       EFIPCI_OFFSET ( location ), strerror ( rc ) );
-		goto err_read;
+		return rc;
 	}
 
- err_read:
-	efipci_root_close ( handle );
- err_root:
-	return rc;
+	return 0;
 }
 
 /**
@@ -206,7 +339,7 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 
 	/* Open root bridge */
 	if ( ( rc = efipci_root_open ( pci, &handle, &root ) ) != 0 )
-		goto err_root;
+		return rc;
 
 	/* Read from configuration space */
 	if ( ( efirc = root->Pci.Write ( root, EFIPCI_WIDTH ( location ),
@@ -216,13 +349,10 @@ int efipci_write ( struct pci_device *pci, unsigned long location,
 		DBGC ( pci, "EFIPCI " PCI_FMT " config write to offset %02lx "
 		       "failed: %s\n", PCI_ARGS ( pci ),
 		       EFIPCI_OFFSET ( location ), strerror ( rc ) );
-		goto err_write;
+		return rc;
 	}
 
- err_write:
-	efipci_root_close ( handle );
- err_root:
-	return rc;
+	return 0;
 }
 
 /**
@@ -263,16 +393,19 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	for ( ; ( ( tag = acpi_resource_tag ( u.res ) ) != ACPI_END_RESOURCE ) ;
 	      u.res = acpi_resource_next ( u.res ) ) {
 
-		/* Ignore anything other than an address space descriptor */
+		/* Ignore anything other than a memory range descriptor */
 		if ( tag != ACPI_QWORD_ADDRESS_SPACE_RESOURCE )
+			continue;
+		if ( u.res->qword.type != ACPI_ADDRESS_TYPE_MEM )
 			continue;
 
 		/* Ignore descriptors that do not cover this memory range */
-		if ( u.res->qword.type != ACPI_ADDRESS_TYPE_MEM )
-			continue;
 		offset = le64_to_cpu ( u.res->qword.offset );
 		start = ( offset + le64_to_cpu ( u.res->qword.min ) );
 		end = ( start + le64_to_cpu ( u.res->qword.len ) );
+		DBGC2 ( pci, "EFIPCI " PCI_FMT " found range [%08llx,%08llx) "
+			"-> [%08llx,%08llx)\n", PCI_ARGS ( pci ), start, end,
+			( start - offset ), ( end - offset ) );
 		if ( ( bus_addr < start ) || ( ( bus_addr + len ) > end ) )
 			continue;
 
@@ -290,12 +423,12 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	}
 
  err_config:
-	efipci_root_close ( handle );
  err_root:
 	return ioremap ( bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( efi, pci_num_bus );
+PROVIDE_PCIAPI_INLINE ( efi, pci_can_probe );
+PROVIDE_PCIAPI ( efi, pci_discover, efipci_discover );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_dword );
@@ -457,9 +590,13 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 		goto err_alloc;
 	}
 
+	/* Clear buffer */
+	memset ( addr, 0, ( pages * EFI_PAGE_SIZE ) );
+
 	/* Map buffer */
 	if ( ( rc = efipci_dma_map ( dma, map, virt_to_phys ( addr ),
-				     len, DMA_BI ) ) != 0 )
+				     ( pages * EFI_PAGE_SIZE ),
+				     DMA_BI ) ) != 0 )
 		goto err_map;
 
 	/* Increment allocation count (for debugging) */
@@ -505,38 +642,6 @@ static void efipci_dma_free ( struct dma_device *dma, struct dma_mapping *map,
 }
 
 /**
- * Allocate and map DMA-coherent buffer from external (user) memory
- *
- * @v dma		DMA device
- * @v map		DMA mapping to fill in
- * @v len		Length of buffer
- * @v align		Physical alignment
- * @ret addr		Buffer address, or NULL on error
- */
-static userptr_t efipci_dma_umalloc ( struct dma_device *dma,
-				      struct dma_mapping *map,
-				      size_t len, size_t align ) {
-	void *addr;
-
-	addr = efipci_dma_alloc ( dma, map, len, align );
-	return virt_to_user ( addr );
-}
-
-/**
- * Unmap and free DMA-coherent buffer from external (user) memory
- *
- * @v dma		DMA device
- * @v map		DMA mapping
- * @v addr		Buffer address
- * @v len		Length of buffer
- */
-static void efipci_dma_ufree ( struct dma_device *dma, struct dma_mapping *map,
-			       userptr_t addr, size_t len ) {
-
-	efipci_dma_free ( dma, map, user_to_virt ( addr, 0 ), len );
-}
-
-/**
  * Set addressable space mask
  *
  * @v dma		DMA device
@@ -574,8 +679,8 @@ static struct dma_operations efipci_dma_operations = {
 	.unmap = efipci_dma_unmap,
 	.alloc = efipci_dma_alloc,
 	.free = efipci_dma_free,
-	.umalloc = efipci_dma_umalloc,
-	.ufree = efipci_dma_ufree,
+	.umalloc = efipci_dma_alloc,
+	.ufree = efipci_dma_free,
 	.set_mask = efipci_dma_set_mask,
 };
 
@@ -587,44 +692,35 @@ static struct dma_operations efipci_dma_operations = {
  */
 
 /**
- * Open EFI PCI device
+ * Get EFI PCI device information
  *
  * @v device		EFI device handle
- * @v attributes	Protocol opening attributes
  * @v efipci		EFI PCI device to fill in
  * @ret rc		Return status code
  */
-int efipci_open ( EFI_HANDLE device, UINT32 attributes,
-		  struct efi_pci_device *efipci ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_PCI_IO_PROTOCOL *pci_io;
-		void *interface;
-	} pci_io;
+int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
+	EFI_PCI_IO_PROTOCOL *pci_io;
 	UINTN pci_segment, pci_bus, pci_dev, pci_fn;
 	unsigned int busdevfn;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* See if device is a PCI device */
-	if ( ( efirc = bs->OpenProtocol ( device, &efi_pci_io_protocol_guid,
-					  &pci_io.interface, efi_image_handle,
-					  device, attributes ) ) != 0 ) {
-		rc = -EEFI_PCI ( efirc );
+	if ( ( rc = efi_open ( device, &efi_pci_io_protocol_guid,
+			       &pci_io ) ) != 0 ) {
 		DBGCP ( device, "EFIPCI %s cannot open PCI protocols: %s\n",
 			efi_handle_name ( device ), strerror ( rc ) );
-		goto err_open_protocol;
+		return rc;
 	}
-	efipci->io = pci_io.pci_io;
+	efipci->io = pci_io;
 
 	/* Get PCI bus:dev.fn address */
-	if ( ( efirc = pci_io.pci_io->GetLocation ( pci_io.pci_io, &pci_segment,
-						    &pci_bus, &pci_dev,
-						    &pci_fn ) ) != 0 ) {
+	if ( ( efirc = pci_io->GetLocation ( pci_io, &pci_segment, &pci_bus,
+					     &pci_dev, &pci_fn ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFIPCI %s could not get PCI location: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
-		goto err_get_location;
+		return rc;
 	}
 	busdevfn = PCI_BUSDEVFN ( pci_segment, pci_bus, pci_dev, pci_fn );
 	pci_init ( &efipci->pci, busdevfn );
@@ -638,63 +734,20 @@ int efipci_open ( EFI_HANDLE device, UINT32 attributes,
 	 * support I/O cycles).  Work around any such platforms by
 	 * enabling bits individually and simply ignoring any errors.
 	 */
-	pci_io.pci_io->Attributes ( pci_io.pci_io,
-				    EfiPciIoAttributeOperationEnable,
-				    EFI_PCI_IO_ATTRIBUTE_IO, NULL );
-	pci_io.pci_io->Attributes ( pci_io.pci_io,
-				    EfiPciIoAttributeOperationEnable,
-				    EFI_PCI_IO_ATTRIBUTE_MEMORY, NULL );
-	pci_io.pci_io->Attributes ( pci_io.pci_io,
-				    EfiPciIoAttributeOperationEnable,
-				    EFI_PCI_IO_ATTRIBUTE_BUS_MASTER, NULL );
+	pci_io->Attributes ( pci_io, EfiPciIoAttributeOperationEnable,
+			     EFI_PCI_IO_ATTRIBUTE_IO, NULL );
+	pci_io->Attributes ( pci_io, EfiPciIoAttributeOperationEnable,
+			     EFI_PCI_IO_ATTRIBUTE_MEMORY, NULL );
+	pci_io->Attributes ( pci_io, EfiPciIoAttributeOperationEnable,
+			     EFI_PCI_IO_ATTRIBUTE_BUS_MASTER, NULL );
 
 	/* Populate PCI device */
 	if ( ( rc = pci_read_config ( &efipci->pci ) ) != 0 ) {
 		DBGC ( device, "EFIPCI " PCI_FMT " cannot read PCI "
 		       "configuration: %s\n",
 		       PCI_ARGS ( &efipci->pci ), strerror ( rc ) );
-		goto err_pci_read_config;
-	}
-
-	return 0;
-
- err_pci_read_config:
- err_get_location:
-	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, device );
- err_open_protocol:
-	return rc;
-}
-
-/**
- * Close EFI PCI device
- *
- * @v device		EFI device handle
- */
-void efipci_close ( EFI_HANDLE device ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-
-	bs->CloseProtocol ( device, &efi_pci_io_protocol_guid,
-			    efi_image_handle, device );
-}
-
-/**
- * Get EFI PCI device information
- *
- * @v device		EFI device handle
- * @v efipci		EFI PCI device to fill in
- * @ret rc		Return status code
- */
-int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
-	int rc;
-
-	/* Open PCI device, if possible */
-	if ( ( rc = efipci_open ( device, EFI_OPEN_PROTOCOL_GET_PROTOCOL,
-				  efipci ) ) != 0 )
 		return rc;
-
-	/* Close PCI device */
-	efipci_close ( device );
+	}
 
 	return 0;
 }
@@ -714,11 +767,21 @@ int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
  */
 static int efipci_supported ( EFI_HANDLE device ) {
 	struct efi_pci_device efipci;
+	uint8_t hdrtype;
 	int rc;
 
 	/* Get PCI device information */
 	if ( ( rc = efipci_info ( device, &efipci ) ) != 0 )
 		return rc;
+
+	/* Do not attempt to drive bridges */
+	hdrtype = efipci.pci.hdrtype;
+	if ( ( hdrtype & PCI_HEADER_TYPE_MASK ) != PCI_HEADER_TYPE_NORMAL ) {
+		DBGC ( device, "EFIPCI " PCI_FMT " type %02x is not type %02x\n",
+		       PCI_ARGS ( &efipci.pci ), hdrtype,
+		       PCI_HEADER_TYPE_NORMAL );
+		return -ENOTTY;
+	}
 
 	/* Look for a driver */
 	if ( ( rc = pci_find_driver ( &efipci.pci ) ) != 0 ) {
@@ -731,6 +794,26 @@ static int efipci_supported ( EFI_HANDLE device ) {
 	DBGC ( device, "EFIPCI " PCI_FMT " (%04x:%04x class %06x) has driver "
 	       "\"%s\"\n", PCI_ARGS ( &efipci.pci ), efipci.pci.vendor,
 	       efipci.pci.device, efipci.pci.class, efipci.pci.id->name );
+
+	return 0;
+}
+
+/**
+ * Exclude existing drivers
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+static int efipci_exclude ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_pci_io_protocol_guid;
+	int rc;
+
+	/* Exclude existing PCI I/O protocol drivers */
+	if ( ( rc = efi_driver_exclude ( device, protocol ) ) != 0 ) {
+		DBGC ( device, "EFIPCI %s could not exclude drivers: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
 
 	return 0;
 }
@@ -753,10 +836,13 @@ static int efipci_start ( struct efi_device *efidev ) {
 		goto err_alloc;
 	}
 
-	/* Open PCI device */
-	if ( ( rc = efipci_open ( device, ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE ),
-				  efipci ) ) != 0 ) {
+	/* Get PCI device information */
+	if ( ( rc = efipci_info ( device, efipci ) ) != 0 )
+		goto err_info;
+
+	/* Open PCI I/O protocol */
+	if ( ( rc = efi_open_by_driver ( device, &efi_pci_io_protocol_guid,
+					 &efipci->io ) ) != 0 ) {
 		DBGC ( device, "EFIPCI %s could not open PCI device: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( device, device, &efi_pci_io_protocol_guid );
@@ -791,8 +877,9 @@ static int efipci_start ( struct efi_device *efidev ) {
  err_probe:
 	list_del ( &efipci->pci.dev.siblings );
  err_find_driver:
-	efipci_close ( device );
+	efi_close_by_driver ( device, &efi_pci_io_protocol_guid );
  err_open:
+ err_info:
 	free ( efipci );
  err_alloc:
 	return rc;
@@ -811,14 +898,15 @@ static void efipci_stop ( struct efi_device *efidev ) {
 	list_del ( &efipci->pci.dev.siblings );
 	assert ( efipci->pci.dma.mapped == 0 );
 	assert ( efipci->pci.dma.allocated == 0 );
-	efipci_close ( device );
+	efi_close_by_driver ( device, &efi_pci_io_protocol_guid );
 	free ( efipci );
 }
 
 /** EFI PCI driver */
-struct efi_driver efipci_driver __efi_driver ( EFI_DRIVER_NORMAL ) = {
+struct efi_driver efipci_driver __efi_driver ( EFI_DRIVER_HARDWARE ) = {
 	.name = "PCI",
 	.supported = efipci_supported,
+	.exclude = efipci_exclude,
 	.start = efipci_start,
 	.stop = efipci_stop,
 };

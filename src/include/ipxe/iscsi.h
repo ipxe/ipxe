@@ -22,6 +22,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Default iSCSI port */
 #define ISCSI_PORT 3260
 
+/** Default iSCSI first burst length */
+#define ISCSI_FIRST_BURST_LEN 65536
+
+/** Default iSCSI maximum burst length */
+#define ISCSI_MAX_BURST_LEN 262144
+
+/** Default iSCSI maximum receive data segment length */
+#define ISCSI_MAX_RECV_DATA_SEG_LEN 8192
+
 /**
  * iSCSI segment lengths
  *
@@ -576,6 +585,9 @@ struct iscsi_session {
 	unsigned char chap_challenge[17];
 	/** CHAP response (used for both initiator and target auth) */
 	struct chap_response chap;
+
+	/** Maximum burst length */
+	size_t max_burst_len;
 
 	/** Initiator session ID (IANA format) qualifier
 	 *

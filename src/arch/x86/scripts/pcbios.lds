@@ -58,11 +58,12 @@ SECTIONS {
 	*(SORT(.pci_devlist.*))
 	*(.prefix.*)
 	_mprefix = .;
-    } .bss.prefix (NOLOAD) : AT ( _end_lma ) {
+    } .bss.prefix (NOLOAD) : AT ( _bss_prefix_lma ) {
 	_eprefix = .;
     }
     _prefix_filesz	= ABSOLUTE ( _mprefix ) - ABSOLUTE ( _prefix );
     _prefix_memsz	= ABSOLUTE ( _eprefix ) - ABSOLUTE ( _prefix );
+    _prefix_padsz	= ABSOLUTE ( _eprefix ) - ABSOLUTE ( _mprefix );
 
     /*
      * The 16-bit (real-mode) code section
@@ -82,7 +83,7 @@ SECTIONS {
 	*(.text16)
 	*(.text16.*)
 	_mtext16 = .;
-    } .bss.text16 (NOLOAD) : AT ( _end_lma ) {
+    } .bss.text16 (NOLOAD) : AT ( _bss_text16_lma ) {
 	_etext16 = .;
     }
     _text16_early_filesz = ABSOLUTE ( _etext16_early ) - ABSOLUTE ( _text16 );
@@ -90,6 +91,7 @@ SECTIONS {
     _text16_late_filesz	= ABSOLUTE ( _mtext16 ) - ABSOLUTE ( _text16_late );
     _text16_late_memsz	= ABSOLUTE ( _etext16 ) - ABSOLUTE ( _text16_late );
     _text16_memsz	= ABSOLUTE ( _etext16 ) - ABSOLUTE ( _text16 );
+    _text16_padsz	= ABSOLUTE ( _etext16 ) - ABSOLUTE ( _mtext16 );
 
     /*
      * The 16-bit (real-mode) data section
@@ -104,7 +106,7 @@ SECTIONS {
 	*(.data16)
 	*(.data16.*)
 	_mdata16 = .;
-    } .bss.data16 (NOLOAD) : AT ( _end_lma ) {
+    } .bss.data16 (NOLOAD) : AT ( _bss_data16_lma ) {
 	*(.bss16)
 	*(.bss16.*)
 	*(.stack16)
@@ -114,6 +116,7 @@ SECTIONS {
     }
     _data16_filesz	= ABSOLUTE ( _mdata16 ) - ABSOLUTE ( _data16 );
     _data16_memsz	= ABSOLUTE ( _edata16 ) - ABSOLUTE ( _data16 );
+    _data16_padsz	= ABSOLUTE ( _edata16 ) - ABSOLUTE ( _mdata16 );
 
     /*
      * The 32-bit sections
@@ -135,7 +138,7 @@ SECTIONS {
 	KEEP(*(.provided))
 	KEEP(*(.provided.*))
 	_mtextdata = .;
-    } .bss.textdata (NOLOAD) : AT ( _end_lma ) {
+    } .bss.textdata (NOLOAD) : AT ( _bss_textdata_lma ) {
 	*(.bss)
 	*(.bss.*)
 	*(COMMON)
@@ -157,6 +160,7 @@ SECTIONS {
     }
     _textdata_filesz	= ABSOLUTE ( _mtextdata ) - ABSOLUTE ( _textdata );
     _textdata_memsz	= ABSOLUTE ( _etextdata ) - ABSOLUTE ( _textdata );
+    _textdata_padsz	= ABSOLUTE ( _etextdata ) - ABSOLUTE ( _mtextdata );
 
     /*
      * Payload prefix
@@ -169,11 +173,12 @@ SECTIONS {
 	KEEP(*(.pprefix))
 	KEEP(*(.pprefix.*))
 	_mpprefix = .;
-    } .bss.pprefix (NOLOAD) : AT ( _end_lma ) {
+    } .bss.pprefix (NOLOAD) : AT ( _bss_pprefix_lma ) {
 	_epprefix = .;
     }
     _pprefix_filesz	= ABSOLUTE ( _mpprefix ) - ABSOLUTE ( _pprefix );
     _pprefix_memsz	= ABSOLUTE ( _epprefix ) - ABSOLUTE ( _pprefix );
+    _pprefix_padsz	= ABSOLUTE ( _epprefix ) - ABSOLUTE ( _mpprefix );
 
     /*
      * Compressor information block
@@ -185,11 +190,12 @@ SECTIONS {
 	KEEP(*(.zinfo))
 	KEEP(*(.zinfo.*))
 	_mzinfo = .;
-    } .bss.zinfo (NOLOAD) : AT ( _end_lma ) {
+    } .bss.zinfo (NOLOAD) : AT ( _bss_zinfo_lma ) {
 	_ezinfo = .;
     }
     _zinfo_filesz	= ABSOLUTE ( _mzinfo ) - ABSOLUTE ( _zinfo );
     _zinfo_memsz	= ABSOLUTE ( _ezinfo ) - ABSOLUTE ( _zinfo );
+    _zinfo_padsz	= ABSOLUTE ( _ezinfo ) - ABSOLUTE ( _mzinfo );
 
     /*
      * Weak symbols that need zero values if not otherwise defined
@@ -223,6 +229,8 @@ SECTIONS {
 	*(.einfo.*)
 	*(.discard)
 	*(.discard.*)
+	*(.sbat)
+	*(.sbat.*)
     }
 
     /*
@@ -235,36 +243,65 @@ SECTIONS {
 
     .			= ALIGN ( _max_align );
     _prefix_lma		= .;
-    .			+= _prefix_filesz;
+    .			+= ABSOLUTE ( _prefix_filesz );
 
     .			= ALIGN ( _max_align );
     _text16_early_lma	= .;
-    .			+= _text16_early_filesz;
+    .			+= ABSOLUTE ( _text16_early_filesz );
 
     .			= ALIGN ( _max_align );
     .			= ALIGN ( _payload_align );
     _pprefix_lma	= .;
-    .			+= _pprefix_filesz;
+    .			+= ABSOLUTE ( _pprefix_filesz );
 
     .			= ALIGN ( _max_align );
     _payload_lma	= .;
     _pprefix_skip	= ABSOLUTE ( _payload_lma ) - ABSOLUTE ( _pprefix_lma );
     _text16_late_lma	= .;
-    .			+= _text16_late_filesz;
+    .			+= ABSOLUTE ( _text16_late_filesz );
 
     .			= ALIGN ( _max_align );
     _data16_lma		= .;
-    .			+= _data16_filesz;
+    .			+= ABSOLUTE ( _data16_filesz );
 
     .			= ALIGN ( _max_align );
     _textdata_lma	= .;
-    .			+= _textdata_filesz;
+    .			+= ABSOLUTE ( _textdata_filesz );
 
-    _filesz		= .; /* Do not include zinfo block in file size */
+    _filesz		= .; /* Do not include .bss.* or .zinfo in file size */
+
+    /*
+     * Dummy load addresses for .bss.* and .zinfo sections
+     *
+     */
+
+    .			= ALIGN ( _max_align );
+    _bss_prefix_lma	= .;
+    .			+= ABSOLUTE ( _prefix_padsz );
+
+    .			= ALIGN ( _max_align );
+    _bss_text16_lma	= .;
+    .			+= ABSOLUTE ( _text16_padsz );
+
+    .			= ALIGN ( _max_align );
+    _bss_data16_lma	= .;
+    .			+= ABSOLUTE ( _data16_padsz );
+
+    .			= ALIGN ( _max_align );
+    _bss_textdata_lma	= .;
+    .			+= ABSOLUTE ( _textdata_padsz );
+
+    .			= ALIGN ( _max_align );
+    _bss_pprefix_lma	= .;
+    .			+= ABSOLUTE ( _pprefix_padsz );
+
+    .			= ALIGN ( _max_align );
+    _bss_zinfo_lma	= .;
+    .			+= ABSOLUTE ( _zinfo_padsz );
 
     .			= ALIGN ( _max_align );
     _zinfo_lma		= .;
-    .			+= _zinfo_filesz;
+    .			+= ABSOLUTE ( _zinfo_filesz );
 
     .			= ALIGN ( _max_align );
     _end_lma		= .;

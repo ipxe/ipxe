@@ -870,6 +870,7 @@ static int xsmp_rx_xve_modify ( struct xsigo_manager *xcm,
 	 * erroneously transmitted as little-endian.
 	 */
 	mtu = ntohs ( msg->mtu );
+	memset ( &tca, 0, sizeof ( tca ) );
 	tca.qpn = ntohl ( msg->tca.data );
 	tca.qkey = ntohs ( msg->tca.qkey );
 	tca.gid_present = 1;
@@ -1828,8 +1829,10 @@ struct ib_driver xsigo_ib_driver __ib_driver = {
  * Handle device or link status change
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void xsigo_net_notify ( struct net_device *netdev ) {
+static void xsigo_net_notify ( struct net_device *netdev,
+			       void *priv __unused ) {
 	struct xsigo_device *xdev;
 	struct ib_device *ibdev;
 	struct xsigo_manager *xcm;

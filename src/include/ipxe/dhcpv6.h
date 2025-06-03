@@ -276,6 +276,6 @@ static inline void ipv6_all_dhcp_relay_and_servers ( struct in6_addr *addr ) {
 }
 
 extern int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
-			  int stateful );
+			  struct in6_addr *router, int stateful );
 
 #endif /* _IPXE_DHCPV6_H */

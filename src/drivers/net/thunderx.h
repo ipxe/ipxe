@@ -12,7 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/list.h>
 #include <ipxe/netdevice.h>
-#include <ipxe/uaccess.h>
 
 /******************************************************************************
  *
@@ -188,7 +187,7 @@ struct txnic_sq {
 	/** Consumer counter */
 	unsigned int cons;
 	/** Send queue entries */
-	userptr_t sqe;
+	struct txnic_sqe *sqe;
 };
 
 /******************************************************************************
@@ -280,7 +279,7 @@ struct txnic_rq {
 	/** Consumer counter */
 	unsigned int cons;
 	/** Receive queue entries */
-	userptr_t rqe;
+	struct txnic_rqe *rqe;
 	/** I/O buffers */
 	struct io_buffer *iobuf[TXNIC_RQ_FILL];
 };
@@ -381,6 +380,8 @@ union txnic_cqe {
 	struct txnic_cqe_send send;
 	/** Receive completion */
 	struct txnic_cqe_rx rx;
+	/** Padding */
+	uint8_t pad[512];
 };
 
 /** Number of completion queue entries
@@ -393,7 +394,7 @@ union txnic_cqe {
 #define TXNIC_CQ_ALIGN 512
 
 /** Completion queue stride */
-#define TXNIC_CQ_STRIDE 512
+#define TXNIC_CQ_STRIDE sizeof ( union txnic_cqe )
 
 /** Completion queue size */
 #define TXNIC_CQ_SIZE ( TXNIC_CQES * TXNIC_CQ_STRIDE )
@@ -403,7 +404,7 @@ struct txnic_cq {
 	/** Consumer counter */
 	unsigned int cons;
 	/** Completion queue entries */
-	userptr_t cqe;
+	union txnic_cqe *cqe;
 };
 
 /******************************************************************************

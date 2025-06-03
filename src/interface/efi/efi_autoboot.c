@@ -23,7 +23,12 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <string.h>
+#include <errno.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/vlan.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_autoboot.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <usr/autoboot.h>
@@ -37,35 +42,44 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /**
  * Identify autoboot device
  *
+ * @v device		Device handle
+ * @v path		Device path
+ * @ret rc		Return status code
  */
-void efi_set_autoboot ( void ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	union {
-		EFI_SIMPLE_NETWORK_PROTOCOL *snp;
-		void *interface;
-	} snp;
+int efi_set_autoboot_ll_addr ( EFI_HANDLE device,
+			       EFI_DEVICE_PATH_PROTOCOL *path ) {
+	EFI_SIMPLE_NETWORK_PROTOCOL *snp;
 	EFI_SIMPLE_NETWORK_MODE *mode;
-	EFI_STATUS efirc;
+	unsigned int vlan;
+	int rc;
 
 	/* Look for an SNP instance on the image's device handle */
-	if ( ( efirc = bs->OpenProtocol ( efi_loaded_image->DeviceHandle,
-					  &efi_simple_network_protocol_guid,
-					  &snp.interface, efi_image_handle,
-					  NULL,
-					  EFI_OPEN_PROTOCOL_GET_PROTOCOL ))!=0){
-		DBGC ( efi_loaded_image, "EFI found no autoboot device\n" );
-		return;
+	if ( ( rc = efi_open ( device, &efi_simple_network_protocol_guid,
+			       &snp ) ) != 0 ) {
+		DBGC ( device, "EFI %s has no SNP instance: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
 	}
 
 	/* Record autoboot device */
-	mode = snp.snp->Mode;
-	set_autoboot_ll_addr ( &mode->CurrentAddress, mode->HwAddressSize );
-	DBGC ( efi_loaded_image, "EFI found autoboot link-layer address:\n" );
-	DBGC_HDA ( efi_loaded_image, 0, &mode->CurrentAddress,
-		   mode->HwAddressSize );
+	mode = snp->Mode;
+	vlan = efi_path_vlan ( path );
+	set_autoboot_ll_addr ( &mode->CurrentAddress, mode->HwAddressSize,
+			       vlan );
+	DBGC ( device, "EFI %s found autoboot link-layer address:\n",
+	       efi_handle_name ( device ) );
+	DBGC_HDA ( device, 0, &mode->CurrentAddress, mode->HwAddressSize );
+	if ( vlan ) {
+		DBGC ( device, "EFI %s found autoboot VLAN %d\n",
+		       efi_handle_name ( device ), vlan );
+	}
 
-	/* Close protocol */
-	bs->CloseProtocol ( efi_loaded_image->DeviceHandle,
-			    &efi_simple_network_protocol_guid,
-			    efi_image_handle, NULL );
+	/* Configure automatic VLAN device, if applicable */
+	if ( vlan && ( mode->HwAddressSize == ETH_ALEN ) ) {
+		vlan_auto ( &mode->CurrentAddress, vlan );
+		DBGC ( device, "EFI %s configured automatic VLAN %d\n",
+		       efi_handle_name ( device ), vlan );
+	}
+
+	return 0;
 }

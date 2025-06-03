@@ -61,11 +61,26 @@ struct vlan_header {
  */
 #define VLAN_PRIORITY_IS_VALID( priority ) ( (priority) <= 7 )
 
-extern unsigned int vlan_tag ( struct net_device *netdev );
+extern unsigned int vlan_tci ( struct net_device *netdev );
+
+/**
+ * Get the VLAN tag
+ *
+ * @v netdev		Network device
+ * @ret tag		VLAN tag, or 0 if device is not a VLAN device
+ */
+static inline __attribute__ (( always_inline )) unsigned int
+vlan_tag ( struct net_device *netdev ) {
+	return VLAN_TAG ( vlan_tci ( netdev ) );
+}
+
+extern struct net_device * vlan_find ( struct net_device *trunk,
+				       unsigned int tag );
 extern int vlan_can_be_trunk ( struct net_device *trunk );
 extern int vlan_create ( struct net_device *trunk, unsigned int tag,
 			 unsigned int priority );
 extern int vlan_destroy ( struct net_device *netdev );
+extern void vlan_auto ( const void *ll_addr, unsigned int tag );
 extern void vlan_netdev_rx ( struct net_device *netdev, unsigned int tag,
 			     struct io_buffer *iobuf );
 extern void vlan_netdev_rx_err ( struct net_device *netdev, unsigned int tag,

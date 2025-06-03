@@ -31,7 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
+#include <string.h>
 #include <ipxe/blocktrans.h>
 #include <ipxe/blockdev.h>
 #include <ipxe/acpi.h>
@@ -52,7 +52,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret rc		Return status code
  */
 int http_block_read ( struct http_transaction *http, struct interface *data,
-		      uint64_t lba, unsigned int count, userptr_t buffer,
+		      uint64_t lba, unsigned int count, void *buffer,
 		      size_t len ) {
 	struct http_request_range range;
 	int rc;
@@ -101,7 +101,7 @@ int http_block_read_capacity ( struct http_transaction *http,
 		goto err_open;
 
 	/* Insert block device translator */
-	if ( ( rc = block_translate ( data, UNULL, HTTP_BLKSIZE ) ) != 0 ) {
+	if ( ( rc = block_translate ( data, NULL, HTTP_BLKSIZE ) ) != 0 ) {
 		DBGC ( http, "HTTP %p could not insert block translator: %s\n",
 		       http, strerror ( rc ) );
 		goto err_translate;

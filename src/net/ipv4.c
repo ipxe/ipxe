@@ -85,9 +85,18 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
 				struct in_addr address, struct in_addr netmask,
 				struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
+	struct in_addr hostmask;
+	struct in_addr broadcast;
 
+	/* Calculate host mask */
+	hostmask.s_addr = ( IN_IS_SMALL ( netmask.s_addr ) ?
+			    INADDR_NONE : ~netmask.s_addr );
+	broadcast.s_addr = ( address.s_addr | hostmask.s_addr );
+
+	/* Print debugging information */
 	DBGC ( netdev, "IPv4 add %s", inet_ntoa ( address ) );
 	DBGC ( netdev, "/%s ", inet_ntoa ( netmask ) );
+	DBGC ( netdev, "bc %s ", inet_ntoa ( broadcast ) );
 	if ( gateway.s_addr )
 		DBGC ( netdev, "gw %s ", inet_ntoa ( gateway ) );
 	DBGC ( netdev, "via %s\n", netdev->name );
@@ -103,8 +112,9 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
 	miniroute->netdev = netdev_get ( netdev );
 	miniroute->address = address;
 	miniroute->netmask = netmask;
+	miniroute->hostmask = hostmask;
 	miniroute->gateway = gateway;
-		
+
 	/* Add to end of list if we have a gateway, otherwise
 	 * to start of list.
 	 */
@@ -163,7 +173,7 @@ static struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
 			/* If destination is non-global, and the scope ID
 			 * matches this network device, then use this route.
 			 */
-			if ( miniroute->netdev->index == scope_id )
+			if ( miniroute->netdev->scope_id == scope_id )
 				return miniroute;
 
 		} else {
@@ -310,7 +320,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	struct sockaddr_in *sin_dest = ( ( struct sockaddr_in * ) st_dest );
 	struct ipv4_miniroute *miniroute;
 	struct in_addr next_hop;
-	struct in_addr netmask = { .s_addr = 0 };
+	struct in_addr hostmask = { .s_addr = INADDR_NONE };
 	uint8_t ll_dest_buf[MAX_LL_ADDR_LEN];
 	const void *ll_dest;
 	int rc;
@@ -338,7 +348,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 	     ( ( miniroute = ipv4_route ( sin_dest->sin_scope_id,
 					  &next_hop ) ) != NULL ) ) {
 		iphdr->src = miniroute->address;
-		netmask = miniroute->netmask;
+		hostmask = miniroute->hostmask;
 		netdev = miniroute->netdev;
 	}
 	if ( ! netdev ) {
@@ -373,7 +383,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		ntohs ( iphdr->chksum ) );
 
 	/* Calculate link-layer destination address, if possible */
-	if ( ( ( next_hop.s_addr ^ INADDR_BROADCAST ) & ~netmask.s_addr ) == 0){
+	if ( ( ( ~next_hop.s_addr ) & hostmask.s_addr ) == 0 ) {
 		/* Broadcast address */
 		ipv4_stats.out_bcast_pkts++;
 		ll_dest = netdev->ll_broadcast;

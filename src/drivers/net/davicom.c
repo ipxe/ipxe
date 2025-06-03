@@ -159,7 +159,7 @@ static void davicom_reset(struct nic *nic);
 static void davicom_transmit(struct nic *nic, const char *d, unsigned int t,
 			   unsigned int s, const char *p);
 static int davicom_poll(struct nic *nic, int retrieve);
-static void davicom_disable(struct nic *nic);
+static void davicom_disable(struct nic *nic, void *hwdev);
 static void davicom_wait(unsigned int nticks);
 static int phy_read(int);
 static void phy_write(int, u16);
@@ -601,7 +601,7 @@ static int davicom_poll(struct nic *nic, int retrieve)
 /*********************************************************************/
 /* eth_disable - Disable the interface                               */
 /*********************************************************************/
-static void davicom_disable ( struct nic *nic ) {
+static void davicom_disable ( struct nic *nic, void *hwdev __unused ) {
 
   whereami("davicom_disable\n");
 
@@ -689,9 +689,9 @@ static struct nic_operations davicom_operations = {
 };
 
 static struct pci_device_id davicom_nics[] = {
+PCI_ROM(0x1282, 0x9009, "davicom9009", "Davicom 9009", 0),
 PCI_ROM(0x1282, 0x9100, "davicom9100", "Davicom 9100", 0),
 PCI_ROM(0x1282, 0x9102, "davicom9102", "Davicom 9102", 0),
-PCI_ROM(0x1282, 0x9009, "davicom9009", "Davicom 9009", 0),
 PCI_ROM(0x1282, 0x9132, "davicom9132", "Davicom 9132", 0),	/* Needs probably some fixing */
 };
 

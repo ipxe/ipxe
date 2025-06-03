@@ -89,7 +89,7 @@ static __attribute__ (( unused )) void txnic_diag ( struct txnic *vnic ) {
 	       ( ( vnic->rq.cons % TXNIC_RQES ) * TXNIC_RQ_STRIDE ),
 	       readq ( vnic->regs + TXNIC_QS_RBDR_HEAD(0) ),
 	       readq ( vnic->regs + TXNIC_QS_RBDR_STATUS0(0) ) );
-	DBGC ( vnic, "TXNIC %s CQ xxxxx(%05llx)/%05x(%05llx) %08llx:%08llx\n",
+	DBGC ( vnic, "TXNIC %s CQ xxxxx(%05llx)/%05zx(%05llx) %08llx:%08llx\n",
 	       vnic->name, readq ( vnic->regs + TXNIC_QS_CQ_TAIL(0) ),
 	       ( ( vnic->cq.cons % TXNIC_CQES ) * TXNIC_CQ_STRIDE ),
 	       readq ( vnic->regs + TXNIC_QS_CQ_HEAD(0) ),
@@ -118,14 +118,14 @@ static int txnic_create_sq ( struct txnic *vnic ) {
 	writeq ( TXNIC_QS_SQ_CFG_RESET, ( vnic->regs + TXNIC_QS_SQ_CFG(0) ) );
 
 	/* Configure and enable send queue */
-	writeq ( user_to_phys ( vnic->sq.sqe, 0 ),
+	writeq ( virt_to_phys ( vnic->sq.sqe ),
 		 ( vnic->regs + TXNIC_QS_SQ_BASE(0) ) );
 	writeq ( ( TXNIC_QS_SQ_CFG_ENA | TXNIC_QS_SQ_CFG_QSIZE_1K ),
 		 ( vnic->regs + TXNIC_QS_SQ_CFG(0) ) );
 
 	DBGC ( vnic, "TXNIC %s SQ at [%08lx,%08lx)\n",
-	       vnic->name, user_to_phys ( vnic->sq.sqe, 0 ),
-	       user_to_phys ( vnic->sq.sqe, TXNIC_SQ_SIZE ) );
+	       vnic->name, virt_to_phys ( vnic->sq.sqe ),
+	       ( virt_to_phys ( vnic->sq.sqe ) + TXNIC_SQ_SIZE ) );
 	return 0;
 }
 
@@ -184,9 +184,8 @@ static void txnic_destroy_sq ( struct txnic *vnic ) {
  * @ret rc		Return status code
  */
 static int txnic_send ( struct txnic *vnic, struct io_buffer *iobuf ) {
-	struct txnic_sqe sqe;
+	struct txnic_sqe *sqe;
 	unsigned int sq_idx;
-	size_t offset;
 	size_t len;
 
 	/* Get next send queue entry */
@@ -196,23 +195,20 @@ static int txnic_send ( struct txnic *vnic, struct io_buffer *iobuf ) {
 		return -ENOBUFS;
 	}
 	sq_idx = ( vnic->sq.prod++ % TXNIC_SQES );
-	offset = ( sq_idx * TXNIC_SQ_STRIDE );
+	sqe = &vnic->sq.sqe[sq_idx];
 
 	/* Populate send descriptor */
 	len = iob_len ( iobuf );
-	memset ( &sqe, 0, sizeof ( sqe ) );
-	sqe.hdr.total = cpu_to_le32 ( ( len >= ETH_ZLEN ) ? len : ETH_ZLEN );
-	sqe.hdr.subdcnt = ( TXNIC_SQE_SUBDESCS - 1 );
-	sqe.hdr.flags = TXNIC_SEND_HDR_FLAGS;
-	sqe.gather.size = cpu_to_le16 ( len );
-	sqe.gather.flags = TXNIC_SEND_GATHER_FLAGS;
-	sqe.gather.addr = cpu_to_le64 ( virt_to_bus ( iobuf->data ) );
+	memset ( sqe, 0, sizeof ( *sqe ) );
+	sqe->hdr.total = cpu_to_le32 ( ( len >= ETH_ZLEN ) ? len : ETH_ZLEN );
+	sqe->hdr.subdcnt = ( TXNIC_SQE_SUBDESCS - 1 );
+	sqe->hdr.flags = TXNIC_SEND_HDR_FLAGS;
+	sqe->gather.size = cpu_to_le16 ( len );
+	sqe->gather.flags = TXNIC_SEND_GATHER_FLAGS;
+	sqe->gather.addr = cpu_to_le64 ( virt_to_bus ( iobuf->data ) );
 	DBGC2 ( vnic, "TXNIC %s SQE %#03x is [%08lx,%08lx)\n",
 		vnic->name, sq_idx, virt_to_bus ( iobuf->data ),
 		( virt_to_bus ( iobuf->data ) + len ) );
-
-	/* Copy send descriptor to ring */
-	copy_to_user ( vnic->sq.sqe, offset, &sqe, sizeof ( sqe ) );
 
 	/* Ring doorbell */
 	wmb();
@@ -277,7 +273,7 @@ static int txnic_create_rq ( struct txnic *vnic ) {
 		 ( vnic->regs + TXNIC_QS_RBDR_CFG(0) ) );
 
 	/* Configure and enable receive buffer descriptor ring */
-	writeq ( user_to_phys ( vnic->rq.rqe, 0 ),
+	writeq ( virt_to_phys ( vnic->rq.rqe ),
 		 ( vnic->regs + TXNIC_QS_RBDR_BASE(0) ) );
 	writeq ( ( TXNIC_QS_RBDR_CFG_ENA | TXNIC_QS_RBDR_CFG_QSIZE_8K |
 		   TXNIC_QS_RBDR_CFG_LINES ( TXNIC_RQE_SIZE /
@@ -288,8 +284,8 @@ static int txnic_create_rq ( struct txnic *vnic ) {
 	writeq ( TXNIC_QS_RQ_CFG_ENA, ( vnic->regs + TXNIC_QS_RQ_CFG(0) ) );
 
 	DBGC ( vnic, "TXNIC %s RQ at [%08lx,%08lx)\n",
-	       vnic->name, user_to_phys ( vnic->rq.rqe, 0 ),
-	       user_to_phys ( vnic->rq.rqe, TXNIC_RQ_SIZE ) );
+	       vnic->name, virt_to_phys ( vnic->rq.rqe ),
+	       ( virt_to_phys ( vnic->rq.rqe ) + TXNIC_RQ_SIZE ) );
 	return 0;
 }
 
@@ -359,11 +355,10 @@ static void txnic_destroy_rq ( struct txnic *vnic ) {
  */
 static void txnic_refill_rq ( struct txnic *vnic ) {
 	struct io_buffer *iobuf;
-	struct txnic_rqe rqe;
+	struct txnic_rqe *rqe;
 	unsigned int rq_idx;
 	unsigned int rq_iobuf_idx;
 	unsigned int refilled = 0;
-	size_t offset;
 
 	/* Refill ring */
 	while ( ( vnic->rq.prod - vnic->rq.cons ) < TXNIC_RQ_FILL ) {
@@ -377,16 +372,15 @@ static void txnic_refill_rq ( struct txnic *vnic ) {
 
 		/* Get next receive descriptor */
 		rq_idx = ( vnic->rq.prod++ % TXNIC_RQES );
-		offset = ( rq_idx * TXNIC_RQ_STRIDE );
+		rqe = &vnic->rq.rqe[rq_idx];
 
 		/* Populate receive descriptor */
-		rqe.rbdre.addr = cpu_to_le64 ( virt_to_bus ( iobuf->data ) );
+		rqe->rbdre.addr = cpu_to_le64 ( virt_to_bus ( iobuf->data ) );
 		DBGC2 ( vnic, "TXNIC %s RQE %#03x is [%08lx,%08lx)\n",
 			vnic->name, rq_idx, virt_to_bus ( iobuf->data ),
 			( virt_to_bus ( iobuf->data ) + TXNIC_RQE_SIZE ) );
 
-		/* Copy receive descriptor to ring */
-		copy_to_user ( vnic->rq.rqe, offset, &rqe, sizeof ( rqe ) );
+		/* Record number of refills for doorbell */
 		refilled++;
 
 		/* Record I/O buffer */
@@ -463,14 +457,14 @@ static int txnic_create_cq ( struct txnic *vnic ) {
 	writeq ( TXNIC_QS_CQ_CFG_RESET, ( vnic->regs + TXNIC_QS_CQ_CFG(0) ) );
 
 	/* Configure and enable completion queue */
-	writeq ( user_to_phys ( vnic->cq.cqe, 0 ),
+	writeq ( virt_to_phys ( vnic->cq.cqe ),
 		 ( vnic->regs + TXNIC_QS_CQ_BASE(0) ) );
 	writeq ( ( TXNIC_QS_CQ_CFG_ENA | TXNIC_QS_CQ_CFG_QSIZE_256 ),
 		 ( vnic->regs + TXNIC_QS_CQ_CFG(0) ) );
 
 	DBGC ( vnic, "TXNIC %s CQ at [%08lx,%08lx)\n",
-	       vnic->name, user_to_phys ( vnic->cq.cqe, 0 ),
-	       user_to_phys ( vnic->cq.cqe, TXNIC_CQ_SIZE ) );
+	       vnic->name, virt_to_phys ( vnic->cq.cqe ),
+	       ( virt_to_phys ( vnic->cq.cqe ) + TXNIC_CQ_SIZE ) );
 	return 0;
 }
 
@@ -527,9 +521,8 @@ static void txnic_destroy_cq ( struct txnic *vnic ) {
  * @v vnic		Virtual NIC
  */
 static void txnic_poll_cq ( struct txnic *vnic ) {
-	union txnic_cqe cqe;
+	union txnic_cqe *cqe;
 	uint64_t status;
-	size_t offset;
 	unsigned int qcount;
 	unsigned int cq_idx;
 	unsigned int i;
@@ -545,22 +538,21 @@ static void txnic_poll_cq ( struct txnic *vnic ) {
 
 		/* Get completion queue entry */
 		cq_idx = ( vnic->cq.cons++ % TXNIC_CQES );
-		offset = ( cq_idx * TXNIC_CQ_STRIDE );
-		copy_from_user ( &cqe, vnic->cq.cqe, offset, sizeof ( cqe ) );
+		cqe = &vnic->cq.cqe[cq_idx];
 
 		/* Process completion queue entry */
-		switch ( cqe.common.cqe_type ) {
+		switch ( cqe->common.cqe_type ) {
 		case TXNIC_CQE_TYPE_SEND:
-			txnic_complete_sqe ( vnic, &cqe.send );
+			txnic_complete_sqe ( vnic, &cqe->send );
 			break;
 		case TXNIC_CQE_TYPE_RX:
-			txnic_complete_rqe ( vnic, &cqe.rx );
+			txnic_complete_rqe ( vnic, &cqe->rx );
 			break;
 		default:
 			DBGC ( vnic, "TXNIC %s unknown completion type %d\n",
-			       vnic->name, cqe.common.cqe_type );
-			DBGC_HDA ( vnic, user_to_phys ( vnic->cq.cqe, offset ),
-				   &cqe, sizeof ( cqe ) );
+			       vnic->name, cqe->common.cqe_type );
+			DBGC_HDA ( vnic, virt_to_phys ( cqe ), cqe,
+				   sizeof ( *cqe ) );
 			break;
 		}
 	}

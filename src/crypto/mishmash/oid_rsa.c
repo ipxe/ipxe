@@ -34,5 +34,5 @@ struct asn1_algorithm rsa_encryption_algorithm __asn1_algorithm = {
 	.name = "rsaEncryption",
 	.pubkey = &rsa_algorithm,
 	.digest = NULL,
-	.oid = ASN1_OID_CURSOR ( oid_rsa_encryption ),
+	.oid = ASN1_CURSOR ( oid_rsa_encryption ),
 };

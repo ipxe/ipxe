@@ -1,0 +1,62 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Prefix all iPXE symbols to avoid collisions with platform libraries
+#
+SYMBOL_PREFIX	= _ipxe__
+
+# Enable valgrind
+#
+CFLAGS		+= -UNVALGRIND
+
+# The Linux linker script
+#
+LDSCRIPT	= scripts/linux.lds
+
+# Use a two-stage link
+#
+LDFLAGS		+= -r -d
+
+# Source directories
+#
+SRCDIRS		+= drivers/linux
+SRCDIRS		+= interface/linux
+NON_AUTO_SRCS	+= interface/linux/linux_api.c
+
+# Media types
+#
+NON_AUTO_MEDIA = linux
+
+# Compiler flags for building host API wrapper
+#
+LINUX_CFLAGS	+= -Os -idirafter include -DSYMBOL_PREFIX=$(SYMBOL_PREFIX)
+LINUX_CFLAGS	+= -Wall -W
+ifneq ($(SYSROOT),)
+LINUX_CFLAGS	+= --sysroot=$(SYSROOT)
+endif
+ifneq ($(NO_WERROR),1)
+LINUX_CFLAGS	+= -Werror
+endif
+
+# Check for libslirp
+#
+LIBSLIRP_TEST = $(CC) $(LINUX_CFLAGS) -x c /dev/null -nostartfiles \
+		      -include slirp/libslirp.h -lslirp \
+		      -o /dev/null >/dev/null 2>&1
+WITH_LIBSLIRP	:= $(shell $(LIBSLIRP_TEST) && $(ECHO) yes)
+ifneq ($(WITH_LIBSLIRP),)
+LINUX_CFLAGS	+= -DHAVE_LIBSLIRP
+LINUX_LIBS	+= -lslirp
+endif
+
+# Host API wrapper
+#
+$(BIN)/linux_api.o : interface/linux/linux_api.c include/ipxe/linux_api.h \
+		     include/ipxe/slirp.h $(MAKEDEPS)
+	$(QM)$(ECHO) "  [BUILD] $@"
+	$(Q)$(CC) $(LINUX_CFLAGS) $(WORKAROUND_CFLAGS) -o $@ -c $<
+
+# Rule to generate final binary
+#
+$(BIN)/%.linux : $(BIN)/%.linux.tmp $(BIN)/linux_api.o
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(CC) $(LINUX_CFLAGS) $(WORKAROUND_CFLAGS) -o $@ $^ $(LINUX_LIBS)

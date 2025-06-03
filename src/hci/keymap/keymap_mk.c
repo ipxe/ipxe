@@ -10,6 +10,21 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "mk" keyboard mapping */
-struct key_mapping mk_mapping[] __keymap = {
+/** "mk" basic remapping */
+static struct keymap_key mk_basic[] = {
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "mk" AltGr remapping */
+static struct keymap_key mk_altgr[] = {
+	{ 0, 0 }
+};
+
+/** "mk" keyboard map */
+struct keymap mk_keymap __keymap = {
+	.name = "mk",
+	.basic = mk_basic,
+	.altgr = mk_altgr,
 };

@@ -130,13 +130,13 @@ static void dma_op_free ( struct dma_mapping *map, void *addr, size_t len ) {
  * @v align		Physical alignment
  * @ret addr		Buffer address, or NULL on error
  */
-static userptr_t dma_op_umalloc ( struct dma_device *dma,
-				  struct dma_mapping *map,
-				  size_t len, size_t align ) {
+static void * dma_op_umalloc ( struct dma_device *dma,
+			       struct dma_mapping *map,
+			       size_t len, size_t align ) {
 	struct dma_operations *op = dma->op;
 
 	if ( ! op )
-		return UNULL;
+		return NULL;
 	return op->umalloc ( dma, map, len, align );
 }
 
@@ -147,8 +147,7 @@ static userptr_t dma_op_umalloc ( struct dma_device *dma,
  * @v addr		Buffer address
  * @v len		Length of buffer
  */
-static void dma_op_ufree ( struct dma_mapping *map, userptr_t addr,
-			   size_t len ) {
+static void dma_op_ufree ( struct dma_mapping *map, void *addr, size_t len ) {
 	struct dma_device *dma = map->dma;
 
 	assert ( dma != NULL );

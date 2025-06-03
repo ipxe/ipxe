@@ -65,6 +65,9 @@ struct md4_context {
 /** MD4 context size */
 #define MD4_CTX_SIZE sizeof ( struct md4_context )
 
+/** MD4 block size */
+#define MD4_BLOCK_SIZE sizeof ( union md4_block )
+
 /** MD4 digest size */
 #define MD4_DIGEST_SIZE sizeof ( struct md4_digest )
 

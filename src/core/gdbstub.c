@@ -36,7 +36,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ctype.h>
 #include <byteswap.h>
 #include <ipxe/gdbstub.h>
-#include "gdbmach.h"
 
 enum {
 	POSIX_EINVAL = 0x1c,  /* used to report bad arguments to GDB */

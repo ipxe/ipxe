@@ -26,12 +26,14 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
 #include <ipxe/vsprintf.h>
 #include <ipxe/timer.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/Protocol/SimpleNetwork.h>
 #include <ipxe/efi/efi_driver.h>
 #include <ipxe/efi/efi_utils.h>
+#include <ipxe/efi/efi_snp.h>
 #include "snpnet.h"
 
 /** @file
@@ -71,6 +73,27 @@ struct snp_nic {
 /** Delay between each initialisation retry */
 #define SNP_INITIALIZE_RETRY_DELAY_MS 10
 
+/** Additional padding for receive buffers
+ *
+ * Some SNP implementations seem to require additional space in the
+ * allocated receive buffers, otherwise full-length packets will be
+ * silently dropped.
+ *
+ * The EDK2 MnpDxe driver happens to allocate an additional 8 bytes of
+ * padding (4 for a VLAN tag, 4 for the Ethernet frame checksum).
+ * Match this behaviour since drivers are very likely to have been
+ * tested against MnpDxe.
+ */
+#define SNP_RX_PAD 8
+
+/** An SNP interface patch to inhibit shutdown for insomniac devices */
+struct snp_insomniac_patch {
+	/** Original Shutdown() method */
+	EFI_SIMPLE_NETWORK_SHUTDOWN shutdown;
+	/** Original Stop() method */
+	EFI_SIMPLE_NETWORK_STOP stop;
+};
+
 /**
  * Format SNP MAC address (for debugging)
  *
@@ -97,7 +120,7 @@ static const char * snpnet_mac_text ( EFI_MAC_ADDRESS *mac, size_t len ) {
  * @v netdev		Network device
  */
 static void snpnet_dump_mode ( struct net_device *netdev ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
 	size_t mac_len = mode->HwAddressSize;
 	unsigned int i;
@@ -136,7 +159,7 @@ static void snpnet_dump_mode ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void snpnet_check_link ( struct net_device *netdev ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_SIMPLE_NETWORK_MODE *mode = snp->snp->Mode;
 
 	/* Do nothing unless media presence detection is supported */
@@ -160,15 +183,25 @@ static void snpnet_check_link ( struct net_device *netdev ) {
  */
 static int snpnet_transmit ( struct net_device *netdev,
 			     struct io_buffer *iobuf ) {
-	struct snp_nic *snp = netdev_priv ( netdev );
+	struct snp_nic *snp = netdev->priv;
 	EFI_STATUS efirc;
 	int rc;
+
+	/* Do nothing if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return -ECANCELED;
 
 	/* Defer the packet if there is already a transmission in progress */
 	if ( snp->txbuf ) {
 		netdev_tx_defer ( netdev, iobuf );
 		return 0;
 	}
+
+	/* Pad to minimum Ethernet length, to work around underlying
+	 * drivers that do not correctly handle frame padding
+	 * themselves.
+	 */
+	iob_pad ( iobuf, ETH_ZLEN );
 
 	/* Transmit packet */
 	if ( ( efirc = snp->snp->Transmit ( snp->snp, 0, iob_len ( iobuf ),
@@ -242,7 +275,7 @@ static void snpnet_poll_rx ( struct net_device *netdev ) {
 
 		/* Allocate buffer, if required */
 		if ( ! snp->rxbuf ) {
-			snp->rxbuf = alloc_iob ( snp->mtu );
+			snp->rxbuf = alloc_iob ( snp->mtu + SNP_RX_PAD );
 			if ( ! snp->rxbuf ) {
 				/* Leave for next poll */
 				break;
@@ -282,6 +315,10 @@ static void snpnet_poll_rx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void snpnet_poll ( struct net_device *netdev ) {
+
+	/* Do nothing if shutdown is in progress */
+	if ( efi_shutdown_in_progress )
+		return;
 
 	/* Process any TX completions */
 	snpnet_poll_tx ( netdev );
@@ -358,9 +395,10 @@ static int snpnet_open ( struct net_device *netdev ) {
 	/* Initialise NIC, retrying multiple times if link stays down */
 	for ( retry = 0 ; ; ) {
 
-		/* Initialise NIC */
-		if ( ( efirc = snp->snp->Initialize ( snp->snp,
-						      0, 0 ) ) != 0 ) {
+		/* Initialise NIC, if not already initialised */
+		if ( ( mode->State != EfiSimpleNetworkInitialized ) &&
+		     ( ( efirc = snp->snp->Initialize ( snp->snp,
+							0, 0 ) ) != 0 ) ) {
 			rc = -EEFI ( efirc );
 			snpnet_dump_mode ( netdev );
 			DBGC ( snp, "SNP %s could not initialise: %s\n",
@@ -384,11 +422,13 @@ static int snpnet_open ( struct net_device *netdev ) {
 		/* Delay to allow time for link to establish */
 		mdelay ( SNP_INITIALIZE_RETRY_DELAY_MS );
 
-		/* Shut down and retry; this is sometimes necessary in
-		 * order to persuade the underlying SNP driver to
-		 * actually update the link state.
+		/* Shut down and retry (unless device is insomniac);
+		 * this is sometimes necessary in order to persuade
+		 * the underlying SNP driver to actually update the
+		 * link state.
 		 */
-		if ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) {
+		if ( ( ! netdev_insomniac ( netdev ) ) &&
+		     ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) ) {
 			rc = -EEFI ( efirc );
 			snpnet_dump_mode ( netdev );
 			DBGC ( snp, "SNP %s could not shut down: %s\n",
@@ -426,8 +466,12 @@ static void snpnet_close ( struct net_device *netdev ) {
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Shut down NIC */
-	if ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) {
+	/* Shut down NIC (unless whole system shutdown is in progress,
+	 * or device is insomniac).
+	 */
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ! netdev_insomniac ( netdev ) ) &&
+	     ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( snp, "SNP %s could not shut down: %s\n",
 		       netdev->name, strerror ( rc ) );
@@ -456,28 +500,231 @@ static struct net_device_operations snpnet_operations = {
 };
 
 /**
+ * Check to see if driver supports a device
+ *
+ * @v device		EFI device handle
+ * @v protocol		Protocol GUID
+ * @ret rc		Return status code
+ */
+int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
+	EFI_HANDLE parent;
+	int rc;
+
+	/* Check that this is not a device we are providing ourselves */
+	if ( find_snpdev ( device ) != NULL ) {
+		DBGCP ( device, "HANDLE %s is provided by this binary\n",
+			efi_handle_name ( device ) );
+		return -ENOTTY;
+	}
+
+	/* Test for presence of protocol */
+	if ( ( rc = efi_test ( device, protocol ) ) != 0 ) {
+		DBGCP ( device, "HANDLE %s is not a %s device\n",
+			efi_handle_name ( device ),
+			efi_guid_ntoa ( protocol ) );
+		return rc;
+	}
+
+	/* Check that there are no instances of this protocol further
+	 * up this device path.
+	 */
+	if ( ( rc = efi_locate_device ( device, protocol,
+					&parent, 1 ) ) == 0 ) {
+		DBGC2 ( device, "HANDLE %s has %s-supporting parent ",
+			efi_handle_name ( device ),
+			efi_guid_ntoa ( protocol ) );
+		DBGC2 ( device, "%s\n", efi_handle_name ( parent ) );
+		return -ENOTTY;
+	}
+
+	DBGC ( device, "HANDLE %s is a %s device\n",
+	       efi_handle_name ( device ), efi_guid_ntoa ( protocol ) );
+	return 0;
+}
+
+/**
+ * Check if device must be insomniac
+ *
+ * @v device		EFI device handle
+ * @v is_insomniac	Device must be insomniac
+ */
+static int snpnet_is_insomniac ( EFI_HANDLE device ) {
+	int rc;
+
+	/* Check for wireless devices
+	 *
+	 * The UEFI model for wireless network configuration is
+	 * somewhat underdefined.  At the time of writing, the EDK2
+	 * "UEFI WiFi Connection Manager" driver provides only one way
+	 * to configure wireless network credentials, which is to
+	 * enter them interactively via an HII form.  Credentials are
+	 * not stored (or exposed via any protocol interface), and so
+	 * any temporary disconnection from the wireless network will
+	 * inevitably leave the interface in an unusable state that
+	 * cannot be recovered without user intervention.
+	 *
+	 * Experimentation shows that at least some wireless network
+	 * drivers will disconnect from the wireless network when the
+	 * SNP Shutdown() method is called, or if the device is not
+	 * polled sufficiently frequently to maintain its association
+	 * to the network.  We therefore inhibit calls to Shutdown()
+	 * and Stop() for any such SNP protocol interfaces, and mark
+	 * our network device as insomniac so that it will be polled
+	 * even when closed.
+	 */
+	if ( ( rc = efi_test ( device, &efi_wifi2_protocol_guid ) ) == 0 ) {
+		DBGC ( device, "SNP %s is wireless: assuming insomniac\n",
+		       efi_handle_name ( device ) );
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * Ignore shutdown attempt
+ *
+ * @v snp		SNP interface
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI
+snpnet_do_nothing ( EFI_SIMPLE_NETWORK_PROTOCOL *snp __unused ) {
+
+	return 0;
+}
+
+/**
+ * Patch SNP protocol interface to prevent shutdown
+ *
+ * @v device		EFI device handle
+ * @v patch		Interface patch
+ * @ret rc		Return status code
+ */
+static int snpnet_insomniac_patch ( EFI_HANDLE device,
+				    struct snp_insomniac_patch *patch ) {
+	EFI_SIMPLE_NETWORK_PROTOCOL *interface;
+	int rc;
+
+	/* Open interface for ephemeral use */
+	if ( ( rc = efi_open ( device, &efi_simple_network_protocol_guid,
+			       &interface ) ) != 0 ) {
+		DBGC ( device, "SNP %s cannot open SNP protocol for patching: "
+		       "%s\n", efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Record original Shutdown() and Stop() methods */
+	patch->shutdown = interface->Shutdown;
+	patch->stop = interface->Stop;
+
+	/* Inhibit other UEFI drivers' calls to Shutdown() and Stop()
+	 *
+	 * This is necessary since disconnecting the MnpDxe driver
+	 * will attempt to shut down the SNP device, which would leave
+	 * us with an unusable device.
+	 */
+	interface->Shutdown = snpnet_do_nothing;
+	interface->Stop = snpnet_do_nothing;
+	DBGC ( device, "SNP %s patched to inhibit shutdown\n",
+	       efi_handle_name ( device ) );
+
+	return 0;
+}
+
+/**
+ * Restore patched SNP protocol interface
+ *
+ * @v device		EFI device handle
+ * @v patch		Interface patch to fill in
+ * @ret rc		Return status code
+ */
+static int snpnet_insomniac_restore ( EFI_HANDLE device,
+				      struct snp_insomniac_patch *patch ) {
+	EFI_SIMPLE_NETWORK_PROTOCOL *interface;
+	int rc;
+
+	/* Avoid returning uninitialised data on error */
+	memset ( patch, 0, sizeof ( *patch ) );
+
+	/* Open interface for ephemeral use */
+	if ( ( rc = efi_open ( device, &efi_simple_network_protocol_guid,
+			       &interface ) ) != 0 ) {
+		DBGC ( device, "SNP %s cannot open patched SNP protocol: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Restore original Shutdown() and Stop() methods, if possible */
+	if ( interface->Shutdown == snpnet_do_nothing )
+		interface->Shutdown = patch->shutdown;
+	if ( interface->Stop == snpnet_do_nothing )
+		interface->Stop = patch->stop;
+
+	/* Check that original methods were restored (by us or others) */
+	if ( ( interface->Shutdown != patch->shutdown ) ||
+	     ( interface->Stop != patch->stop ) ) {
+		DBGC ( device, "SNP %s could not restore patched SNP "
+		       "protocol\n", efi_handle_name ( device ) );
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
+/**
+ * Exclude existing drivers
+ *
+ * @v device		EFI device handle
+ * @ret rc		Return status code
+ */
+int snpnet_exclude ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_simple_network_protocol_guid;
+	struct snp_insomniac_patch patch;
+	int insomniac;
+	int rc;
+
+	/* Check if this is a device that must not ever be shut down */
+	insomniac = snpnet_is_insomniac ( device );
+
+	/* Inhibit calls to Shutdown() and Stop(), if applicable */
+	if ( insomniac &&
+	     ( ( rc = snpnet_insomniac_patch ( device, &patch ) ) != 0 ) ) {
+		goto err_patch;
+	}
+
+	/* Exclude existing SNP drivers */
+	if ( ( rc = efi_driver_exclude ( device, protocol ) ) != 0 ) {
+		DBGC ( device, "SNP %s could not exclude drivers: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		goto err_exclude;
+	}
+
+ err_exclude:
+	if ( insomniac )
+		snpnet_insomniac_restore ( device, &patch );
+ err_patch:
+	return rc;
+}
+
+/**
  * Attach driver to device
  *
  * @v efidev		EFI device
  * @ret rc		Return status code
  */
 int snpnet_start ( struct efi_device *efidev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE device = efidev->device;
+	EFI_SIMPLE_NETWORK_PROTOCOL *interface;
 	EFI_SIMPLE_NETWORK_MODE *mode;
 	struct net_device *netdev;
 	struct snp_nic *snp;
-	void *interface;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Open SNP protocol */
-	if ( ( efirc = bs->OpenProtocol ( device,
-					  &efi_simple_network_protocol_guid,
-					  &interface, efi_image_handle, device,
-					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_driver ( device,
+					 &efi_simple_network_protocol_guid,
+					 &interface ) ) != 0 ) {
 		DBGC ( device, "SNP %s cannot open SNP protocol: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
 		DBGC_EFI_OPENERS ( device, device,
@@ -506,7 +753,11 @@ int snpnet_start ( struct efi_device *efidev ) {
 	INIT_LIST_HEAD ( &snp->dev.children );
 	netdev->dev = &snp->dev;
 
-	/* Bring to the Started state */
+	/* Check if device is insomniac */
+	if ( snpnet_is_insomniac ( device ) )
+		netdev->state |= NETDEV_INSOMNIAC;
+
+	/* Bring to the correct state for a closed interface */
 	if ( ( mode->State == EfiSimpleNetworkStopped ) &&
 	     ( ( efirc = snp->snp->Start ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
@@ -515,6 +766,7 @@ int snpnet_start ( struct efi_device *efidev ) {
 		goto err_start;
 	}
 	if ( ( mode->State == EfiSimpleNetworkInitialized ) &&
+	     ( ! netdev_insomniac ( netdev ) ) &&
 	     ( ( efirc = snp->snp->Shutdown ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "SNP %s could not shut down: %s\n",
@@ -567,8 +819,7 @@ int snpnet_start ( struct efi_device *efidev ) {
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
-	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_by_driver ( device, &efi_simple_network_protocol_guid );
  err_open_protocol:
 	return rc;
 }
@@ -579,7 +830,6 @@ int snpnet_start ( struct efi_device *efidev ) {
  * @v efidev		EFI device
   */
 void snpnet_stop ( struct efi_device *efidev ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct net_device *netdev = efidev_get_drvdata ( efidev );
 	struct snp_nic *snp = netdev->priv;
 	EFI_HANDLE device = efidev->device;
@@ -589,8 +839,9 @@ void snpnet_stop ( struct efi_device *efidev ) {
 	/* Unregister network device */
 	unregister_netdev ( netdev );
 
-	/* Stop SNP protocol */
-	if ( ( efirc = snp->snp->Stop ( snp->snp ) ) != 0 ) {
+	/* Stop SNP protocol (unless whole system shutdown is in progress) */
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = snp->snp->Stop ( snp->snp ) ) != 0 ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "SNP %s could not stop: %s\n",
 		       efi_handle_name ( device ), strerror ( rc ) );
@@ -603,6 +854,5 @@ void snpnet_stop ( struct efi_device *efidev ) {
 	netdev_put ( netdev );
 
 	/* Close SNP protocol */
-	bs->CloseProtocol ( device, &efi_simple_network_protocol_guid,
-			    efi_image_handle, device );
+	efi_close_by_driver ( device, &efi_simple_network_protocol_guid );
 }

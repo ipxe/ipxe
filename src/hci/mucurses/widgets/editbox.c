@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 #include <assert.h>
+#include <ipxe/ansicol.h>
 #include <ipxe/editbox.h>
 
 /** @file
@@ -36,38 +37,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EDITBOX_MIN_CHARS 3
 
 /**
- * Initialise text box widget
- *
- * @v box		Editable text box widget
- * @v buf		Text buffer
- * @v len		Size of text buffer
- * @v win		Containing window
- * @v row		Row
- * @v col		Starting column
- * @v width		Width
- * @v flags		Flags
- */
-void init_editbox ( struct edit_box *box, char *buf, size_t len,
-		    WINDOW *win, unsigned int row, unsigned int col,
-		    unsigned int width, unsigned int flags ) {
-	memset ( box, 0, sizeof ( *box ) );
-	init_editstring ( &box->string, buf, len );
-	box->string.cursor = strlen ( buf );
-	box->win = ( win ? win : stdscr );
-	box->row = row;
-	box->col = col;
-	box->width = width;
-	box->flags = flags;
-}
-
-/**
  * Draw text box widget
  *
- * @v box		Editable text box widget
- *
+ * @v widget		Text widget
  */
-void draw_editbox ( struct edit_box *box ) {
-	size_t width = box->width;
+static void draw_editbox ( struct widget *widget ) {
+	struct edit_box *box = container_of ( widget, struct edit_box, widget );
+	const char *content = *(box->string.buf);
+	size_t width = widget->width;
 	char buf[ width + 1 ];
 	signed int cursor_offset, underflow, overflow, first;
 	size_t len;
@@ -90,18 +67,37 @@ void draw_editbox ( struct edit_box *box ) {
 	/* Construct underscore-padded string portion */
 	memset ( buf, '_', width );
 	buf[width] = '\0';
-	len = ( strlen ( box->string.buf ) - first );
+	len = ( content ? ( strlen ( content ) - first ) : 0 );
 	if ( len > width )
 		len = width;
-	if ( box->flags & EDITBOX_STARS ) {
+	if ( widget->flags & WIDGET_SECRET ) {
 		memset ( buf, '*', len );
 	} else {
-		memcpy ( buf, ( box->string.buf + first ), len );
+		memcpy ( buf, ( content + first ), len );
 	}
 
 	/* Print box content and move cursor */
-	if ( ! box->win )
-		box->win = stdscr;
-	mvwprintw ( box->win, box->row, box->col, "%s", buf );
-	wmove ( box->win, box->row, ( box->col + cursor_offset ) );
+	color_set ( CPAIR_EDIT, NULL );
+	mvprintw ( widget->row, widget->col, "%s", buf );
+	move ( widget->row, ( widget->col + cursor_offset ) );
+	color_set ( CPAIR_NORMAL, NULL );
 }
+
+/**
+ * Edit text box widget
+ *
+ * @v widget		Text widget
+ * @v key		Key pressed by user
+ * @ret key		Key returned to application, or zero
+ */
+static int edit_editbox ( struct widget *widget, int key ) {
+	struct edit_box *box = container_of ( widget, struct edit_box, widget );
+
+	return edit_string ( &box->string, key );
+}
+
+/** Text box widget operations */
+struct widget_operations editbox_operations = {
+	.draw = draw_editbox,
+	.edit = edit_editbox,
+};

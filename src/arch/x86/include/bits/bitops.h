@@ -29,7 +29,7 @@ set_bit ( unsigned int bit, volatile void *bits ) {
 		uint8_t byte[ ( bit / 8 ) + 1 ];
 	} *bytes = bits;
 
-	__asm__ __volatile__ ( "lock bts %1, %0"
+	__asm__ __volatile__ ( "lock btsl %k1, %0"
 			       : "+m" ( *bytes ) : "Ir" ( bit ) );
 }
 
@@ -45,7 +45,7 @@ clear_bit ( unsigned int bit, volatile void *bits ) {
 		uint8_t byte[ ( bit / 8 ) + 1 ];
 	} *bytes = bits;
 
-	__asm__ __volatile__ ( "lock btr %1, %0"
+	__asm__ __volatile__ ( "lock btrl %k1, %0"
 			       : "+m" ( *bytes ) : "Ir" ( bit ) );
 }
 
@@ -63,7 +63,7 @@ test_and_set_bit ( unsigned int bit, volatile void *bits ) {
 	} *bytes = bits;
 	int old;
 
-	__asm__ __volatile__ ( "lock bts %2, %0\n\t"
+	__asm__ __volatile__ ( "lock btsl %k2, %0\n\t"
 			       "sbb %1, %1\n\t"
 			       : "+m" ( *bytes ), "=r"  ( old )
 			       : "Ir" ( bit ) );
@@ -84,7 +84,7 @@ test_and_clear_bit ( unsigned int bit, volatile void *bits ) {
 	} *bytes = bits;
 	int old;
 
-	__asm__ __volatile__ ( "lock btr %2, %0\n\t"
+	__asm__ __volatile__ ( "lock btrl %k2, %0\n\t"
 			       "sbb %1, %1\n\t"
 			       : "+m" ( *bytes ), "=r"  ( old )
 			       : "Ir" ( bit ) );

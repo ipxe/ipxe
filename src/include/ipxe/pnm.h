@@ -10,7 +10,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 
 /** PNM signature */

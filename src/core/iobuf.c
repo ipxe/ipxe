@@ -124,18 +124,24 @@ struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
  * @ret iobuf	I/O buffer, or NULL if none available
  *
  * The I/O buffer will be physically aligned on its own size (rounded
- * up to the nearest power of two).
+ * up to the nearest power of two), up to a maximum of page-size
+ * alignment.
  */
 struct io_buffer * alloc_iob ( size_t len ) {
+	size_t align;
 
 	/* Pad to minimum length */
 	if ( len < IOB_ZLEN )
 		len = IOB_ZLEN;
 
-	/* Align buffer on its own size to avoid potential problems
-	 * with boundary-crossing DMA.
+	/* Align buffer on its own size (up to page size) to avoid
+	 * potential problems with boundary-crossing DMA.
 	 */
-	return alloc_iob_raw ( len, len, 0 );
+	align = len;
+	if ( align > PAGE_SIZE )
+		align = PAGE_SIZE;
+
+	return alloc_iob_raw ( len, align, 0 );
 }
 
 /**

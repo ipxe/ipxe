@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/list.h>
@@ -37,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/rsa.h>
 #include <ipxe/rootcert.h>
 #include <ipxe/certstore.h>
+#include <ipxe/privkey.h>
 #include <ipxe/socket.h>
 #include <ipxe/in.h>
 #include <ipxe/image.h>
@@ -123,6 +125,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	__einfo_uniqify ( EINFO_EACCES, 0x0b, "No usable certificates" )
 
 /**
+ * Free X.509 certificate
+ *
+ * @v refcnt		Reference count
+ */
+static void x509_free ( struct refcnt *refcnt ) {
+	struct x509_certificate *cert =
+		container_of ( refcnt, struct x509_certificate, refcnt );
+
+	x509_root_put ( cert->root );
+	free ( cert );
+}
+
+/**
  * Get X.509 certificate display name
  *
  * @v cert		X.509 certificate
@@ -156,7 +171,7 @@ static uint8_t oid_common_name[] = { ASN1_OID_COMMON_NAME };
 
 /** "commonName" object identifier cursor */
 static struct asn1_cursor oid_common_name_cursor =
-	ASN1_OID_CURSOR ( oid_common_name );
+	ASN1_CURSOR ( oid_common_name );
 
 /**
  * Parse X.509 certificate version
@@ -523,12 +538,12 @@ static struct x509_key_purpose x509_key_purposes[] = {
 	{
 		.name = "codeSigning",
 		.bits = X509_CODE_SIGNING,
-		.oid = ASN1_OID_CURSOR ( oid_code_signing ),
+		.oid = ASN1_CURSOR ( oid_code_signing ),
 	},
 	{
 		.name = "ocspSigning",
 		.bits = X509_OCSP_SIGNING,
-		.oid = ASN1_OID_CURSOR ( oid_ocsp_signing ),
+		.oid = ASN1_CURSOR ( oid_ocsp_signing ),
 	},
 };
 
@@ -631,7 +646,7 @@ static uint8_t oid_ad_ocsp[] = { ASN1_OID_OCSP };
 static struct x509_access_method x509_access_methods[] = {
 	{
 		.name = "OCSP",
-		.oid = ASN1_OID_CURSOR ( oid_ad_ocsp ),
+		.oid = ASN1_CURSOR ( oid_ad_ocsp ),
 		.parse = x509_parse_ocsp,
 	},
 };
@@ -768,27 +783,27 @@ static uint8_t oid_ce_subject_alt_name[] =
 static struct x509_extension x509_extensions[] = {
 	{
 		.name = "basicConstraints",
-		.oid = ASN1_OID_CURSOR ( oid_ce_basic_constraints ),
+		.oid = ASN1_CURSOR ( oid_ce_basic_constraints ),
 		.parse = x509_parse_basic_constraints,
 	},
 	{
 		.name = "keyUsage",
-		.oid = ASN1_OID_CURSOR ( oid_ce_key_usage ),
+		.oid = ASN1_CURSOR ( oid_ce_key_usage ),
 		.parse = x509_parse_key_usage,
 	},
 	{
 		.name = "extKeyUsage",
-		.oid = ASN1_OID_CURSOR ( oid_ce_ext_key_usage ),
+		.oid = ASN1_CURSOR ( oid_ce_ext_key_usage ),
 		.parse = x509_parse_extended_key_usage,
 	},
 	{
 		.name = "authorityInfoAccess",
-		.oid = ASN1_OID_CURSOR ( oid_pe_authority_info_access ),
+		.oid = ASN1_CURSOR ( oid_pe_authority_info_access ),
 		.parse = x509_parse_authority_info_access,
 	},
 	{
 		.name = "subjectAltName",
-		.oid = ASN1_OID_CURSOR ( oid_ce_subject_alt_name ),
+		.oid = ASN1_CURSOR ( oid_ce_subject_alt_name ),
 		.parse = x509_parse_subject_alt_name,
 	},
 };
@@ -1064,7 +1079,7 @@ int x509_certificate ( const void *data, size_t len,
 	asn1_shrink_any ( &cursor );
 
 	/* Return stored certificate, if present */
-	if ( ( *cert = certstore_find ( &cursor ) ) != NULL ) {
+	if ( ( *cert = x509_find ( NULL, &cursor ) ) != NULL ) {
 
 		/* Add caller's reference */
 		x509_get ( *cert );
@@ -1075,7 +1090,7 @@ int x509_certificate ( const void *data, size_t len,
 	*cert = zalloc ( sizeof ( **cert ) + cursor.len );
 	if ( ! *cert )
 		return -ENOMEM;
-	ref_init ( &(*cert)->refcnt, NULL );
+	ref_init ( &(*cert)->refcnt, x509_free );
 	raw = ( *cert + 1 );
 
 	/* Copy raw data */
@@ -1110,7 +1125,6 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	struct pubkey_algorithm *pubkey = algorithm->pubkey;
 	uint8_t digest_ctx[ digest->ctxsize ];
 	uint8_t digest_out[ digest->digestsize ];
-	uint8_t pubkey_ctx[ pubkey->ctxsize ];
 	int rc;
 
 	/* Sanity check */
@@ -1134,14 +1148,8 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	}
 
 	/* Verify signature using signer's public key */
-	if ( ( rc = pubkey_init ( pubkey, pubkey_ctx, public_key->raw.data,
-				  public_key->raw.len ) ) != 0 ) {
-		DBGC ( cert, "X509 %p \"%s\" cannot initialise public key: "
-		       "%s\n", cert, x509_name ( cert ), strerror ( rc ) );
-		goto err_pubkey_init;
-	}
-	if ( ( rc = pubkey_verify ( pubkey, pubkey_ctx, digest, digest_out,
-				    signature->value.data,
+	if ( ( rc = pubkey_verify ( pubkey, &public_key->raw, digest,
+				    digest_out, signature->value.data,
 				    signature->value.len ) ) != 0 ) {
 		DBGC ( cert, "X509 %p \"%s\" signature verification failed: "
 		       "%s\n", cert, x509_name ( cert ), strerror ( rc ) );
@@ -1152,8 +1160,6 @@ static int x509_check_signature ( struct x509_certificate *cert,
 	rc = 0;
 
  err_pubkey_verify:
-	pubkey_final ( pubkey, pubkey_ctx );
- err_pubkey_init:
  err_mismatch:
 	return rc;
 }
@@ -1296,6 +1302,50 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
 }
 
 /**
+ * Check if X.509 certificate is valid
+ *
+ * @v cert		X.509 certificate
+ * @v root		Root certificate list, or NULL to use default
+ */
+int x509_is_valid ( struct x509_certificate *cert, struct x509_root *root ) {
+
+	/* Use default root certificate store if none specified */
+	if ( ! root )
+		root = &root_certificates;
+
+	return ( cert->root == root );
+}
+
+/**
+ * Set X.509 certificate as validated
+ *
+ * @v cert		X.509 certificate
+ * @v issuer		Issuing X.509 certificate (or NULL)
+ * @v root		Root certificate list
+ */
+void x509_set_valid ( struct x509_certificate *cert,
+		      struct x509_certificate *issuer,
+		      struct x509_root *root ) {
+	unsigned int max_path_remaining;
+
+	/* Sanity checks */
+	assert ( root != NULL );
+	assert ( ( issuer == NULL ) || ( issuer->path_remaining >= 1 ) );
+
+	/* Record validation root */
+	x509_root_put ( cert->root );
+	cert->root = x509_root_get ( root );
+
+	/* Calculate effective path length */
+	cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+	if ( issuer ) {
+		max_path_remaining = ( issuer->path_remaining - 1 );
+		if ( cert->path_remaining > max_path_remaining )
+			cert->path_remaining = max_path_remaining;
+	}
+}
+
+/**
  * Validate X.509 certificate
  *
  * @v cert		X.509 certificate
@@ -1313,7 +1363,6 @@ int x509_check_time ( struct x509_certificate *cert, time_t time ) {
 int x509_validate ( struct x509_certificate *cert,
 		    struct x509_certificate *issuer,
 		    time_t time, struct x509_root *root ) {
-	unsigned int max_path_remaining;
 	int rc;
 
 	/* Use default root certificate store if none specified */
@@ -1321,7 +1370,7 @@ int x509_validate ( struct x509_certificate *cert,
 		root = &root_certificates;
 
 	/* Return success if certificate has already been validated */
-	if ( x509_is_valid ( cert ) )
+	if ( x509_is_valid ( cert, root ) )
 		return 0;
 
 	/* Fail if certificate is invalid at specified time */
@@ -1330,20 +1379,19 @@ int x509_validate ( struct x509_certificate *cert,
 
 	/* Succeed if certificate is a trusted root certificate */
 	if ( x509_check_root ( cert, root ) == 0 ) {
-		cert->flags |= X509_FL_VALIDATED;
-		cert->path_remaining = ( cert->extensions.basic.path_len + 1 );
+		x509_set_valid ( cert, NULL, root );
 		return 0;
 	}
 
 	/* Fail unless we have an issuer */
 	if ( ! issuer ) {
-		DBGC2 ( cert, "X509 %p \"%s\" has no issuer\n",
+		DBGC2 ( cert, "X509 %p \"%s\" has no trusted issuer\n",
 			cert, x509_name ( cert ) );
 		return -EACCES_UNTRUSTED;
 	}
 
 	/* Fail unless issuer has already been validated */
-	if ( ! x509_is_valid ( issuer ) ) {
+	if ( ! x509_is_valid ( issuer, root ) ) {
 		DBGC ( cert, "X509 %p \"%s\" ", cert, x509_name ( cert ) );
 		DBGC ( cert, "issuer %p \"%s\" has not yet been validated\n",
 		       issuer, x509_name ( issuer ) );
@@ -1369,14 +1417,8 @@ int x509_validate ( struct x509_certificate *cert,
 		return -EACCES_OCSP_REQUIRED;
 	}
 
-	/* Calculate effective path length */
-	cert->path_remaining = ( issuer->path_remaining - 1 );
-	max_path_remaining = ( cert->extensions.basic.path_len + 1 );
-	if ( cert->path_remaining > max_path_remaining )
-		cert->path_remaining = max_path_remaining;
-
 	/* Mark certificate as valid */
-	cert->flags |= X509_FL_VALIDATED;
+	x509_set_valid ( cert, issuer, root );
 
 	DBGC ( cert, "X509 %p \"%s\" successfully validated using ",
 	       cert, x509_name ( cert ) );
@@ -1415,7 +1457,7 @@ static int x509_check_dnsname ( struct x509_certificate *cert,
 
 	/* Compare names */
 	if ( ! ( ( strlen ( name ) == len ) &&
-		 ( memcmp ( name, dnsname, len ) == 0 ) ) )
+		 ( strncasecmp ( name, dnsname, len ) == 0 ) ) )
 		return -ENOENT;
 
 	if ( name != fullname ) {
@@ -1553,19 +1595,12 @@ int x509_check_name ( struct x509_certificate *cert, const char *name ) {
 static void x509_free_chain ( struct refcnt *refcnt ) {
 	struct x509_chain *chain =
 		container_of ( refcnt, struct x509_chain, refcnt );
-	struct x509_link *link;
-	struct x509_link *tmp;
 
 	DBGC2 ( chain, "X509 chain %p freed\n", chain );
 
-	/* Free each link in the chain */
-	list_for_each_entry_safe ( link, tmp, &chain->links, list ) {
-		x509_put ( link->cert );
-		list_del ( &link->list );
-		free ( link );
-	}
-
 	/* Free chain */
+	x509_truncate ( chain, NULL );
+	assert ( list_empty ( &chain->links ) );
 	free ( chain );
 }
 
@@ -1599,11 +1634,17 @@ struct x509_chain * x509_alloc_chain ( void ) {
  */
 int x509_append ( struct x509_chain *chain, struct x509_certificate *cert ) {
 	struct x509_link *link;
+	int rc;
+
+	/* Ensure allocation of link cannot invalidate certificate */
+	x509_get ( cert );
 
 	/* Allocate link */
 	link = zalloc ( sizeof ( *link ) );
-	if ( ! link )
-		return -ENOMEM;
+	if ( ! link ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 
 	/* Add link to chain */
 	link->cert = x509_get ( cert );
@@ -1611,7 +1652,12 @@ int x509_append ( struct x509_chain *chain, struct x509_certificate *cert ) {
 	DBGC ( chain, "X509 chain %p added X509 %p \"%s\"\n",
 	       chain, cert, x509_name ( cert ) );
 
-	return 0;
+	/* Success */
+	rc = 0;
+
+	x509_put ( cert );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -1647,25 +1693,160 @@ int x509_append_raw ( struct x509_chain *chain, const void *data,
 }
 
 /**
+ * Truncate X.509 certificate chain
+ *
+ * @v chain		X.509 certificate chain
+ * @v link		Link after which to truncate chain, or NULL
+ */
+void x509_truncate ( struct x509_chain *chain, struct x509_link *link ) {
+	struct x509_link *tmp;
+
+	/* Truncate entire chain if no link is specified */
+	if ( ! link )
+		link = list_entry ( &chain->links, struct x509_link, list );
+
+	/* Free each link in the chain */
+	list_for_each_entry_safe_continue ( link, tmp, &chain->links, list ) {
+		x509_put ( link->cert );
+		list_del ( &link->list );
+		free ( link );
+	}
+}
+
+/**
+ * Mark X.509 certificate as found
+ *
+ * @v store		Certificate store
+ * @v cert		X.509 certificate
+ * @ret cert		X.509 certificate
+ */
+static struct x509_certificate * x509_found ( struct x509_chain *store,
+					      struct x509_certificate *cert ) {
+
+	/* Sanity check */
+	assert ( store != NULL );
+
+	/* Mark as found, if applicable */
+	if ( store->found )
+		store->found ( store, cert );
+
+	return cert;
+}
+
+/**
+ * Identify X.509 certificate by raw certificate data
+ *
+ * @v store		Certificate store, or NULL to use default
+ * @v raw		Raw certificate data
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+struct x509_certificate * x509_find ( struct x509_chain *store,
+				      const struct asn1_cursor *raw ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
+	/* Search for certificate within store */
+	list_for_each_entry ( link, &store->links, list ) {
+
+		/* Check raw certificate data */
+		cert = link->cert;
+		if ( asn1_compare ( raw, &cert->raw ) == 0 )
+			return x509_found ( store, cert );
+	}
+
+	return NULL;
+}
+
+/**
  * Identify X.509 certificate by subject
  *
- * @v certs		X.509 certificate list
+ * @v store		Certificate store, or NULL to use default
  * @v subject		Subject
  * @ret cert		X.509 certificate, or NULL if not found
  */
-static struct x509_certificate *
-x509_find_subject ( struct x509_chain *certs,
+struct x509_certificate *
+x509_find_subject ( struct x509_chain *store,
 		    const struct asn1_cursor *subject ) {
 	struct x509_link *link;
 	struct x509_certificate *cert;
 
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
 	/* Scan through certificate list */
-	list_for_each_entry ( link, &certs->links, list ) {
+	list_for_each_entry ( link, &store->links, list ) {
 
 		/* Check subject */
 		cert = link->cert;
 		if ( asn1_compare ( subject, &cert->subject.raw ) == 0 )
-			return cert;
+			return x509_found ( store, cert );
+	}
+
+	return NULL;
+}
+
+/**
+ * Identify X.509 certificate by issuer and serial number
+ *
+ * @v store		Certificate store, or NULL to use default
+ * @v issuer		Issuer
+ * @v serial		Serial number
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+struct x509_certificate *
+x509_find_issuer_serial ( struct x509_chain *store,
+			  const struct asn1_cursor *issuer,
+			  const struct asn1_cursor *serial ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
+	/* Scan through certificate list */
+	list_for_each_entry ( link, &store->links, list ) {
+
+		/* Check issuer and serial number */
+		cert = link->cert;
+		if ( ( asn1_compare ( issuer, &cert->issuer.raw ) == 0 ) &&
+		     ( asn1_compare ( serial, &cert->serial.raw ) == 0 ) )
+			return x509_found ( store, cert );
+	}
+
+	return NULL;
+}
+
+/**
+ * Identify X.509 certificate by corresponding public key
+ *
+ * @v store		Certificate store, or NULL to use default
+ * @v key		Private key
+ * @ret cert		X.509 certificate, or NULL if not found
+ */
+struct x509_certificate * x509_find_key ( struct x509_chain *store,
+					  struct private_key *key ) {
+	struct x509_link *link;
+	struct x509_certificate *cert;
+
+	/* Use default certificate store if none specified */
+	if ( ! store )
+		store = &certstore;
+
+	/* Scan through certificate list */
+	list_for_each_entry ( link, &store->links, list ) {
+
+		/* Check public key */
+		cert = link->cert;
+		if ( pubkey_match ( cert->signature_algorithm->pubkey,
+				    privkey_cursor ( key ),
+				    &cert->subject.public_key.raw ) == 0 )
+			return x509_found ( store, cert );
 	}
 
 	return NULL;
@@ -1675,13 +1856,13 @@ x509_find_subject ( struct x509_chain *certs,
  * Append X.509 certificates to X.509 certificate chain
  *
  * @v chain		X.509 certificate chain
- * @v certs		X.509 certificate list
+ * @v store		Certificate store, or NULL to use default
  * @ret rc		Return status code
  *
  * Certificates will be automatically appended to the chain based upon
  * the subject and issuer names.
  */
-int x509_auto_append ( struct x509_chain *chain, struct x509_chain *certs ) {
+int x509_auto_append ( struct x509_chain *chain, struct x509_chain *store ) {
 	struct x509_certificate *cert;
 	struct x509_certificate *previous;
 	int rc;
@@ -1698,7 +1879,7 @@ int x509_auto_append ( struct x509_chain *chain, struct x509_chain *certs ) {
 
 		/* Find issuing certificate */
 		previous = cert;
-		cert = x509_find_subject ( certs, &cert->issuer.raw );
+		cert = x509_find_subject ( store, &cert->issuer.raw );
 		if ( ! cert )
 			break;
 		if ( cert == previous )
@@ -1726,10 +1907,6 @@ int x509_validate_chain ( struct x509_chain *chain, time_t time,
 	struct x509_certificate *issuer = NULL;
 	struct x509_link *link;
 	int rc;
-
-	/* Use default certificate store if none specified */
-	if ( ! store )
-		store = &certstore;
 
 	/* Append any applicable certificates from the certificate store */
 	if ( ( rc = x509_auto_append ( chain, store ) ) != 0 )

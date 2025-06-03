@@ -41,12 +41,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Define inline IPv6 address */
 #define IPV6(...) { __VA_ARGS__ }
 
+/** An IPv6 test prefix */
+struct ipv6_test_prefix {
+	/** Prefix length */
+	unsigned int len;
+	/** Prefix mask */
+	const char *mask;
+};
+
 /** An IPv6 test routing table entry */
 struct ipv6_test_route {
 	/** Local address */
 	const char *address;
-	/** Prefix length */
-	unsigned int prefix_len;
+	/** Prefix */
+	const struct ipv6_test_prefix *prefix;
 	/** Router address (if any) */
 	const char *router;
 };
@@ -60,6 +68,13 @@ struct ipv6_test_table {
 	/** Constructed routing table */
 	struct list_head list;
 };
+
+/** Define a test prefix */
+#define PREFIX( name, LEN, MASK )					\
+	static const struct ipv6_test_prefix name = {			\
+		.len = LEN,						\
+		.mask = MASK,						\
+	};
 
 /** Define a test routing table */
 #define TABLE( name, ... )						\
@@ -112,27 +127,49 @@ static const struct in6_addr sample_multicast = {
 /** Dummy network device used for routing tests */
 static struct net_device ipv6_test_netdev = {
 	.refcnt = REF_INIT ( ref_no_free ),
-	.index = 42,
+	.scope_id = 42,
 	.state = NETDEV_OPEN,
 };
 
+/** /48 prefix */
+PREFIX ( prefix48, 48, "ffff:ffff:ffff::" );
+
+/** /64 prefix */
+PREFIX ( prefix64, 64, "ffff:ffff:ffff:ffff::" );
+
+/** /126 prefix */
+PREFIX ( prefix126, 126, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffc" );
+
+/** /127 prefix */
+PREFIX ( prefix127, 127, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe" );
+
+/** /128 prefix */
+PREFIX ( prefix128, 128, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff" );
+
 /** Routing table with only a link-local address */
 TABLE ( table_link_local,
-	{ "fe80::69ff:fe50:5845", 64, NULL } );
+	{ "fe80::69ff:fe50:5845", &prefix64, NULL } );
 
 /** Routing table with a global address */
 TABLE ( table_normal,
-	{ "fe80::69ff:fe50:5845", 64, NULL },
-	{ "2001:db8:3::1", 64, "fe80::1" } );
+	{ "fe80::69ff:fe50:5845", &prefix64, NULL },
+	{ "2001:db8:3::1", &prefix64, "fe80::1" } );
 
 /** Routing table with multiple addresses and routers */
 TABLE ( table_multi,
-	{ "fe80::69ff:fe50:5845", 64, NULL },
-	{ "2001:db8:3::1", 64, "fe80::1" },
-	{ "2001:db8:5::1", 64, NULL },
-	{ "2001:db8:42::1", 64, "fe80::2" },
-	{ "fd44:9112:6442::69ff:fe50:5845", 64, "fe80::1" },
-	{ "fd70:6ba9:50ae::69ff:fe50:5845", 64, "fe80::3" } );
+	{ "fe80::69ff:fe50:5845", &prefix64, NULL },
+	{ "2001:db8:3::1", &prefix64, "fe80::1" },
+	{ "2001:db8:5::1", &prefix64, NULL },
+	{ "2001:db8:42::1", &prefix64, "fe80::2" },
+	{ "fd44:9112:6442::69ff:fe50:5845", &prefix64, "fe80::1" },
+	{ "fd70:6ba9:50ae::69ff:fe50:5845", &prefix64, "fe80::3" } );
+
+/** Routing table with unusual prefix lengths */
+TABLE ( table_unusual,
+	{ "2001:db8:1::1", &prefix48, "fe80::1" },
+	{ "2001:db8:2::1", &prefix126, NULL },
+	{ "2001:db8:3::1", &prefix127, NULL },
+	{ "2001:db8:4::1", &prefix128, NULL } );
 
 /**
  * Report an inet6_ntoa() test result
@@ -212,8 +249,10 @@ static void inet6_aton_fail_okx ( const char *text, const char *file,
 static void ipv6_table_okx ( struct ipv6_test_table *table, const char *file,
 			     unsigned int line ) {
 	const struct ipv6_test_route *route;
+	struct ipv6_miniroute *miniroute;
 	struct in6_addr address;
 	struct in6_addr router;
+	struct in6_addr mask;
 	struct list_head saved;
 	unsigned int i;
 
@@ -235,13 +274,33 @@ static void ipv6_table_okx ( struct ipv6_test_table *table, const char *file,
 			okx ( inet6_aton ( route->router, &router ) == 0,
 			      file, line );
 		}
+		okx ( inet6_aton ( route->prefix->mask, &mask ) == 0,
+		      file, line );
 
 		/* Add routing table entry */
 		okx ( ipv6_add_miniroute ( &ipv6_test_netdev, &address,
-					   route->prefix_len,
+					   route->prefix->len,
 					   ( route->router ?
 					     &router : NULL ) ) == 0,
 		      file, line );
+
+		/* Check routing table entry */
+		miniroute = list_first_entry ( &ipv6_miniroutes,
+					       struct ipv6_miniroute, list );
+		okx ( miniroute != NULL, file, line );
+		okx ( memcmp ( &miniroute->address, &address,
+			       sizeof ( address ) ) == 0, file, line );
+		okx ( miniroute->prefix_len == route->prefix->len,
+		      file, line );
+		okx ( memcmp ( &miniroute->prefix_mask, &mask,
+			       sizeof ( mask ) ) == 0, file, line );
+		if ( route->router ) {
+			okx ( memcmp ( &miniroute->router, &router,
+				       sizeof ( router ) ) == 0, file, line );
+		} else {
+			okx ( IN6_IS_ADDR_UNSPECIFIED ( &miniroute->router ),
+			      file, line );
+		}
 	}
 
 	/* Save constructed routing table */
@@ -290,7 +349,7 @@ static void ipv6_route_okx ( struct ipv6_test_table *table, const char *dest,
 
 	/* Perform routing */
 	actual = &in_dest;
-	miniroute = ipv6_route ( ipv6_test_netdev.index, &actual );
+	miniroute = ipv6_route ( ipv6_test_netdev.scope_id, &actual );
 
 	/* Validate result */
 	if ( src ) {
@@ -462,6 +521,7 @@ static void ipv6_test_exec ( void ) {
 	ipv6_table_ok ( &table_link_local );
 	ipv6_table_ok ( &table_normal );
 	ipv6_table_ok ( &table_multi );
+	ipv6_table_ok ( &table_unusual );
 
 	/* Routing table with only a link-local address */
 	ipv6_route_ok ( &table_link_local, "fe80::1",
@@ -505,10 +565,27 @@ static void ipv6_test_exec ( void ) {
 	ipv6_route_ok ( &table_multi, "ff02::1",
 			"fe80::69ff:fe50:5845", NULL );
 
+	/* Routing table with unusual prefix lengths */
+	ipv6_route_ok ( &table_unusual, "2001:db8:2::1",
+			"2001:db8:2::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:2::3",
+			"2001:db8:2::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:3::1",
+			"2001:db8:3::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:3::2",
+			"2001:db8:1::1", "fe80::1" );
+	ipv6_route_ok ( &table_unusual, "2001:db8:4::1",
+			"2001:db8:4::1", NULL );
+	ipv6_route_ok ( &table_unusual, "2001:db8:4::0",
+			"2001:db8:1::1", "fe80::1" );
+	ipv6_route_ok ( &table_unusual, "2001:db8:4::2",
+			"2001:db8:1::1", "fe80::1" );
+
 	/* Destroy test routing tables */
 	ipv6_table_del ( &table_link_local );
 	ipv6_table_del ( &table_normal );
 	ipv6_table_del ( &table_multi );
+	ipv6_table_del ( &table_unusual );
 }
 
 /** IPv6 self-test */

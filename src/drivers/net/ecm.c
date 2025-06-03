@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/if_ether.h>
 #include <ipxe/base16.h>
 #include <ipxe/profile.h>
+#include <ipxe/acpimac.h>
 #include <ipxe/usb.h>
 #include "ecm.h"
 
@@ -81,20 +82,24 @@ ecm_ethernet_descriptor ( struct usb_configuration_descriptor *config,
 /**
  * Get hardware MAC address
  *
- * @v usb		USB device
+ * @v func		USB function
  * @v desc		Ethernet functional descriptor
- * @v hw_addr		Hardware address to fill in
+ * @v netdev		Network device
  * @ret rc		Return status code
  */
-int ecm_fetch_mac ( struct usb_device *usb,
-		    struct ecm_ethernet_descriptor *desc, uint8_t *hw_addr ) {
+int ecm_fetch_mac ( struct usb_function *func,
+		    struct ecm_ethernet_descriptor *desc,
+		    struct net_device *netdev ) {
+	struct usb_device *usb = func->usb;
 	char buf[ base16_encoded_len ( ETH_ALEN ) + 1 /* NUL */ ];
+	uint8_t amac[ETH_ALEN];
 	int len;
 	int rc;
 
 	/* Fetch MAC address string */
+	buf[ sizeof ( buf ) - 1 ] = '\0';
 	len = usb_get_string_descriptor ( usb, desc->mac, 0, buf,
-					  sizeof ( buf ) );
+					  ( sizeof ( buf ) - 1 ) );
 	if ( len < 0 ) {
 		rc = len;
 		return rc;
@@ -103,17 +108,26 @@ int ecm_fetch_mac ( struct usb_device *usb,
 	/* Sanity check */
 	if ( len != ( ( int ) ( sizeof ( buf ) - 1 /* NUL */ ) ) ) {
 		DBGC ( usb, "USB %s has invalid ECM MAC \"%s\"\n",
-		       usb->name, buf );
+		       func->name, buf );
 		return -EINVAL;
 	}
 
 	/* Decode MAC address */
-	len = base16_decode ( buf, hw_addr, ETH_ALEN );
+	len = base16_decode ( buf, netdev->hw_addr, ETH_ALEN );
 	if ( len < 0 ) {
 		rc = len;
 		DBGC ( usb, "USB %s could not decode ECM MAC \"%s\": %s\n",
-		       usb->name, buf, strerror ( rc ) );
+		       func->name, buf, strerror ( rc ) );
 		return rc;
+	}
+
+	/* Apply system-specific MAC address as current link-layer
+	 * address, if present.
+	 */
+	if ( ( rc = acpi_mac ( amac ) ) == 0 ) {
+		memcpy ( netdev->ll_addr, amac, ETH_ALEN );
+		DBGC ( usb, "USB %s using system-specific MAC %s\n",
+		       func->name, eth_ntoa ( netdev->ll_addr ) );
 	}
 
 	return 0;
@@ -464,7 +478,7 @@ static int ecm_probe ( struct usb_function *func,
 	}
 
 	/* Fetch MAC address */
-	if ( ( rc = ecm_fetch_mac ( usb, ethernet, netdev->hw_addr ) ) != 0 ) {
+	if ( ( rc = ecm_fetch_mac ( func, ethernet, netdev ) ) != 0 ) {
 		DBGC ( ecm, "ECM %p could not fetch MAC address: %s\n",
 		       ecm, strerror ( rc ) );
 		goto err_fetch_mac;

@@ -79,12 +79,10 @@ size_t uri_decode ( const char *encoded, void *buf, size_t len ) {
 /**
  * Decode URI field in-place
  *
- * @v uri		URI
- * @v field		URI field index
+ * @v encoded		Encoded field, or NULL
  */
-static void uri_decode_inplace ( struct uri *uri, unsigned int field ) {
-	const char *encoded = uri_field ( uri, field );
-	char *decoded = ( ( char * ) encoded );
+static void uri_decode_inplace ( char *encoded ) {
+	char *decoded = encoded;
 	size_t len;
 
 	/* Do nothing if field is not present */
@@ -150,7 +148,7 @@ static int uri_character_escaped ( char c, unsigned int field ) {
 	 * parser but for any other URI parsers (e.g. HTTP query
 	 * string parsers, which care about '=' and '&').
 	 */
-	static const char *escaped[URI_FIELDS] = {
+	static const char *escaped[URI_EPATH] = {
 		/* Scheme or default: escape everything */
 		[URI_SCHEME]	= "/#:@?=&",
 		/* Opaque part: escape characters which would affect
@@ -172,20 +170,21 @@ static int uri_character_escaped ( char c, unsigned int field ) {
 		 * appears within paths.
 		 */
 		[URI_PATH]	= "#:@?",
-		/* Query: escape everything except '/', which
-		 * sometimes appears within queries.
-		 */
-		[URI_QUERY]	= "#:@?",
-		/* Fragment: escape everything */
-		[URI_FRAGMENT]	= "/#:@?",
 	};
 
-	return ( /* Always escape non-printing characters and whitespace */
-		 ( ! isprint ( c ) ) || ( c == ' ' ) ||
-		 /* Always escape '%' */
-		 ( c == '%' ) ||
-		 /* Escape field-specific characters */
-		 strchr ( escaped[field], c ) );
+	/* Always escape non-printing characters and whitespace */
+	if ( ( ! isprint ( c ) ) || ( c == ' ' ) )
+		return 1;
+
+	/* Escape nothing else in already-escaped fields */
+	if ( field >= URI_EPATH )
+		return 0;
+
+	/* Escape '%' and any field-specific characters */
+	if ( ( c == '%' ) || strchr ( escaped[field], c ) )
+		return 1;
+
+	return 0;
 }
 
 /**
@@ -262,10 +261,12 @@ static void uri_dump ( const struct uri *uri ) {
 		DBGC ( uri, " port \"%s\"", uri->port );
 	if ( uri->path )
 		DBGC ( uri, " path \"%s\"", uri->path );
-	if ( uri->query )
-		DBGC ( uri, " query \"%s\"", uri->query );
-	if ( uri->fragment )
-		DBGC ( uri, " fragment \"%s\"", uri->fragment );
+	if ( uri->epath )
+		DBGC ( uri, " epath \"%s\"", uri->epath );
+	if ( uri->equery )
+		DBGC ( uri, " equery \"%s\"", uri->equery );
+	if ( uri->efragment )
+		DBGC ( uri, " efragment \"%s\"", uri->efragment );
 	if ( uri->params )
 		DBGC ( uri, " params \"%s\"", uri->params->name );
 }
@@ -298,17 +299,19 @@ struct uri * parse_uri ( const char *uri_string ) {
 	char *raw;
 	char *tmp;
 	char *path;
+	char *epath;
 	char *authority;
 	size_t raw_len;
 	unsigned int field;
 
-	/* Allocate space for URI struct and a copy of the string */
+	/* Allocate space for URI struct and two copies of the string */
 	raw_len = ( strlen ( uri_string ) + 1 /* NUL */ );
-	uri = zalloc ( sizeof ( *uri ) + raw_len );
+	uri = zalloc ( sizeof ( *uri ) + ( 2 * raw_len ) );
 	if ( ! uri )
 		return NULL;
 	ref_init ( &uri->refcnt, uri_free );
 	raw = ( ( ( void * ) uri ) + sizeof ( *uri ) );
+	path = ( raw + raw_len );
 
 	/* Copy in the raw string */
 	memcpy ( raw, uri_string, raw_len );
@@ -328,57 +331,62 @@ struct uri * parse_uri ( const char *uri_string ) {
 	/* Chop off the fragment, if it exists */
 	if ( ( tmp = strchr ( raw, '#' ) ) ) {
 		*(tmp++) = '\0';
-		uri->fragment = tmp;
+		uri->efragment = tmp;
 	}
 
-	/* Identify absolute/relative URI */
-	if ( ( tmp = strchr ( raw, ':' ) ) ) {
+	/* Identify absolute URIs */
+	epath = raw;
+	for ( tmp = raw ; ; tmp++ ) {
+		/* Possible scheme character (for our URI schemes) */
+		if ( isalpha ( *tmp ) || ( *tmp == '-' ) || ( *tmp == '_' ) )
+			continue;
+		/* Invalid scheme character or NUL: is a relative URI */
+		if ( *tmp != ':' )
+			break;
 		/* Absolute URI: identify hierarchical/opaque */
 		uri->scheme = raw;
 		*(tmp++) = '\0';
 		if ( *tmp == '/' ) {
 			/* Absolute URI with hierarchical part */
-			path = tmp;
+			epath = tmp;
 		} else {
 			/* Absolute URI with opaque part */
 			uri->opaque = tmp;
-			path = NULL;
+			epath = NULL;
 		}
-	} else {
-		/* Relative URI */
-		path = raw;
+		break;
 	}
 
 	/* If we don't have a path (i.e. we have an absolute URI with
 	 * an opaque portion, we're already finished processing
 	 */
-	if ( ! path )
+	if ( ! epath )
 		goto done;
 
 	/* Chop off the query, if it exists */
-	if ( ( tmp = strchr ( path, '?' ) ) ) {
+	if ( ( tmp = strchr ( epath, '?' ) ) ) {
 		*(tmp++) = '\0';
-		uri->query = tmp;
+		uri->equery = tmp;
 	}
 
 	/* If we have no path remaining, then we're already finished
 	 * processing.
 	 */
-	if ( ! path[0] )
+	if ( ! epath[0] )
 		goto done;
 
 	/* Identify net/absolute/relative path */
-	if ( uri->scheme && ( strncmp ( path, "//", 2 ) == 0 ) ) {
+	if ( uri->scheme && ( strncmp ( epath, "//", 2 ) == 0 ) ) {
 		/* Net path.  If this is terminated by the first '/'
 		 * of an absolute path, then we have no space for a
 		 * terminator after the authority field, so shuffle
 		 * the authority down by one byte, overwriting one of
 		 * the two slashes.
 		 */
-		authority = ( path + 2 );
+		authority = ( epath + 2 );
 		if ( ( tmp = strchr ( authority, '/' ) ) ) {
 			/* Shuffle down */
-			uri->path = tmp;
+			uri->epath = tmp;
 			memmove ( ( authority - 1 ), authority,
 				  ( tmp - authority ) );
 			authority--;
@@ -386,8 +394,14 @@ struct uri * parse_uri ( const char *uri_string ) {
 		}
 	} else {
 		/* Absolute/relative path */
-		uri->path = path;
+		uri->epath = epath;
 		authority = NULL;
+	}
+
+	/* Create copy of path for decoding */
+	if ( uri->epath ) {
+		strcpy ( path, uri->epath );
+		uri->path = path;
 	}
 
 	/* If we don't have an authority (i.e. we have a non-net
@@ -421,8 +435,8 @@ struct uri * parse_uri ( const char *uri_string ) {
 
  done:
 	/* Decode fields in-place */
-	for ( field = 0 ; field < URI_FIELDS ; field++ )
-		uri_decode_inplace ( uri, field );
+	for ( field = 0 ; field < URI_EPATH ; field++ )
+		uri_decode_inplace ( ( char * ) uri_field ( uri, field ) );
 
 	DBGC ( uri, "URI parsed \"%s\" to", uri_string );
 	uri_dump ( uri );
@@ -458,8 +472,8 @@ size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 	static const char prefixes[URI_FIELDS] = {
 		[URI_PASSWORD] = ':',
 		[URI_PORT] = ':',
-		[URI_QUERY] = '?',
-		[URI_FRAGMENT] = '#',
+		[URI_EQUERY] = '?',
+		[URI_EFRAGMENT] = '#',
 	};
 	char prefix;
 	size_t used = 0;
@@ -478,6 +492,10 @@ size_t format_uri ( const struct uri *uri, char *buf, size_t len ) {
 
 		/* Skip non-existent fields */
 		if ( ! uri_field ( uri, field ) )
+			continue;
+
+		/* Skip path field if encoded path is present */
+		if ( ( field == URI_PATH ) && uri->epath )
 			continue;
 
 		/* Prefix this field, if applicable */
@@ -676,6 +694,7 @@ char * resolve_path ( const char *base_path,
 struct uri * resolve_uri ( const struct uri *base_uri,
 			   struct uri *relative_uri ) {
 	struct uri tmp_uri;
+	char *tmp_epath = NULL;
 	char *tmp_path = NULL;
 	struct uri *new_uri;
 
@@ -685,20 +704,27 @@ struct uri * resolve_uri ( const struct uri *base_uri,
 
 	/* Mangle URI */
 	memcpy ( &tmp_uri, base_uri, sizeof ( tmp_uri ) );
-	if ( relative_uri->path ) {
-		tmp_path = resolve_path ( ( base_uri->path ?
-					    base_uri->path : "/" ),
-					  relative_uri->path );
+	if ( relative_uri->epath ) {
+		tmp_epath = resolve_path ( ( base_uri->epath ?
+					     base_uri->epath : "/" ),
+					   relative_uri->epath );
+		if ( ! tmp_epath )
+			goto err_epath;
+		tmp_path = strdup ( tmp_epath );
+		if ( ! tmp_path )
+			goto err_path;
+		uri_decode_inplace ( tmp_path );
+		tmp_uri.epath = tmp_epath;
 		tmp_uri.path = tmp_path;
-		tmp_uri.query = relative_uri->query;
-		tmp_uri.fragment = relative_uri->fragment;
+		tmp_uri.equery = relative_uri->equery;
+		tmp_uri.efragment = relative_uri->efragment;
 		tmp_uri.params = relative_uri->params;
-	} else if ( relative_uri->query ) {
-		tmp_uri.query = relative_uri->query;
-		tmp_uri.fragment = relative_uri->fragment;
+	} else if ( relative_uri->equery ) {
+		tmp_uri.equery = relative_uri->equery;
+		tmp_uri.efragment = relative_uri->efragment;
 		tmp_uri.params = relative_uri->params;
-	} else if ( relative_uri->fragment ) {
-		tmp_uri.fragment = relative_uri->fragment;
+	} else if ( relative_uri->efragment ) {
+		tmp_uri.efragment = relative_uri->efragment;
 		tmp_uri.params = relative_uri->params;
 	} else if ( relative_uri->params ) {
 		tmp_uri.params = relative_uri->params;
@@ -707,7 +733,14 @@ struct uri * resolve_uri ( const struct uri *base_uri,
 	/* Create demangled URI */
 	new_uri = uri_dup ( &tmp_uri );
 	free ( tmp_path );
+	free ( tmp_epath );
 	return new_uri;
+
+	free ( tmp_path );
+ err_path:
+	free ( tmp_epath );
+ err_epath:
+	return NULL;
 }
 
 /**
@@ -746,6 +779,7 @@ static struct uri * tftp_uri ( struct sockaddr *sa_server,
 	if ( asprintf ( &path, "/%s", filename ) < 0 )
 		goto err_path;
 	tmp.path = path;
+	tmp.epath = path;
 
 	/* Demangle URI */
 	uri = uri_dup ( &tmp );

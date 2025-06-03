@@ -22,6 +22,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <string.h>
 #include <assert.h>
 #include <realmode.h>
 #include <biosint.h>
@@ -29,7 +30,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <fakee820.h>
 #include <ipxe/init.h>
 #include <ipxe/io.h>
-#include <ipxe/hidemem.h>
+#include <ipxe/uheap.h>
+#include <ipxe/memmap.h>
 
 /** Set to true if you want to test a fake E820 map */
 #define FAKE_E820 0
@@ -72,13 +74,17 @@ extern void int15();
 extern struct segoff __text16 ( int15_vector );
 #define int15_vector __use_text16 ( int15_vector )
 
+/** INT 15 interception flag */
+extern uint8_t __text16 ( int15_intercept_flag );
+#define int15_intercept_flag __use_text16 ( int15_intercept_flag )
+
 /* The linker defines these symbols for us */
 extern char _textdata[];
 extern char _etextdata[];
-extern char _text16_memsz[];
-#define _text16_memsz ( ( size_t ) _text16_memsz )
-extern char _data16_memsz[];
-#define _data16_memsz ( ( size_t ) _data16_memsz )
+extern size_t ABS_SYMBOL ( _text16_memsz );
+#define _text16_memsz ABS_VALUE ( _text16_memsz )
+extern size_t ABS_SYMBOL ( _data16_memsz );
+#define _data16_memsz ABS_VALUE ( _data16_memsz )
 
 /**
  * Hide region of memory from system memory map
@@ -113,15 +119,6 @@ void hide_basemem ( void ) {
 }
 
 /**
- * Hide umalloc() region
- *
- */
-void hide_umalloc ( physaddr_t start, physaddr_t end ) {
-	assert ( end <= virt_to_phys ( _textdata ) );
-	hide_region ( &hidemem_umalloc, start, end );
-}
-
-/**
  * Hide .text and .data
  *
  */
@@ -131,32 +128,62 @@ void hide_textdata ( void ) {
 }
 
 /**
+ * Synchronise in-use regions with the externally visible system memory map
+ *
+ */
+static void int15_sync ( void ) {
+	physaddr_t start;
+	physaddr_t end;
+
+	/* Besides our fixed base memory and textdata regions, we
+	 * support hiding only a single in-use memory region (the
+	 * umalloc region), which must be placed before the hidden
+	 * textdata region (even if zero-length).
+	 */
+	start = uheap_start;
+	end = uheap_end;
+	if ( start == end )
+		start = end = virt_to_phys ( _textdata );
+	hide_region ( &hidemem_umalloc, start, end );
+}
+
+/**
+ * Set INT 15 interception flag
+ *
+ * @v intercept		Intercept INT 15 calls to modify memory map
+ */
+void int15_intercept ( int intercept ) {
+
+	/* Set flag for INT 15 handler */
+	int15_intercept_flag = intercept;
+}
+
+/**
  * Hide Etherboot
  *
  * Installs an INT 15 handler to edit Etherboot out of the memory map
  * returned by the BIOS.
  */
 static void hide_etherboot ( void ) {
-	struct memory_map memmap;
 	unsigned int rm_ds_top;
 	unsigned int rm_cs_top;
 	unsigned int fbms;
 
 	/* Dump memory map before mangling */
 	DBG ( "Hiding iPXE from system memory map\n" );
-	get_memmap ( &memmap );
+	memmap_dump_all ( 1 );
 
 	/* Hook in fake E820 map, if we're testing one */
 	if ( FAKE_E820 ) {
 		DBG ( "Hooking in fake E820 map\n" );
 		fake_e820();
-		get_memmap ( &memmap );
+		memmap_dump_all ( 1 );
 	}
 
 	/* Initialise the hidden regions */
 	hide_basemem();
-	hide_umalloc ( virt_to_phys ( _textdata ), virt_to_phys ( _textdata ) );
 	hide_textdata();
+	int15_sync();
 
 	/* Some really moronic BIOSes bring up the PXE stack via the
 	 * UNDI loader entry point and then don't bother to unload it
@@ -183,7 +210,7 @@ static void hide_etherboot ( void ) {
 
 	/* Dump memory map after mangling */
 	DBG ( "Hidden iPXE from system memory map\n" );
-	get_memmap ( &memmap );
+	memmap_dump_all ( 1 );
 }
 
 /**
@@ -193,7 +220,6 @@ static void hide_etherboot ( void ) {
  * possible.
  */
 static void unhide_etherboot ( int flags __unused ) {
-	struct memory_map memmap;
 	int rc;
 
 	/* If we have more than one hooked interrupt at this point, it
@@ -224,7 +250,7 @@ static void unhide_etherboot ( int flags __unused ) {
 
 	/* Dump memory map after unhiding */
 	DBG ( "Unhidden iPXE from system memory map\n" );
-	get_memmap ( &memmap );
+	memmap_dump_all ( 1 );
 }
 
 /** Hide Etherboot startup function */
@@ -233,3 +259,5 @@ struct startup_fn hide_etherboot_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.startup = hide_etherboot,
 	.shutdown = unhide_etherboot,
 };
+
+PROVIDE_MEMMAP ( int15, memmap_sync, int15_sync );

@@ -24,6 +24,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
+	.section ".note.GNU-stack", "", @progbits
+	.code16
 	.arch i386
 
 /****************************************************************************
@@ -285,7 +287,7 @@ enable_a20:
 	ret
 
 	.section ".text16.early.data", "aw", @progbits
-	.align	2
+	.balign	2
 enable_a20_method:
 	.word	0
 	.size	enable_a20_method, . - enable_a20_method

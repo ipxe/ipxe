@@ -11,7 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <string.h>
-#include <ipxe/uaccess.h>
 
 /** Compression formats */
 enum deflate_format {
@@ -163,6 +162,11 @@ struct deflate {
 	/** Format */
 	enum deflate_format format;
 
+	/** Current input data pointer */
+	const uint8_t *in;
+	/** End of input data pointer */
+	const uint8_t *end;
+
 	/** Accumulator */
 	uint32_t accumulator;
 	/** Bit-reversed accumulator
@@ -240,7 +244,7 @@ struct deflate {
 /** A chunk of data */
 struct deflate_chunk {
 	/** Data */
-	userptr_t data;
+	void *data;
 	/** Current offset */
 	size_t offset;
 	/** Length of data */
@@ -256,7 +260,7 @@ struct deflate_chunk {
  * @v len		Length
  */
 static inline __attribute__ (( always_inline )) void
-deflate_chunk_init ( struct deflate_chunk *chunk, userptr_t data,
+deflate_chunk_init ( struct deflate_chunk *chunk, void *data,
 		     size_t offset, size_t len ) {
 
 	chunk->data = data;
@@ -277,7 +281,7 @@ static inline int deflate_finished ( struct deflate *deflate ) {
 extern void deflate_init ( struct deflate *deflate,
 			   enum deflate_format format );
 extern int deflate_inflate ( struct deflate *deflate,
-			     struct deflate_chunk *in,
+			     const void *data, size_t len,
 			     struct deflate_chunk *out );
 
 #endif /* _IPXE_DEFLATE_H */

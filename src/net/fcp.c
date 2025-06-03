@@ -413,7 +413,7 @@ static int fcpcmd_recv_rddata ( struct fcp_command *fcpcmd,
 		fcpdev, fcpcmd->xchg_id, offset, ( offset + len ) );
 
 	/* Copy to user buffer */
-	copy_to_user ( command->data_in, offset, iobuf->data, len );
+	memcpy ( ( command->data_in + offset ), iobuf->data, len );
 	fcpcmd->offset += len;
 	assert ( fcpcmd->offset <= command->data_in_len );
 
@@ -464,8 +464,8 @@ static int fcpcmd_send_wrdata ( struct fcp_command *fcpcmd ) {
 	}
 
 	/* Construct data IU frame */
-	copy_from_user ( iob_put ( iobuf, len ), command->data_out,
-			 fcpcmd->offset, len );
+	memcpy ( iob_put ( iobuf, len ),
+		 ( command->data_out + fcpcmd->offset ), len );
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.flags = ( XFER_FL_RESPONSE | XFER_FL_ABS_OFFSET );
 	meta.offset = fcpcmd->offset;

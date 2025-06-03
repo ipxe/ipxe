@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdio.h>
 #include <errno.h>
 #include <byteswap.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 #include <ipxe/linux.h>
 #include <ipxe/pci.h>
 
@@ -187,3 +187,13 @@ int linux_pci_write ( struct pci_device *pci, unsigned long where,
  err_open:
 	return rc;
 }
+
+PROVIDE_PCIAPI_INLINE ( linux, pci_can_probe );
+PROVIDE_PCIAPI_INLINE ( linux, pci_discover );
+PROVIDE_PCIAPI_INLINE ( linux, pci_read_config_byte );
+PROVIDE_PCIAPI_INLINE ( linux, pci_read_config_word );
+PROVIDE_PCIAPI_INLINE ( linux, pci_read_config_dword );
+PROVIDE_PCIAPI_INLINE ( linux, pci_write_config_byte );
+PROVIDE_PCIAPI_INLINE ( linux, pci_write_config_word );
+PROVIDE_PCIAPI_INLINE ( linux, pci_write_config_dword );
+PROVIDE_PCIAPI_INLINE ( linux, pci_ioremap );

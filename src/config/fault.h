@@ -29,6 +29,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Corrupt every N received PeerDist packets */
 #define PEERBLK_CORRUPT_RATE 0
 
+/* Experience virtual machine migration on every N watchdog checks */
+#define VM_MIGRATED_RATE 0
+
 #include <config/local/fault.h>
 
 #endif /* CONFIG_FAULT_H */

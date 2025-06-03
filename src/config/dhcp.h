@@ -28,7 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Maximum number of discovery deferrals due to blocked links
  * (e.g. from non-forwarding STP ports)
  */
-#define DHCP_DISC_MAX_DEFERRALS		60
+#define DHCP_DISC_MAX_DEFERRALS		180
 
 /*
  * ProxyDHCP offers are given precedence by continue to wait for them

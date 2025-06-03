@@ -51,6 +51,21 @@ static struct profiler xferbuf_read_profiler __profiler =
 	{ .name = "xferbuf.read" };
 
 /**
+ * Detach data from data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ *
+ * The caller assumes responsibility for eventually freeing the data
+ * previously owned by the data transfer buffer.
+ */
+void xferbuf_detach ( struct xfer_buffer *xferbuf ) {
+
+	xferbuf->data = NULL;
+	xferbuf->len = 0;
+	xferbuf->pos = 0;
+}
+
+/**
  * Free data transfer buffer
  *
  * @v xferbuf		Data transfer buffer
@@ -58,8 +73,7 @@ static struct profiler xferbuf_read_profiler __profiler =
 void xferbuf_free ( struct xfer_buffer *xferbuf ) {
 
 	xferbuf->op->realloc ( xferbuf, 0 );
-	xferbuf->len = 0;
-	xferbuf->pos = 0;
+	xferbuf_detach ( xferbuf );
 }
 
 /**
@@ -109,9 +123,13 @@ int xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
 	if ( ( rc = xferbuf_ensure_size ( xferbuf, max_len ) ) != 0 )
 		return rc;
 
+	/* Check that buffer is non-void */
+	if ( len && ( ! xferbuf->data ) )
+		return -ENOTTY;
+
 	/* Copy data to buffer */
 	profile_start ( &xferbuf_write_profiler );
-	xferbuf->op->write ( xferbuf, offset, data, len );
+	memcpy ( ( xferbuf->data + offset ), data, len );
 	profile_stop ( &xferbuf_write_profiler );
 
 	return 0;
@@ -133,9 +151,13 @@ int xferbuf_read ( struct xfer_buffer *xferbuf, size_t offset,
 	     ( len > ( xferbuf->len - offset ) ) )
 		return -ENOENT;
 
+	/* Check that buffer is non-void */
+	if ( len && ( ! xferbuf->data ) )
+		return -ENOTTY;
+
 	/* Copy data from buffer */
 	profile_start ( &xferbuf_read_profiler );
-	xferbuf->op->read ( xferbuf, offset, data, len );
+	memcpy ( data, ( xferbuf->data + offset ), len );
 	profile_stop ( &xferbuf_read_profiler );
 
 	return 0;
@@ -178,7 +200,7 @@ int xferbuf_deliver ( struct xfer_buffer *xferbuf, struct io_buffer *iobuf,
 }
 
 /**
- * Reallocate malloc()-based data buffer
+ * Reallocate malloc()-based data transfer buffer
  *
  * @v xferbuf		Data transfer buffer
  * @v len		New length (or zero to free buffer)
@@ -194,94 +216,76 @@ static int xferbuf_malloc_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
 	return 0;
 }
 
-/**
- * Write data to malloc()-based data buffer
- *
- * @v xferbuf		Data transfer buffer
- * @v offset		Starting offset
- * @v data		Data to copy
- * @v len		Length of data
- */
-static void xferbuf_malloc_write ( struct xfer_buffer *xferbuf, size_t offset,
-				   const void *data, size_t len ) {
-
-	memcpy ( ( xferbuf->data + offset ), data, len );
-}
-
-/**
- * Read data from malloc()-based data buffer
- *
- * @v xferbuf		Data transfer buffer
- * @v offset		Starting offset
- * @v data		Data to read
- * @v len		Length of data
- */
-static void xferbuf_malloc_read ( struct xfer_buffer *xferbuf, size_t offset,
-				  void *data, size_t len ) {
-
-	memcpy ( data, ( xferbuf->data + offset ), len );
-}
-
 /** malloc()-based data buffer operations */
 struct xfer_buffer_operations xferbuf_malloc_operations = {
 	.realloc = xferbuf_malloc_realloc,
-	.write = xferbuf_malloc_write,
-	.read = xferbuf_malloc_read,
 };
 
 /**
- * Reallocate umalloc()-based data buffer
+ * Reallocate umalloc()-based data transfer buffer
  *
  * @v xferbuf		Data transfer buffer
  * @v len		New length (or zero to free buffer)
  * @ret rc		Return status code
  */
 static int xferbuf_umalloc_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
-	userptr_t *udata = xferbuf->data;
-	userptr_t new_udata;
+	void *new_udata;
 
-	new_udata = urealloc ( *udata, len );
+	new_udata = urealloc ( xferbuf->data, len );
 	if ( ! new_udata )
 		return -ENOSPC;
-	*udata = new_udata;
+	xferbuf->data = new_udata;
 	return 0;
-}
-
-/**
- * Write data to umalloc()-based data buffer
- *
- * @v xferbuf		Data transfer buffer
- * @v offset		Starting offset
- * @v data		Data to copy
- * @v len		Length of data
- */
-static void xferbuf_umalloc_write ( struct xfer_buffer *xferbuf, size_t offset,
-				    const void *data, size_t len ) {
-	userptr_t *udata = xferbuf->data;
-
-	copy_to_user ( *udata, offset, data, len );
-}
-
-/**
- * Read data from umalloc()-based data buffer
- *
- * @v xferbuf		Data transfer buffer
- * @v offset		Starting offset
- * @v data		Data to read
- * @v len		Length of data
- */
-static void xferbuf_umalloc_read ( struct xfer_buffer *xferbuf, size_t offset,
-				   void *data, size_t len ) {
-	userptr_t *udata = xferbuf->data;
-
-	copy_from_user ( data, *udata, offset, len );
 }
 
 /** umalloc()-based data buffer operations */
 struct xfer_buffer_operations xferbuf_umalloc_operations = {
 	.realloc = xferbuf_umalloc_realloc,
-	.write = xferbuf_umalloc_write,
-	.read = xferbuf_umalloc_read,
+};
+
+/**
+ * Reallocate fixed-size data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ * @v len		New length (or zero to free buffer)
+ * @ret rc		Return status code
+ */
+static int xferbuf_fixed_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
+
+	/* Refuse to allocate extra space */
+	if ( len > xferbuf->len ) {
+		/* Note that EFI relies upon this error mapping to
+		 * EFI_BUFFER_TOO_SMALL.
+		 */
+		return -ERANGE;
+	}
+
+	return 0;
+}
+
+/** Fixed-size data buffer operations */
+struct xfer_buffer_operations xferbuf_fixed_operations = {
+	.realloc = xferbuf_fixed_realloc,
+};
+
+/**
+ * Reallocate void data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ * @v len		New length (or zero to free buffer)
+ * @ret rc		Return status code
+ */
+static int xferbuf_void_realloc ( struct xfer_buffer *xferbuf,
+				  size_t len __unused ) {
+
+	/* Succeed without ever allocating data */
+	assert ( xferbuf->data == NULL );
+	return 0;
+}
+
+/** Void data buffer operations */
+struct xfer_buffer_operations xferbuf_void_operations = {
+	.realloc = xferbuf_void_realloc,
 };
 
 /**

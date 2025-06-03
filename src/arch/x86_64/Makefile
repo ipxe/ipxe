@@ -1,3 +1,7 @@
+# Specify compressor
+#
+ZBIN		= $(ZBIN64)
+
 # Code size reduction.
 #
 CFLAGS		+= -fstrength-reduce -fomit-frame-pointer

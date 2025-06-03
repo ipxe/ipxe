@@ -87,9 +87,6 @@ static struct dns_server dns6;
 /** Total number of DNS servers */
 static unsigned int dns_count;
 
-/** Current DNS server index */
-static unsigned int dns_index;
-
 /** The DNS search list */
 static struct dns_name dns_search;
 
@@ -489,6 +486,8 @@ struct dns_request {
 	size_t offset;
 	/** Search list */
 	struct dns_name search;
+	/** Server index */
+	unsigned int index;
 	/** Recursion counter */
 	unsigned int recursion;
 };
@@ -606,7 +605,7 @@ static int dns_send_packet ( struct dns_request *dns ) {
 		DBGC ( dns, "DNS %p lost DNS servers mid query\n", dns );
 		return -EINVAL;
 	}
-	index = ( dns_index % dns_count );
+	index = ( dns->index % dns_count );
 	if ( index < dns6.count ) {
 		nameserver.sin6.sin6_family = AF_INET6;
 		memcpy ( &nameserver.sin6.sin6_addr, &dns6.in6[index],
@@ -651,7 +650,7 @@ static void dns_timer_expired ( struct retry_timer *timer, int fail ) {
 
 	/* Move to next DNS server if this is a retransmission */
 	if ( dns->buf.query.id )
-		dns_index++;
+		dns->index++;
 
 	/* Send DNS query */
 	dns_send_packet ( dns );
@@ -1211,7 +1210,7 @@ static int apply_dns_settings ( void ) {
 
 	/* Fetch DNS server address */
 	apply_dns_servers();
-	if ( DBG_LOG && ( dns_count != 0 ) ) {
+	if ( DBG_EXTRA && ( dns_count != 0 ) ) {
 		union {
 			struct sockaddr sa;
 			struct sockaddr_in sin;
@@ -1219,37 +1218,37 @@ static int apply_dns_settings ( void ) {
 		} u;
 		unsigned int i;
 
-		DBGC ( dbgcol, "DNS servers:" );
+		DBGC2 ( dbgcol, "DNS servers:" );
 		for ( i = 0 ; i < dns6.count ; i++ ) {
 			u.sin6.sin6_family = AF_INET6;
 			memcpy ( &u.sin6.sin6_addr, &dns6.in6[i],
 				 sizeof ( u.sin6.sin6_addr ) );
-			DBGC ( dbgcol, " %s", sock_ntoa ( &u.sa ) );
+			DBGC2 ( dbgcol, " %s", sock_ntoa ( &u.sa ) );
 		}
 		for ( i = 0 ; i < dns4.count ; i++ ) {
 			u.sin.sin_family = AF_INET;
 			u.sin.sin_addr = dns4.in[i];
-			DBGC ( dbgcol, " %s", sock_ntoa ( &u.sa ) );
+			DBGC2 ( dbgcol, " %s", sock_ntoa ( &u.sa ) );
 		}
-		DBGC ( dbgcol, "\n" );
+		DBGC2 ( dbgcol, "\n" );
 	}
 
 	/* Fetch DNS search list */
 	apply_dns_search();
-	if ( DBG_LOG && ( dns_search.len != 0 ) ) {
+	if ( DBG_EXTRA && ( dns_search.len != 0 ) ) {
 		struct dns_name name;
 		int offset;
 
-		DBGC ( dbgcol, "DNS search list:" );
+		DBGC2 ( dbgcol, "DNS search list:" );
 		memcpy ( &name, &dns_search, sizeof ( name ) );
 		while ( name.offset != name.len ) {
-			DBGC ( dbgcol, " %s", dns_name ( &name ) );
+			DBGC2 ( dbgcol, " %s", dns_name ( &name ) );
 			offset = dns_skip_search ( &name );
 			if ( offset < 0 )
 				break;
 			name.offset = offset;
 		}
-		DBGC ( dbgcol, "\n" );
+		DBGC2 ( dbgcol, "\n" );
 	}
 
 	return 0;

@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdio.h>
 #include <errno.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/vlan.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/settings.h>
 #include <ipxe/image.h>
@@ -56,6 +57,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Link-layer address of preferred autoboot device, if known */
 static uint8_t autoboot_ll_addr[MAX_LL_ADDR_LEN];
+
+/** VLAN tag of preferred autoboot device, if known */
+static unsigned int autoboot_vlan;
 
 /** Device location of preferred autoboot device, if known */
 static struct device_description autoboot_desc;
@@ -112,7 +116,7 @@ const struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA,
  * @v root_paths	Root path(s)
  * @v root_path_count	Number of root paths
  * @v drive		SAN drive (if applicable)
- * @v san_filename	SAN filename (or NULL to use default)
+ * @v san_config	SAN boot configuration parameters
  * @v flags		Boot action flags
  * @ret rc		Return status code
  *
@@ -124,8 +128,9 @@ const struct setting skip_san_boot_setting __setting ( SETTING_SANBOOT_EXTRA,
  */
 int uriboot ( struct uri *filename, struct uri **root_paths,
 	      unsigned int root_path_count, int drive,
-	      const char *san_filename, unsigned int flags ) {
+	      struct san_boot_config *san_config, unsigned int flags ) {
 	struct image *image;
+	const char *san_filename;
 	int rc;
 
 	/* Hook SAN device, if applicable */
@@ -178,11 +183,12 @@ int uriboot ( struct uri *filename, struct uri **root_paths,
 
 	/* Attempt SAN boot if applicable */
 	if ( ! ( flags & URIBOOT_NO_SAN_BOOT ) ) {
+		san_filename = san_config->filename;
 		if ( fetch_intz_setting ( NULL, &skip_san_boot_setting) == 0 ) {
 			printf ( "Booting%s%s from SAN device %#02x\n",
 				 ( san_filename ? " " : "" ),
 				 ( san_filename ? san_filename : "" ), drive );
-			rc = san_boot ( drive, san_filename );
+			rc = san_boot ( drive, san_config );
 			printf ( "Boot from SAN device %#02x failed: %s\n",
 				 drive, strerror ( rc ) );
 		} else {
@@ -210,18 +216,19 @@ int uriboot ( struct uri *filename, struct uri **root_paths,
 }
 
 /**
- * Close all open net devices
+ * Close all but one network device
  *
  * Called before a fresh boot attempt in order to free up memory.  We
  * don't just close the device immediately after the boot fails,
  * because there may still be TCP connections in the process of
  * closing.
  */
-static void close_all_netdevs ( void ) {
-	struct net_device *netdev;
+static void close_other_netdevs ( struct net_device *netdev ) {
+	struct net_device *other;
 
-	for_each_netdev ( netdev ) {
-		ifclose ( netdev );
+	for_each_netdev ( other ) {
+		if ( other != netdev )
+			ifclose ( other );
 	}
 }
 
@@ -382,13 +389,14 @@ static int have_pxe_menu ( void ) {
  * @ret rc		Return status code
  */
 int netboot ( struct net_device *netdev ) {
+	struct san_boot_config san_config;
 	struct uri *filename;
 	struct uri *root_path;
 	char *san_filename;
 	int rc;
 
 	/* Close all other network devices */
-	close_all_netdevs();
+	close_other_netdevs ( netdev );
 
 	/* Open device and display device status */
 	if ( ( rc = ifopen ( netdev ) ) != 0 )
@@ -416,6 +424,10 @@ int netboot ( struct net_device *netdev ) {
 	/* Fetch SAN filename (if any) */
 	san_filename = fetch_san_filename ( NULL );
 
+	/* Construct SAN boot configuration parameters */
+	memset ( &san_config, 0, sizeof ( san_config ) );
+	san_config.filename = san_filename;
+
 	/* If we have both a filename and a root path, ignore an
 	 * unsupported or missing URI scheme in the root path, since
 	 * it may represent an NFS root.
@@ -437,7 +449,7 @@ int netboot ( struct net_device *netdev ) {
 
 	/* Boot using next server, filename and root path */
 	if ( ( rc = uriboot ( filename, &root_path, ( root_path ? 1 : 0 ),
-			      san_default_drive(), san_filename,
+			      san_default_drive(), &san_config,
 			      ( root_path ? 0 : URIBOOT_NO_SAN ) ) ) != 0 )
 		goto err_uriboot;
 
@@ -493,8 +505,9 @@ void set_autoboot_busloc ( unsigned int bus_type, unsigned int location ) {
  */
 static int is_autoboot_ll_addr ( struct net_device *netdev ) {
 
-	return ( memcmp ( netdev->ll_addr, autoboot_ll_addr,
-			  netdev->ll_protocol->ll_addr_len ) == 0 );
+	return ( ( memcmp ( netdev->ll_addr, autoboot_ll_addr,
+			    netdev->ll_protocol->ll_addr_len ) == 0 ) &&
+		 ( vlan_tag ( netdev ) == autoboot_vlan ) );
 }
 
 /**
@@ -502,13 +515,18 @@ static int is_autoboot_ll_addr ( struct net_device *netdev ) {
  *
  * @v ll_addr		Link-layer address
  * @v len		Length of link-layer address
+ * @v vlan		VLAN tag
  */
-void set_autoboot_ll_addr ( const void *ll_addr, size_t len ) {
+void set_autoboot_ll_addr ( const void *ll_addr, size_t len,
+			    unsigned int vlan ) {
 
 	/* Record autoboot link-layer address (truncated if necessary) */
 	if ( len > sizeof ( autoboot_ll_addr ) )
 		len = sizeof ( autoboot_ll_addr );
 	memcpy ( autoboot_ll_addr, ll_addr, len );
+
+	/* Record autoboot VLAN tag */
+	autoboot_vlan = vlan;
 
 	/* Mark autoboot device as present */
 	is_autoboot_device = is_autoboot_ll_addr;
@@ -580,8 +598,8 @@ int ipxe ( struct net_device *netdev ) {
 	 * defining the string PRODUCT_NAME in config/branding.h.
 	 *
 	 * While nothing in the GPL prevents you from removing all
-	 * references to iPXE or http://ipxe.org, we prefer you not to
-	 * do so.
+	 * references to iPXE or https://ipxe.org, we prefer you not
+	 * to do so.
 	 *
 	 */
 	printf ( NORMAL "\n\n" PRODUCT_NAME "\n" BOLD PRODUCT_SHORT_NAME " %s"

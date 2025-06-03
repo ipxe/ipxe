@@ -51,7 +51,8 @@ struct readline_history {
 
 extern void history_free ( struct readline_history *history );
 extern int readline_history ( const char *prompt, const char *prefill,
-			      struct readline_history *history, char **line );
+			      struct readline_history *history,
+			      unsigned long timeout, char **line );
 extern char * __malloc readline ( const char *prompt );
 
 #endif /* _READLINE_H */

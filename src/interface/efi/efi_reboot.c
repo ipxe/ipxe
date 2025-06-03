@@ -31,19 +31,44 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <errno.h>
+#include <string.h>
 #include <ipxe/efi/efi.h>
+#include <ipxe/efi/Guid/GlobalVariable.h>
 #include <ipxe/reboot.h>
 
 /**
  * Reboot system
  *
- * @v warm		Perform a warm reboot
+ * @v flags		Reboot flags
  */
-static void efi_reboot ( int warm ) {
+static void efi_reboot ( int flags ) {
 	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	static CHAR16 wname[] = EFI_OS_INDICATIONS_VARIABLE_NAME;
+	UINT64 osind;
+	UINT32 attrs;
+	EFI_RESET_TYPE type;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Request boot to firmware setup, if applicable */
+	if ( flags & REBOOT_SETUP ) {
+		osind = EFI_OS_INDICATIONS_BOOT_TO_FW_UI;
+		attrs = ( EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			  EFI_VARIABLE_RUNTIME_ACCESS |
+			  EFI_VARIABLE_NON_VOLATILE );
+		if ( ( efirc = rs->SetVariable ( wname, &efi_global_variable,
+						 attrs, sizeof ( osind ),
+						 &osind ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			DBGC ( efi_systab, "EFI could not set %ls: %s\n",
+			       wname, strerror ( rc ) );
+			/* Continue to reboot anyway */
+		}
+	}
 
 	/* Use runtime services to reset system */
-	rs->ResetSystem ( ( warm ? EfiResetWarm : EfiResetCold ), 0, 0, NULL );
+	type = ( ( flags & REBOOT_WARM ) ? EfiResetWarm : EfiResetCold );
+	rs->ResetSystem ( type, 0, 0, NULL );
 }
 
 /**

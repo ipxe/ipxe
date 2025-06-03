@@ -25,7 +25,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <assert.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/sha256.h>
 #include <ipxe/sha512.h>
 #include <ipxe/hmac.h>
@@ -88,7 +87,7 @@ static int peerdist_info_get ( const struct peerdist_info *info, void *data,
 	}
 
 	/* Copy data */
-	copy_from_user ( data, info->raw.data, offset, len );
+	memcpy ( data, ( info->raw.data + offset ), len );
 
 	return 0;
 }
@@ -104,9 +103,8 @@ static void peerdist_info_segment_hash ( struct peerdist_info_segment *segment,
 					 const void *hash, const void *secret ){
 	const struct peerdist_info *info = segment->info;
 	struct digest_algorithm *digest = info->digest;
-	uint8_t ctx[digest->ctxsize];
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	size_t digestsize = info->digestsize;
-	size_t secretsize = digestsize;
 	static const uint16_t magic[] = PEERDIST_SEGMENT_ID_MAGIC;
 
 	/* Sanity check */
@@ -121,12 +119,10 @@ static void peerdist_info_segment_hash ( struct peerdist_info_segment *segment,
 	memcpy ( segment->secret, secret, digestsize );
 
 	/* Calculate segment identifier */
-	hmac_init ( digest, ctx, segment->secret, &secretsize );
-	assert ( secretsize == digestsize );
+	hmac_init ( digest, ctx, segment->secret, digestsize );
 	hmac_update ( digest, ctx, segment->hash, digestsize );
 	hmac_update ( digest, ctx, magic, sizeof ( magic ) );
-	hmac_final ( digest, ctx, segment->secret, &secretsize, segment->id );
-	assert ( secretsize == digestsize );
+	hmac_final ( digest, ctx, segment->id );
 }
 
 /******************************************************************************
@@ -670,7 +666,8 @@ static struct peerdist_info_operations peerdist_info_v2_operations = {
  * @v info		Content information to fill in
  * @ret rc		Return status code
  */
-int peerdist_info ( userptr_t data, size_t len, struct peerdist_info *info ) {
+int peerdist_info ( const void *data, size_t len,
+		    struct peerdist_info *info ) {
 	union peerdist_info_version version;
 	int rc;
 

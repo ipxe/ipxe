@@ -27,6 +27,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	COMSTOP		1		/* Stop bits */
 #endif
 
+/* Early UART configuration (for bare metal prefix debugging only) */
+//#define EARLY_UART_MODEL	8250
+//#define EARLY_UART_REG_BASE	0x10000000
+//#define EARLY_UART_REG_SHIFT	0
+
 #include <config/named.h>
 #include NAMED_CONFIG(serial.h)
 #include <config/local/serial.h>

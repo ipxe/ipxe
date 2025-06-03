@@ -39,7 +39,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v key		Key pressed by user
  * @ret move		Scroller movement, or zero
  */
-int jump_scroll_key ( struct jump_scroller *scroll, int key ) {
+unsigned int jump_scroll_key ( struct jump_scroller *scroll, int key ) {
+	unsigned int flags = 0;
+	int16_t delta;
 
 	/* Sanity checks */
 	assert ( scroll->rows != 0 );
@@ -52,20 +54,32 @@ int jump_scroll_key ( struct jump_scroller *scroll, int key ) {
 	/* Handle key, if applicable */
 	switch ( key ) {
 	case KEY_UP:
-		return -1;
+		delta = -1;
+		break;
+	case TAB:
+		flags = SCROLL_WRAP;
+		/* fall through */
 	case KEY_DOWN:
-		return +1;
+		delta = +1;
+		break;
 	case KEY_PPAGE:
-		return ( scroll->first - scroll->current - 1 );
+		delta = ( scroll->first - scroll->current - 1 );
+		break;
 	case KEY_NPAGE:
-		return ( scroll->first - scroll->current + scroll->rows );
+		delta = ( scroll->first - scroll->current + scroll->rows );
+		break;
 	case KEY_HOME:
-		return -( scroll->count );
+		delta = -( scroll->count );
+		break;
 	case KEY_END:
-		return +( scroll->count );
+		delta = +( scroll->count );
+		break;
 	default:
-		return 0;
+		delta = 0;
+		break;
 	}
+
+	return ( SCROLL ( delta ) | flags );
 }
 
 /**
@@ -75,7 +89,9 @@ int jump_scroll_key ( struct jump_scroller *scroll, int key ) {
  * @v move		Scroller movement
  * @ret move		Continuing scroller movement (if applicable)
  */
-int jump_scroll_move ( struct jump_scroller *scroll, int move ) {
+unsigned int jump_scroll_move ( struct jump_scroller *scroll,
+				unsigned int move ) {
+	int16_t delta = SCROLL_DELTA ( move );
 	int current = scroll->current;
 	int last = ( scroll->count - 1 );
 
@@ -84,30 +100,35 @@ int jump_scroll_move ( struct jump_scroller *scroll, int move ) {
 	assert ( scroll->count != 0 );
 
 	/* Move to the new current item */
-	current += move;
+	current += delta;
+
+	/* Default to continuing movement in the same direction */
+	delta = ( ( delta >= 0 ) ? +1 : -1 );
 
 	/* Check for start/end of list */
-	if ( current < 0 ) {
-		/* We have attempted to move before the start of the
-		 * list.  Move to the start of the list and continue
-		 * moving forwards (if applicable).
-		 */
-		scroll->current = 0;
-		return +1;
-	} else if ( current > last ) {
-		/* We have attempted to move after the end of the
-		 * list.  Move to the end of the list and continue
-		 * moving backwards (if applicable).
-		 */
-		scroll->current = last;
-		return -1;
-	} else {
-		/* Update the current item and continue moving in the
-		 * same direction (if applicable).
+	if ( ( current >= 0 ) && ( current <= last ) ) {
+		/* We are still within the list.  Update the current
+		 * item and continue moving in the same direction (if
+		 * applicable).
 		 */
 		scroll->current = current;
-		return ( ( move > 0 ) ? +1 : -1 );
+	} else {
+		/* We have attempted to move outside the list.  If we
+		 * are wrapping around, then continue in the same
+		 * direction (if applicable), otherwise reverse.
+		 */
+		if ( ! ( move & SCROLL_WRAP ) )
+			delta = -delta;
+
+		/* Move to start or end of list as appropriate */
+		if ( delta >= 0 ) {
+			scroll->current = 0;
+		} else {
+			scroll->current = last;
+		}
 	}
+
+	return ( SCROLL ( delta ) | ( move & SCROLL_FLAGS ) );
 }
 
 /**

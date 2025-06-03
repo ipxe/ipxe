@@ -7,6 +7,7 @@
 
 #include <ipxe/malloc.h>
 #include <stddef.h>
+#include <string.h>
 #include <byteswap.h>
 #include <ipxe/io.h>
 #include "../../mlx_utils/include/private/mlx_memory_priv.h"

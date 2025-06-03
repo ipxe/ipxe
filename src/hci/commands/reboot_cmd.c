@@ -38,12 +38,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 struct reboot_options {
 	/** Perform a warm reboot */
 	int warm;
+	/** Reboot to firmware setup */
+	int setup;
 };
 
 /** "reboot" option list */
 static struct option_descriptor reboot_opts[] = {
 	OPTION_DESC ( "warm", 'w', no_argument,
 		      struct reboot_options, warm, parse_flag ),
+	OPTION_DESC ( "setup", 's', no_argument,
+		      struct reboot_options, setup, parse_flag ),
 };
 
 /** "reboot" command descriptor */
@@ -59,6 +63,7 @@ static struct command_descriptor reboot_cmd =
  */
 static int reboot_exec ( int argc, char **argv ) {
 	struct reboot_options opts;
+	int flags = 0;
 	int rc;
 
 	/* Parse options */
@@ -66,7 +71,11 @@ static int reboot_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Reboot system */
-	reboot ( opts.warm );
+	if ( opts.warm )
+		flags |= REBOOT_WARM;
+	if ( opts.setup )
+		flags |= REBOOT_SETUP;
+	reboot ( flags );
 
 	return 0;
 }

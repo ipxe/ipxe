@@ -30,5 +30,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <ipxe/time.h>
+#include <ipxe/timer.h>
 
-PROVIDE_TIME_INLINE ( null, time_now );
+/**
+ * Get current time in seconds
+ *
+ * @ret time		Time, in seconds
+ */
+static time_t null_now ( void ) {
+
+	/* Provide a non-absolute timer bassed on currticks() */
+	return ( currticks() / TICKS_PER_SEC );
+}
+
+PROVIDE_TIME ( null, time_now, null_now );

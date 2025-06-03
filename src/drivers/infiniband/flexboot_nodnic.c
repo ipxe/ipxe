@@ -20,6 +20,7 @@
 FILE_LICENCE ( GPL2_OR_LATER );
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
 #include <ipxe/pci.h>
@@ -1165,6 +1166,7 @@ flexboot_nodnic_allocate_infiniband_devices( struct flexboot_nodnic *flexboot_no
 		ibdev->op = &flexboot_nodnic_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = ( FLEXBOOT_NODNIC_PORT_BASE + i);
+		ibdev->ports = device_priv->device_cap.num_ports;
 		ib_set_drvdata(ibdev, flexboot_nodnic_priv);
 	}
 	return status;

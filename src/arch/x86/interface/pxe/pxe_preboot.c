@@ -33,7 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/fakedhcp.h>
 #include <ipxe/device.h>
@@ -184,7 +183,7 @@ pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO *get_cached_info ) {
 	union pxe_cached_info *info;
 	unsigned int idx;
 	size_t len;
-	userptr_t buffer;
+	void *buffer;
 
 	DBGC ( &pxe_netdev, "PXENV_GET_CACHED_INFO %s to %04x:%04x+%x",
 	       pxenv_get_cached_info_name ( get_cached_info->PacketType ),
@@ -243,9 +242,9 @@ pxenv_get_cached_info ( struct s_PXENV_GET_CACHED_INFO *get_cached_info ) {
 			len = sizeof ( *info );
 		if ( len < sizeof ( *info ) )
 			DBGC ( &pxe_netdev, " buffer may be too short" );
-		buffer = real_to_user ( get_cached_info->Buffer.segment,
+		buffer = real_to_virt ( get_cached_info->Buffer.segment,
 					get_cached_info->Buffer.offset );
-		copy_to_user ( buffer, 0, info, len );
+		memcpy ( buffer, info, len );
 		get_cached_info->BufferSize = len;
 	}
 

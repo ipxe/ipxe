@@ -74,7 +74,7 @@ FILE_LICENCE ( GPL2_ONLY );
  */
 
 #include <stdint.h>
-
+#include <string.h>
 #include <byteswap.h>
 #include <errno.h>
 #include <ipxe/ethernet.h>

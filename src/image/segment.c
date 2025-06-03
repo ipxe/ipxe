@@ -30,9 +30,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+#include <string.h>
 #include <errno.h>
 #include <ipxe/uaccess.h>
-#include <ipxe/io.h>
+#include <ipxe/memmap.h>
 #include <ipxe/errortab.h>
 #include <ipxe/segment.h>
 
@@ -57,39 +58,46 @@ struct errortab segment_errors[] __errortab = {
  * @v memsz		Size of the segment
  * @ret rc		Return status code
  */
-int prep_segment ( userptr_t segment, size_t filesz, size_t memsz ) {
-	struct memory_map memmap;
-	physaddr_t start = user_to_phys ( segment, 0 );
-	physaddr_t mid = user_to_phys ( segment, filesz );
-	physaddr_t end = user_to_phys ( segment, memsz );
-	unsigned int i;
+int prep_segment ( void *segment, size_t filesz, size_t memsz ) {
+	struct memmap_region region;
+	physaddr_t start = virt_to_phys ( segment );
+	physaddr_t mid = ( start + filesz );
+	physaddr_t end = ( start + memsz );
+	physaddr_t max;
 
-	DBG ( "Preparing segment [%lx,%lx,%lx)\n", start, mid, end );
+	DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx)\n", start, mid, end );
 
-	/* Sanity check */
+	/* Check for malformed lengths */
 	if ( filesz > memsz ) {
-		DBG ( "Insane segment [%lx,%lx,%lx)\n", start, mid, end );
+		DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx) is "
+		       "malformed\n", start, mid, end );
 		return -EINVAL;
 	}
 
-	/* Get a fresh memory map.  This allows us to automatically
-	 * avoid treading on any regions that Etherboot is currently
-	 * editing out of the memory map.
-	 */
-	get_memmap ( &memmap );
+	/* Zero-length segments do not need a memory region */
+	if ( memsz == 0 )
+		return 0;
+	max = ( end - 1 );
 
-	/* Look for a suitable memory region */
-	for ( i = 0 ; i < memmap.count ; i++ ) {
-		if ( ( start >= memmap.regions[i].start ) &&
-		     ( end <= memmap.regions[i].end ) ) {
-			/* Found valid region: zero bss and return */
-			memset_user ( segment, filesz, 0, ( memsz - filesz ) );
-			return 0;
-		}
+	/* Check for address space overflow */
+	if ( max < start ) {
+		DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx) wraps "
+		       "around\n", start, mid, end );
+		return -EINVAL;
 	}
 
-	/* No suitable memory region found */
-	DBG ( "Segment [%lx,%lx,%lx) does not fit into available memory\n",
-	      start, mid, end );
-	return -ERANGE_SEGMENT;
+	/* Describe region containing this segment */
+	memmap_describe ( start, 1, &region );
+	DBGC_MEMMAP ( segment, &region );
+
+	/* Fail unless region is usable and sufficiently large */
+	if ( ( ! memmap_is_usable ( &region ) ) || ( region.max < max ) ) {
+		DBGC ( segment, "SEGMENT [%#08lx,%#08lx,%#08lx) does not fit "
+		       "into available memory\n", start, mid, end );
+		return -ERANGE_SEGMENT;
+	}
+
+	/* Found valid region: zero bss and return */
+	memset ( ( segment + filesz ), 0, ( memsz - filesz ) );
+	return 0;
 }

@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/image.h>
 #include <ipxe/downloader.h>
@@ -58,8 +59,8 @@ int imgdownload ( struct uri *uri, unsigned long timeout,
 	memcpy ( &uri_redacted, uri, sizeof ( uri_redacted ) );
 	uri_redacted.user = NULL;
 	uri_redacted.password = NULL;
-	uri_redacted.query = NULL;
-	uri_redacted.fragment = NULL;
+	uri_redacted.equery = NULL;
+	uri_redacted.efragment = NULL;
 	uri_string_redacted = format_uri_alloc ( &uri_redacted );
 	if ( ! uri_string_redacted ) {
 		rc = -ENOMEM;
@@ -156,16 +157,43 @@ int imgacquire ( const char *name_uri, unsigned long timeout,
  * @v image		Executable/loadable image
  */
 void imgstat ( struct image *image ) {
+	struct image_tag *tag;
+
 	printf ( "%s : %zd bytes", image->name, image->len );
 	if ( image->type )
 		printf ( " [%s]", image->type->name );
+	for_each_table_entry ( tag, IMAGE_TAGS ) {
+		if ( tag->image == image )
+			printf ( " [%s]", tag->name );
+	}
 	if ( image->flags & IMAGE_TRUSTED )
 		printf ( " [TRUSTED]" );
-	if ( image->flags & IMAGE_SELECTED )
-		printf ( " [SELECTED]" );
 	if ( image->flags & IMAGE_AUTO_UNREGISTER )
 		printf ( " [AUTOFREE]" );
+	if ( image->flags & IMAGE_HIDDEN )
+		printf ( " [HIDDEN]" );
 	if ( image->cmdline )
 		printf ( " \"%s\"", image->cmdline );
 	printf ( "\n" );
+}
+
+/**
+ * Create image from block of memory
+ *
+ * @v name		Name
+ * @v data		Image data
+ * @v len		Length
+ * @ret rc		Return status code
+ */
+int imgmem ( const char *name, const void *data, size_t len ) {
+	struct image *image;
+
+	/* Create image */
+	image = image_memory ( name, data, len );
+	if ( ! image ) {
+		printf ( "Could not create image\n" );
+		return -ENOMEM;
+	}
+
+	return 0;
 }

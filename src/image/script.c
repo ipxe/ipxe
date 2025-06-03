@@ -69,7 +69,7 @@ static int process_script ( struct image *image,
 	size_t line_offset;
 	char *label;
 	char *command;
-	off_t eol;
+	const void *eol;
 	size_t frag_len;
 	char *tmp;
 	int rc;
@@ -81,11 +81,13 @@ static int process_script ( struct image *image,
 	do {
 
 		/* Find length of next line, excluding any terminating '\n' */
-		eol = memchr_user ( image->data, script_offset, '\n',
-				    ( image->len - script_offset ) );
-		if ( eol < 0 )
-			eol = image->len;
-		frag_len = ( eol - script_offset );
+		eol = memchr ( ( image->data + script_offset ), '\n',
+			       ( image->len - script_offset ) );
+		if ( eol ) {
+			frag_len = ( ( eol - image->data ) - script_offset );
+		} else {
+			frag_len = ( image->len - script_offset );
+		}
 
 		/* Allocate buffer for line */
 		tmp = realloc ( line, ( len + frag_len + 1 /* NUL */ ) );
@@ -96,8 +98,8 @@ static int process_script ( struct image *image,
 		line = tmp;
 
 		/* Copy line */
-		copy_from_user ( ( line + len ), image->data, script_offset,
-				 frag_len );
+		memcpy ( ( line + len ), ( image->data + script_offset ),
+			 frag_len );
 		len += frag_len;
 
 		/* Move to next line in script */
@@ -197,11 +199,6 @@ static int script_exec ( struct image *image ) {
 	size_t saved_offset;
 	int rc;
 
-	/* Temporarily de-register image, so that a "boot" command
-	 * doesn't throw us into an execution loop.
-	 */
-	unregister_image ( image );
-
 	/* Preserve state of any currently-running script */
 	saved_offset = script_offset;
 
@@ -211,10 +208,6 @@ static int script_exec ( struct image *image ) {
 
 	/* Restore saved state */
 	script_offset = saved_offset;
-
-	/* Re-register image (unless we have been replaced) */
-	if ( ! image->replacement )
-		register_image ( image );
 
 	return rc;
 }
@@ -228,22 +221,25 @@ static int script_exec ( struct image *image ) {
 static int script_probe ( struct image *image ) {
 	static const char ipxe_magic[] = "#!ipxe";
 	static const char gpxe_magic[] = "#!gpxe";
-	linker_assert ( sizeof ( ipxe_magic ) == sizeof ( gpxe_magic ),
-			magic_size_mismatch );
-	char test[ sizeof ( ipxe_magic ) - 1 /* NUL */
-		   + 1 /* terminating space */];
+	static_assert ( sizeof ( ipxe_magic ) == sizeof ( gpxe_magic ) );
+	const struct {
+		char magic[ sizeof ( ipxe_magic ) - 1 /* NUL */ ];
+		char space;
+	} __attribute__ (( packed )) *test;
 
 	/* Sanity check */
-	if ( image->len < sizeof ( test ) ) {
+	if ( image->len < sizeof ( *test ) ) {
 		DBGC ( image, "Too short to be a script\n" );
 		return -ENOEXEC;
 	}
 
 	/* Check for magic signature */
-	copy_from_user ( test, image->data, 0, sizeof ( test ) );
-	if ( ! ( ( ( memcmp ( test, ipxe_magic, sizeof ( test ) - 1 ) == 0 ) ||
-		   ( memcmp ( test, gpxe_magic, sizeof ( test ) - 1 ) == 0 )) &&
-		 isspace ( test[ sizeof ( test ) - 1 ] ) ) ) {
+	test = image->data;
+	if ( ! ( ( ( memcmp ( test->magic, ipxe_magic,
+			      sizeof ( test->magic ) ) == 0 ) ||
+		   ( memcmp ( test->magic, gpxe_magic,
+			      sizeof ( test->magic ) ) == 0 ) ) &&
+		 isspace ( test->space ) ) ) {
 		DBGC ( image, "Invalid magic signature\n" );
 		return -ENOEXEC;
 	}
@@ -320,6 +316,7 @@ static int terminate_on_label_found ( int rc ) {
  * @ret rc		Return status code
  */
 static int goto_exec ( int argc, char **argv ) {
+	struct image *image = current_image.image;
 	struct goto_options opts;
 	size_t saved_offset;
 	int rc;
@@ -329,7 +326,7 @@ static int goto_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Sanity check */
-	if ( ! current_image ) {
+	if ( ! image ) {
 		rc = -ENOTTY;
 		printf ( "Not in a script: %s\n", strerror ( rc ) );
 		return rc;
@@ -340,10 +337,10 @@ static int goto_exec ( int argc, char **argv ) {
 
 	/* Find label */
 	saved_offset = script_offset;
-	if ( ( rc = process_script ( current_image, goto_find_label,
+	if ( ( rc = process_script ( image, goto_find_label,
 				     terminate_on_label_found ) ) != 0 ) {
 		script_offset = saved_offset;
-		DBGC ( current_image, "[%04zx] No such label :%s\n",
+		DBGC ( image, "[%04zx] No such label :%s\n",
 		       script_offset, goto_label );
 		return rc;
 	}

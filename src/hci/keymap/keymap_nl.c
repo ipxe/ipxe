@@ -10,8 +10,12 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "nl" keyboard mapping */
-struct key_mapping nl_mapping[] __keymap = {
+/** "nl" basic remapping */
+static struct keymap_key nl_basic[] = {
+	{ 0x1c, 0x3c },	/* 0x1c => '<' */
+	{ 0x1d, 0x1c },	/* 0x1d => 0x1c */
+	{ 0x1e, 0x36 },	/* 0x1e => '6' */
+	{ 0x22, 0x60 },	/* '"' => '`' */
 	{ 0x26, 0x5f },	/* '&' => '_' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
 	{ 0x29, 0x27 },	/* ')' => '\'' */
@@ -29,6 +33,26 @@ struct key_mapping nl_mapping[] __keymap = {
 	{ 0x5e, 0x26 },	/* '^' => '&' */
 	{ 0x5f, 0x3f },	/* '_' => '?' */
 	{ 0x60, 0x40 },	/* '`' => '@' */
+	{ 0x7b, 0x5e },	/* '{' => '^' */
 	{ 0x7c, 0x3e },	/* '|' => '>' */
 	{ 0x7d, 0x7c },	/* '}' => '|' */
+	{ 0xdc, 0x5d },	/* Pseudo-'\\' => ']' */
+	{ 0xfc, 0x5b },	/* Pseudo-'|' => '[' */
+	{ 0, 0 }
+};
+
+/** "nl" AltGr remapping */
+static struct keymap_key nl_altgr[] = {
+	{ 0x2d, 0x5c },	/* '-' => '\\' */
+	{ 0x38, 0x7b },	/* '8' => '{' */
+	{ 0x39, 0x7d },	/* '9' => '}' */
+	{ 0x5f, 0x5c },	/* '_' => '\\' */
+	{ 0, 0 }
+};
+
+/** "nl" keyboard map */
+struct keymap nl_keymap __keymap = {
+	.name = "nl",
+	.basic = nl_basic,
+	.altgr = nl_altgr,
 };

@@ -52,7 +52,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 struct golan_page {
 	struct list_head list;
-	userptr_t addr;
+	void *addr;
 };
 
 static void golan_free_fw_areas ( struct golan *golan ) {
@@ -61,7 +61,7 @@ static void golan_free_fw_areas ( struct golan *golan ) {
 	for (i = 0; i < GOLAN_FW_AREAS_NUM; i++) {
 		if ( golan->fw_areas[i].area ) {
 			ufree ( golan->fw_areas[i].area );
-			golan->fw_areas[i].area = UNULL;
+			golan->fw_areas[i].area = NULL;
 		}
 	}
 }
@@ -75,7 +75,7 @@ static int golan_init_fw_areas ( struct golan *golan ) {
 	}
 
 	for (i = 0; i < GOLAN_FW_AREAS_NUM; i++)
-		golan->fw_areas[i].area = UNULL;
+		golan->fw_areas[i].area = NULL;
 
 	return rc;
 
@@ -448,12 +448,12 @@ static inline int golan_provide_pages ( struct golan *golan , uint32_t pages
 	int size_ibox = 0;
 	int size_obox = 0;
 	int rc = 0;
-	userptr_t next_page_addr = UNULL;
+	void *next_page_addr = NULL;
 
 	DBGC(golan, "%s\n", __FUNCTION__);
 	if ( ! fw_area->area ) {
 		fw_area->area = umalloc ( GOLAN_PAGE_SIZE * pages );
-		if ( fw_area->area == UNULL ) {
+		if ( fw_area->area == NULL ) {
 			rc = -ENOMEM;
 			DBGC (golan ,"Failed to allocated %d pages \n",pages);
 			goto err_golan_alloc_fw_area;
@@ -467,7 +467,7 @@ static inline int golan_provide_pages ( struct golan *golan , uint32_t pages
 		unsigned i, j;
 		struct golan_cmd_layout	*cmd;
 		struct golan_manage_pages_inbox *in;
-		userptr_t addr = 0;
+		void *addr = NULL;
 
 		mailbox = GET_INBOX(golan, MEM_MBOX);
 		size_ibox = sizeof(struct golan_manage_pages_inbox) + (pas_num * GOLAN_PAS_SIZE);
@@ -486,8 +486,8 @@ static inline int golan_provide_pages ( struct golan *golan , uint32_t pages
 		for ( i = 0 , j = MANAGE_PAGES_PSA_OFFSET; i < pas_num; ++i ,++j,
 				next_page_addr += GOLAN_PAGE_SIZE ) {
 			addr = next_page_addr;
-			if (GOLAN_PAGE_MASK & user_to_phys(addr, 0)) {
-				DBGC (golan ,"Addr not Page alligned [%lx %lx]\n", user_to_phys(addr, 0), addr);
+			if (GOLAN_PAGE_MASK & virt_to_phys(addr)) {
+				DBGC (golan ,"Addr not Page alligned [%lx]\n", virt_to_phys(addr));
 			}
 			mailbox->mblock.data[j]	= USR_2_BE64_BUS(addr);
 		}
@@ -2386,6 +2386,7 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 		ibdev->op = &golan_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = (GOLAN_PORT_BASE + i);
+		ibdev->ports = golan->caps.num_ports;
 		ib_set_drvdata( ibdev, golan );
 	}
 
@@ -2501,7 +2502,7 @@ static mlx_status shomron_fill_eth_send_wqe ( struct ib_device *ibdev,
 	}
 
 #define SHOMRON_GENERATE_CQE 0x3
-#define SHOMRON_INLINE_HEADERS_SIZE 18
+#define SHOMRON_INLINE_HEADERS_SIZE ETH_HLEN
 #define SHOMRON_INLINE_HEADERS_OFFSET 32
 	MLX_FILL_2 ( &eth_wqe->ctrl, 0, opcode, FLEXBOOT_NODNIC_OPCODE_SEND,
 			wqe_index, wqe_index & 0xFFFF);
@@ -2642,7 +2643,11 @@ static struct pci_device_id golan_nics[] = {
 	PCI_ROM ( 0x15b3, 0x1019, "ConnectX-5EX", "ConnectX-5EX HCA driver, DevID 4121", 0 ),
 	PCI_ROM ( 0x15b3, 0x101b, "ConnectX-6", "ConnectX-6 HCA driver, DevID 4123", 0 ),
 	PCI_ROM ( 0x15b3, 0x101d, "ConnectX-6DX", "ConnectX-6DX HCA driver, DevID 4125", 0 ),
+	PCI_ROM ( 0x15b3, 0x101f, "ConnectX-6Lx", "ConnectX-6LX HCA driver, DevID 4127", 0 ),
+	PCI_ROM ( 0x15b3, 0x1021, "ConnectX-7", "ConnectX-7 HCA driver, DevID 4129", 0 ),
 	PCI_ROM ( 0x15b3, 0xa2d2, "BlueField", "BlueField integrated ConnectX-5 network controller HCA driver, DevID 41682", 0 ),
+	PCI_ROM ( 0x15b3, 0xa2d6, "BlueField-2", "BlueField-2 network controller HCA driver, DevID 41686", 0 ),
+	PCI_ROM ( 0x15b3, 0xa2dc, "BlueField-3", "BlueField-3 network controller HCA driver, DevID 41692", 0 ),
 };
 
 struct pci_driver golan_driver __pci_driver = {

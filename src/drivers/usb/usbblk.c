@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/usb.h>
 #include <ipxe/scsi.h>
@@ -205,7 +206,7 @@ static int usbblk_out_data ( struct usbblk_device *usbblk ) {
 
 	/* Calculate length */
 	assert ( cmd->tag );
-	assert ( cmd->scsi.data_out != UNULL );
+	assert ( cmd->scsi.data_out != NULL );
 	assert ( cmd->offset < cmd->scsi.data_out_len );
 	len = ( cmd->scsi.data_out_len - cmd->offset );
 	if ( len > USBBLK_MAX_LEN )
@@ -220,8 +221,8 @@ static int usbblk_out_data ( struct usbblk_device *usbblk ) {
 	}
 
 	/* Populate I/O buffer */
-	copy_from_user ( iob_put ( iobuf, len ), cmd->scsi.data_out,
-			 cmd->offset, len );
+	memcpy ( iob_put ( iobuf, len ),
+		 ( cmd->scsi.data_out + cmd->offset ), len );
 
 	/* Send data */
 	if ( ( rc = usb_stream ( &usbblk->out, iobuf, 0 ) ) != 0 ) {
@@ -332,12 +333,12 @@ static int usbblk_in_data ( struct usbblk_device *usbblk, const void *data,
 
 	/* Sanity checks */
 	assert ( cmd->tag );
-	assert ( cmd->scsi.data_in != UNULL );
+	assert ( cmd->scsi.data_in != NULL );
 	assert ( cmd->offset <= cmd->scsi.data_in_len );
 	assert ( len <= ( cmd->scsi.data_in_len - cmd->offset ) );
 
 	/* Store data */
-	copy_to_user ( cmd->scsi.data_in, cmd->offset, data, len );
+	memcpy ( ( cmd->scsi.data_in + cmd->offset ), data, len );
 	cmd->offset += len;
 
 	return 0;

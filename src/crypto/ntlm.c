@@ -117,10 +117,9 @@ void ntlm_key ( const char *domain, const char *username,
 	struct digest_algorithm *md5 = &md5_algorithm;
 	union {
 		uint8_t md4[MD4_CTX_SIZE];
-		uint8_t md5[MD5_CTX_SIZE];
+		uint8_t md5[ MD5_CTX_SIZE + MD5_BLOCK_SIZE ];
 	} ctx;
 	uint8_t digest[MD4_DIGEST_SIZE];
-	size_t digest_len;
 	uint8_t c;
 	uint16_t wc;
 
@@ -141,8 +140,7 @@ void ntlm_key ( const char *domain, const char *username,
 	digest_final ( md4, ctx.md4, digest );
 
 	/* Construct HMAC-MD5 of (Unicode) upper-case username */
-	digest_len = sizeof ( digest );
-	hmac_init ( md5, ctx.md5, digest, &digest_len );
+	hmac_init ( md5, ctx.md5, digest, sizeof ( digest ) );
 	while ( ( c = *(username++) ) ) {
 		wc = cpu_to_le16 ( toupper ( c ) );
 		hmac_update ( md5, ctx.md5, &wc, sizeof ( wc ) );
@@ -151,7 +149,7 @@ void ntlm_key ( const char *domain, const char *username,
 		wc = cpu_to_le16 ( c );
 		hmac_update ( md5, ctx.md5, &wc, sizeof ( wc ) );
 	}
-	hmac_final ( md5, ctx.md5, digest, &digest_len, key->raw );
+	hmac_final ( md5, ctx.md5, key->raw );
 	DBGC ( key, "NTLM key:\n" );
 	DBGC_HDA ( key, 0, key, sizeof ( *key ) );
 }
@@ -170,8 +168,7 @@ void ntlm_response ( struct ntlm_challenge_info *info, struct ntlm_key *key,
 		     struct ntlm_nt_response *nt ) {
 	struct digest_algorithm *md5 = &md5_algorithm;
 	struct ntlm_nonce tmp_nonce;
-	uint8_t ctx[MD5_CTX_SIZE];
-	size_t key_len = sizeof ( *key );
+	uint8_t ctx[ MD5_CTX_SIZE + MD5_BLOCK_SIZE ];
 	unsigned int i;
 
 	/* Generate random nonce, if needed */
@@ -183,10 +180,10 @@ void ntlm_response ( struct ntlm_challenge_info *info, struct ntlm_key *key,
 
 	/* Construct LAN Manager response */
 	memcpy ( &lm->nonce, nonce, sizeof ( lm->nonce ) );
-	hmac_init ( md5, ctx, key->raw, &key_len );
+	hmac_init ( md5, ctx, key->raw, sizeof ( *key ) );
 	hmac_update ( md5, ctx, info->nonce, sizeof ( *info->nonce ) );
 	hmac_update ( md5, ctx, &lm->nonce, sizeof ( lm->nonce ) );
-	hmac_final ( md5, ctx, key->raw, &key_len, lm->digest );
+	hmac_final ( md5, ctx, lm->digest );
 	DBGC ( key, "NTLM LAN Manager response:\n" );
 	DBGC_HDA ( key, 0, lm, sizeof ( *lm ) );
 
@@ -195,14 +192,14 @@ void ntlm_response ( struct ntlm_challenge_info *info, struct ntlm_key *key,
 	nt->version = NTLM_VERSION_NTLMV2;
 	nt->high = NTLM_VERSION_NTLMV2;
 	memcpy ( &nt->nonce, nonce, sizeof ( nt->nonce ) );
-	hmac_init ( md5, ctx, key->raw, &key_len );
+	hmac_init ( md5, ctx, key->raw, sizeof ( *key ) );
 	hmac_update ( md5, ctx, info->nonce, sizeof ( *info->nonce ) );
 	hmac_update ( md5, ctx, &nt->version,
 		      ( sizeof ( *nt ) -
 			offsetof ( typeof ( *nt ), version ) ) );
 	hmac_update ( md5, ctx, info->target, info->len );
 	hmac_update ( md5, ctx, &nt->zero, sizeof ( nt->zero ) );
-	hmac_final ( md5, ctx, key->raw, &key_len, nt->digest );
+	hmac_final ( md5, ctx, nt->digest );
 	DBGC ( key, "NTLM NT response prefix:\n" );
 	DBGC_HDA ( key, 0, nt, sizeof ( *nt ) );
 }

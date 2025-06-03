@@ -22,9 +22,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
-	.text
-	.arch i386
+	.section ".note.GNU-stack", "", @progbits
 	.code16
+	.arch i386
 
 /****************************************************************************
  * Set/clear CF on the stack as appropriate, assumes stack is as it should

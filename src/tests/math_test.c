@@ -79,6 +79,42 @@ __attribute__ (( noinline )) int flsll_var ( long long value ) {
 }
 
 /**
+ * Force a use of runtime 64-bit shift left
+ *
+ * @v value		Value
+ * @v shift		Shift amount
+ * @ret value		Shifted value
+ */
+__attribute__ (( noinline )) uint64_t lsl64_var ( uint64_t value,
+						  unsigned int shift ) {
+	return ( value << shift );
+}
+
+/**
+ * Force a use of runtime 64-bit logical shift right
+ *
+ * @v value		Value
+ * @v shift		Shift amount
+ * @ret value		Shifted value
+ */
+__attribute__ (( noinline )) uint64_t lsr64_var ( uint64_t value,
+						  unsigned int shift ) {
+	return ( value >> shift );
+}
+
+/**
+ * Force a use of runtime 64-bit arithmetic shift right
+ *
+ * @v value		Value
+ * @v shift		Shift amount
+ * @ret value		Shifted value
+ */
+__attribute__ (( noinline )) int64_t asr64_var ( int64_t value,
+						 unsigned int shift ) {
+	return ( value >> shift );
+}
+
+/**
  * Check current stack pointer
  *
  * @ret stack		A value at a fixed offset from the current stack pointer
@@ -273,6 +309,72 @@ flsll_okx ( long long value, int msb, const char *file, unsigned int line ) {
 #define flsll_ok( value, msb ) flsll_okx ( value, msb, __FILE__, __LINE__ )
 
 /**
+ * Report a 64-bit shift left test result
+ *
+ * @v value		Value
+ * @v shift		Shift amount
+ * @v expected		Expected value
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static inline __attribute__ (( always_inline )) void
+lsl64_okx ( uint64_t value, unsigned int shift, uint64_t expected,
+	    const char *file, unsigned int line ) {
+
+	/* Verify as a compile-time calculation */
+	okx ( ( value << shift ) == expected, file, line );
+
+	/* Verify as a runtime calculation */
+	okx ( lsl64_var ( value, shift ) == expected, file, line );
+}
+#define lsl64_ok( value, shift, expected ) \
+	lsl64_okx ( value, shift, expected, __FILE__, __LINE__ )
+
+/**
+ * Report a 64-bit logical shift right test result
+ *
+ * @v value		Value
+ * @v shift		Shift amount
+ * @v expected		Expected value
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static inline __attribute__ (( always_inline )) void
+lsr64_okx ( uint64_t value, unsigned int shift, uint64_t expected,
+	    const char *file, unsigned int line ) {
+
+	/* Verify as a compile-time calculation */
+	okx ( ( value >> shift ) == expected, file, line );
+
+	/* Verify as a runtime calculation */
+	okx ( lsr64_var ( value, shift ) == expected, file, line );
+}
+#define lsr64_ok( value, shift, expected ) \
+	lsr64_okx ( value, shift, expected, __FILE__, __LINE__ )
+
+/**
+ * Report a 64-bit arithmetic shift right test result
+ *
+ * @v value		Value
+ * @v shift		Shift amount
+ * @v expected		Expected value
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static inline __attribute__ (( always_inline )) void
+asr64_okx ( int64_t value, unsigned int shift, int64_t expected,
+	    const char *file, unsigned int line ) {
+
+	/* Verify as a compile-time calculation */
+	okx ( ( value >> shift ) == expected, file, line );
+
+	/* Verify as a runtime calculation */
+	okx ( asr64_var ( value, shift ) == expected, file, line );
+}
+#define asr64_ok( value, shift, expected ) \
+	asr64_okx ( value, shift, expected, __FILE__, __LINE__ )
+
+/**
  * Report a 64-bit unsigned integer division test result
  *
  * @v dividend		Dividend
@@ -375,6 +477,21 @@ static void math_test_exec ( void ) {
 	 * etc. (including checking that the implicit calling
 	 * convention assumed by gcc matches our expectations).
 	 */
+	lsl64_ok ( 0x06760c14710540c2ULL,  0, 0x06760c14710540c2ULL );
+	lsr64_ok ( 0x06760c14710540c2ULL,  0, 0x06760c14710540c2ULL );
+	asr64_ok ( 0x06760c14710540c2ULL,  0, 0x06760c14710540c2ULL );
+	lsl64_ok ( 0xccafd1a8cb724c13ULL, 20, 0x1a8cb724c1300000ULL );
+	lsr64_ok ( 0xccafd1a8cb724c13ULL, 20, 0x00000ccafd1a8cb7ULL );
+	asr64_ok ( 0xccafd1a8cb724c13ULL, 20, 0xfffffccafd1a8cb7ULL );
+	lsl64_ok ( 0x83567264b1234518ULL, 32, 0xb123451800000000ULL );
+	lsr64_ok ( 0x83567264b1234518ULL, 32, 0x0000000083567264ULL );
+	asr64_ok ( 0x83567264b1234518ULL, 32, 0xffffffff83567264ULL );
+	lsl64_ok ( 0x69ee42fcbf1a4ea4ULL, 47, 0x2752000000000000ULL );
+	lsr64_ok ( 0x69ee42fcbf1a4ea4ULL, 47, 0x000000000000d3dcULL );
+	asr64_ok ( 0x69ee42fcbf1a4ea4ULL, 47, 0x000000000000d3dcULL );
+	lsl64_ok ( 0xaa20b8caddee4269ULL, 63, 0x8000000000000000ULL );
+	lsr64_ok ( 0xaa20b8caddee4269ULL, 63, 0x0000000000000001ULL );
+	asr64_ok ( 0xaa20b8caddee4269ULL, 63, 0xffffffffffffffffULL );
 	u64divmod_ok ( 0x2b90ddccf699f765ULL, 0xed9f5e73ULL,
 		       0x2eef6ab4ULL, 0x0e12f089ULL );
 	s64divmod_ok ( 0x2b90ddccf699f765ULL, 0xed9f5e73ULL,

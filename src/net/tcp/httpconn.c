@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <ipxe/tcpip.h>
@@ -63,7 +64,7 @@ static struct http_scheme * http_scheme ( struct uri *uri ) {
 
 	/* Identify scheme */
 	for_each_table_entry ( scheme, HTTP_SCHEMES ) {
-		if ( strcmp ( uri->scheme, scheme->name ) == 0 )
+		if ( strcasecmp ( uri->scheme, scheme->name ) == 0 )
 			return scheme;
 	}
 
@@ -236,7 +237,6 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 	struct http_connection *conn;
 	struct http_scheme *scheme;
 	struct sockaddr_tcpip server;
-	struct interface *socket;
 	unsigned int port;
 	int rc;
 
@@ -296,14 +296,14 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 	/* Open socket */
 	memset ( &server, 0, sizeof ( server ) );
 	server.st_port = htons ( port );
-	socket = &conn->socket;
-	if ( scheme->filter &&
-	     ( ( rc = scheme->filter ( socket, uri->host, &socket ) ) != 0 ) )
-		goto err_filter;
-	if ( ( rc = xfer_open_named_socket ( socket, SOCK_STREAM,
+	if ( ( rc = xfer_open_named_socket ( &conn->socket, SOCK_STREAM,
 					     ( struct sockaddr * ) &server,
 					     uri->host, NULL ) ) != 0 )
 		goto err_open;
+
+	/* Add filter, if any */
+	if ( scheme->filter && ( ( rc = scheme->filter ( conn ) ) != 0 ) )
+		goto err_filter;
 
 	/* Attach to parent interface, mortalise self, and return */
 	intf_plug_plug ( &conn->xfer, xfer );
@@ -313,8 +313,8 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 		conn->scheme->name, conn->uri->host, port );
 	return 0;
 
- err_open:
  err_filter:
+ err_open:
 	DBGC2 ( conn, "HTTPCONN %p could not create %s://%s:%d: %s\n", conn,
 		conn->scheme->name, conn->uri->host, port, strerror ( rc ) );
 	http_conn_close ( conn, rc );

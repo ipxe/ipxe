@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Forcibly enable assertions */
 #undef NDEBUG
 
+#include <string.h>
 #include <assert.h>
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
@@ -54,9 +55,6 @@ void pixbuf_okx ( struct pixel_buffer_test *test, const char *file,
 	assert ( ( test->width * test->height * sizeof ( test->data[0] ) )
 		 == test->len );
 
-	/* Correct image data pointer */
-	test->image->data = virt_to_user ( ( void * ) test->image->data );
-
 	/* Check that image is detected as correct type */
 	okx ( register_image ( test->image ) == 0, file, line );
 	okx ( test->image->type == test->type, file, line );
@@ -71,9 +69,8 @@ void pixbuf_okx ( struct pixel_buffer_test *test, const char *file,
 
 		/* Check pixel buffer data */
 		okx ( pixbuf->len == test->len, file, line );
-		okx ( memcmp_user ( pixbuf->data, 0,
-				    virt_to_user ( test->data ), 0,
-				    test->len ) == 0, file, line );
+		okx ( memcmp ( pixbuf->data, test->data, test->len ) == 0,
+		      file, line );
 
 		pixbuf_put ( pixbuf );
 	}

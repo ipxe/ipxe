@@ -145,12 +145,12 @@ static void sha1_digest ( struct sha1_context *context ) {
 
 	/* Sanity checks */
 	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-	linker_assert ( &u.ddd.dd.digest.h[0] == a, sha1_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[1] == b, sha1_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[2] == c, sha1_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[3] == d, sha1_bad_layout );
-	linker_assert ( &u.ddd.dd.digest.h[4] == e, sha1_bad_layout );
-	linker_assert ( &u.ddd.dd.data.dword[0] == w, sha1_bad_layout );
+	build_assert ( &u.ddd.dd.digest.h[0] == a );
+	build_assert ( &u.ddd.dd.digest.h[1] == b );
+	build_assert ( &u.ddd.dd.digest.h[2] == c );
+	build_assert ( &u.ddd.dd.digest.h[3] == d );
+	build_assert ( &u.ddd.dd.digest.h[4] == e );
+	build_assert ( &u.ddd.dd.data.dword[0] == w );
 
 	DBGC ( context, "SHA1 digesting:\n" );
 	DBGC_HDA ( context, 0, &context->ddd.dd.digest,

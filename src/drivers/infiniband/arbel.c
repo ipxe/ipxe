@@ -545,8 +545,8 @@ static int arbel_mad ( struct ib_device *ibdev, union ib_mad *mad ) {
 	union arbelprm_mad mad_ifc;
 	int rc;
 
-	linker_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ),
-			mad_size_mismatch );
+	/* Sanity check */
+	static_assert ( sizeof ( *mad ) == sizeof ( mad_ifc.mad ) );
 
 	/* Copy in request packet */
 	memcpy ( &mad_ifc.mad, mad, sizeof ( mad_ifc.mad ) );
@@ -2079,7 +2079,7 @@ static int arbel_start_firmware ( struct arbel *arbel ) {
 	} else {
 		assert ( arbel->firmware_len == fw_len );
 	}
-	fw_base = user_to_phys ( arbel->firmware_area, 0 );
+	fw_base = virt_to_phys ( arbel->firmware_area );
 	DBGC ( arbel, "Arbel %p firmware area at [%08lx,%08lx)\n",
 	       arbel, fw_base, ( fw_base + fw_len ) );
 	if ( ( rc = arbel_map_vpm ( arbel, arbel_cmd_map_fa,
@@ -2119,7 +2119,7 @@ static void arbel_stop_firmware ( struct arbel *arbel ) {
 		DBGC ( arbel, "Arbel %p FATAL could not stop firmware: %s\n",
 		       arbel, strerror ( rc ) );
 		/* Leak memory and return; at least we avoid corruption */
-		arbel->firmware_area = UNULL;
+		arbel->firmware_area = NULL;
 		return;
 	}
 }
@@ -2452,7 +2452,7 @@ static int arbel_alloc_icm ( struct arbel *arbel,
 		assert ( arbel->icm_len == icm_len );
 		assert ( arbel->icm_aux_len == icm_aux_len );
 	}
-	icm_phys = user_to_phys ( arbel->icm, 0 );
+	icm_phys = virt_to_phys ( arbel->icm );
 
 	/* Allocate doorbell UAR */
 	arbel->db_rec = malloc_phys ( ARBEL_PAGE_SIZE, ARBEL_PAGE_SIZE );
@@ -2561,7 +2561,7 @@ static void arbel_reset ( struct arbel *arbel ) {
 	unsigned int i;
 
 	/* Perform device reset and preserve PCI configuration */
-	pci_backup ( pci, &backup, backup_exclude );
+	pci_backup ( pci, &backup, PCI_CONFIG_BACKUP_ALL, backup_exclude );
 	writel ( ARBEL_RESET_MAGIC,
 		 ( arbel->config + ARBEL_RESET_OFFSET ) );
 	for ( i = 0 ; i < ARBEL_RESET_WAIT_TIME_MS ; i++ ) {
@@ -2570,7 +2570,7 @@ static void arbel_reset ( struct arbel *arbel ) {
 		if ( vendor != 0xffff )
 			break;
 	}
-	pci_restore ( pci, &backup, backup_exclude );
+	pci_restore ( pci, &backup, PCI_CONFIG_BACKUP_ALL, backup_exclude );
 }
 
 /**
@@ -3061,6 +3061,7 @@ static int arbel_probe ( struct pci_device *pci ) {
 		ibdev->op = &arbel_ib_operations;
 		ibdev->dev = &pci->dev;
 		ibdev->port = ( ARBEL_PORT_BASE + i );
+		ibdev->ports = ARBEL_NUM_PORTS;
 		ib_set_drvdata ( ibdev, arbel );
 	}
 
@@ -3138,8 +3139,8 @@ static void arbel_remove ( struct pci_device *pci ) {
 }
 
 static struct pci_device_id arbel_nics[] = {
-	PCI_ROM ( 0x15b3, 0x6282, "mt25218", "MT25218 HCA driver", 0 ),
 	PCI_ROM ( 0x15b3, 0x6274, "mt25204", "MT25204 HCA driver", 0 ),
+	PCI_ROM ( 0x15b3, 0x6282, "mt25218", "MT25218 HCA driver", 0 ),
 };
 
 struct pci_driver arbel_driver __pci_driver = {

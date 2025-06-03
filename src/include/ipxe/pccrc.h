@@ -11,7 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <byteswap.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/crypto.h>
 
 /******************************************************************************
@@ -300,7 +299,7 @@ struct peerdist_info_v2_segment {
 /** Raw content information */
 struct peerdist_raw {
 	/** Data buffer */
-	userptr_t data;
+	const void *data;
 	/** Length of data buffer */
 	size_t len;
 };
@@ -435,7 +434,7 @@ struct peerdist_info_operations {
 
 extern struct digest_algorithm sha512_trunc_algorithm;
 
-extern int peerdist_info ( userptr_t data, size_t len,
+extern int peerdist_info ( const void *data, size_t len,
 			   struct peerdist_info *info );
 extern int peerdist_info_segment ( const struct peerdist_info *info,
 				   struct peerdist_info_segment *segment,

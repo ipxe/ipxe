@@ -28,7 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <byteswap.h>
 #include <ipxe/init.h>
 #include <ipxe/settings.h>
-#include <ipxe/io.h>
+#include <ipxe/memmap.h>
 
 /** @file
  *
@@ -139,16 +139,15 @@ static int memmap_settings_applies ( struct settings *settings __unused,
 static int memmap_settings_fetch ( struct settings *settings,
 				   struct setting *setting,
 				   void *data, size_t len ) {
-	struct memory_map memmap;
-	struct memory_region *region;
+	struct memmap_region region;
 	uint64_t result = 0;
+	unsigned int index = 0;
 	unsigned int start;
 	unsigned int count;
 	unsigned int scale;
 	int include_start;
 	int include_length;
 	int ignore_nonexistent;
-	unsigned int i;
 
 	/* Parse settings tag */
 	start = MEMMAP_START ( setting->tag );
@@ -163,35 +162,40 @@ static int memmap_settings_fetch ( struct settings *settings,
 	       ( include_length ? "length" : "" ),
 	       ( ignore_nonexistent ? " ignore" : "" ), scale );
 
-	/* Fetch memory map */
-	get_memmap ( &memmap );
-
 	/* Extract results from memory map */
-	for ( i = start ; count-- ; i++ ) {
+	for_each_memmap ( &region, 0 ) {
 
-		/* Check that region exists */
-		if ( i >= memmap.count ) {
-			if ( ignore_nonexistent ) {
-				continue;
-			} else {
-				DBGC ( settings, "MEMMAP region %d does not "
-				       "exist\n", i );
-				return -ENOENT;
-			}
-		}
+		/* Skip non-memory regions */
+		if ( ! ( region.flags & MEMMAP_FL_MEMORY ) )
+			continue;
+
+		/* Ignore unwanted regions */
+		if ( index++ < start )
+			continue;
 
 		/* Extract results from this region */
-		region = &memmap.regions[i];
 		if ( include_start ) {
-			result += region->start;
-			DBGC ( settings, "MEMMAP %d start %08llx\n",
-			       i, region->start );
+			result += region.min;
+			DBGC ( settings, "MEMMAP %d start %#08llx\n", index,
+			       ( ( unsigned long long ) region.min ) );
 		}
 		if ( include_length ) {
-			result += ( region->end - region->start );
-			DBGC ( settings, "MEMMAP %d length %08llx\n",
-			       i, ( region->end - region->start ) );
+			result += memmap_size ( &region );
+			DBGC ( settings, "MEMMAP %d length %#08llx\n", index,
+			       ( ( unsigned long long )
+				 memmap_size ( &region ) ) );
 		}
+
+		/* Stop when we have accumulated sufficient regions */
+		if ( --count == 0 )
+			break;
+	}
+
+	/* Check for nonexistent regions */
+	if ( count && ( ! ignore_nonexistent ) ) {
+		DBGC ( settings, "MEMMAP regions %d-%d do not exist\n",
+		       index, ( index + count - 1 ) );
+		return -ENOENT;
 	}
 
 	/* Scale result */

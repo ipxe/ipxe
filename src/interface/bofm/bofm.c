@@ -26,7 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/list.h>
 #include <ipxe/ethernet.h>
 #include <ipxe/bofm.h>
@@ -150,27 +149,25 @@ static void bofm_remove ( struct pci_device *pci ) {
 /**
  * Locate BOFM table section
  *
- * @v bofmtab		BOFM table
- * @v len		Length of BOFM table
+ * @v bofmhdr		BOFM table header
  * @v magic		Section magic
- * @v bofmsec		BOFM section header to fill in
- * @ret offset		Offset to section, or 0 if not found
+ * @ret bofmsec		BOFM section header, or NULL if not found
  */
-static size_t bofm_locate_section ( userptr_t bofmtab, size_t len,
-				    uint32_t magic,
-				    struct bofm_section_header *bofmsec ) {
-	size_t offset = sizeof ( struct bofm_global_header );
+static struct bofm_section_header *
+bofm_locate_section ( struct bofm_global_header *bofmhdr, uint32_t magic ) {
+	struct bofm_section_header *bofmsec;
+	size_t offset;
 
-	while ( offset < len ) {
-		copy_from_user ( bofmsec, bofmtab, offset,
-				 sizeof ( *bofmsec ) );
+	/* Scan for section */
+	for ( offset = sizeof ( *bofmhdr ) ; offset < bofmhdr->length ;
+	      offset += ( sizeof ( *bofmsec ) + bofmsec->length ) ) {
+		bofmsec = ( ( ( void * ) bofmhdr ) + offset );
 		if ( bofmsec->magic == magic )
-			return offset;
+			return bofmsec;
 		if ( bofmsec->magic == BOFM_DONE_MAGIC )
 			break;
-		offset += ( sizeof ( *bofmsec ) + bofmsec->length );
 	}
-	return 0;
+	return NULL;
 }
 
 /**
@@ -235,32 +232,31 @@ static int bofm_en ( struct bofm_device *bofm, struct bofm_en *en ) {
  * @v pci		PCI device
  * @ret bofmrc		BOFM return status
  */
-int bofm ( userptr_t bofmtab, struct pci_device *pci ) {
-	struct bofm_global_header bofmhdr;
-	struct bofm_section_header bofmsec;
-	struct bofm_en en;
+int bofm ( void *bofmtab, struct pci_device *pci ) {
+	struct bofm_global_header *bofmhdr;
+	struct bofm_section_header *bofmsec;
+	struct bofm_en *en;
 	struct bofm_device *bofm;
-	size_t en_region_offset;
-	size_t en_offset;
+	size_t offset;
 	int skip;
 	int rc;
 	int bofmrc;
 
 	/* Read BOFM structure */
-	copy_from_user ( &bofmhdr, bofmtab, 0, sizeof ( bofmhdr ) );
-	if ( bofmhdr.magic != BOFM_IOAA_MAGIC ) {
+	bofmhdr = bofmtab;
+	if ( bofmhdr->magic != BOFM_IOAA_MAGIC ) {
 		DBG ( "BOFM: invalid table signature " BOFM_MAGIC_FMT "\n",
-		      BOFM_MAGIC_ARGS ( bofmhdr.magic ) );
+		      BOFM_MAGIC_ARGS ( bofmhdr->magic ) );
 		bofmrc = BOFM_ERR_INVALID_ACTION;
 		goto err_bad_signature;
 	}
 	DBG ( "BOFM: " BOFM_MAGIC_FMT " (profile \"%s\")\n",
-	      BOFM_MAGIC_ARGS ( bofmhdr.action ), bofmhdr.profile );
+	      BOFM_MAGIC_ARGS ( bofmhdr->action ), bofmhdr->profile );
 
 	/* Determine whether or not we should skip normal POST
 	 * initialisation.
 	 */
-	switch ( bofmhdr.action ) {
+	switch ( bofmhdr->action ) {
 	case BOFM_ACTION_UPDT:
 	case BOFM_ACTION_DFLT:
 	case BOFM_ACTION_HVST:
@@ -272,7 +268,7 @@ int bofm ( userptr_t bofmtab, struct pci_device *pci ) {
 		break;
 	default:
 		DBG ( "BOFM: invalid action " BOFM_MAGIC_FMT "\n",
-		      BOFM_MAGIC_ARGS ( bofmhdr.action ) );
+		      BOFM_MAGIC_ARGS ( bofmhdr->action ) );
 		bofmrc = BOFM_ERR_INVALID_ACTION;
 		goto err_bad_action;
 	}
@@ -291,46 +287,44 @@ int bofm ( userptr_t bofmtab, struct pci_device *pci ) {
 	}
 
 	/* Locate EN section, if present */
-	en_region_offset = bofm_locate_section ( bofmtab, bofmhdr.length,
-						 BOFM_EN_MAGIC, &bofmsec );
-	if ( ! en_region_offset ) {
+	bofmsec = bofm_locate_section ( bofmhdr, BOFM_EN_MAGIC );
+	if ( ! bofmsec ) {
 		DBG ( "BOFM: No EN section found\n" );
 		bofmrc = ( BOFM_SUCCESS | skip );
 		goto err_no_en_section;
 	}
 
 	/* Iterate through EN entries */
-	for ( en_offset = ( en_region_offset + sizeof ( bofmsec ) ) ;
-	      en_offset < ( en_region_offset + sizeof ( bofmsec ) +
-			    bofmsec.length ) ; en_offset += sizeof ( en ) ) {
-		copy_from_user ( &en, bofmtab, en_offset, sizeof ( en ) );
+	for ( offset = sizeof ( *bofmsec ) ; offset < bofmsec->length ;
+	      offset += sizeof ( *en ) ) {
+		en = ( ( ( void * ) bofmsec ) + offset );
 		DBG2 ( "BOFM: EN entry found:\n" );
-		DBG2_HDA ( en_offset, &en, sizeof ( en ) );
-		if ( ( en.options & BOFM_EN_MAP_MASK ) != BOFM_EN_MAP_PFA ) {
+		DBG2_HDA ( offset, en, sizeof ( *en ) );
+		if ( ( en->options & BOFM_EN_MAP_MASK ) != BOFM_EN_MAP_PFA ) {
 			DBG ( "BOFM: slot %d port %d has no PCI mapping\n",
-			      en.slot, ( en.port + 1 ) );
+			      en->slot, ( en->port + 1 ) );
 			continue;
 		}
 		DBG ( "BOFM: slot %d port %d%s is " PCI_FMT " mport %d\n",
-		      en.slot, ( en.port + 1 ),
-		      ( ( en.slot || en.port ) ? "" : "(?)" ), 0,
-		      PCI_BUS ( en.busdevfn ), PCI_SLOT ( en.busdevfn ),
-		      PCI_FUNC ( en.busdevfn ), en.mport );
-		bofm = bofm_find_busdevfn ( en.busdevfn );
+		      en->slot, ( en->port + 1 ),
+		      ( ( en->slot || en->port ) ? "" : "(?)" ), 0,
+		      PCI_BUS ( en->busdevfn ), PCI_SLOT ( en->busdevfn ),
+		      PCI_FUNC ( en->busdevfn ), en->mport );
+		bofm = bofm_find_busdevfn ( en->busdevfn );
 		if ( ! bofm ) {
 			DBG ( "BOFM: " PCI_FMT " mport %d ignored\n", 0,
-			      PCI_BUS ( en.busdevfn ), PCI_SLOT ( en.busdevfn ),
-			      PCI_FUNC ( en.busdevfn ), en.mport );
+			      PCI_BUS ( en->busdevfn ),
+			      PCI_SLOT ( en->busdevfn ),
+			      PCI_FUNC ( en->busdevfn ), en->mport );
 			continue;
 		}
-		if ( ( rc = bofm_en ( bofm, &en ) ) == 0 ) {
-			en.options |= BOFM_EN_CSM_SUCCESS;
+		if ( ( rc = bofm_en ( bofm, en ) ) == 0 ) {
+			en->options |= BOFM_EN_CSM_SUCCESS;
 		} else {
-			en.options |= BOFM_EN_CSM_FAILED;
+			en->options |= BOFM_EN_CSM_FAILED;
 		}
 		DBG2 ( "BOFM: EN entry after processing:\n" );
-		DBG2_HDA ( en_offset, &en, sizeof ( en ) );
-		copy_to_user ( bofmtab, en_offset, &en, sizeof ( en ) );
+		DBG2_HDA ( offset, en, sizeof ( *en ) );
 	}
 
 	bofmrc = ( BOFM_SUCCESS | skip );

@@ -24,11 +24,11 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/asn1.h>
 #include <ipxe/der.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/image.h>
 
 /** @file
@@ -38,7 +38,75 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Extract ASN.1 object from image
+ * Extract ASN.1 object from DER data
+ *
+ * @v data		DER data
+ * @v len		Length of DER data
+ * @v offset		Offset within data
+ * @v cursor		ASN.1 cursor to fill in
+ * @ret next		Offset to next object, or negative error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated ASN.1 cursor.
+ */
+int der_asn1 ( const void *data, size_t len, size_t offset,
+	       struct asn1_cursor **cursor ) {
+	size_t remaining;
+	void *raw;
+
+	/* Sanity check */
+	assert ( offset <= len );
+	remaining = ( len - offset );
+
+	/* Allocate cursor and data buffer */
+	*cursor = malloc ( sizeof ( **cursor ) + remaining );
+	if ( ! *cursor )
+		return -ENOMEM;
+	raw = ( ( ( void * ) *cursor ) + sizeof ( **cursor ) );
+
+	/* Populate cursor and data buffer */
+	(*cursor)->data = raw;
+	(*cursor)->len = remaining;
+	memcpy ( raw, ( data + offset ), remaining );
+
+	/* Shrink cursor */
+	asn1_shrink_any ( *cursor );
+
+	return ( offset + (*cursor)->len );
+}
+
+/**
+ * Probe DER image
+ *
+ * @v image		DER image
+ * @ret rc		Return status code
+ */
+static int der_image_probe ( struct image *image ) {
+	struct asn1_cursor cursor;
+	int rc;
+
+	/* Prepare cursor */
+	cursor.data = image->data;
+	cursor.len = image->len;
+
+	/* Check that image begins with an ASN.1 sequence object */
+	if ( ( rc = asn1_skip ( &cursor, ASN1_SEQUENCE ) ) != 0 ) {
+		DBGC ( image, "DER %s is not valid ASN.1: %s\n",
+		       image->name, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Check that image comprises a single well-formed ASN.1 object */
+	if ( cursor.len ) {
+		DBGC ( image, "DER %s is not single ASN.1\n", image->name );
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
+/**
+ * Extract ASN.1 object from DER image
  *
  * @v image		DER image
  * @v offset		Offset within image
@@ -48,73 +116,26 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * The caller is responsible for eventually calling free() on the
  * allocated ASN.1 cursor.
  */
-static int der_asn1 ( struct image *image, size_t offset __unused,
-		      struct asn1_cursor **cursor ) {
-	void *data;
-
-	/* Allocate cursor and data buffer */
-	*cursor = malloc ( sizeof ( **cursor ) + image->len );
-	if ( ! *cursor )
-		return -ENOMEM;
-	data = ( ( ( void * ) *cursor ) + sizeof ( **cursor ) );
-
-	/* Populate cursor and data buffer */
-	(*cursor)->data = data;
-	(*cursor)->len = image->len;
-	copy_from_user ( data, image->data, 0, image->len );
-
-	return image->len;
-}
-
-/**
- * Probe DER image
- *
- * @v image		DER image
- * @ret rc		Return status code
- */
-static int der_probe ( struct image *image ) {
-	struct asn1_cursor cursor;
-	uint8_t buf[8];
-	size_t extra;
-	size_t total;
-	int len;
+static int der_image_asn1 ( struct image *image, size_t offset,
+			    struct asn1_cursor **cursor ) {
+	int next;
 	int rc;
 
-	/* Sanity check: no realistic DER image can be smaller than this */
-	if ( image->len < sizeof ( buf ) )
-		return -ENOEXEC;
-
-	/* Prepare partial cursor */
-	cursor.data = buf;
-	cursor.len = sizeof ( buf );
-	copy_from_user ( buf, image->data, 0, sizeof ( buf ) );
-	extra = ( image->len - sizeof ( buf ) );
-
-	/* Get length of ASN.1 sequence */
-	len = asn1_start ( &cursor, ASN1_SEQUENCE, extra );
-	if ( len < 0 ) {
-		rc = len;
-		DBGC ( image, "DER %s is not valid ASN.1: %s\n",
+	/* Extract ASN.1 object */
+	if ( ( next = der_asn1 ( image->data, image->len, offset,
+				 cursor ) ) < 0 ) {
+		rc = next;
+		DBGC ( image, "DER %s could not extract ASN.1: %s\n",
 		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
-	/* Add length of tag and length bytes consumed by asn1_start() */
-	total = ( len + ( cursor.data - ( ( void * ) buf ) ) );
-	assert ( total <= image->len );
-
-	/* Check that image comprises a single well-formed ASN.1 object */
-	if ( total != image->len ) {
-		DBGC ( image, "DER %s is not single ASN.1\n", image->name );
-		return -ENOEXEC;
-	}
-
-	return 0;
+	return next;
 }
 
 /** DER image type */
 struct image_type der_image_type __image_type ( PROBE_NORMAL ) = {
 	.name = "DER",
-	.probe = der_probe,
-	.asn1 = der_asn1,
+	.probe = der_image_probe,
+	.asn1 = der_image_asn1,
 };

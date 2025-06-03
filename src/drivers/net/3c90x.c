@@ -272,7 +272,7 @@ static int a3c90x_setup_tx_ring(struct INF_3C90X *p)
  */
 static void a3c90x_process_tx_packets(struct net_device *netdev)
 {
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 	unsigned int downlist_ptr;
 
 	DBGP("a3c90x_process_tx_packets\n");
@@ -320,7 +320,7 @@ static void a3c90x_free_tx_ring(struct INF_3C90X *p)
 static int a3c90x_transmit(struct net_device *netdev,
 			   struct io_buffer *iob)
 {
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 	struct TXD *tx_cur_desc;
 	struct TXD *tx_prev_desc;
 
@@ -518,7 +518,7 @@ static void a3c90x_process_rx_packets(struct net_device *netdev)
 {
 	int i;
 	unsigned int rx_status;
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 	struct RXD *rx_cur_desc;
 
 	DBGP("a3c90x_process_rx_packets\n");
@@ -567,7 +567,7 @@ static void a3c90x_process_rx_packets(struct net_device *netdev)
  */
 static void a3c90x_poll(struct net_device *netdev)
 {
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 	uint16_t raw_status, int_status;
 
 	DBGP("a3c90x_poll\n");
@@ -611,7 +611,7 @@ static void a3c90x_free_resources(struct INF_3C90X *p)
 static void a3c90x_remove(struct pci_device *pci)
 {
 	struct net_device *netdev = pci_get_drvdata(pci);
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_remove\n");
 
@@ -628,7 +628,7 @@ static void a3c90x_remove(struct pci_device *pci)
 
 static void a3c90x_irq(struct net_device *netdev, int enable)
 {
-	struct INF_3C90X *p = netdev_priv(netdev);
+	struct INF_3C90X *p = netdev->priv;
 
 	DBGP("a3c90x_irq\n");
 
@@ -657,7 +657,7 @@ static void a3c90x_hw_start(struct net_device *netdev)
 	unsigned int cfg;
 	unsigned int mopt;
 	unsigned short linktype;
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_hw_start\n");
 
@@ -796,7 +796,7 @@ static void a3c90x_hw_start(struct net_device *netdev)
 static int a3c90x_open(struct net_device *netdev)
 {
 	int rc;
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_open\n");
 
@@ -845,7 +845,7 @@ static int a3c90x_open(struct net_device *netdev)
  */
 static void a3c90x_close(struct net_device *netdev)
 {
-	struct INF_3C90X *inf_3c90x = netdev_priv(netdev);
+	struct INF_3C90X *inf_3c90x = netdev->priv;
 
 	DBGP("a3c90x_close\n");
 
@@ -895,7 +895,7 @@ static int a3c90x_probe(struct pci_device *pci)
 	pci_set_drvdata(pci, netdev);
 	netdev->dev = &pci->dev;
 
-	inf_3c90x = netdev_priv(netdev);
+	inf_3c90x = netdev->priv;
 	memset(inf_3c90x, 0, sizeof(*inf_3c90x));
 
 	adjust_pci_device(pci);
@@ -955,16 +955,20 @@ static int a3c90x_probe(struct pci_device *pci)
 
 static struct pci_device_id a3c90x_nics[] = {
 /* Original 90x revisions: */
+	PCI_ROM(0x10b7, 0x1201, "3c982a", "3Com982A", 0),
+	PCI_ROM(0x10b7, 0x1202, "3c982b", "3Com982B", 0),
+	PCI_ROM(0x10b7, 0x4500, "3c450", "3Com450 HomePNA Tornado", 0),
 	PCI_ROM(0x10b7, 0x6055, "3c556", "3C556", 0),	/* Huricane */
+	PCI_ROM(0x10b7, 0x7646, "3csoho100-tx", "3CSOHO100-TX", 0),	/* Hurricane */
 	PCI_ROM(0x10b7, 0x9000, "3c905-tpo", "3Com900-TPO", 0),	/* 10 Base TPO */
 	PCI_ROM(0x10b7, 0x9001, "3c905-t4", "3Com900-Combo", 0),	/* 10/100 T4 */
-	PCI_ROM(0x10b7, 0x9050, "3c905-tpo100", "3Com905-TX", 0),	/* 100 Base TX / 10/100 TPO */
-	PCI_ROM(0x10b7, 0x9051, "3c905-combo", "3Com905-T4", 0),	/* 100 Base T4 / 10 Base Combo */
 /* Newer 90xB revisions: */
 	PCI_ROM(0x10b7, 0x9004, "3c905b-tpo", "3Com900B-TPO", 0),	/* 10 Base TPO */
 	PCI_ROM(0x10b7, 0x9005, "3c905b-combo", "3Com900B-Combo", 0),	/* 10 Base Combo */
 	PCI_ROM(0x10b7, 0x9006, "3c905b-tpb2", "3Com900B-2/T", 0),	/* 10 Base TP and Base2 */
 	PCI_ROM(0x10b7, 0x900a, "3c905b-fl", "3Com900B-FL", 0),	/* 10 Base FL */
+	PCI_ROM(0x10b7, 0x9050, "3c905-tpo100", "3Com905-TX", 0),	/* 100 Base TX / 10/100 TPO */
+	PCI_ROM(0x10b7, 0x9051, "3c905-combo", "3Com905-T4", 0),	/* 100 Base T4 / 10 Base Combo */
 	PCI_ROM(0x10b7, 0x9055, "3c905b-tpo100", "3Com905B-TX", 0),	/* 10/100 TPO */
 	PCI_ROM(0x10b7, 0x9056, "3c905b-t4", "3Com905B-T4", 0),	/* 10/100 T4 */
 	PCI_ROM(0x10b7, 0x9058, "3c905b-9058", "3Com905B-9058", 0),	/* Cyclone 10/100/BNC */
@@ -975,10 +979,6 @@ static struct pci_device_id a3c90x_nics[] = {
 	PCI_ROM(0x10b7, 0x9210, "3c920b-emb-wnm", "3Com20B-EMB WNM", 0),
 	PCI_ROM(0x10b7, 0x9800, "3c980", "3Com980-Cyclone", 0),	/* Cyclone */
 	PCI_ROM(0x10b7, 0x9805, "3c9805", "3Com9805", 0),	/* Dual Port Server Cyclone */
-	PCI_ROM(0x10b7, 0x7646, "3csoho100-tx", "3CSOHO100-TX", 0),	/* Hurricane */
-	PCI_ROM(0x10b7, 0x4500, "3c450", "3Com450 HomePNA Tornado", 0),
-	PCI_ROM(0x10b7, 0x1201, "3c982a", "3Com982A", 0),
-	PCI_ROM(0x10b7, 0x1202, "3c982b", "3Com982B", 0),
 };
 
 struct pci_driver a3c90x_driver __pci_driver = {

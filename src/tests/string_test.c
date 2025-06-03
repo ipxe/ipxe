@@ -105,6 +105,14 @@ static void string_test_exec ( void ) {
 	ok ( strcasecmp ( "Uncle", "Uncle Jack" ) != 0 );
 	ok ( strcasecmp ( "not", "equal" ) != 0 );
 
+	/* Test strncasecmp() */
+	ok ( strncasecmp ( "", "", 0 ) == 0 );
+	ok ( strncasecmp ( "", "", 73 ) == 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jack", 47 ) == 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jake", 47 ) != 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jake", 9 ) != 0 );
+	ok ( strncasecmp ( "Uncle Jack", "Uncle jake", 8 ) == 0 );
+
 	/* Test memcmp() */
 	ok ( memcmp ( "", "", 0 ) == 0 );
 	ok ( memcmp ( "Foo", "Foo", 3 ) == 0 );
@@ -194,6 +202,24 @@ static void string_test_exec ( void ) {
 		ok ( dup != NULL );
 		ok ( strcmp ( dup, "hello" ) == 0 );
 		free ( dup );
+	}
+
+	/* Test stpcpy() */
+	{
+		const char longer[12] = "duplicateme";
+		const char shorter[6] = "hello";
+		char dest[12];
+		char *dnul;
+
+		dnul = stpcpy ( dest, longer );
+		ok ( *dnul == '\0' );
+		ok ( dnul == &dest[11] );
+		ok ( memcmp ( dest, longer, 12 ) == 0 );
+		dnul = stpcpy ( dest, shorter );
+		ok ( *dnul == '\0' );
+		ok ( dnul == &dest[5] );
+		ok ( memcmp ( dest, shorter, 6 ) == 0 );
+		ok ( memcmp ( ( dest + 6 ), ( longer + 6 ), 6 ) == 0 );
 	}
 
 	/* Test strcpy() */

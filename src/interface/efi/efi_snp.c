@@ -934,11 +934,11 @@ static uint8_t efi_undi_checksum ( void *data, size_t len ) {
  */
 static unsigned int efi_undi_ifnum ( struct efi_snp_device *snpdev ) {
 
-	/* iPXE network device indexes are one-based (leaving zero
+	/* iPXE network device scope IDs are one-based (leaving zero
 	 * meaning "unspecified").  UNDI interface numbers are
 	 * zero-based.
 	 */
-	return ( snpdev->netdev->index - 1 );
+	return ( snpdev->netdev->scope_id - 1 );
 }
 
 /**
@@ -1490,6 +1490,164 @@ static EFI_NETWORK_INTERFACE_IDENTIFIER_PROTOCOL efi_snp_device_nii = {
 
 /******************************************************************************
  *
+ * VLAN configuration protocol
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Create or modify VLAN device
+ *
+ * @v vcfg		VLAN configuration protocol
+ * @v tag		VLAN tag
+ * @v priority		Default VLAN priority
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI efi_vlan_set ( EFI_VLAN_CONFIG_PROTOCOL *vcfg,
+					UINT16 tag, UINT8 priority ) {
+	struct efi_snp_device *snpdev =
+		container_of ( vcfg, struct efi_snp_device, vcfg );
+	struct net_device *trunk = snpdev->netdev;
+	struct efi_saved_tpl tpl;
+	int rc;
+
+	/* Raise TPL */
+	efi_raise_tpl ( &tpl );
+
+	/* Create or modify VLAN device */
+	if ( ( rc = vlan_create ( trunk, tag, priority ) ) != 0 ) {
+		DBGC ( snpdev, "SNPDEV %p could not create VLAN tag %d: %s\n",
+		       snpdev, tag, strerror ( rc ) );
+		goto err_create;
+	}
+	DBGC ( snpdev, "SNPDEV %p created VLAN tag %d priority %d\n",
+	       snpdev, tag, priority );
+
+ err_create:
+	efi_restore_tpl ( &tpl );
+	return EFIRC ( rc );
+}
+
+/**
+ * Find VLAN device(s)
+ *
+ * @v vcfg		VLAN configuration protocol
+ * @v filter		VLAN tag, or NULL to find all VLANs
+ * @v count		Number of VLANs
+ * @v entries		List of VLANs
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI efi_vlan_find ( EFI_VLAN_CONFIG_PROTOCOL *vcfg,
+					 UINT16 *filter, UINT16 *count,
+					 EFI_VLAN_FIND_DATA **entries ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_snp_device *snpdev =
+		container_of ( vcfg, struct efi_snp_device, vcfg );
+	struct net_device *trunk = snpdev->netdev;
+	struct net_device *vlan;
+	struct efi_saved_tpl tpl;
+	EFI_VLAN_FIND_DATA *entry;
+	VOID *buffer;
+	unsigned int tag;
+	unsigned int tci;
+	size_t len;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Raise TPL */
+	efi_raise_tpl ( &tpl );
+
+	/* Count number of matching VLANs */
+	*count = 0;
+	for ( tag = 1 ; VLAN_TAG_IS_VALID ( tag ) ; tag++ ) {
+		if ( filter && ( tag != *filter ) )
+			continue;
+		if ( ! ( vlan = vlan_find ( trunk, tag ) ) )
+			continue;
+		(*count)++;
+	}
+
+	/* Allocate buffer to hold results */
+	len = ( (*count) * sizeof ( *entry ) );
+	if ( ( efirc = bs->AllocatePool ( EfiBootServicesData, len,
+					  &buffer ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		goto err_alloc;
+	}
+
+	/* Fill in buffer */
+	*entries = buffer;
+	entry = *entries;
+	for ( tag = 1 ; VLAN_TAG_IS_VALID ( tag ) ; tag++ ) {
+		if ( filter && ( tag != *filter ) )
+			continue;
+		if ( ! ( vlan = vlan_find ( trunk, tag ) ) )
+			continue;
+		tci = vlan_tci ( vlan );
+		entry->VlanId = VLAN_TAG ( tci );
+		entry->Priority = VLAN_PRIORITY ( tci );
+		assert ( entry->VlanId == tag );
+		entry++;
+	}
+	assert ( entry == &(*entries)[*count] );
+
+	/* Success */
+	rc = 0;
+
+ err_alloc:
+	efi_restore_tpl ( &tpl );
+	return EFIRC ( rc );
+}
+
+/**
+ * Remove VLAN device
+ *
+ * @v vcfg		VLAN configuration protocol
+ * @v tag		VLAN tag
+ * @ret efirc		EFI status code
+ */
+static EFI_STATUS EFIAPI efi_vlan_remove ( EFI_VLAN_CONFIG_PROTOCOL *vcfg,
+					   UINT16 tag ) {
+	struct efi_snp_device *snpdev =
+		container_of ( vcfg, struct efi_snp_device, vcfg );
+	struct net_device *trunk = snpdev->netdev;
+	struct net_device *vlan;
+	struct efi_saved_tpl tpl;
+	int rc;
+
+	/* Raise TPL */
+	efi_raise_tpl ( &tpl );
+
+	/* Identify VLAN device */
+	vlan = vlan_find ( trunk, tag );
+	if ( ! vlan ) {
+		DBGC ( snpdev, "SNPDEV %p could not find VLAN tag %d\n",
+		       snpdev, tag );
+		rc = -ENOENT;
+		goto err_find;
+	}
+
+	/* Remove VLAN device */
+	vlan_destroy ( vlan );
+	DBGC ( snpdev, "SNPDEV %p removed VLAN tag %d\n", snpdev, tag );
+
+	/* Success */
+	rc = 0;
+
+ err_find:
+	efi_restore_tpl ( &tpl );
+	return EFIRC ( rc );
+}
+
+/** VLAN configuration protocol */
+static EFI_VLAN_CONFIG_PROTOCOL efi_vlan = {
+	.Set		= efi_vlan_set,
+	.Find		= efi_vlan_find,
+	.Remove		= efi_vlan_remove,
+};
+
+/******************************************************************************
+ *
  * Component name protocol
  *
  ******************************************************************************
@@ -1619,14 +1777,17 @@ static struct efi_snp_device * efi_snp_demux ( struct net_device *netdev ) {
  * Create SNP device
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int efi_snp_probe ( struct net_device *netdev ) {
+static int efi_snp_probe ( struct net_device *netdev, void *priv __unused ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_device *efidev;
 	struct efi_snp_device *snpdev;
 	unsigned int ifcnt;
 	void *interface;
+	unsigned int tci;
+	char vlan_name[ 12 /* ", VLAN xxxx" + NUL */ ];
 	int leak = 0;
 	EFI_STATUS efirc;
 	int rc;
@@ -1687,17 +1848,27 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	efi_snp_undi.Fudge -= efi_undi_checksum ( &efi_snp_undi,
 						  sizeof ( efi_snp_undi ) );
 
+	/* Populate the VLAN configuration protocol */
+	memcpy ( &snpdev->vcfg, &efi_vlan, sizeof ( snpdev->vcfg ) );
+
 	/* Populate the component name structure */
 	efi_snprintf ( snpdev->driver_name,
 		       ( sizeof ( snpdev->driver_name ) /
 			 sizeof ( snpdev->driver_name[0] ) ),
 		       "%s %s", product_short_name, netdev->dev->driver_name );
+	tci = vlan_tci ( netdev );
+	if ( tci ) {
+		snprintf ( vlan_name, sizeof ( vlan_name ), ", VLAN %d",
+			   VLAN_TAG ( tci ) );
+	} else {
+		vlan_name[0] = '\0';
+	}
 	efi_snprintf ( snpdev->controller_name,
 		       ( sizeof ( snpdev->controller_name ) /
 			 sizeof ( snpdev->controller_name[0] ) ),
-		       "%s %s (%s, %s)", product_short_name,
+		       "%s %s (%s, %s%s)", product_short_name,
 		       netdev->dev->driver_name, netdev->dev->name,
-		       netdev_addr ( netdev ) );
+		       netdev_addr ( netdev ), vlan_name );
 	snpdev->name2.GetDriverName = efi_snp_get_driver_name;
 	snpdev->name2.GetControllerName = efi_snp_get_controller_name;
 	snpdev->name2.SupportedLanguages = "en";
@@ -1725,6 +1896,7 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_device_path_protocol_guid, snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
+			&efi_vlan_config_protocol_guid, &snpdev->vcfg,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
 			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL ) ) != 0 ) {
@@ -1744,22 +1916,16 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	 * instances to prevent SnpDxe from attempting to bind to
 	 * them.
 	 */
-	if ( ( efirc = bs->OpenProtocol ( snpdev->handle,
-					  &efi_nii_protocol_guid, &interface,
-					  efi_image_handle, snpdev->handle,
-					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_driver ( snpdev->handle,
+					 &efi_nii_protocol_guid,
+					 &interface ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not open NII protocol: %s\n",
 		       snpdev, strerror ( rc ) );
 		goto err_open_nii;
 	}
-	if ( ( efirc = bs->OpenProtocol ( snpdev->handle,
-					  &efi_nii31_protocol_guid, &interface,
-					  efi_image_handle, snpdev->handle,
-					  ( EFI_OPEN_PROTOCOL_BY_DRIVER |
-					    EFI_OPEN_PROTOCOL_EXCLUSIVE )))!=0){
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_open_by_driver ( snpdev->handle,
+					 &efi_nii31_protocol_guid,
+					 &interface ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not open NII31 protocol: %s\n",
 		       snpdev, strerror ( rc ) );
 		goto err_open_nii31;
@@ -1786,10 +1952,6 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 	/* Add to list of SNP devices */
 	list_add ( &snpdev->list, &efi_snp_devices );
 
-	/* Close device path */
-	bs->CloseProtocol ( efidev->device, &efi_device_path_protocol_guid,
-			    efi_image_handle, efidev->device );
-
 	DBGC ( snpdev, "SNPDEV %p installed for %s as device %s\n",
 	       snpdev, netdev->name, efi_handle_name ( snpdev->handle ) );
 	return 0;
@@ -1799,11 +1961,9 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 		leak |= efi_snp_hii_uninstall ( snpdev );
 	efi_child_del ( efidev->device, snpdev->handle );
  err_efi_child_add:
-	bs->CloseProtocol ( snpdev->handle, &efi_nii31_protocol_guid,
-			    efi_image_handle, snpdev->handle );
+	efi_close_by_driver ( snpdev->handle, &efi_nii31_protocol_guid );
  err_open_nii31:
-	bs->CloseProtocol ( snpdev->handle, &efi_nii_protocol_guid,
-			    efi_image_handle, snpdev->handle );
+	efi_close_by_driver ( snpdev->handle, &efi_nii_protocol_guid );
  err_open_nii:
 	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
@@ -1811,17 +1971,19 @@ static int efi_snp_probe ( struct net_device *netdev ) {
 			&efi_device_path_protocol_guid, snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
+			&efi_vlan_config_protocol_guid, &snpdev->vcfg,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
 			&efi_load_file_protocol_guid, &snpdev->load_file,
 			NULL ) ) != 0 ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall: %s\n",
 		       snpdev, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_snp ( &snpdev->snp );
-		efi_nullify_nii ( &snpdev->nii );
-		efi_nullify_name2 ( &snpdev->name2 );
-		efi_nullify_load_file ( &snpdev->load_file );
 		leak = 1;
 	}
+	efi_nullify_snp ( &snpdev->snp );
+	efi_nullify_nii ( &snpdev->nii );
+	efi_nullify_vlan ( &snpdev->vcfg );
+	efi_nullify_name2 ( &snpdev->name2 );
+	efi_nullify_load_file ( &snpdev->load_file );
  err_install_protocol_interface:
 	if ( ! leak )
 		free ( snpdev->path );
@@ -1844,8 +2006,9 @@ static int efi_snp_probe ( struct net_device *netdev ) {
  * Handle SNP device or link state change
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void efi_snp_notify ( struct net_device *netdev ) {
+static void efi_snp_notify ( struct net_device *netdev, void *priv __unused ) {
 	struct efi_snp_device *snpdev;
 
 	/* Locate SNP device */
@@ -1869,11 +2032,12 @@ static void efi_snp_notify ( struct net_device *netdev ) {
  * Destroy SNP device
  *
  * @v netdev		Network device
+ * @v priv		Private data
  */
-static void efi_snp_remove ( struct net_device *netdev ) {
+static void efi_snp_remove ( struct net_device *netdev, void *priv __unused ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
-	int leak = 0;
+	int leak = efi_shutdown_in_progress;
 	EFI_STATUS efirc;
 
 	/* Locate SNP device */
@@ -1888,27 +2052,28 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 	if ( snpdev->package_list )
 		leak |= efi_snp_hii_uninstall ( snpdev );
 	efi_child_del ( snpdev->efidev->device, snpdev->handle );
-	bs->CloseProtocol ( snpdev->handle, &efi_nii_protocol_guid,
-			    efi_image_handle, snpdev->handle );
-	bs->CloseProtocol ( snpdev->handle, &efi_nii31_protocol_guid,
-			    efi_image_handle, snpdev->handle );
-	if ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
+	efi_close_by_driver ( snpdev->handle, &efi_nii_protocol_guid );
+	efi_close_by_driver ( snpdev->handle, &efi_nii31_protocol_guid );
+	if ( ( ! efi_shutdown_in_progress ) &&
+	     ( ( efirc = bs->UninstallMultipleProtocolInterfaces (
 			snpdev->handle,
 			&efi_simple_network_protocol_guid, &snpdev->snp,
 			&efi_device_path_protocol_guid, snpdev->path,
 			&efi_nii_protocol_guid, &snpdev->nii,
 			&efi_nii31_protocol_guid, &snpdev->nii,
+			&efi_vlan_config_protocol_guid, &snpdev->vcfg,
 			&efi_component_name2_protocol_guid, &snpdev->name2,
 			&efi_load_file_protocol_guid, &snpdev->load_file,
-			NULL ) ) != 0 ) {
+			NULL ) ) != 0 ) ) {
 		DBGC ( snpdev, "SNPDEV %p could not uninstall: %s\n",
 		       snpdev, strerror ( -EEFI ( efirc ) ) );
-		efi_nullify_snp ( &snpdev->snp );
-		efi_nullify_nii ( &snpdev->nii );
-		efi_nullify_name2 ( &snpdev->name2 );
-		efi_nullify_load_file ( &snpdev->load_file );
 		leak = 1;
 	}
+	efi_nullify_snp ( &snpdev->snp );
+	efi_nullify_nii ( &snpdev->nii );
+	efi_nullify_vlan ( &snpdev->vcfg );
+	efi_nullify_name2 ( &snpdev->name2 );
+	efi_nullify_load_file ( &snpdev->load_file );
 	if ( ! leak )
 		free ( snpdev->path );
 	bs->CloseEvent ( snpdev->snp.WaitForPacket );
@@ -1918,7 +2083,7 @@ static void efi_snp_remove ( struct net_device *netdev ) {
 	}
 
 	/* Report leakage, if applicable */
-	if ( leak )
+	if ( leak && ( ! efi_shutdown_in_progress ) )
 		DBGC ( snpdev, "SNPDEV %p nullified and leaked\n", snpdev );
 }
 

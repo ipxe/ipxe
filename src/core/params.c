@@ -25,7 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * Form parameters
+ * Request parameters
  *
  */
 
@@ -37,7 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static LIST_HEAD ( parameters );
 
 /**
- * Free form parameter list
+ * Free request parameter list
  *
  * @v refcnt		Reference count
  */
@@ -60,7 +60,7 @@ static void free_parameters ( struct refcnt *refcnt ) {
 }
 
 /**
- * Find form parameter list by name
+ * Find request parameter list by name
  *
  * @v name		Parameter list name (may be NULL)
  * @ret params		Parameter list, or NULL if not found
@@ -78,7 +78,7 @@ struct parameters * find_parameters ( const char *name ) {
 }
 
 /**
- * Create form parameter list
+ * Create request parameter list
  *
  * @v name		Parameter list name (may be NULL)
  * @ret params		Parameter list, or NULL on failure
@@ -118,15 +118,17 @@ struct parameters * create_parameters ( const char *name ) {
 }
 
 /**
- * Add form parameter
+ * Add request parameter
  *
  * @v params		Parameter list
  * @v key		Parameter key
  * @v value		Parameter value
+ * @v flags		Parameter flags
  * @ret param		Parameter, or NULL on failure
  */
 struct parameter * add_parameter ( struct parameters *params,
-				   const char *key, const char *value ) {
+				   const char *key, const char *value,
+				   unsigned int flags ) {
 	struct parameter *param;
 	size_t key_len;
 	size_t value_len;
@@ -147,11 +149,14 @@ struct parameter * add_parameter ( struct parameters *params,
 	param->key = key_copy;
 	strcpy ( value_copy, value );
 	param->value = value_copy;
+	param->flags = flags;
 
 	/* Add to list of parameters */
 	list_add_tail ( &param->list, &params->entries );
 
-	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"\n",
-	       params->name, param->key, param->value );
+	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"%s%s\n",
+	       params->name, param->key, param->value,
+	       ( ( param->flags & PARAMETER_FORM ) ? " (form)" : "" ),
+	       ( ( param->flags & PARAMETER_HEADER ) ? " (header)" : "" ) );
 	return param;
 }

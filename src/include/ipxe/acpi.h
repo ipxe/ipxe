@@ -14,7 +14,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/refcnt.h>
 #include <ipxe/list.h>
 #include <ipxe/interface.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/tables.h>
 #include <ipxe/api.h>
 #include <config/general.h>
@@ -77,6 +76,9 @@ struct acpi_qword_address_space_resource {
 
 /** A memory address space type */
 #define ACPI_ADDRESS_TYPE_MEM 0x00
+
+/** A bus number address space type */
+#define ACPI_ADDRESS_TYPE_BUS 0x02
 
 /** An ACPI resource descriptor */
 union acpi_resource {
@@ -352,9 +354,13 @@ struct acpi_model {
 #define PROVIDE_ACPI_INLINE( _subsys, _api_func ) \
 	PROVIDE_SINGLE_API_INLINE ( ACPI_PREFIX_ ## _subsys, _api_func )
 
+extern const struct acpi_header * acpi_find_via_rsdt ( uint32_t signature,
+						       unsigned int index );
+
 /* Include all architecture-independent ACPI API headers */
 #include <ipxe/null_acpi.h>
 #include <ipxe/efi/efi_acpi.h>
+#include <ipxe/linux/linux_acpi.h>
 
 /* Include all architecture-dependent ACPI API headers */
 #include <bits/acpi.h>
@@ -362,18 +368,35 @@ struct acpi_model {
 /**
  * Locate ACPI root system description table
  *
- * @ret rsdt		ACPI root system description table, or UNULL
+ * @ret rsdt		ACPI root system description table, or NULL
  */
-userptr_t acpi_find_rsdt ( void );
+const struct acpi_rsdt * acpi_find_rsdt ( void );
+
+/**
+ * Locate ACPI table
+ *
+ * @v signature		Requested table signature
+ * @v index		Requested index of table with this signature
+ * @ret table		Table, or NULL if not found
+ */
+const struct acpi_header * acpi_find ( uint32_t signature,
+				       unsigned int index );
 
 extern struct acpi_descriptor *
 acpi_describe ( struct interface *interface );
 #define acpi_describe_TYPE( object_type )				\
 	typeof ( struct acpi_descriptor * ( object_type ) )
 
+extern const struct acpi_header * ( * acpi_finder ) ( uint32_t signature,
+						      unsigned int index );
+
 extern void acpi_fix_checksum ( struct acpi_header *acpi );
-extern userptr_t acpi_find ( uint32_t signature, unsigned int index );
-extern int acpi_sx ( uint32_t signature );
+extern const struct acpi_header * acpi_table ( uint32_t signature,
+					       unsigned int index );
+extern int acpi_extract ( uint32_t signature, void *data,
+			  int ( * extract ) ( const struct acpi_header *zsdt,
+					      size_t len, size_t offset,
+					      void *data ) );
 extern void acpi_add ( struct acpi_descriptor *desc );
 extern void acpi_del ( struct acpi_descriptor *desc );
 extern int acpi_install ( int ( * install ) ( struct acpi_header *acpi ) );

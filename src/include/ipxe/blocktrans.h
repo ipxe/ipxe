@@ -13,7 +13,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/refcnt.h>
 #include <ipxe/interface.h>
 #include <ipxe/xferbuf.h>
-#include <ipxe/uaccess.h>
 
 /** A block device translator */
 struct block_translator {
@@ -26,13 +25,11 @@ struct block_translator {
 
 	/** Data transfer buffer */
 	struct xfer_buffer xferbuf;
-	/** Data buffer */
-	userptr_t buffer;
 	/** Block size */
 	size_t blksize;
 };
 
-extern int block_translate ( struct interface *block,
-			     userptr_t buffer, size_t size );
+extern int block_translate ( struct interface *block, void *buffer,
+			     size_t size );
 
 #endif /* _IPXE_BLOCKTRANS_H */

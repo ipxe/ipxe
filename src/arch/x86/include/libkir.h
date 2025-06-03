@@ -194,7 +194,7 @@ copy_from_user ( void *dest, userptr_t buffer, off_t offset, size_t len ) {
  * @ret buffer	User buffer
  */
 static inline __attribute__ (( always_inline )) userptr_t
-real_to_user ( unsigned int segment, unsigned int offset ) {
+real_to_virt ( unsigned int segment, unsigned int offset ) {
 	return ( ( segment << 16 ) | offset );
 }
 
@@ -210,7 +210,7 @@ real_to_user ( unsigned int segment, unsigned int offset ) {
  */
 static inline __attribute__ (( always_inline )) userptr_t
 virt_to_user ( void * virtual ) {
-	return real_to_user ( rm_ds, ( intptr_t ) virtual );
+	return real_to_virt ( rm_ds, ( intptr_t ) virtual );
 }
 
 /* TEXT16_CODE: declare a fragment of code that resides in .text16 */

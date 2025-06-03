@@ -69,8 +69,8 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define VIRT_2_BE64_BUS( addr )		cpu_to_be64(((unsigned long long )virt_to_bus(addr)))
 #define BE64_BUS_2_VIRT( addr )		bus_to_virt(be64_to_cpu(addr))
-#define USR_2_BE64_BUS( addr )		cpu_to_be64(((unsigned long long )user_to_phys(addr, 0)))
-#define BE64_BUS_2_USR( addr )		be64_to_cpu(phys_to_user(addr))
+#define USR_2_BE64_BUS( addr )		cpu_to_be64(((unsigned long long )virt_to_phys(addr)))
+#define BE64_BUS_2_USR( addr )		be64_to_cpu(phys_to_virt(addr))
 
 #define GET_INBOX(golan, idx)		(&(((struct mbox *)(golan->mboxes.inbox))[idx]))
 #define GET_OUTBOX(golan, idx)		(&(((struct mbox *)(golan->mboxes.outbox))[idx]))
@@ -121,7 +121,7 @@ struct golan_firmware_area {
 	 * final teardown, in order to avoid memory map changes at
 	 * runtime.
 	 */
-	userptr_t area;
+	void *area;
 };
 /* Queue Pair */
 #define GOLAN_SEND_WQE_BB_SIZE			64

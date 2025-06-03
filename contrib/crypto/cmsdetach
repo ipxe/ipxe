@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+
+"""Detach CMS encrypted data.
+
+Detach encrypted data from a CMS envelopedData or authEnvelopedData
+message into a separate file.
+"""
+
+import argparse
+from pathlib import Path
+
+from asn1crypto.cms import ContentInfo, AuthEnvelopedData, EnvelopedData
+
+# Parse command-line arguments
+#
+parser = argparse.ArgumentParser(
+    description=__doc__,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+)
+parser.add_argument("-d", "--data", metavar="FILE", type=Path,
+                    help="Write detached data (without envelope) to FILE")
+parser.add_argument("-e", "--envelope", metavar="FILE", type=Path,
+                    help="Write envelope (without data) to FILE")
+parser.add_argument("-o", "--overwrite", action="store_true",
+                    help="Overwrite output files")
+parser.add_argument("file", type=Path, help="Input envelope file")
+args = parser.parse_args()
+if args.data is None and args.envelope is None:
+    parser.error("at least one of --data and --envelope is required")
+outmode = "wb" if args.overwrite else "xb"
+
+# Read input envelope
+#
+envelope = ContentInfo.load(args.file.read_bytes())
+
+# Locate encrypted content info
+#
+content = envelope["content"]
+if type(content) is AuthEnvelopedData:
+    encinfo = content["auth_encrypted_content_info"]
+elif type(content) is EnvelopedData:
+    encinfo = content["encrypted_content_info"]
+else:
+    parser.error("Input file does not contain any encrypted data")
+
+# Detach encrypted content data
+#
+data = encinfo["encrypted_content"]
+del encinfo["encrypted_content"]
+
+# Write envelope (without data), if applicable
+#
+if args.envelope:
+    with args.envelope.open(mode=outmode) as fh:
+        fh.write(envelope.dump())
+
+# Write data (without envelope), if applicable
+#
+if args.data:
+    with args.data.open(mode=outmode) as fh:
+        fh.write(data.contents)

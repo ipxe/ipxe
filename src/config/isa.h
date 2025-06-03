@@ -10,7 +10,7 @@
  *
  */
 #undef	ISA_PROBE_ADDRS		/* e.g. 0x200, 0x300 */
-#undef	ISA_PROBE_ONLY		/* Do not probe any other addresses */
+#define	ISA_PROBE_ONLY		/* Do not probe any other addresses */
 
 #include <config/local/isa.h>
 

@@ -1000,7 +1000,7 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	memset_user ( scratch->buffer, 0, 0, buffer_len );
+	memset ( scratch->buffer, 0, buffer_len );
 
 	/* Allocate scratchpad array */
 	array_len = ( scratch->count * sizeof ( scratch->array[0] ) );
@@ -1014,8 +1014,7 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 	}
 
 	/* Populate scratchpad array */
-	addr = dma_phys ( &scratch->buffer_map,
-			  user_to_phys ( scratch->buffer, 0 ) );
+	addr = dma ( &scratch->buffer_map, scratch->buffer );
 	for ( i = 0 ; i < scratch->count ; i++ ) {
 		scratch->array[i] = cpu_to_le64 ( addr );
 		addr += xhci->pagesize;
@@ -1027,8 +1026,8 @@ static int xhci_scratchpad_alloc ( struct xhci_device *xhci ) {
 						     scratch->array ) );
 
 	DBGC2 ( xhci, "XHCI %s scratchpad [%08lx,%08lx) array [%08lx,%08lx)\n",
-		xhci->name, user_to_phys ( scratch->buffer, 0 ),
-		user_to_phys ( scratch->buffer, buffer_len ),
+		xhci->name, virt_to_phys ( scratch->buffer ),
+		( virt_to_phys ( scratch->buffer ) + buffer_len ),
 		virt_to_phys ( scratch->array ),
 		( virt_to_phys ( scratch->array ) + array_len ) );
 	return 0;
@@ -1163,6 +1162,31 @@ static int xhci_reset ( struct xhci_device *xhci ) {
 
 	DBGC ( xhci, "XHCI %s timed out waiting for reset\n", xhci->name );
 	return -ETIMEDOUT;
+}
+
+/**
+ * Mark xHCI device as permanently failed
+ *
+ * @v xhci		xHCI device
+ * @ret rc		Return status code
+ */
+static int xhci_fail ( struct xhci_device *xhci ) {
+	size_t len;
+	int rc;
+
+	/* Mark command mechanism as permanently failed */
+	xhci->failed = 1;
+
+	/* Reset device */
+	if ( ( rc = xhci_reset ( xhci ) ) != 0 )
+		return rc;
+
+	/* Discard DCBAA entries since DCBAAP has been cleared */
+	assert ( xhci->dcbaa.context != NULL );
+	len = ( ( xhci->slots + 1 ) * sizeof ( xhci->dcbaa.context[0] ) );
+	memset ( xhci->dcbaa.context, 0, len );
+
+	return 0;
 }
 
 /******************************************************************************
@@ -1720,6 +1744,10 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
 	unsigned int consumed;
 	unsigned int type;
 
+	/* Do nothing if device has permanently failed */
+	if ( xhci->failed )
+		return;
+
 	/* Poll for events */
 	profile_start ( &xhci_event_profiler );
 	for ( consumed = 0 ; ; consumed++ ) {
@@ -1778,6 +1806,7 @@ static void xhci_event_poll ( struct xhci_device *xhci ) {
  */
 static void xhci_abort ( struct xhci_device *xhci ) {
 	physaddr_t crp;
+	uint32_t crcr;
 
 	/* Abort the command */
 	DBGC2 ( xhci, "XHCI %s aborting command\n", xhci->name );
@@ -1786,8 +1815,18 @@ static void xhci_abort ( struct xhci_device *xhci ) {
 	/* Allow time for command to abort */
 	mdelay ( XHCI_COMMAND_ABORT_DELAY_MS );
 
-	/* Sanity check */
-	assert ( ( readl ( xhci->op + XHCI_OP_CRCR ) & XHCI_CRCR_CRR ) == 0 );
+	/* Check for failure to abort */
+	crcr = readl ( xhci->op + XHCI_OP_CRCR );
+	if ( crcr & XHCI_CRCR_CRR ) {
+
+		/* Device has failed to abort a command and is almost
+		 * certainly beyond repair.  Reset device, abandoning
+		 * all state, and mark device as failed to avoid
+		 * delays on any future command attempts.
+		 */
+		DBGC ( xhci, "XHCI %s failed to abort command\n", xhci->name );
+		xhci_fail ( xhci );
+	}
 
 	/* Consume (and ignore) any final command status */
 	xhci_event_poll ( xhci );
@@ -1812,6 +1851,19 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 	struct xhci_trb_complete *complete = &trb->complete;
 	unsigned int i;
 	int rc;
+
+	/* Immediately fail all commands if command mechanism has failed */
+	if ( xhci->failed ) {
+		rc = -EPIPE;
+		goto err_failed;
+	}
+
+	/* Sanity check */
+	if ( xhci->pending ) {
+		DBGC ( xhci, "XHCI %s command ring busy\n", xhci->name );
+		rc = -EBUSY;
+		goto err_pending;
+	}
 
 	/* Record the pending command */
 	xhci->pending = trb;
@@ -1855,6 +1907,8 @@ static int xhci_command ( struct xhci_device *xhci, union xhci_trb *trb ) {
 
  err_enqueue:
 	xhci->pending = NULL;
+ err_pending:
+ err_failed:
 	return rc;
 }
 
@@ -1875,9 +1929,13 @@ static inline int xhci_nop ( struct xhci_device *xhci ) {
 	nop->type = XHCI_TRB_NOP_CMD;
 
 	/* Issue command and wait for completion */
-	if ( ( rc = xhci_command ( xhci, &trb ) ) != 0 )
+	if ( ( rc = xhci_command ( xhci, &trb ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s NOP failed: %s\n",
+		       xhci->name, strerror ( rc ) );
 		return rc;
+	}
 
+	DBGC2 ( xhci, "XHCI %s NOP completed successfully\n", xhci->name );
 	return 0;
 }
 
@@ -2055,15 +2113,18 @@ static inline int xhci_address_device ( struct xhci_device *xhci,
 	/* Assign device address */
 	if ( ( rc = xhci_context ( xhci, slot, slot->endpoint[XHCI_CTX_EP0],
 				   XHCI_TRB_ADDRESS_DEVICE,
-				   xhci_address_device_input ) ) != 0 )
+				   xhci_address_device_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d could not assign address: %s\n",
+		       xhci->name, slot->id, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Get assigned address */
 	slot_ctx = ( slot->context +
 		     xhci_device_context_offset ( xhci, XHCI_CTX_SLOT ) );
 	usb->address = slot_ctx->address;
-	DBGC2 ( xhci, "XHCI %s assigned address %d to %s\n",
-		xhci->name, usb->address, usb->name );
+	DBGC2 ( xhci, "XHCI %s slot %d assigned address %d to %s\n",
+		xhci->name, slot->id, usb->address, usb->name );
 
 	return 0;
 }
@@ -2124,8 +2185,11 @@ static inline int xhci_configure_endpoint ( struct xhci_device *xhci,
 	/* Configure endpoint */
 	if ( ( rc = xhci_context ( xhci, slot, endpoint,
 				   XHCI_TRB_CONFIGURE_ENDPOINT,
-				   xhci_configure_endpoint_input ) ) != 0 )
+				   xhci_configure_endpoint_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d ctx %d could not configure: %s\n",
+		       xhci->name, slot->id, endpoint->ctx, strerror ( rc ) );
 		return rc;
+	}
 
 	DBGC2 ( xhci, "XHCI %s slot %d ctx %d configured\n",
 		xhci->name, slot->id, endpoint->ctx );
@@ -2175,8 +2239,12 @@ static inline int xhci_deconfigure_endpoint ( struct xhci_device *xhci,
 	/* Deconfigure endpoint */
 	if ( ( rc = xhci_context ( xhci, slot, endpoint,
 				   XHCI_TRB_CONFIGURE_ENDPOINT,
-				   xhci_deconfigure_endpoint_input ) ) != 0 )
+				   xhci_deconfigure_endpoint_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d ctx %d could not deconfigure: "
+		       "%s\n", xhci->name, slot->id, endpoint->ctx,
+		       strerror ( rc ) );
 		return rc;
+	}
 
 	DBGC2 ( xhci, "XHCI %s slot %d ctx %d deconfigured\n",
 		xhci->name, slot->id, endpoint->ctx );
@@ -2230,8 +2298,12 @@ static inline int xhci_evaluate_context ( struct xhci_device *xhci,
 	/* Configure endpoint */
 	if ( ( rc = xhci_context ( xhci, slot, endpoint,
 				   XHCI_TRB_EVALUATE_CONTEXT,
-				   xhci_evaluate_context_input ) ) != 0 )
+				   xhci_evaluate_context_input ) ) != 0 ) {
+		DBGC ( xhci, "XHCI %s slot %d ctx %d could not (re-)evaluate: "
+		       "%s\n", xhci->name, slot->id, endpoint->ctx,
+		       strerror ( rc ) );
 		return rc;
+	}
 
 	DBGC2 ( xhci, "XHCI %s slot %d ctx %d (re-)evaluated\n",
 		xhci->name, slot->id, endpoint->ctx );
@@ -3386,14 +3458,36 @@ static int xhci_probe ( struct pci_device *pci ) {
 static void xhci_remove ( struct pci_device *pci ) {
 	struct xhci_device *xhci = pci_get_drvdata ( pci );
 	struct usb_bus *bus = xhci->bus;
+	uint16_t command;
 
+	/* Some systems are observed to disable bus mastering on
+	 * Thunderbolt controllers before we get a chance to shut
+	 * down.  Detect this and avoid attempting any DMA operations,
+	 * which are guaranteed to fail and may end up spuriously
+	 * completing after the operating system kernel starts up.
+	 */
+	pci_read_config_word ( pci, PCI_COMMAND, &command );
+	if ( ! ( command & PCI_COMMAND_MASTER ) ) {
+		DBGC ( xhci, "XHCI %s DMA was disabled\n", xhci->name );
+		xhci_fail ( xhci );
+	}
+
+	/* Unregister and free USB bus */
 	unregister_usb_bus ( bus );
 	free_usb_bus ( bus );
+
+	/* Reset device and undo any PCH-specific fixes */
 	xhci_reset ( xhci );
 	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
+
+	/* Release ownership back to BIOS */
 	xhci_legacy_release ( xhci );
+
+	/* Unmap registers */
 	iounmap ( xhci->regs );
+
+	/* Free device */
 	free ( xhci );
 }
 

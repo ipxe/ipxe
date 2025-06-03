@@ -31,8 +31,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <errno.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 #include <ipxe/entropy.h>
+
+struct entropy_source linux_entropy __entropy_source ( ENTROPY_NORMAL );
 
 /** Entropy source filename */
 static const char entropy_filename[] = "/dev/random";
@@ -54,6 +56,13 @@ static int linux_entropy_enable ( void ) {
 		       entropy_filename, linux_strerror ( linux_errno ) );
 		return entropy_fd;
 	}
+
+	/* linux_get_noise() reads a single byte from /dev/random,
+	 * which is supposed to block until a sufficient amount of
+	 * entropy is available.  We therefore assume that each sample
+	 * contains exactly 8 bits of entropy.
+	 */
+	entropy_init ( &linux_entropy, MIN_ENTROPY ( 8.0 ) );
 
 	return 0;
 }
@@ -95,7 +104,10 @@ static int linux_get_noise ( noise_sample_t *noise ) {
 	return 0;
 }
 
-PROVIDE_ENTROPY_INLINE ( linux, min_entropy_per_sample );
-PROVIDE_ENTROPY ( linux, entropy_enable, linux_entropy_enable );
-PROVIDE_ENTROPY ( linux, entropy_disable, linux_entropy_disable );
-PROVIDE_ENTROPY ( linux, get_noise, linux_get_noise );
+/** Linux entropy source */
+struct entropy_source linux_entropy __entropy_source ( ENTROPY_NORMAL ) = {
+	.name = "linux",
+	.enable = linux_entropy_enable,
+	.disable = linux_entropy_disable,
+	.get_noise = linux_get_noise,
+};

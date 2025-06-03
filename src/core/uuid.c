@@ -25,7 +25,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdio.h>
+#include <errno.h>
 #include <byteswap.h>
+#include <ipxe/base16.h>
 #include <ipxe/uuid.h>
 
 /** @file
@@ -52,4 +54,30 @@ const char * uuid_ntoa ( const union uuid *uuid ) {
 		  uuid->canonical.e[2], uuid->canonical.e[3],
 		  uuid->canonical.e[4], uuid->canonical.e[5] );
 	return buf;
+}
+
+/**
+ * Parse UUID
+ *
+ * @v string		UUID string
+ * @v uuid		UUID to fill in
+ * @ret rc		Return status code
+ */
+int uuid_aton ( const char *string, union uuid *uuid ) {
+	int len;
+	int rc;
+
+	/* Decode as hex string with optional '-' separator */
+	len = hex_decode ( ( '-' | HEX_DECODE_OPTIONAL ), string, uuid->raw,
+			   sizeof ( *uuid ) );
+	if ( len < 0 ) {
+		rc = len;
+		return rc;
+	}
+
+	/* Check length */
+	if ( len != sizeof ( *uuid ) )
+		return -EINVAL;
+
+	return 0;
 }

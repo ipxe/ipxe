@@ -43,6 +43,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/settings.h>
 #include <ipxe/dhcp.h>
 #include <ipxe/uri.h>
+#include <ipxe/profile.h>
+#include <ipxe/errortab.h>
 #include <ipxe/tftp.h>
 
 /** @file
@@ -75,6 +77,9 @@ FEATURE ( FEATURE_PROTOCOL, "TFTP", DHCP_EB_FEATURE_TFTP, 1 );
 #define EINVAL_MC_INVALID_PORT __einfo_error ( EINFO_EINVAL_MC_INVALID_PORT )
 #define EINFO_EINVAL_MC_INVALID_PORT __einfo_uniqify \
 	( EINFO_EINVAL, 0x07, "Invalid multicast port" )
+#define ENOENT_NOT_FOUND __einfo_error ( EINFO_ENOENT_NOT_FOUND )
+#define EINFO_ENOENT_NOT_FOUND __einfo_uniqify \
+	( EINFO_ENOENT, 0x01, "Not found" )
 
 /**
  * A TFTP request
@@ -157,6 +162,19 @@ enum {
 
 /** Maximum number of MTFTP open requests before falling back to TFTP */
 #define MTFTP_MAX_TIMEOUTS 3
+
+/** Client profiler */
+static struct profiler tftp_client_profiler __profiler =
+	{ .name = "tftp.client" };
+
+/** Server profiler */
+static struct profiler tftp_server_profiler __profiler =
+	{ .name = "tftp.server" };
+
+/** Human-readable error messages */
+struct errortab tftp_errors[] __errortab = {
+	__einfo_errortab ( EINFO_ENOENT_NOT_FOUND ),
+};
 
 /**
  * Free TFTP request
@@ -802,6 +820,10 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	}
 	block += ( ntohs ( data->block ) - 1 );
 
+	/* Stop profiling server turnaround if applicable */
+	if ( block )
+		profile_stop ( &tftp_server_profiler );
+
 	/* Extract data */
 	offset = ( block * tftp->blksize );
 	iob_pull ( iobuf, sizeof ( *data ) );
@@ -834,6 +856,12 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 	/* Acknowledge block */
 	tftp_send_packet ( tftp );
 
+	/* Stop profiling client turnaround */
+	profile_stop ( &tftp_client_profiler );
+
+	/* Start profiling server turnaround */
+	profile_start ( &tftp_server_profiler );
+
 	/* If all blocks have been received, finish. */
 	if ( bitmap_full ( &tftp->bitmap ) )
 		tftp_done ( tftp, 0 );
@@ -853,7 +881,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
  */
 static int tftp_errcode_to_rc ( unsigned int errcode ) {
 	switch ( errcode ) {
-	case TFTP_ERR_FILE_NOT_FOUND:	return -ENOENT;
+	case TFTP_ERR_FILE_NOT_FOUND:	return -ENOENT_NOT_FOUND;
 	case TFTP_ERR_ACCESS_DENIED:	return -EACCES;
 	case TFTP_ERR_ILLEGAL_OP:	return -ENOTTY;
 	default:			return -ENOTSUP;
@@ -906,7 +934,10 @@ static int tftp_rx ( struct tftp_request *tftp,
 	struct tftp_common *common = iobuf->data;
 	size_t len = iob_len ( iobuf );
 	int rc = -EINVAL;
-	
+
+	/* Start profiling client turnaround */
+	profile_start ( &tftp_client_profiler );
+
 	/* Sanity checks */
 	if ( len < sizeof ( *common ) ) {
 		DBGC ( tftp, "TFTP %p received underlength packet length "

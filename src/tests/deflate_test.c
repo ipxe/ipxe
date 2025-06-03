@@ -156,19 +156,18 @@ static void deflate_okx ( struct deflate *deflate,
 			  struct deflate_test *test,
 			  struct deflate_test_fragments *frags,
 			  const char *file, unsigned int line ) {
-	uint8_t data[ test->expected_len ];
-	struct deflate_chunk in;
-	struct deflate_chunk out;
-	size_t frag_len = -1UL;
-	size_t offset = 0;
+	uint8_t buf[ test->expected_len ];
+	const void *data = test->compressed;
 	size_t remaining = test->compressed_len;
+	size_t frag_len = -1UL;
+	struct deflate_chunk out;
 	unsigned int i;
 
 	/* Initialise decompressor */
 	deflate_init ( deflate, test->format );
 
 	/* Initialise output chunk */
-	deflate_chunk_init ( &out, virt_to_user ( data ), 0, sizeof ( data ) );
+	deflate_chunk_init ( &out, buf, 0, sizeof ( buf ) );
 
 	/* Process input (in fragments, if applicable) */
 	for ( i = 0 ; i < ( sizeof ( frags->len ) /
@@ -179,16 +178,15 @@ static void deflate_okx ( struct deflate *deflate,
 			frag_len = frags->len[i];
 		if ( frag_len > remaining )
 			frag_len = remaining;
-		deflate_chunk_init ( &in, virt_to_user ( test->compressed ),
-				     offset, ( offset + frag_len ) );
 
 		/* Decompress this fragment */
-		okx ( deflate_inflate ( deflate, &in, &out ) == 0, file, line );
-		okx ( in.len == ( offset + frag_len ), file, line );
-		okx ( in.offset == in.len, file, line );
+		okx ( deflate_inflate ( deflate, data, frag_len,
+					&out ) == 0, file, line );
+		okx ( deflate->in == ( data + frag_len ), file, line );
+		okx ( deflate->end == ( data + frag_len ), file, line );
 
 		/* Move to next fragment */
-		offset = in.offset;
+		data += frag_len;
 		remaining -= frag_len;
 		if ( ! remaining )
 			break;
@@ -199,9 +197,13 @@ static void deflate_okx ( struct deflate *deflate,
 
 	/* Check decompression has terminated as expected */
 	okx ( deflate_finished ( deflate ), file, line );
-	okx ( offset == test->compressed_len, file, line );
+	okx ( deflate->in == ( test->compressed + test->compressed_len ),
+	      file, line );
+	okx ( deflate->end == ( test->compressed + test->compressed_len ),
+	      file, line );
 	okx ( out.offset == test->expected_len, file, line );
-	okx ( memcmp ( data, test->expected, test->expected_len ) == 0,
+	okx ( out.data == buf, file, line );
+	okx ( memcmp ( out.data, test->expected, test->expected_len ) == 0,
 	     file, line );
 }
 #define deflate_ok( deflate, test, frags ) \

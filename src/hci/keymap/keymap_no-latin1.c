@@ -10,8 +10,9 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "no-latin1" keyboard mapping */
-struct key_mapping no_latin1_mapping[] __keymap = {
+/** "no-latin1" basic remapping */
+static struct keymap_key no_latin1_basic[] = {
+	{ 0x1d, 0x1e },	/* 0x1d => 0x1e */
 	{ 0x26, 0x2f },	/* '&' => '/' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
 	{ 0x29, 0x3d },	/* ')' => '=' */
@@ -31,4 +32,32 @@ struct key_mapping no_latin1_mapping[] __keymap = {
 	{ 0x60, 0x7c },	/* '`' => '|' */
 	{ 0x7c, 0x2a },	/* '|' => '*' */
 	{ 0x7d, 0x5e },	/* '}' => '^' */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "no-latin1" AltGr remapping */
+static struct keymap_key no_latin1_altgr[] = {
+	{ 0x22, 0x5b },	/* '"' => '[' */
+	{ 0x26, 0x7b },	/* '&' => '{' */
+	{ 0x27, 0x7b },	/* '\'' => '{' */
+	{ 0x28, 0x5d },	/* '(' => ']' */
+	{ 0x29, 0x7d },	/* ')' => '}' */
+	{ 0x2a, 0x5b },	/* '*' => '[' */
+	{ 0x30, 0x7d },	/* '0' => '}' */
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x37, 0x7b },	/* '7' => '{' */
+	{ 0x38, 0x5b },	/* '8' => '[' */
+	{ 0x39, 0x5d },	/* '9' => ']' */
+	{ 0x5b, 0x7d },	/* '[' => '}' */
+	{ 0x7b, 0x5d },	/* '{' => ']' */
+	{ 0, 0 }
+};
+
+/** "no-latin1" keyboard map */
+struct keymap no_latin1_keymap __keymap = {
+	.name = "no-latin1",
+	.basic = no_latin1_basic,
+	.altgr = no_latin1_altgr,
 };

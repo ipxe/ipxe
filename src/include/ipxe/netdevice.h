@@ -356,8 +356,8 @@ struct net_device {
 	struct list_head list;
 	/** List of open network devices */
 	struct list_head open_list;
-	/** Index of this network device */
-	unsigned int index;
+	/** Scope ID */
+	unsigned int scope_id;
 	/** Name of this network device */
 	char name[NETDEV_NAME_LEN];
 	/** Underlying hardware device */
@@ -451,6 +451,15 @@ struct net_device {
  */
 #define NETDEV_IRQ_UNSUPPORTED 0x0008
 
+/** Network device transmission is in progress */
+#define NETDEV_TX_IN_PROGRESS 0x0010
+
+/** Network device poll is in progress */
+#define NETDEV_POLL_IN_PROGRESS 0x0020
+
+/** Network device must be polled even when closed */
+#define NETDEV_INSOMNIAC 0x0040
+
 /** Link-layer protocol table */
 #define LL_PROTOCOLS __table ( struct ll_protocol, "ll_protocols" )
 
@@ -467,22 +476,27 @@ struct net_device {
 struct net_driver {
 	/** Name */
 	const char *name;
+	/** Size of private data */
+	size_t priv_len;
 	/** Probe device
 	 *
 	 * @v netdev		Network device
+	 * @v priv		Private data
 	 * @ret rc		Return status code
 	 */
-	int ( * probe ) ( struct net_device *netdev );
+	int ( * probe ) ( struct net_device *netdev, void *priv );
 	/** Notify of device or link state change
 	 *
 	 * @v netdev		Network device
+	 * @v priv		Private data
 	 */
-	void ( * notify ) ( struct net_device *netdev );
+	void ( * notify ) ( struct net_device *netdev, void *priv );
 	/** Remove device
 	 *
 	 * @v netdev		Network device
+	 * @v priv		Private data
 	 */
-	void ( * remove ) ( struct net_device *netdev );
+	void ( * remove ) ( struct net_device *netdev, void *priv );
 };
 
 /** Network driver table */
@@ -560,17 +574,6 @@ netdev_get ( struct net_device *netdev ) {
 static inline __attribute__ (( always_inline )) void
 netdev_put ( struct net_device *netdev ) {
 	ref_put ( &netdev->refcnt );
-}
-
-/**
- * Get driver private area for this network device
- *
- * @v netdev		Network device
- * @ret priv		Driver private area for this network device
- */
-static inline __attribute__ (( always_inline )) void *
-netdev_priv ( struct net_device *netdev ) {
-        return netdev->priv;
 }
 
 /**
@@ -693,6 +696,19 @@ netdev_rx_frozen ( struct net_device *netdev ) {
 	return ( netdev->state & NETDEV_RX_FROZEN );
 }
 
+/**
+ * Check whether or not network device must be polled even while closed
+ *
+ * @v netdev		Network device
+ * @ret insomniac	Network device must be polled even while closed
+ */
+static inline __attribute__ (( always_inline )) int
+netdev_insomniac ( struct net_device *netdev ) {
+	return ( netdev->state & NETDEV_INSOMNIAC );
+}
+
+extern void * netdev_priv ( struct net_device *netdev,
+			    struct net_driver *driver );
 extern void netdev_rx_freeze ( struct net_device *netdev );
 extern void netdev_rx_unfreeze ( struct net_device *netdev );
 extern void netdev_link_err ( struct net_device *netdev, int rc );
@@ -720,11 +736,9 @@ extern void netdev_close ( struct net_device *netdev );
 extern void unregister_netdev ( struct net_device *netdev );
 extern void netdev_irq ( struct net_device *netdev, int enable );
 extern struct net_device * find_netdev ( const char *name );
-extern struct net_device * find_netdev_by_index ( unsigned int index );
+extern struct net_device * find_netdev_by_scope_id ( unsigned int scope_id );
 extern struct net_device * find_netdev_by_location ( unsigned int bus_type,
 						     unsigned int location );
-extern struct net_device *
-find_netdev_by_ll_addr ( struct ll_protocol *ll_protocol, const void *ll_addr );
 extern struct net_device * last_opened_netdev ( void );
 extern int net_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    struct net_protocol *net_protocol, const void *ll_dest,

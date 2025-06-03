@@ -23,8 +23,10 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <string.h>
 #include <errno.h>
 #include <elf.h>
+#include <librm.h>
 #include <ipxe/image.h>
 #include <ipxe/elf.h>
 #include <ipxe/features.h>
@@ -52,8 +54,8 @@ static int elfboot_exec ( struct image *image ) {
 
 	/* Load the image using core ELF support */
 	if ( ( rc = elf_load ( image, &entry, &max ) ) != 0 ) {
-		DBGC ( image, "ELF %p could not load: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "ELF %s could not load: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -63,14 +65,15 @@ static int elfboot_exec ( struct image *image ) {
 	shutdown_boot();
 
 	/* Jump to OS with flat physical addressing */
-	DBGC ( image, "ELF %p starting execution at %lx\n", image, entry );
+	DBGC ( image, "ELF %s starting execution at %lx\n",
+	       image->name, entry );
 	__asm__ __volatile__ ( PHYS_CODE ( "pushl %%ebp\n\t" /* gcc bug */
 					   "call *%%edi\n\t"
 					   "popl %%ebp\n\t" /* gcc bug */ )
 			       : : "D" ( entry )
 			       : "eax", "ebx", "ecx", "edx", "esi", "memory" );
 
-	DBGC ( image, "ELF %p returned\n", image );
+	DBGC ( image, "ELF %s returned\n", image->name );
 
 	/* It isn't safe to continue after calling shutdown() */
 	while ( 1 ) {}
@@ -86,13 +89,13 @@ static int elfboot_exec ( struct image *image ) {
  * @v dest		Destination address
  * @ret rc		Return status code
  */
-static int elfboot_check_segment ( struct image *image, Elf_Phdr *phdr,
+static int elfboot_check_segment ( struct image *image, const Elf_Phdr *phdr,
 				   physaddr_t dest ) {
 
 	/* Check that ELF segment uses flat physical addressing */
 	if ( phdr->p_vaddr != dest ) {
-		DBGC ( image, "ELF %p uses virtual addressing (phys %x, "
-		       "virt %x)\n", image, phdr->p_paddr, phdr->p_vaddr );
+		DBGC ( image, "ELF %s uses virtual addressing (phys %x, virt "
+		       "%x)\n", image->name, phdr->p_paddr, phdr->p_vaddr );
 		return -ENOEXEC;
 	}
 
@@ -106,7 +109,7 @@ static int elfboot_check_segment ( struct image *image, Elf_Phdr *phdr,
  * @ret rc		Return status code
  */
 static int elfboot_probe ( struct image *image ) {
-	Elf32_Ehdr ehdr;
+	const Elf32_Ehdr *ehdr;
 	static const uint8_t e_ident[] = {
 		[EI_MAG0]	= ELFMAG0,
 		[EI_MAG1]	= ELFMAG1,
@@ -121,16 +124,22 @@ static int elfboot_probe ( struct image *image ) {
 	int rc;
 
 	/* Read ELF header */
-	copy_from_user ( &ehdr, image->data, 0, sizeof ( ehdr ) );
-	if ( memcmp ( ehdr.e_ident, e_ident, sizeof ( e_ident ) ) != 0 ) {
-		DBGC ( image, "Invalid ELF identifier\n" );
+	if ( image->len < sizeof ( *ehdr ) ) {
+		DBGC ( image, "ELF %s too short for ELF header\n",
+		       image->name );
+		return -ENOEXEC;
+	}
+	ehdr = image->data;
+	if ( memcmp ( ehdr->e_ident, e_ident, sizeof ( e_ident ) ) != 0 ) {
+		DBGC ( image, "ELF %s invalid identifier\n", image->name );
 		return -ENOEXEC;
 	}
 
 	/* Check that this image uses flat physical addressing */
-	if ( ( rc = elf_segments ( image, &ehdr, elfboot_check_segment,
+	if ( ( rc = elf_segments ( image, ehdr, elfboot_check_segment,
 				   &entry, &max ) ) != 0 ) {
-		DBGC ( image, "Unloadable ELF image\n" );
+		DBGC ( image, "ELF %s is not loadable: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 

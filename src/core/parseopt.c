@@ -28,13 +28,16 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <ipxe/uuid.h>
 #include <ipxe/netdevice.h>
-#include <ipxe/menu.h>
+#include <ipxe/dynui.h>
 #include <ipxe/settings.h>
 #include <ipxe/params.h>
 #include <ipxe/timer.h>
+#include <ipxe/keys.h>
 #include <ipxe/parseopt.h>
 #include <config/branding.h>
 
@@ -123,6 +126,29 @@ int parse_timeout ( char *text, unsigned long *value ) {
 }
 
 /**
+ * Parse UUID
+ *
+ * @v text		Text
+ * @ret uuid		UUID value
+ * @ret rc		Return status code
+ */
+int parse_uuid ( char *text, struct uuid_option *uuid ) {
+	int rc;
+
+	/* Sanity check */
+	assert ( text != NULL );
+
+	/* Parse UUID */
+	if ( ( rc = uuid_aton ( text, &uuid->buf ) ) != 0 ) {
+		printf ( "\"%s\": invalid UUID\n", text );
+		return rc;
+	}
+	uuid->value = &uuid->buf;
+
+	return 0;
+}
+
+/**
  * Parse network device name
  *
  * @v text		Text
@@ -168,21 +194,21 @@ int parse_netdev_configurator ( char *text,
 }
 
 /**
- * Parse menu name
+ * Parse dynamic user interface name
  *
  * @v text		Text
- * @ret menu		Menu
+ * @ret dynui		Dynamic user interface
  * @ret rc		Return status code
  */
-int parse_menu ( char *text, struct menu **menu ) {
+int parse_dynui ( char *text, struct dynamic_ui **dynui ) {
 
-	/* Find menu */
-	*menu = find_menu ( text );
-	if ( ! *menu ) {
+	/* Find user interface */
+	*dynui = find_dynui ( text );
+	if ( ! *dynui ) {
 		if ( text ) {
-			printf ( "\"%s\": no such menu\n", text );
+			printf ( "\"%s\": no such user interface\n", text );
 		} else {
-			printf ( "No default menu\n" );
+			printf ( "No default user interface\n" );
 		}
 		return -ENOENT;
 	}
@@ -213,6 +239,7 @@ int parse_flag ( char *text __unused, int *flag ) {
  * @ret rc		Return status code
  */
 int parse_key ( char *text, unsigned int *key ) {
+	int rc;
 
 	/* Interpret single characters as being a literal key character */
 	if ( text[0] && ! text[1] ) {
@@ -221,7 +248,17 @@ int parse_key ( char *text, unsigned int *key ) {
 	}
 
 	/* Otherwise, interpret as an integer */
-	return parse_integer ( text, key );
+	if ( ( rc = parse_integer ( text, key ) ) < 0 )
+		return rc;
+
+	/* For backwards compatibility with existing scripts, treat
+	 * integers between the ASCII range and special key range as
+	 * being relative special key values.
+	 */
+	if ( ( ! isascii ( *key ) ) && ( *key < KEY_MIN ) )
+		*key += KEY_MIN;
+
+	return 0;
 }
 
 /**
@@ -302,7 +339,7 @@ int parse_autovivified_setting ( char *text, struct named_setting *setting ) {
 }
 
 /**
- * Parse form parameter list name
+ * Parse request parameter list name
  *
  * @v text		Text
  * @ret params		Parameter list

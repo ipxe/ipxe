@@ -11,7 +11,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/interface.h>
 
 /** Block device capacity */
@@ -25,20 +24,20 @@ struct block_device_capacity {
 };
 
 extern int block_read ( struct interface *control, struct interface *data,
-			uint64_t lba, unsigned int count,
-			userptr_t buffer, size_t len );
+			uint64_t lba, unsigned int count, void *buffer,
+			size_t len );
 #define block_read_TYPE( object_type )					\
 	typeof ( int ( object_type, struct interface *data,		\
 		       uint64_t lba, unsigned int count,		\
-		       userptr_t buffer, size_t len ) )
+		       void *buffer, size_t len ) )
 
 extern int block_write ( struct interface *control, struct interface *data,
-			 uint64_t lba, unsigned int count,
-			 userptr_t buffer, size_t len );
+			 uint64_t lba, unsigned int count, void *buffer,
+			 size_t len );
 #define block_write_TYPE( object_type )					\
 	typeof ( int ( object_type, struct interface *data,		\
 		       uint64_t lba, unsigned int count,		\
-		       userptr_t buffer, size_t len ) )
+		       void *buffer, size_t len ) )
 
 extern int block_read_capacity ( struct interface *control,
 				 struct interface *data );

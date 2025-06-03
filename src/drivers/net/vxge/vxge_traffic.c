@@ -15,6 +15,7 @@
 FILE_LICENCE(GPL2_ONLY);
 
 #include <ipxe/netdevice.h>
+#include <string.h>
 #include <errno.h>
 
 #include "vxge_traffic.h"

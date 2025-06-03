@@ -1,6 +1,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
-	.arch i386
+	.section ".note.GNU-stack", "", @progbits
 
 #ifdef __x86_64__
 #define STACK_SIZE 8192
@@ -13,7 +13,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  ****************************************************************************
  */
 	.section ".stack", "aw", @nobits
-	.align 8
+	.balign 8
 	.globl _stack
 _stack:
 	.space STACK_SIZE

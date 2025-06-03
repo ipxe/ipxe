@@ -33,5 +33,5 @@ static uint8_t oid_sha224[] = { ASN1_OID_SHA224 };
 struct asn1_algorithm oid_sha224_algorithm __asn1_algorithm = {
 	.name = "sha224",
 	.digest = &sha224_algorithm,
-	.oid = ASN1_OID_CURSOR ( oid_sha224 ),
+	.oid = ASN1_CURSOR ( oid_sha224 ),
 };

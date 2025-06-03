@@ -33,6 +33,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef NDEBUG
 
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <ipxe/image.h>
 #include <ipxe/asn1.h>
@@ -57,9 +58,6 @@ void asn1_okx ( struct asn1_test *test, const char *file, unsigned int line ) {
 
 	/* Sanity check */
 	assert ( sizeof ( out ) == digest->digestsize );
-
-	/* Correct image data pointer */
-	test->image->data = virt_to_user ( ( void * ) test->image->data );
 
 	/* Check that image is detected as correct type */
 	okx ( register_image ( test->image ) == 0, file, line );

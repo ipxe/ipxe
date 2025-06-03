@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <ipxe/xfer.h>
@@ -43,16 +44,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/settings.h>
 #include <ipxe/quiesce.h>
 #include <ipxe/sanboot.h>
-
-/**
- * Default SAN drive number
- *
- * The drive number is a meaningful concept only in a BIOS
- * environment, where it represents the INT13 drive number (0x80 for
- * the first hard disk).  We retain it in other environments to allow
- * for a simple way for iPXE commands to refer to SAN drives.
- */
-#define SAN_DEFAULT_DRIVE 0x80
 
 /**
  * Timeout for block device commands (in ticks)
@@ -102,6 +93,22 @@ struct san_device * sandev_find ( unsigned int drive ) {
 
 	list_for_each_entry ( sandev, &san_devices, list ) {
 		if ( sandev->drive == drive )
+			return sandev;
+	}
+	return NULL;
+}
+
+/**
+ * Find next SAN device by drive number
+ *
+ * @v drive		Minimum drive number
+ * @ret sandev		SAN device, or NULL
+ */
+struct san_device * sandev_next ( unsigned int drive ) {
+	struct san_device *sandev;
+
+	list_for_each_entry ( sandev, &san_devices, list ) {
+		if ( sandev->drive >= drive )
 			return sandev;
 	}
 	return NULL;
@@ -197,7 +204,7 @@ static int sanpath_open ( struct san_path *sanpath ) {
 
 	/* Open interface */
 	if ( ( rc = xfer_open_uri ( &sanpath->block, sanpath->uri ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x.%d could not (re)open URI: "
+		DBGC ( sandev->drive, "SAN %#02x.%d could not (re)open URI: "
 		       "%s\n", sandev->drive, sanpath->index, strerror ( rc ) );
 		return rc;
 	}
@@ -265,7 +272,7 @@ static void sanpath_block_close ( struct san_path *sanpath, int rc ) {
 	/* Any closure is an error from our point of view */
 	if ( rc == 0 )
 		rc = -ENOTCONN;
-	DBGC ( sandev, "SAN %#02x.%d closed: %s\n",
+	DBGC ( sandev->drive, "SAN %#02x.%d closed: %s\n",
 	       sandev->drive, sanpath->index, strerror ( rc ) );
 
 	/* Close path */
@@ -307,11 +314,11 @@ static void sanpath_step ( struct san_path *sanpath ) {
 
 	/* Mark as active path or close as applicable */
 	if ( ! sandev->active ) {
-		DBGC ( sandev, "SAN %#02x.%d is active\n",
+		DBGC ( sandev->drive, "SAN %#02x.%d is active\n",
 		       sandev->drive, sanpath->index );
 		sandev->active = sanpath;
 	} else {
-		DBGC ( sandev, "SAN %#02x.%d is available\n",
+		DBGC ( sandev->drive, "SAN %#02x.%d is available\n",
 		       sandev->drive, sanpath->index );
 		sanpath_close ( sanpath, 0 );
 	}
@@ -398,8 +405,9 @@ int sandev_reopen ( struct san_device *sandev ) {
 				rc = sanpath->path_rc;
 				break;
 			}
-			DBGC ( sandev, "SAN %#02x never became available: %s\n",
-			       sandev->drive, strerror ( rc ) );
+			DBGC ( sandev->drive, "SAN %#02x never became "
+			       "available: %s\n", sandev->drive,
+			       strerror ( rc ) );
 			goto err_none;
 		}
 	}
@@ -417,10 +425,10 @@ int sandev_reopen ( struct san_device *sandev ) {
 struct san_command_rw_params {
 	/** SAN device read/write operation */
 	int ( * block_rw ) ( struct interface *control, struct interface *data,
-			     uint64_t lba, unsigned int count,
-			     userptr_t buffer, size_t len );
+			     uint64_t lba, unsigned int count, void *buffer,
+			     size_t len );
 	/** Data buffer */
-	userptr_t buffer;
+	void *buffer;
 	/** Starting LBA */
 	uint64_t lba;
 	/** Block count */
@@ -453,8 +461,9 @@ static int sandev_command_rw ( struct san_device *sandev,
 	if ( ( rc = params->rw.block_rw ( &sanpath->block, &sandev->command,
 					  params->rw.lba, params->rw.count,
 					  params->rw.buffer, len ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x.%d could not initiate read/write: "
-		       "%s\n", sandev->drive, sanpath->index, strerror ( rc ) );
+		DBGC ( sandev->drive, "SAN %#02x.%d could not initiate "
+		       "read/write: %s\n", sandev->drive, sanpath->index,
+		       strerror ( rc ) );
 		return rc;
 	}
 
@@ -480,8 +489,9 @@ sandev_command_read_capacity ( struct san_device *sandev,
 	/* Initiate read capacity command */
 	if ( ( rc = block_read_capacity ( &sanpath->block,
 					  &sandev->command ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x.%d could not initiate read capacity: "
-		       "%s\n", sandev->drive, sanpath->index, strerror ( rc ) );
+		DBGC ( sandev->drive, "SAN %#02x.%d could not initiate read "
+		       "capacity: %s\n", sandev->drive, sanpath->index,
+		       strerror ( rc ) );
 		return rc;
 	}
 
@@ -565,7 +575,7 @@ sandev_command ( struct san_device *sandev,
 int sandev_reset ( struct san_device *sandev ) {
 	int rc;
 
-	DBGC ( sandev, "SAN %#02x reset\n", sandev->drive );
+	DBGC ( sandev->drive, "SAN %#02x reset\n", sandev->drive );
 
 	/* Close and reopen underlying block device */
 	if ( ( rc = sandev_reopen ( sandev ) ) != 0 )
@@ -585,11 +595,11 @@ int sandev_reset ( struct san_device *sandev ) {
  * @ret rc		Return status code
  */
 static int sandev_rw ( struct san_device *sandev, uint64_t lba,
-		       unsigned int count, userptr_t buffer,
+		       unsigned int count, void *buffer,
 		       int ( * block_rw ) ( struct interface *control,
 					    struct interface *data,
 					    uint64_t lba, unsigned int count,
-					    userptr_t buffer, size_t len ) ) {
+					    void *buffer, size_t len ) ) {
 	union san_command_params params;
 	unsigned int remaining;
 	size_t frag_len;
@@ -616,7 +626,7 @@ static int sandev_rw ( struct san_device *sandev, uint64_t lba,
 
 		/* Move to next fragment */
 		frag_len = ( sandev->capacity.blksize * params.rw.count );
-		params.rw.buffer = userptr_add ( params.rw.buffer, frag_len );
+		params.rw.buffer += frag_len;
 		params.rw.lba += params.rw.count;
 		remaining -= params.rw.count;
 	}
@@ -634,11 +644,12 @@ static int sandev_rw ( struct san_device *sandev, uint64_t lba,
  * @ret rc		Return status code
  */
 int sandev_read ( struct san_device *sandev, uint64_t lba,
-		  unsigned int count, userptr_t buffer ) {
+		  unsigned int count, void *buffer ) {
 	int rc;
 
 	/* Read from device */
-	if ( ( rc = sandev_rw ( sandev, lba, count, buffer, block_read ) ) != 0 )
+	if ( ( rc = sandev_rw ( sandev, lba, count, buffer,
+				block_read ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -654,11 +665,12 @@ int sandev_read ( struct san_device *sandev, uint64_t lba,
  * @ret rc		Return status code
  */
 int sandev_write ( struct san_device *sandev, uint64_t lba,
-		   unsigned int count, userptr_t buffer ) {
+		   unsigned int count, void *buffer ) {
 	int rc;
 
 	/* Write to device */
-	if ( ( rc = sandev_rw ( sandev, lba, count, buffer, block_write ) ) != 0 )
+	if ( ( rc = sandev_rw ( sandev, lba, count, buffer,
+				block_write ) ) != 0 )
 		return rc;
 
 	/* Quiesce system.  This is a heuristic designed to ensure
@@ -698,8 +710,8 @@ static int sandev_describe ( struct san_device *sandev ) {
 			if ( ! desc )
 				continue;
 			if ( ( rc = desc->model->complete ( desc ) ) != 0 ) {
-				DBGC ( sandev, "SAN %#02x.%d could not be "
-				       "described: %s\n", sandev->drive,
+				DBGC ( sandev->drive, "SAN %#02x.%d could not "
+				       "be described: %s\n", sandev->drive,
 				       sanpath->index, strerror ( rc ) );
 				return rc;
 			}
@@ -790,10 +802,9 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 	}
 
 	/* Read primary volume descriptor */
-	if ( ( rc = sandev_read ( sandev, lba, count,
-				  virt_to_user ( scratch ) ) ) != 0 ) {
-		DBGC ( sandev, "SAN %#02x could not read ISO9660 primary"
-		       "volume descriptor: %s\n",
+	if ( ( rc = sandev_read ( sandev, lba, count, scratch ) ) != 0 ) {
+		DBGC ( sandev->drive, "SAN %#02x could not read ISO9660 "
+		       "primary volume descriptor: %s\n",
 		       sandev->drive, strerror ( rc ) );
 		goto err_rw;
 	}
@@ -801,8 +812,8 @@ static int sandev_parse_iso9660 ( struct san_device *sandev ) {
 	/* Configure as CD-ROM if applicable */
 	if ( memcmp ( &scratch->primary.fixed, &primary_check,
 		      sizeof ( primary_check ) ) == 0 ) {
-		DBGC ( sandev, "SAN %#02x contains an ISO9660 filesystem; "
-		       "treating as CD-ROM\n", sandev->drive );
+		DBGC ( sandev->drive, "SAN %#02x contains an ISO9660 "
+		       "filesystem; treating as CD-ROM\n", sandev->drive );
 		sandev->blksize_shift = blksize_shift;
 		sandev->is_cdrom = 1;
 	}
@@ -867,11 +878,12 @@ struct san_device * alloc_sandev ( struct uri **uris, unsigned int count,
  */
 int register_sandev ( struct san_device *sandev, unsigned int drive,
 		      unsigned int flags ) {
+	struct san_device *before;
 	int rc;
 
 	/* Check that drive number is not in use */
 	if ( sandev_find ( drive ) != NULL ) {
-		DBGC ( sandev, "SAN %#02x is already in use\n", drive );
+		DBGC ( sandev->drive, "SAN %#02x is already in use\n", drive );
 		rc = -EADDRINUSE;
 		goto err_in_use;
 	}
@@ -900,9 +912,13 @@ int register_sandev ( struct san_device *sandev, unsigned int drive,
 	if ( ( rc = sandev_parse_iso9660 ( sandev ) ) != 0 )
 		goto err_iso9660;
 
-	/* Add to list of SAN devices */
-	list_add_tail ( &sandev->list, &san_devices );
-	DBGC ( sandev, "SAN %#02x registered\n", sandev->drive );
+	/* Add to list of SAN devices, in drive order */
+	for_each_sandev ( before ) {
+		if ( before->drive > sandev->drive )
+			break;
+	}
+	list_add_tail ( &sandev->list, &before->list );
+	DBGC ( sandev->drive, "SAN %#02x registered\n", sandev->drive );
 
 	return 0;
 
@@ -936,7 +952,7 @@ void unregister_sandev ( struct san_device *sandev ) {
 	/* Remove ACPI descriptors */
 	sandev_undescribe ( sandev );
 
-	DBGC ( sandev, "SAN %#02x unregistered\n", sandev->drive );
+	DBGC ( sandev->drive, "SAN %#02x unregistered\n", sandev->drive );
 }
 
 /** The "san-drive" setting */

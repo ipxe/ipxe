@@ -24,6 +24,7 @@
 FILE_LICENCE ( MIT );
 
 #include <stddef.h>
+#include <string.h>
 #include <byteswap.h>
 #include <ipxe/io.h>
 #include <ipxe/netdevice.h>

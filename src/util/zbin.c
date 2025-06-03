@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <lzma.h>
+#include <elf.h>
 
 #define DEBUG 0
 
@@ -16,6 +17,67 @@
 /* LZMA preset choice.  This is a policy decision */
 #define LZMA_PRESET ( LZMA_PRESET_DEFAULT | LZMA_PRESET_EXTREME )
 
+#undef ELF_R_TYPE
+
+#ifdef ELF32
+#define Elf_Addr Elf32_Addr
+#define Elf_Rel Elf32_Rel
+#define Elf_Rela Elf32_Rela
+#define ELF_R_TYPE ELF32_R_TYPE
+typedef uint32_t zrel_t;
+#endif
+
+#ifdef ELF64
+#define Elf_Addr Elf64_Addr
+#define Elf_Rel Elf64_Rel
+#define Elf_Rela Elf64_Rela
+#define ELF_R_TYPE ELF64_R_TYPE
+typedef uint64_t zrel_t;
+#endif
+
+/* Provide constants missing on some platforms */
+#ifndef EM_RISCV
+#define EM_RISCV 243
+#endif
+#ifndef R_RISCV_NONE
+#define R_RISCV_NONE 0
+#endif
+#ifndef R_RISCV_RELATIVE
+#define R_RISCV_RELATIVE 3
+#endif
+
+#define ELF_MREL( mach, type ) ( (mach) | ( (type) << 16 ) )
+
+/* Compressed relocation records
+ *
+ * Based on ELF Relr (which is not yet sufficiently widely supported
+ * to be usable), and optimised slightly for iPXE.  Each record is a
+ * single machine word comprising the bit pattern:
+ *
+ *     NSSS...SSSSRRR...RRRRRRRRRRRRRR
+ *
+ * where:
+ *
+ * "N" is a single bit (the MSB).  If N=0 then there are 19 "S" bits,
+ * otherwise there are zero "S" bits.  All remaining bits are "R"
+ * bits.
+ *
+ * "SSS...SSSS" is the number of machine words to skip.  (If there are
+ * no "S" bits, then the number of machine words to skip is zero.)
+ *
+ * Each "R" bit represents a potential machine word relocation.  If
+ * R=1 then a relocation is to be applied.
+ *
+ * The record list is terminated by a record with N=0 and S=0.
+ */
+#define ZREL_BITS ( 8 * sizeof ( zrel_t ) )
+#define ZREL_NO_SKIP_LIMIT ( ZREL_BITS - 1 )
+#define ZREL_NO_SKIP_FLAG ( 1ULL << ZREL_NO_SKIP_LIMIT )
+#define ZREL_SKIP_BITS 19
+#define ZREL_SKIP_LIMIT ( ZREL_NO_SKIP_LIMIT - ZREL_SKIP_BITS )
+#define ZREL_SKIP( x ) ( ( ( unsigned long long ) (x) ) << ZREL_SKIP_LIMIT )
+#define ZREL_SKIP_MAX ( ( 1ULL << ZREL_SKIP_BITS ) - 1 )
+
 struct input_file {
 	void *buf;
 	size_t len;
@@ -26,6 +88,7 @@ struct output_file {
 	size_t len;
 	size_t hdr_len;
 	size_t max_len;
+	uintptr_t base;
 };
 
 struct zinfo_common {
@@ -61,12 +124,27 @@ struct zinfo_add {
 	uint32_t pad;
 };
 
+struct zinfo_base {
+	char type[4];
+	uint32_t pad;
+	uint64_t base;
+};
+
+struct zinfo_zrel {
+	char type[4];
+	uint32_t offset;
+	uint32_t len;
+	uint32_t machine;
+};
+
 union zinfo_record {
 	struct zinfo_common common;
 	struct zinfo_copy copy;
 	struct zinfo_pack pack;
 	struct zinfo_payload payload;
 	struct zinfo_add add;
+	struct zinfo_base base;
+	struct zinfo_zrel zrel;
 };
 
 struct zinfo_file {
@@ -513,6 +591,166 @@ static int process_zinfo_appl ( struct input_file *input,
 				   &zinfo->add, output->hdr_len, 4 );
 }
 
+static int process_zinfo_base ( struct input_file *input
+					__attribute__ (( unused )),
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	struct zinfo_base *base = &zinfo->base;
+
+	if ( DEBUG ) {
+		fprintf ( stderr, "BASE %#llx\n",
+			  ( ( unsigned long long ) base->base ) );
+	}
+
+	output->base = base->base;
+	return 0;
+}
+
+static int process_zinfo_zrel ( struct input_file *input,
+				struct output_file *output,
+				union zinfo_record *zinfo ) {
+	struct zinfo_zrel *zrel = &zinfo->zrel;
+	size_t start_len = output->len;
+	union {
+		const Elf_Rel *rel;
+		const Elf_Rela *rela;
+		void *raw;
+	} erel;
+	Elf_Addr *address;
+	Elf_Addr addend;
+	size_t remaining;
+	size_t stride;
+	size_t offset;
+	size_t prev;
+	zrel_t *records;
+	zrel_t *record;
+	unsigned long base;
+	unsigned long limit;
+	unsigned long delta;
+	unsigned int type;
+
+	/* Check input length */
+	if ( ( zrel->offset + zrel->len ) > input->len ) {
+		fprintf ( stderr, "Input buffer overrun on relocations\n" );
+		return -1;
+	}
+
+	/* Align output and check length */
+	output->len = align ( output->len, sizeof ( *address ) );
+	if ( output->len > output->max_len ) {
+		fprintf ( stderr, "Output buffer overrun on relocations\n" );
+		return -1;
+	}
+
+	/* Calculate stride based on relocation type */
+	switch ( zrel->machine ) {
+	case EM_RISCV:
+		stride = sizeof ( *erel.rela );
+		break;
+	default:
+		fprintf ( stderr, "Unsupported machine type %d\n",
+			  zrel->machine );
+		return -1;
+	}
+
+	/* Apply dynamic relocations and build compressed relocation records */
+	records = ( output->buf + output->len );
+	record = ( records - 1 );
+	base = 0;
+	limit = 0;
+	prev = 0;
+	for ( remaining = zrel->len, erel.raw = ( input->buf + zrel->offset ) ;
+	      remaining >= stride ; remaining -= stride, erel.raw += stride ) {
+
+		/* Parse ELF relocation record */
+		type = ELF_R_TYPE ( erel.rel->r_info );
+	        offset = ( erel.rel->r_offset - output->base );
+
+		/* Handle relocation type */
+		switch ( ELF_MREL ( zrel->machine, type ) ) {
+		case ELF_MREL ( EM_RISCV, R_RISCV_NONE ):
+			continue;
+		case ELF_MREL ( EM_RISCV, R_RISCV_RELATIVE ):
+			addend = erel.rela->r_addend;
+			break;
+		default:
+			fprintf ( stderr, "Unsupported relocation type %d\n",
+				  type );
+			return -1;
+		}
+
+		/* Apply dynamic relocation */
+		if ( offset > output->len ) {
+			fprintf ( stderr, "Relocation outside output\n" );
+			return -1;
+		}
+		if ( ( offset % sizeof ( *address ) ) != 0 ) {
+			fprintf ( stderr, "Misaligned relocation\n" );
+			return -1;
+		}
+		address = ( output->buf + offset );
+		if ( stride == sizeof ( *erel.rela ) )
+			*address = addend;
+
+		/* Construct compressed relocation record */
+		if ( prev && ( offset <= prev ) ) {
+			fprintf ( stderr, "Unsorted relocation\n" );
+			return -1;
+		}
+		prev = offset;
+		delta = ( ( offset / sizeof ( *address ) ) - base );
+		while ( delta >= limit ) {
+			output->len += sizeof ( *record );
+			if ( output->len > output->max_len ) {
+				fprintf ( stderr, "Output buffer overrun on "
+					  "relocation\n" );
+				return -1;
+			}
+			record++;
+			base += limit;
+			delta -= limit;
+			if ( delta < ZREL_SKIP_BITS ) {
+				*record = ZREL_NO_SKIP_FLAG;
+				limit = ZREL_NO_SKIP_LIMIT;
+			} else if ( delta <= ZREL_SKIP_MAX ) {
+				*record = ZREL_SKIP ( delta );
+				base += delta;
+				delta = 0;
+				limit = ZREL_SKIP_LIMIT;
+			} else {
+				*record = ZREL_SKIP ( ZREL_SKIP_MAX );
+				base += ZREL_SKIP_MAX;
+				delta -= ZREL_SKIP_MAX;
+				limit = ZREL_SKIP_LIMIT;
+			}
+		}
+		*record |= ( 1ULL << delta );
+	}
+
+	/* Convert final record to terminator or add terminator as needed */
+	if ( ( record >= records ) &&
+	     ( ( *record & ZREL_SKIP ( ZREL_SKIP_MAX ) ) == 0 ) ) {
+		*record &= ~ZREL_NO_SKIP_FLAG;
+	} else {
+		output->len += sizeof ( *record );
+		if ( output->len > output->max_len ) {
+			fprintf ( stderr, "Output buffer overrun on "
+				  "relocation\n" );
+			return -1;
+		}
+		record++;
+		*record = 0;
+	}
+
+	if ( DEBUG ) {
+		fprintf ( stderr, "ZREL [%#x,%#x) to [%#zx,%#zx)\n",
+			  zrel->offset, ( zrel->offset + zrel->len ),
+			  start_len, output->len );
+	}
+
+	return 0;
+}
+
 struct zinfo_processor {
 	char *type;
 	int ( * process ) ( struct input_file *input,
@@ -536,6 +774,8 @@ static struct zinfo_processor zinfo_processors[] = {
 	{ "APPB", process_zinfo_appb },
 	{ "APPW", process_zinfo_appw },
 	{ "APPL", process_zinfo_appl },
+	{ "BASE", process_zinfo_base },
+	{ "ZREL", process_zinfo_zrel },
 };
 
 static int process_zinfo ( struct input_file *input,

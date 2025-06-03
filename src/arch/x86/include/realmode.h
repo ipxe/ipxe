@@ -2,7 +2,9 @@
 #define REALMODE_H
 
 #include <stdint.h>
+#include <string.h>
 #include <registers.h>
+#include <librm.h>
 #include <ipxe/uaccess.h>
 
 /*
@@ -65,15 +67,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 /**
- * Convert segment:offset address to user buffer
+ * Convert segment:offset address to virtual address
  *
  * @v segment		Real-mode segment
  * @v offset		Real-mode offset
- * @ret buffer		User buffer
+ * @ret virt		Virtual address
  */
-static inline __always_inline userptr_t
-real_to_user ( unsigned int segment, unsigned int offset ) {
-	return ( phys_to_user ( ( segment << 4 ) + offset ) );
+static inline __always_inline void *
+real_to_virt ( unsigned int segment, unsigned int offset ) {
+	return ( phys_to_virt ( ( segment << 4 ) + offset ) );
 }
 
 /**
@@ -87,7 +89,7 @@ real_to_user ( unsigned int segment, unsigned int offset ) {
 static inline __always_inline void
 copy_to_real ( unsigned int dest_seg, unsigned int dest_off,
 	       void *src, size_t n ) {
-	copy_to_user ( real_to_user ( dest_seg, dest_off ), 0, src, n );
+	memcpy ( real_to_virt ( dest_seg, dest_off ), src, n );
 }
 
 /**
@@ -101,7 +103,7 @@ copy_to_real ( unsigned int dest_seg, unsigned int dest_off,
 static inline __always_inline void
 copy_from_real ( void *dest, unsigned int src_seg,
 		 unsigned int src_off, size_t n ) {
-	copy_from_user ( dest, real_to_user ( src_seg, src_off ), 0, n );
+	memcpy ( dest, real_to_virt ( src_seg, src_off ), n );
 }
 
 /**

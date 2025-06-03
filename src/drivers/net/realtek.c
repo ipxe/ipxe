@@ -420,6 +420,16 @@ static int realtek_phy_reset ( struct realtek_nic *rtl ) {
 		 */
 	}
 
+	/* Some cards (e.g. RTL8211B) have a hardware errata that
+	 * requires the MII_MMD_DATA register to be cleared before the
+	 * link will come up.
+	 */
+	if ( ( rc = mii_write ( &rtl->mii, MII_MMD_DATA, 0 ) ) != 0 ) {
+		/* Ignore failures, since the register may not be
+		 * present on all PHYs.
+		 */
+	}
+
 	/* Restart autonegotiation */
 	if ( ( rc = mii_restart ( &rtl->mii ) ) != 0 ) {
 		DBGC ( rtl, "REALTEK %p could not restart MII: %s\n",
@@ -1057,11 +1067,15 @@ static void realtek_detect ( struct realtek_nic *rtl ) {
 	 * Note that enabling DAC seems to cause bizarre behaviour
 	 * (lockups, garbage data on the wire) on some systems, even
 	 * if only 32-bit addresses are used.
+	 *
+	 * Disable VLAN offload, since some cards seem to have it
+	 * enabled by default.
 	 */
 	cpcr = readw ( rtl->regs + RTL_CPCR );
 	cpcr |= ( RTL_CPCR_MULRW | RTL_CPCR_CPRX | RTL_CPCR_CPTX );
 	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
 		cpcr |= RTL_CPCR_DAC;
+	cpcr &= ~RTL_CPCR_VLAN;
 	writew ( cpcr, rtl->regs + RTL_CPCR );
 	check_cpcr = readw ( rtl->regs + RTL_CPCR );
 

@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <ctype.h>
 #include <ipxe/image.h>
@@ -46,21 +47,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static int pnm_ascii ( struct image *image, struct pnm_context *pnm ) {
 	char buf[ pnm->ascii_len + 1 /* NUL */ ];
 	char *endp;
+	char ch;
 	size_t len;
 	int value;
 	int in_comment = 0;
 
 	/* Skip any leading whitespace and comments */
 	for ( ; pnm->offset < image->len ; pnm->offset++ ) {
-		copy_from_user ( &buf[0], image->data, pnm->offset,
-				 sizeof ( buf[0] ) );
+		ch = *( ( ( const uint8_t * ) image->data ) + pnm->offset );
 		if ( in_comment ) {
-			if ( buf[0] == '\n' )
+			if ( ch == '\n' )
 				in_comment = 0;
 		} else {
-			if ( buf[0] == '#' ) {
+			if ( ch == '#' ) {
 				in_comment = 1;
-			} else if ( ! isspace ( buf[0] ) ) {
+			} else if ( ! isspace ( ch ) ) {
 				break;
 			}
 		}
@@ -76,7 +77,7 @@ static int pnm_ascii ( struct image *image, struct pnm_context *pnm ) {
 	/* Copy ASCII value to buffer and ensure string is NUL-terminated */
 	if ( len > ( sizeof ( buf ) - 1 /* NUL */ ) )
 		len = ( sizeof ( buf ) - 1 /* NUL */ );
-	copy_from_user ( buf, image->data, pnm->offset, len );
+	memcpy ( buf, ( image->data + pnm->offset ), len );
 	buf[len] = '\0';
 
 	/* Parse value and update offset */
@@ -104,7 +105,7 @@ static int pnm_ascii ( struct image *image, struct pnm_context *pnm ) {
  * @ret value		Value, or negative error
  */
 static int pnm_binary ( struct image *image, struct pnm_context *pnm ) {
-	uint8_t value;
+	const uint8_t *value;
 
 	/* Sanity check */
 	if ( pnm->offset == image->len ) {
@@ -114,10 +115,8 @@ static int pnm_binary ( struct image *image, struct pnm_context *pnm ) {
 	}
 
 	/* Extract value */
-	copy_from_user ( &value, image->data, pnm->offset, sizeof ( value ) );
-	pnm->offset++;
-
-	return value;
+	value = ( image->data + pnm->offset++ );
+	return *value;
 }
 
 /**
@@ -189,15 +188,15 @@ static uint32_t pnm_pixmap ( uint32_t composite, unsigned int index __unused ) {
 static int pnm_data ( struct image *image, struct pnm_context *pnm,
 		      struct pixel_buffer *pixbuf ) {
 	struct pnm_type *type = pnm->type;
-	size_t offset = 0;
+	unsigned int pixels = pixbuf->pixels;
+	unsigned int index = 0;
 	unsigned int xpos = 0;
 	int scalar;
 	uint32_t composite;
-	uint32_t rgb;
 	unsigned int i;
 
 	/* Fill pixel buffer */
-	while ( offset < pixbuf->len ) {
+	while ( index < pixels ) {
 
 		/* Extract a scaled composite scalar value from the file */
 		composite = 0;
@@ -213,15 +212,12 @@ static int pnm_data ( struct image *image, struct pnm_context *pnm,
 
 		/* Extract 24-bit RGB values from composite value */
 		for ( i = 0 ; i < type->packing ; i++ ) {
-			if ( offset >= pixbuf->len ) {
+			if ( index >= pixels ) {
 				DBGC ( image, "PNM %s has too many pixels\n",
 				       image->name );
 				return -EINVAL;
 			}
-			rgb = type->rgb ( composite, i );
-			copy_to_user ( pixbuf->data, offset, &rgb,
-				       sizeof ( rgb ) );
-			offset += sizeof ( rgb );
+			pixbuf->data[index++] = type->rgb ( composite, i );
 			if ( ++xpos == pixbuf->width ) {
 				xpos = 0;
 				break;
@@ -287,19 +283,19 @@ static struct pnm_type pnm_types[] = {
  * @ret type		PNM image type, or NULL if not found
  */
 static struct pnm_type * pnm_type ( struct image *image ) {
-	struct pnm_signature signature;
+	const struct pnm_signature *signature;
 	struct pnm_type *type;
 	unsigned int i;
 
 	/* Extract signature */
-	assert ( image->len >= sizeof ( signature ) );
-	copy_from_user ( &signature, image->data, 0, sizeof ( signature ) );
+	assert ( image->len >= sizeof ( *signature ) );
+	signature = image->data;
 
 	/* Check for supported types */
 	for ( i = 0 ; i < ( sizeof ( pnm_types ) /
 			    sizeof ( pnm_types[0] ) ) ; i++ ) {
 		type = &pnm_types[i];
-		if ( type->type == signature.type )
+		if ( type->type == signature->type )
 			return type;
 	}
 	return NULL;
@@ -390,23 +386,23 @@ static int pnm_pixbuf ( struct image *image, struct pixel_buffer **pixbuf ) {
  * @ret rc		Return status code
  */
 static int pnm_probe ( struct image *image ) {
-	struct pnm_signature signature;
+	const struct pnm_signature *signature;
 
 	/* Sanity check */
-	if ( image->len < sizeof ( signature ) ) {
+	if ( image->len < sizeof ( *signature ) ) {
 		DBGC ( image, "PNM %s is too short\n", image->name );
 		return -ENOEXEC;
 	}
 
 	/* Check signature */
-	copy_from_user ( &signature, image->data, 0, sizeof ( signature ) );
-	if ( ! ( ( signature.magic == PNM_MAGIC ) &&
-		 ( isdigit ( signature.type ) ) &&
-		 ( isspace ( signature.space ) ) ) ) {
+	signature = image->data;
+	if ( ! ( ( signature->magic == PNM_MAGIC ) &&
+		 ( isdigit ( signature->type ) ) &&
+		 ( isspace ( signature->space ) ) ) ) {
 		DBGC ( image, "PNM %s has invalid signature\n", image->name );
 		return -ENOEXEC;
 	}
-	DBGC ( image, "PNM %s is type %c\n", image->name, signature.type );
+	DBGC ( image, "PNM %s is type %c\n", image->name, signature->type );
 
 	return 0;
 }

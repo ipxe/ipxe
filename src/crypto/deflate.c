@@ -28,7 +28,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <assert.h>
 #include <ctype.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/deflate.h>
 
 /** @file
@@ -300,24 +299,21 @@ static int deflate_alphabet ( struct deflate *deflate,
  * Attempt to accumulate bits from input stream
  *
  * @v deflate		Decompressor
- * @v in		Compressed input data
  * @v target		Number of bits to accumulate
  * @ret excess		Number of excess bits accumulated (may be negative)
  */
 static int deflate_accumulate ( struct deflate *deflate,
-				struct deflate_chunk *in,
 				unsigned int target ) {
 	uint8_t byte;
 
 	while ( deflate->bits < target ) {
 
 		/* Check for end of input */
-		if ( in->offset >= in->len )
+		if ( deflate->in == deflate->end )
 			break;
 
 		/* Acquire byte from input */
-		copy_from_user ( &byte, in->data, in->offset++,
-				 sizeof ( byte ) );
+		byte = *(deflate->in++);
 		deflate->accumulator = ( deflate->accumulator |
 					 ( byte << deflate->bits ) );
 		deflate->rotalumucca = ( deflate->rotalumucca |
@@ -359,12 +355,10 @@ static int deflate_consume ( struct deflate *deflate, unsigned int count ) {
  * Attempt to extract a fixed number of bits from input stream
  *
  * @v deflate		Decompressor
- * @v in		Compressed input data
  * @v target		Number of bits to extract
  * @ret data		Extracted bits (or negative if not yet accumulated)
  */
-static int deflate_extract ( struct deflate *deflate, struct deflate_chunk *in,
-			     unsigned int target ) {
+static int deflate_extract ( struct deflate *deflate, unsigned int target ) {
 	int excess;
 	int data;
 
@@ -373,7 +367,7 @@ static int deflate_extract ( struct deflate *deflate, struct deflate_chunk *in,
 		return 0;
 
 	/* Attempt to accumulate bits */
-	excess = deflate_accumulate ( deflate, in, target );
+	excess = deflate_accumulate ( deflate, target );
 	if ( excess < 0 )
 		return excess;
 
@@ -389,12 +383,10 @@ static int deflate_extract ( struct deflate *deflate, struct deflate_chunk *in,
  * Attempt to decode a Huffman-coded symbol from input stream
  *
  * @v deflate		Decompressor
- * @v in		Compressed input data
  * @v alphabet		Huffman alphabet
  * @ret code		Raw code (or negative if not yet accumulated)
  */
 static int deflate_decode ( struct deflate *deflate,
-			    struct deflate_chunk *in,
 			    struct deflate_alphabet *alphabet ) {
 	struct deflate_huf_symbols *huf_sym;
 	uint16_t huf;
@@ -407,7 +399,7 @@ static int deflate_decode ( struct deflate *deflate,
 	 * even if the stream still contains some complete
 	 * Huffman-coded symbols.
 	 */
-	deflate_accumulate ( deflate, in, DEFLATE_HUFFMAN_BITS );
+	deflate_accumulate ( deflate, DEFLATE_HUFFMAN_BITS );
 
 	/* Normalise the bit-reversed accumulated value to 16 bits */
 	huf = ( deflate->rotalumucca >> 16 );
@@ -449,24 +441,22 @@ static void deflate_discard_to_byte ( struct deflate *deflate ) {
  * Copy data to output buffer (if available)
  *
  * @v out		Output data buffer
- * @v start		Source data
- * @v offset		Starting offset within source data
+ * @v in		Input data
  * @v len		Length to copy
  */
-static void deflate_copy ( struct deflate_chunk *out,
-			   userptr_t start, size_t offset, size_t len ) {
-	size_t out_offset = out->offset;
+static void deflate_copy ( struct deflate_chunk *out, const void *in,
+			   size_t len ) {
+	const uint8_t *in_byte = in;
+	uint8_t *out_byte = ( out->data + out->offset );
 	size_t copy_len;
 
 	/* Copy data one byte at a time, to allow for overlap */
-	if ( out_offset < out->len ) {
-		copy_len = ( out->len - out_offset );
+	if ( out->offset < out->len ) {
+		copy_len = ( out->len - out->offset );
 		if ( copy_len > len )
 			copy_len = len;
-		while ( copy_len-- ) {
-			memcpy_user ( out->data, out_offset++,
-				      start, offset++, 1 );
-		}
+		while ( copy_len-- )
+			*(out_byte++) = *(in_byte++);
 	}
 	out->offset += len;
 }
@@ -475,7 +465,8 @@ static void deflate_copy ( struct deflate_chunk *out,
  * Inflate compressed data
  *
  * @v deflate		Decompressor
- * @v in		Compressed input data
+ * @v data		Compressed input data
+ * @v len		Length of compressed input data
  * @v out		Output data buffer
  * @ret rc		Return status code
  *
@@ -489,9 +480,12 @@ static void deflate_copy ( struct deflate_chunk *out,
  * caller can use this to find the length of the decompressed data
  * before allocating the output data buffer.
  */
-int deflate_inflate ( struct deflate *deflate,
-		      struct deflate_chunk *in,
+int deflate_inflate ( struct deflate *deflate, const void *data, size_t len,
 		      struct deflate_chunk *out ) {
+
+	/* Store input data pointers */
+	deflate->in = data;
+	deflate->end = ( data + len );
 
 	/* This could be implemented more neatly if gcc offered a
 	 * means for enforcing tail recursion.
@@ -509,7 +503,7 @@ int deflate_inflate ( struct deflate *deflate,
 		int cm;
 
 		/* Extract header */
-		header = deflate_extract ( deflate, in, ZLIB_HEADER_BITS );
+		header = deflate_extract ( deflate, ZLIB_HEADER_BITS );
 		if ( header < 0 ) {
 			deflate->resume = &&zlib_header;
 			return 0;
@@ -538,7 +532,7 @@ int deflate_inflate ( struct deflate *deflate,
 		int btype;
 
 		/* Extract block header */
-		header = deflate_extract ( deflate, in, DEFLATE_HEADER_BITS );
+		header = deflate_extract ( deflate, DEFLATE_HEADER_BITS );
 		if ( header < 0 ) {
 			deflate->resume = &&block_header;
 			return 0;
@@ -571,17 +565,17 @@ int deflate_inflate ( struct deflate *deflate,
 	}
 
  literal_len: {
-		int len;
+		int llen;
 
 		/* Extract LEN field */
-		len = deflate_extract ( deflate, in, DEFLATE_LITERAL_LEN_BITS );
-		if ( len < 0 ) {
+		llen = deflate_extract ( deflate, DEFLATE_LITERAL_LEN_BITS );
+		if ( llen < 0 ) {
 			deflate->resume = &&literal_len;
 			return 0;
 		}
 
 		/* Record length of literal data */
-		deflate->remaining = len;
+		deflate->remaining = llen;
 		DBGC2 ( deflate, "DEFLATE %p literal block length %#04zx\n",
 			deflate, deflate->remaining );
 	}
@@ -590,7 +584,7 @@ int deflate_inflate ( struct deflate *deflate,
 		int nlen;
 
 		/* Extract NLEN field */
-		nlen = deflate_extract ( deflate, in, DEFLATE_LITERAL_LEN_BITS);
+		nlen = deflate_extract ( deflate, DEFLATE_LITERAL_LEN_BITS );
 		if ( nlen < 0 ) {
 			deflate->resume = &&literal_nlen;
 			return 0;
@@ -608,20 +602,20 @@ int deflate_inflate ( struct deflate *deflate,
 
  literal_data: {
 		size_t in_remaining;
-		size_t len;
+		size_t dlen;
 
 		/* Calculate available amount of literal data */
-		in_remaining = ( in->len - in->offset );
-		len = deflate->remaining;
-		if ( len > in_remaining )
-			len = in_remaining;
+		in_remaining = ( deflate->end - deflate->in );
+		dlen = deflate->remaining;
+		if ( dlen > in_remaining )
+			dlen = in_remaining;
 
 		/* Copy data to output buffer */
-		deflate_copy ( out, in->data, in->offset, len );
+		deflate_copy ( out, deflate->in, dlen );
 
 		/* Consume data from input buffer */
-		in->offset += len;
-		deflate->remaining -= len;
+		deflate->in += dlen;
+		deflate->remaining -= dlen;
 
 		/* Finish processing if we are blocked */
 		if ( deflate->remaining ) {
@@ -657,7 +651,7 @@ int deflate_inflate ( struct deflate *deflate,
 		unsigned int hclen;
 
 		/* Extract block header */
-		header = deflate_extract ( deflate, in, DEFLATE_DYNAMIC_BITS );
+		header = deflate_extract ( deflate, DEFLATE_DYNAMIC_BITS );
 		if ( header < 0 ) {
 			deflate->resume = &&dynamic_header;
 			return 0;
@@ -684,7 +678,7 @@ int deflate_inflate ( struct deflate *deflate,
 	}
 
  dynamic_codelen: {
-		int len;
+		int clen;
 		unsigned int index;
 		int rc;
 
@@ -692,18 +686,18 @@ int deflate_inflate ( struct deflate *deflate,
 		while ( deflate->length_index < deflate->length_target ) {
 
 			/* Extract code length length */
-			len = deflate_extract ( deflate, in,
-						DEFLATE_CODELEN_BITS );
-			if ( len < 0 ) {
+			clen = deflate_extract ( deflate,
+						 DEFLATE_CODELEN_BITS );
+			if ( clen < 0 ) {
 				deflate->resume = &&dynamic_codelen;
 				return 0;
 			}
 
 			/* Store code length */
 			index = deflate_codelen_map[deflate->length_index++];
-			deflate_set_length ( deflate, index, len );
+			deflate_set_length ( deflate, index, clen );
 			DBGCP ( deflate, "DEFLATE %p codelen for %d is %d\n",
-				deflate, index, len );
+				deflate, index, clen );
 		}
 
 		/* Generate code length alphabet */
@@ -722,25 +716,25 @@ int deflate_inflate ( struct deflate *deflate,
 	}
 
  dynamic_litlen_distance: {
-		int len;
+		int clen;
 		int index;
 
 		/* Decode literal/length/distance code length */
-		len = deflate_decode ( deflate, in, &deflate->distance_codelen);
-		if ( len < 0 ) {
+		clen = deflate_decode ( deflate, &deflate->distance_codelen );
+		if ( clen < 0 ) {
 			deflate->resume = &&dynamic_litlen_distance;
 			return 0;
 		}
 
 		/* Prepare for extra bits */
-		if ( len < 16 ) {
-			deflate->length = len;
+		if ( clen < 16 ) {
+			deflate->length = clen;
 			deflate->extra_bits = 0;
 			deflate->dup_len = 1;
 		} else {
 			static const uint8_t dup_len[3] = { 3, 3, 11 };
 			static const uint8_t extra_bits[3] = { 2, 3, 7 };
-			index = ( len - 16 );
+			index = ( clen - 16 );
 			deflate->dup_len = dup_len[index];
 			deflate->extra_bits = extra_bits[index];
 			if ( index )
@@ -753,7 +747,7 @@ int deflate_inflate ( struct deflate *deflate,
 		unsigned int dup_len;
 
 		/* Extract extra bits */
-		extra = deflate_extract ( deflate, in, deflate->extra_bits );
+		extra = deflate_extract ( deflate, deflate->extra_bits );
 		if ( extra < 0 ) {
 			deflate->resume = &&dynamic_litlen_distance_extra;
 			return 0;
@@ -830,7 +824,7 @@ int deflate_inflate ( struct deflate *deflate,
 		while ( 1 ) {
 
 			/* Decode Huffman code */
-			code = deflate_decode ( deflate, in, &deflate->litlen );
+			code = deflate_decode ( deflate, &deflate->litlen );
 			if ( code < 0 ) {
 				deflate->resume = &&lzhuf_litlen;
 				return 0;
@@ -844,8 +838,7 @@ int deflate_inflate ( struct deflate *deflate,
 				DBGCP ( deflate, "DEFLATE %p literal %#02x "
 					"('%c')\n", deflate, byte,
 					( isprint ( byte ) ? byte : '.' ) );
-				deflate_copy ( out, virt_to_user ( &byte ), 0,
-					       sizeof ( byte ) );
+				deflate_copy ( out, &byte, sizeof ( byte ) );
 
 			} else if ( code == DEFLATE_LITLEN_END ) {
 
@@ -876,7 +869,7 @@ int deflate_inflate ( struct deflate *deflate,
 		int extra;
 
 		/* Extract extra bits */
-		extra = deflate_extract ( deflate, in, deflate->extra_bits );
+		extra = deflate_extract ( deflate, deflate->extra_bits );
 		if ( extra < 0 ) {
 			deflate->resume = &&lzhuf_litlen_extra;
 			return 0;
@@ -892,8 +885,7 @@ int deflate_inflate ( struct deflate *deflate,
 		unsigned int bits;
 
 		/* Decode Huffman code */
-		code = deflate_decode ( deflate, in,
-					&deflate->distance_codelen );
+		code = deflate_decode ( deflate, &deflate->distance_codelen );
 		if ( code < 0 ) {
 			deflate->resume = &&lzhuf_distance;
 			return 0;
@@ -914,7 +906,7 @@ int deflate_inflate ( struct deflate *deflate,
 		size_t dup_distance;
 
 		/* Extract extra bits */
-		extra = deflate_extract ( deflate, in, deflate->extra_bits );
+		extra = deflate_extract ( deflate, deflate->extra_bits );
 		if ( extra < 0 ) {
 			deflate->resume = &&lzhuf_distance_extra;
 			return 0;
@@ -934,7 +926,7 @@ int deflate_inflate ( struct deflate *deflate,
 		}
 
 		/* Copy data, allowing for overlap */
-		deflate_copy ( out, out->data, ( out->offset - dup_distance ),
+		deflate_copy ( out, ( out->data + out->offset - dup_distance ),
 			       dup_len );
 
 		/* Process next literal/length symbol */
@@ -972,7 +964,7 @@ int deflate_inflate ( struct deflate *deflate,
 		 * cases involved in calling deflate_extract() to
 		 * obtain a full 32 bits.
 		 */
-		excess = deflate_accumulate ( deflate, in, ZLIB_ADLER32_BITS );
+		excess = deflate_accumulate ( deflate, ZLIB_ADLER32_BITS );
 		if ( excess < 0 ) {
 			deflate->resume = &&zlib_adler32;
 			return 0;

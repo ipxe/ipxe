@@ -18,66 +18,75 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 #include <stdlib.h>
+#include <ipxe/list.h>
 #include <ipxe/tables.h>
 #include <valgrind/memcheck.h>
 
-extern size_t freemem;
-extern size_t usedmem;
-extern size_t maxusedmem;
-
-extern void * __malloc alloc_memblock ( size_t size, size_t align,
-					size_t offset );
-extern void free_memblock ( void *ptr, size_t size );
-extern void mpopulate ( void *start, size_t len );
-extern void mdumpfree ( void );
-
 /**
- * Allocate memory with specified physical alignment and offset
+ * Address for zero-length memory blocks
  *
- * @v size		Requested size
- * @v align		Physical alignment
- * @v offset		Offset from physical alignment
- * @ret ptr		Memory, or NULL
+ * @c malloc(0) or @c realloc(ptr,0) will return the special value @c
+ * NOWHERE.  Calling @c free(NOWHERE) will have no effect.
  *
- * @c align must be a power of two.  @c size may not be zero.
+ * This is consistent with the ANSI C standards, which state that
+ * "either NULL or a pointer suitable to be passed to free()" must be
+ * returned in these cases.  Using a special non-NULL value means that
+ * the caller can take a NULL return value to indicate failure,
+ * without first having to check for a requested size of zero.
+ *
+ * Code outside of the memory allocators themselves does not ever need
+ * to refer to the actual value of @c NOWHERE; this is an internal
+ * definition.
  */
-static inline void * __malloc malloc_phys_offset ( size_t size,
-						   size_t phys_align,
-						   size_t offset ) {
-	void * ptr = alloc_memblock ( size, phys_align, offset );
-	if ( ptr && size )
-		VALGRIND_MALLOCLIKE_BLOCK ( ptr, size, 0, 0 );
-	return ptr;
-}
+#define NOWHERE ( ( void * ) ~( ( intptr_t ) 0 ) )
 
-/**
- * Allocate memory with specified physical alignment
- *
- * @v size		Requested size
- * @v align		Physical alignment
- * @ret ptr		Memory, or NULL
- *
- * @c align must be a power of two.  @c size may not be zero.
- */
-static inline void * __malloc malloc_phys ( size_t size, size_t phys_align ) {
-	return malloc_phys_offset ( size, phys_align, 0 );
-}
+/** A heap */
+struct heap {
+	/** List of free memory blocks */
+	struct list_head blocks;
 
-/**
- * Free memory allocated with malloc_phys()
- *
- * @v ptr		Memory allocated by malloc_phys(), or NULL
- * @v size		Size of memory, as passed to malloc_phys()
- *
- * Memory allocated with malloc_phys() can only be freed with
- * free_phys(); it cannot be freed with the standard free().
- *
- * If @c ptr is NULL, no action is taken.
- */
-static inline void free_phys ( void *ptr, size_t size ) {
-	VALGRIND_FREELIKE_BLOCK ( ptr, 0 );
-	free_memblock ( ptr, size );
-}
+	/** Alignment for free memory blocks */
+	size_t align;
+	/** Alignment for size-tracked allocations */
+	size_t ptr_align;
+
+	/** Total amount of free memory */
+	size_t freemem;
+	/** Total amount of used memory */
+	size_t usedmem;
+	/** Maximum amount of used memory */
+	size_t maxusedmem;
+
+	/**
+	 * Attempt to grow heap (optional)
+	 *
+	 * @v size		Failed allocation size
+	 * @ret grown		Heap has grown: retry allocations
+	 */
+	unsigned int ( * grow ) ( size_t size );
+	/**
+	 * Allow heap to shrink (optional)
+	 *
+	 * @v ptr		Start of free block
+	 * @v size		Size of free block
+	 * @ret shrunk		Heap has shrunk: discard block
+	 *
+	 * Note that the discarded block will be accessed once after
+	 * this method returns, in order to clear the free block
+	 * metadata.
+	 */
+	unsigned int ( * shrink ) ( void *ptr, size_t size );
+};
+
+extern void * heap_realloc ( struct heap *heap, void *old_ptr,
+			     size_t new_size );
+extern void heap_dump ( struct heap *heap );
+extern void heap_populate ( struct heap *heap, void *start, size_t len );
+
+extern void * __malloc malloc_phys_offset ( size_t size, size_t phys_align,
+					    size_t offset );
+extern void * __malloc malloc_phys ( size_t size, size_t phys_align );
+extern void free_phys ( void *ptr, size_t size );
 
 /** A cache discarder */
 struct cache_discarder {

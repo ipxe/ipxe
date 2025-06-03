@@ -11,11 +11,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stddef.h>
+#include <ipxe/uuid.h>
 #include <ipxe/settings.h>
 
 struct net_device;
 struct net_device_configurator;
-struct menu;
+struct dynamic_ui;
 struct parameters;
 
 /** A command-line option descriptor */
@@ -125,14 +126,23 @@ struct named_setting {
 	struct setting setting;
 };
 
+/** A UUID command-line option */
+struct uuid_option {
+	/** UUID */
+	union uuid *value;
+	/** Storage buffer */
+	union uuid buf;
+};
+
 extern int parse_string ( char *text, char **value );
 extern int parse_integer ( char *text, unsigned int *value );
 extern int parse_timeout ( char *text, unsigned long *value );
+extern int parse_uuid ( char *text, struct uuid_option *uuid );
 extern int parse_netdev ( char *text, struct net_device **netdev );
 extern int
 parse_netdev_configurator ( char *text,
 			    struct net_device_configurator **configurator );
-extern int parse_menu ( char *text, struct menu **menu );
+extern int parse_dynui ( char *text, struct dynamic_ui **dynui );
 extern int parse_flag ( char *text __unused, int *flag );
 extern int parse_key ( char *text, unsigned int *key );
 extern int parse_settings ( char *text, struct settings **settings );

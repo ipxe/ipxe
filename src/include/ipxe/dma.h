@@ -106,9 +106,9 @@ struct dma_operations {
 	 * @v align		Physical alignment
 	 * @ret addr		Buffer address, or NULL on error
 	 */
-	userptr_t ( * umalloc ) ( struct dma_device *dma,
-				  struct dma_mapping *map,
-				  size_t len, size_t align );
+	void * ( * umalloc ) ( struct dma_device *dma,
+			       struct dma_mapping *map,
+			       size_t len, size_t align );
 	/**
 	 * Unmap and free DMA-coherent buffer from external (user) memory
 	 *
@@ -118,7 +118,7 @@ struct dma_operations {
 	 * @v len		Length of buffer
 	 */
 	void ( * ufree ) ( struct dma_device *dma, struct dma_mapping *map,
-			   userptr_t addr, size_t len );
+			   void *addr, size_t len );
 	/**
 	 * Set addressable space mask
 	 *
@@ -265,11 +265,11 @@ DMAAPI_INLINE ( flat, dma_free ) ( struct dma_mapping *map,
  * @v align		Physical alignment
  * @ret addr		Buffer address, or NULL on error
  */
-static inline __always_inline userptr_t
+static inline __always_inline void *
 DMAAPI_INLINE ( flat, dma_umalloc ) ( struct dma_device *dma,
 				      struct dma_mapping *map,
 				      size_t len, size_t align __unused ) {
-	userptr_t addr;
+	void *addr;
 
 	/* Allocate buffer */
 	addr = umalloc ( len );
@@ -292,7 +292,7 @@ DMAAPI_INLINE ( flat, dma_umalloc ) ( struct dma_device *dma,
  */
 static inline __always_inline void
 DMAAPI_INLINE ( flat, dma_ufree ) ( struct dma_mapping *map,
-				    userptr_t addr, size_t len __unused ) {
+				    void *addr, size_t len __unused ) {
 
 	/* Free buffer */
 	ufree ( addr );
@@ -397,8 +397,8 @@ void dma_free ( struct dma_mapping *map, void *addr, size_t len );
  * @v align		Physical alignment
  * @ret addr		Buffer address, or NULL on error
  */
-userptr_t dma_umalloc ( struct dma_device *dma, struct dma_mapping *map,
-			size_t len, size_t align );
+void * dma_umalloc ( struct dma_device *dma, struct dma_mapping *map,
+		     size_t len, size_t align );
 
 /**
  * Unmap and free DMA-coherent buffer from external (user) memory
@@ -407,7 +407,7 @@ userptr_t dma_umalloc ( struct dma_device *dma, struct dma_mapping *map,
  * @v addr		Buffer address
  * @v len		Length of buffer
  */
-void dma_ufree ( struct dma_mapping *map, userptr_t addr, size_t len );
+void dma_ufree ( struct dma_mapping *map, void *addr, size_t len );
 
 /**
  * Set addressable space mask

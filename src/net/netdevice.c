@@ -55,9 +55,6 @@ struct list_head net_devices = LIST_HEAD_INIT ( net_devices );
 /** List of open network devices, in reverse order of opening */
 static struct list_head open_net_devices = LIST_HEAD_INIT ( open_net_devices );
 
-/** Network device index */
-static unsigned int netdev_index = 0;
-
 /** Network polling profiler */
 static struct profiler net_poll_profiler __profiler = { .name = "net.poll" };
 
@@ -113,16 +110,63 @@ static int netdev_has_ll_addr ( struct net_device *netdev ) {
 }
 
 /**
+ * Get offset of network device driver private data
+ *
+ * @v driver		Upper-layer driver, or NULL for device driver
+ * @ret offset		Offset of driver private data
+ */
+static size_t netdev_priv_offset ( struct net_driver *driver ) {
+	struct net_device *netdev;
+	unsigned int num_configs;
+	size_t offset;
+
+	/* Allow space for network device */
+	offset = sizeof ( *netdev );
+
+	/* Allow space for configurations */
+	num_configs = table_num_entries ( NET_DEVICE_CONFIGURATORS );
+	offset += ( num_configs * sizeof ( netdev->configs[0] ) );
+
+	/* Place variable-length device driver private data at end */
+	if ( ! driver )
+		driver = table_end ( NET_DRIVERS );
+
+	/* Allow space for preceding upper-layer drivers' private data */
+	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS ) {
+		offset += driver->priv_len;
+	}
+
+	/* Sanity check */
+	assert ( ( offset & ( sizeof ( void * ) - 1 ) ) == 0 );
+
+	return offset;
+}
+
+/**
+ * Get network device driver private data
+ *
+ * @v netdev		Network device
+ * @v driver		Upper-layer driver, or NULL for device driver
+ * @ret priv		Driver private data
+ */
+void * netdev_priv ( struct net_device *netdev, struct net_driver *driver ) {
+
+	return ( ( ( void * ) netdev ) + netdev_priv_offset ( driver ) );
+}
+
+/**
  * Notify drivers of network device or link state change
  *
  * @v netdev		Network device
  */
 static void netdev_notify ( struct net_device *netdev ) {
 	struct net_driver *driver;
+	void *priv;
 
 	for_each_table_entry ( driver, NET_DRIVERS ) {
+		priv = netdev_priv ( netdev, driver );
 		if ( driver->notify )
-			driver->notify ( netdev );
+			driver->notify ( netdev, priv );
 	}
 }
 
@@ -297,30 +341,45 @@ int netdev_tx ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	/* Enqueue packet */
 	list_add_tail ( &iobuf->list, &netdev->tx_queue );
 
+	/* Guard against re-entry */
+	if ( netdev->state & NETDEV_TX_IN_PROGRESS ) {
+		rc = -EBUSY;
+		goto err_busy;
+	}
+	netdev->state |= NETDEV_TX_IN_PROGRESS;
+
 	/* Avoid calling transmit() on unopened network devices */
 	if ( ! netdev_is_open ( netdev ) ) {
 		rc = -ENETUNREACH;
-		goto err;
+		goto err_closed;
 	}
 
 	/* Discard packet (for test purposes) if applicable */
 	if ( ( rc = inject_fault ( NETDEV_DISCARD_RATE ) ) != 0 )
-		goto err;
+		goto err_fault;
 
 	/* Map for DMA, if required */
 	if ( netdev->dma && ( ! dma_mapped ( &iobuf->map ) ) ) {
 		if ( ( rc = iob_map_tx ( iobuf, netdev->dma ) ) != 0 )
-			goto err;
+			goto err_map;
 	}
 
 	/* Transmit packet */
 	if ( ( rc = netdev->op->transmit ( netdev, iobuf ) ) != 0 )
-		goto err;
+		goto err_transmit;
+
+	/* Clear in-progress flag */
+	netdev->state &= ~NETDEV_TX_IN_PROGRESS;
 
 	profile_stop ( &net_tx_profiler );
 	return 0;
 
- err:
+ err_transmit:
+ err_map:
+ err_fault:
+ err_closed:
+	netdev->state &= ~NETDEV_TX_IN_PROGRESS;
+ err_busy:
 	netdev_tx_complete_err ( netdev, iobuf, rc );
 	return rc;
 }
@@ -552,8 +611,18 @@ void netdev_rx_err ( struct net_device *netdev,
  */
 void netdev_poll ( struct net_device *netdev ) {
 
-	if ( netdev_is_open ( netdev ) )
-		netdev->op->poll ( netdev );
+	/* Call poll() only on open (or insomniac) network devices */
+	if ( ! ( netdev->state & ( NETDEV_OPEN | NETDEV_INSOMNIAC ) ) )
+		return;
+
+	/* Guard against re-entry */
+	if ( netdev->state & NETDEV_POLL_IN_PROGRESS )
+		return;
+
+	/* Poll device */
+	netdev->state |= NETDEV_POLL_IN_PROGRESS;
+	netdev->op->poll ( netdev );
+	netdev->state &= ~NETDEV_POLL_IN_PROGRESS;
 }
 
 /**
@@ -634,7 +703,7 @@ static void free_netdev ( struct refcnt *refcnt ) {
 	struct net_device *netdev =
 		container_of ( refcnt, struct net_device, refcnt );
 
-	stop_timer ( &netdev->link_block );
+	assert ( ! timer_running ( &netdev->link_block ) );
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
 	clear_settings ( netdev_settings ( netdev ) );
@@ -653,14 +722,8 @@ struct net_device * alloc_netdev ( size_t priv_len ) {
 	struct net_device *netdev;
 	struct net_device_configurator *configurator;
 	struct net_device_configuration *config;
-	unsigned int num_configs;
-	size_t confs_len;
-	size_t total_len;
 
-	num_configs = table_num_entries ( NET_DEVICE_CONFIGURATORS );
-	confs_len = ( num_configs * sizeof ( netdev->configs[0] ) );
-	total_len = ( sizeof ( *netdev ) + confs_len + priv_len );
-	netdev = zalloc ( total_len );
+	netdev = zalloc ( netdev_priv_offset ( NULL ) + priv_len );
 	if ( netdev ) {
 		ref_init ( &netdev->refcnt, free_netdev );
 		netdev->link_rc = -EUNKNOWN_LINK_STATUS;
@@ -679,8 +742,7 @@ struct net_device * alloc_netdev ( size_t priv_len ) {
 				    &netdev->refcnt );
 			config++;
 		}
-		netdev->priv = ( ( ( void * ) netdev ) + sizeof ( *netdev ) +
-				 confs_len );
+		netdev->priv = netdev_priv ( netdev, NULL );
 	}
 	return netdev;
 }
@@ -698,7 +760,9 @@ int register_netdev ( struct net_device *netdev ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_driver *driver;
 	struct net_device *duplicate;
+	unsigned int i;
 	uint32_t seed;
+	void *priv;
 	int rc;
 
 	/* Set initial link-layer address, if not already set */
@@ -712,18 +776,6 @@ int register_netdev ( struct net_device *netdev ) {
 				ll_protocol->ll_header_len );
 	}
 
-	/* Reject network devices that are already available via a
-	 * different hardware device.
-	 */
-	duplicate = find_netdev_by_ll_addr ( ll_protocol, netdev->ll_addr );
-	if ( duplicate && ( duplicate->dev != netdev->dev ) ) {
-		DBGC ( netdev, "NETDEV rejecting duplicate (phys %s) of %s "
-		       "(phys %s)\n", netdev->dev->name, duplicate->name,
-		       duplicate->dev->name );
-		rc = -EEXIST;
-		goto err_duplicate;
-	}
-
 	/* Reject named network devices that already exist */
 	if ( netdev->name[0] && ( duplicate = find_netdev ( netdev->name ) ) ) {
 		DBGC ( netdev, "NETDEV rejecting duplicate name %s\n",
@@ -732,12 +784,21 @@ int register_netdev ( struct net_device *netdev ) {
 		goto err_duplicate;
 	}
 
-	/* Record device index and create device name */
+	/* Assign a unique device name, if not already set */
 	if ( netdev->name[0] == '\0' ) {
-		snprintf ( netdev->name, sizeof ( netdev->name ), "net%d",
-			   netdev_index );
+		for ( i = 0 ; ; i++ ) {
+			snprintf ( netdev->name, sizeof ( netdev->name ),
+				   "net%d", i );
+			if ( find_netdev ( netdev->name ) == NULL )
+				break;
+		}
 	}
-	netdev->index = ++netdev_index;
+
+	/* Assign a unique non-zero scope ID */
+	for ( netdev->scope_id = 1 ; ; netdev->scope_id++ ) {
+		if ( find_netdev_by_scope_id ( netdev->scope_id ) == NULL )
+			break;
+	}
 
 	/* Use least significant bits of the link-layer address to
 	 * improve the randomness of the (non-cryptographic) random
@@ -764,7 +825,9 @@ int register_netdev ( struct net_device *netdev ) {
 
 	/* Probe device */
 	for_each_table_entry ( driver, NET_DRIVERS ) {
-		if ( driver->probe && ( rc = driver->probe ( netdev ) ) != 0 ) {
+		priv = netdev_priv ( netdev, driver );
+		if ( driver->probe &&
+		     ( rc = driver->probe ( netdev, priv ) ) != 0 ) {
 			DBGC ( netdev, "NETDEV %s could not add %s device: "
 			       "%s\n", netdev->name, driver->name,
 			       strerror ( rc ) );
@@ -776,8 +839,9 @@ int register_netdev ( struct net_device *netdev ) {
 
  err_probe:
 	for_each_table_entry_continue_reverse ( driver, NET_DRIVERS ) {
+		priv = netdev_priv ( netdev, driver );
 		if ( driver->remove )
-			driver->remove ( netdev );
+			driver->remove ( netdev, priv );
 	}
 	clear_settings ( netdev_settings ( netdev ) );
 	unregister_settings ( netdev_settings ( netdev ) );
@@ -859,6 +923,9 @@ void netdev_close ( struct net_device *netdev ) {
 	/* Close the device */
 	netdev->op->close ( netdev );
 
+	/* Stop link block timer */
+	stop_timer ( &netdev->link_block );
+
 	/* Flush TX and RX queues */
 	netdev_tx_flush ( netdev );
 	netdev_rx_flush ( netdev );
@@ -873,14 +940,16 @@ void netdev_close ( struct net_device *netdev ) {
  */
 void unregister_netdev ( struct net_device *netdev ) {
 	struct net_driver *driver;
+	void *priv;
 
 	/* Ensure device is closed */
 	netdev_close ( netdev );
 
 	/* Remove device */
 	for_each_table_entry_reverse ( driver, NET_DRIVERS ) {
+		priv = netdev_priv ( netdev, driver );
 		if ( driver->remove )
-			driver->remove ( netdev );
+			driver->remove ( netdev, priv );
 	}
 
 	/* Unregister per-netdev configuration settings */
@@ -891,10 +960,6 @@ void unregister_netdev ( struct net_device *netdev ) {
 	DBGC ( netdev, "NETDEV %s unregistered\n", netdev->name );
 	list_del ( &netdev->list );
 	netdev_put ( netdev );
-
-	/* Reset network device index if no devices remain */
-	if ( list_empty ( &net_devices ) )
-		netdev_index = 0;
 }
 
 /** Enable or disable interrupts
@@ -937,17 +1002,17 @@ struct net_device * find_netdev ( const char *name ) {
 }
 
 /**
- * Get network device by index
+ * Get network device by scope ID
  *
  * @v index		Network device index
  * @ret netdev		Network device, or NULL
  */
-struct net_device * find_netdev_by_index ( unsigned int index ) {
+struct net_device * find_netdev_by_scope_id ( unsigned int scope_id ) {
 	struct net_device *netdev;
 
 	/* Identify network device by index */
 	list_for_each_entry ( netdev, &net_devices, list ) {
-		if ( netdev->index == index )
+		if ( netdev->scope_id == scope_id )
 			return netdev;
 	}
 
@@ -972,27 +1037,6 @@ struct net_device * find_netdev_by_location ( unsigned int bus_type,
 	}
 
 	return NULL;	
-}
-
-/**
- * Get network device by link-layer address
- *
- * @v ll_protocol	Link-layer protocol
- * @v ll_addr		Link-layer address
- * @ret netdev		Network device, or NULL
- */
-struct net_device * find_netdev_by_ll_addr ( struct ll_protocol *ll_protocol,
-					     const void *ll_addr ) {
-	struct net_device *netdev;
-
-	list_for_each_entry ( netdev, &net_devices, list ) {
-		if ( ( netdev->ll_protocol == ll_protocol ) &&
-		     ( memcmp ( netdev->ll_addr, ll_addr,
-				ll_protocol->ll_addr_len ) == 0 ) )
-			return netdev;
-	}
-
-	return NULL;
 }
 
 /**
@@ -1146,12 +1190,12 @@ static void net_step ( struct process *process __unused ) {
 }
 
 /**
- * Get the VLAN tag (when VLAN support is not present)
+ * Get the VLAN tag control information (when VLAN support is not present)
  *
  * @v netdev		Network device
  * @ret tag		0, indicating that device is not a VLAN device
  */
-__weak unsigned int vlan_tag ( struct net_device *netdev __unused ) {
+__weak unsigned int vlan_tci ( struct net_device *netdev __unused ) {
 	return 0;
 }
 

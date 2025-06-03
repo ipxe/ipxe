@@ -12,7 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/pci.h>
 #include <ipxe/ethernet.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/retry.h>
 #include <ipxe/i2c.h>
 #include <ipxe/bitbash.h>
@@ -158,6 +157,9 @@ struct exanic_rx_chunk {
 /** Receive status error mask */
 #define EXANIC_STATUS_ERROR_MASK 0x0f
 
+/** Number of receive chunks */
+#define EXANIC_RX_COUNT ( EXANIC_RX_LEN / sizeof ( struct exanic_rx_chunk ) )
+
 /** An ExaNIC I2C bus configuration */
 struct exanic_i2c_config {
 	/** GPIO bit for pulling SCL low */
@@ -194,7 +196,7 @@ struct exanic_port {
 	uint16_t *txf;
 
 	/** Receive region */
-	userptr_t rx;
+	struct exanic_rx_chunk *rx;
 	/** Receive consumer counter */
 	unsigned int rx_cons;
 	/** Receive I/O buffer (if any) */

@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/image.h>
@@ -65,7 +66,8 @@ struct pixel_buffer * alloc_pixbuf ( unsigned int width, unsigned int height ) {
 	ref_init ( &pixbuf->refcnt, free_pixbuf );
 	pixbuf->width = width;
 	pixbuf->height = height;
-	pixbuf->len = ( width * height * sizeof ( uint32_t ) );
+	pixbuf->pixels = ( width * height );
+	pixbuf->len = ( pixbuf->pixels * sizeof ( uint32_t ) );
 
 	/* Check for multiplication overflow */
 	if ( ( width != 0 ) &&

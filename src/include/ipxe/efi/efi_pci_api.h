@@ -33,13 +33,12 @@ extern int efipci_write ( struct pci_device *pci, unsigned long location,
 			  unsigned long value );
 
 /**
- * Determine number of PCI buses within system
+ * Check if PCI bus probing is allowed
  *
- * @ret num_bus		Number of buses
+ * @ret ok		Bus probing is allowed
  */
 static inline __always_inline int
-PCIAPI_INLINE ( efi, pci_num_bus ) ( void ) {
-	/* EFI does not want us to scan the PCI bus ourselves */
+PCIAPI_INLINE ( efi, pci_can_probe ) ( void ) {
 	return 0;
 }
 

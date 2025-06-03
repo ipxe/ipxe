@@ -96,12 +96,6 @@ static void arc4_xor ( void *ctxv, const void *srcv, void *dstv,
 	ctx->j = j;
 }
 
-static void arc4_setiv ( void *ctx __unused, const void *iv __unused )
-{
-	/* ARC4 does not use a fixed-length IV */
-}
-
-
 /**
  * Perform ARC4 encryption or decryption, skipping initial keystream bytes
  *
@@ -125,8 +119,11 @@ struct cipher_algorithm arc4_algorithm = {
 	.name = "ARC4",
 	.ctxsize = ARC4_CTX_SIZE,
 	.blocksize = 1,
+	.alignsize = 1,
+	.authsize = 0,
 	.setkey = arc4_setkey,
-	.setiv = arc4_setiv,
+	.setiv = cipher_null_setiv,
 	.encrypt = arc4_xor,
 	.decrypt = arc4_xor,
+	.auth = cipher_null_auth,
 };

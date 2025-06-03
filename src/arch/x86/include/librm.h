@@ -64,12 +64,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #else /* ASSEMBLY */
 
-#ifdef UACCESS_LIBRM
-#define UACCESS_PREFIX_librm
-#else
-#define UACCESS_PREFIX_librm __librm_
-#endif
-
 /**
  * Call C function from real-mode code
  *
@@ -78,114 +72,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define VIRT_CALL( function )						\
 	"pushl $( " _S2 ( VIRTUAL ( function ) ) " )\n\t"		\
 	"call virt_call\n\t"
-
-/* Variables in librm.S */
-extern const unsigned long virt_offset;
-
-/**
- * Convert physical address to user pointer
- *
- * @v phys_addr		Physical address
- * @ret userptr		User pointer
- */
-static inline __always_inline userptr_t
-UACCESS_INLINE ( librm, phys_to_user ) ( unsigned long phys_addr ) {
-
-	/* In a 64-bit build, any valid physical address is directly
-	 * usable as a virtual address, since the low 4GB is
-	 * identity-mapped.
-	 */
-	if ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) )
-		return phys_addr;
-
-	/* In a 32-bit build, subtract virt_offset */
-	return ( phys_addr - virt_offset );
-}
-
-/**
- * Convert user buffer to physical address
- *
- * @v userptr		User pointer
- * @v offset		Offset from user pointer
- * @ret phys_addr	Physical address
- */
-static inline __always_inline unsigned long
-UACCESS_INLINE ( librm, user_to_phys ) ( userptr_t userptr, off_t offset ) {
-	unsigned long addr = ( userptr + offset );
-
-	/* In a 64-bit build, any virtual address in the low 4GB is
-	 * directly usable as a physical address, since the low 4GB is
-	 * identity-mapped.
-	 */
-	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
-	     ( addr <= 0xffffffffUL ) )
-		return addr;
-
-	/* In a 32-bit build or in a 64-bit build with a virtual
-	 * address above 4GB: add virt_offset
-	 */
-	return ( addr + virt_offset );
-}
-
-static inline __always_inline userptr_t
-UACCESS_INLINE ( librm, virt_to_user ) ( volatile const void *addr ) {
-	return trivial_virt_to_user ( addr );
-}
-
-static inline __always_inline void *
-UACCESS_INLINE ( librm, user_to_virt ) ( userptr_t userptr, off_t offset ) {
-	return trivial_user_to_virt ( userptr, offset );
-}
-
-static inline __always_inline userptr_t
-UACCESS_INLINE ( librm, userptr_add ) ( userptr_t userptr, off_t offset ) {
-	return trivial_userptr_add ( userptr, offset );
-}
-
-static inline __always_inline off_t
-UACCESS_INLINE ( librm, userptr_sub ) ( userptr_t userptr,
-					userptr_t subtrahend ) {
-	return trivial_userptr_sub ( userptr, subtrahend );
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( librm, memcpy_user ) ( userptr_t dest, off_t dest_off,
-					userptr_t src, off_t src_off,
-					size_t len ) {
-	trivial_memcpy_user ( dest, dest_off, src, src_off, len );
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( librm, memmove_user ) ( userptr_t dest, off_t dest_off,
-					 userptr_t src, off_t src_off,
-					 size_t len ) {
-	trivial_memmove_user ( dest, dest_off, src, src_off, len );
-}
-
-static inline __always_inline int
-UACCESS_INLINE ( librm, memcmp_user ) ( userptr_t first, off_t first_off,
-					userptr_t second, off_t second_off,
-					size_t len ) {
-	return trivial_memcmp_user ( first, first_off, second, second_off, len);
-}
-
-static inline __always_inline void
-UACCESS_INLINE ( librm, memset_user ) ( userptr_t buffer, off_t offset,
-					int c, size_t len ) {
-	trivial_memset_user ( buffer, offset, c, len );
-}
-
-static inline __always_inline size_t
-UACCESS_INLINE ( librm, strlen_user ) ( userptr_t buffer, off_t offset ) {
-	return trivial_strlen_user ( buffer, offset );
-}
-
-static inline __always_inline off_t
-UACCESS_INLINE ( librm, memchr_user ) ( userptr_t buffer, off_t offset,
-					int c, size_t len ) {
-	return trivial_memchr_user ( buffer, offset, c, len );
-}
-
 
 /******************************************************************************
  *
@@ -244,14 +130,16 @@ extern const uint16_t __text16 ( rm_cs );
 extern const uint16_t __text16 ( rm_ds );
 #define rm_ds __use_text16 ( rm_ds )
 
-extern uint16_t copy_user_to_rm_stack ( userptr_t data, size_t size );
-extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
+extern uint16_t copy_to_rm_stack ( const void *data, size_t size );
+extern void remove_from_rm_stack ( void *data, size_t size );
 
 /* CODE_DEFAULT: restore default .code32/.code64 directive */
 #ifdef __x86_64__
 #define CODE_DEFAULT ".code64"
+#define STACK_DEFAULT "q"
 #else
 #define CODE_DEFAULT ".code32"
+#define STACK_DEFAULT "l"
 #endif
 
 /* LINE_SYMBOL: declare a symbol for the current source code line */
@@ -268,7 +156,7 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 
 /* REAL_CODE: declare a fragment of code that executes in real mode */
 #define REAL_CODE( asm_code_str )			\
-	"push $1f\n\t"					\
+	"push" STACK_DEFAULT " $1f\n\t"			\
 	"call real_call\n\t"				\
 	TEXT16_CODE ( "\n1:\n\t"			\
 		      asm_code_str			\
@@ -277,7 +165,7 @@ extern void remove_user_from_rm_stack ( userptr_t data, size_t size );
 
 /* PHYS_CODE: declare a fragment of code that executes in flat physical mode */
 #define PHYS_CODE( asm_code_str )			\
-	"push $1f\n\t"					\
+	"push" STACK_DEFAULT " $1f\n\t"			\
 	"call phys_call\n\t"				\
 	".section \".text.phys\", \"ax\", @progbits\n\t"\
 	"\n" LINE_SYMBOL "\n\t"				\
@@ -471,6 +359,27 @@ extern struct page_table io_pages;
  * 32-bit address space.
  */
 #define IO_BASE ( ( void * ) 0x100000000ULL )
+
+/** Startup IPI real-mode handler */
+extern char __text16_array ( sipi, [] );
+#define sipi __use_text16 ( sipi )
+
+/** Length of startup IPI real-mode handler */
+extern size_t ABS_SYMBOL ( sipi_len );
+#define sipi_len ABS_VALUE ( sipi_len )
+
+/** Startup IPI real-mode handler copy of real-mode data segment */
+extern uint16_t __text16 ( sipi_ds );
+#define sipi_ds __use_text16 ( sipi_ds )
+
+/** Startup IPI protected-mode handler (physical address) */
+extern uint32_t sipi_handler;
+
+/** Startup IPI register state */
+extern struct i386_regs sipi_regs;
+
+extern void setup_sipi ( unsigned int vector, uint32_t handler,
+			 struct i386_regs *regs );
 
 #endif /* ASSEMBLY */
 

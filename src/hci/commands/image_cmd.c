@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <getopt.h>
 #include <ipxe/image.h>
@@ -129,7 +130,7 @@ static int imgsingle_exec ( int argc, char **argv,
 					    &image ) ) != 0 )
 			goto err_acquire;
 	} else {
-		image = image_find_selected();
+		image = find_image_tag ( &selected_image );
 		if ( ! image ) {
 			printf ( "No image selected\n" );
 			goto err_acquire;

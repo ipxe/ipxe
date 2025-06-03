@@ -10,7 +10,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/ib_packet.h>
 #include "mlx_bitops.h"
 #include "MT25218_PRM.h"
@@ -492,7 +491,7 @@ struct arbel {
 	 * final teardown, in order to avoid memory map changes at
 	 * runtime.
 	 */
-	userptr_t firmware_area;
+	void *firmware_area;
 	/** ICM size */
 	size_t icm_len;
 	/** ICM AUX size */
@@ -503,7 +502,7 @@ struct arbel {
 	 * final teardown, in order to avoid memory map changes at
 	 * runtime.
 	 */
-	userptr_t icm;
+	void *icm;
 	/** Offset within ICM of doorbell records */
 	size_t db_rec_offset;
 	/** Doorbell records */

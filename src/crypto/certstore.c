@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #undef CERT
 #define CERT( _index, _path )						\
 	extern char stored_cert_ ## _index ## _data[];			\
-	extern char stored_cert_ ## _index ## _len[];			\
+	extern size_t ABS_SYMBOL ( stored_cert_ ## _index ## _len );	\
 	__asm__ ( ".section \".rodata\", \"a\", " PROGBITS "\n\t"	\
 		  "\nstored_cert_" #_index "_data:\n\t"			\
 		  ".incbin \"" _path "\"\n\t"				\
@@ -59,7 +59,7 @@ CERT_ALL
 #undef CERT
 #define CERT( _index, _path ) {						\
 	.data = stored_cert_ ## _index ## _data,			\
-	.len = ( size_t ) stored_cert_ ## _index ## _len, 		\
+	.len = ABS_VALUE_INIT ( stored_cert_ ## _index ## _len ), 	\
 },
 static struct asn1_cursor certstore_raw[] = {
 	CERT_ALL
@@ -69,66 +69,28 @@ static struct asn1_cursor certstore_raw[] = {
 static struct x509_certificate certstore_certs[ sizeof ( certstore_raw ) /
 						sizeof ( certstore_raw[0] ) ];
 
+/**
+ * Mark stored certificate as most recently used
+ *
+ * @v store		Certificate store
+ * @v cert		X.509 certificate
+ */
+static void certstore_found ( struct x509_chain *store,
+			      struct x509_certificate *cert ) {
+
+	/* Mark as most recently used */
+	list_del ( &cert->store.list );
+	list_add ( &cert->store.list, &store->links );
+	DBGC2 ( store, "CERTSTORE found certificate %s\n",
+		x509_name ( cert ) );
+}
+
 /** Certificate store */
 struct x509_chain certstore = {
 	.refcnt = REF_INIT ( ref_no_free ),
 	.links = LIST_HEAD_INIT ( certstore.links ),
+	.found = certstore_found,
 };
-
-/**
- * Mark stored certificate as most recently used
- *
- * @v cert		X.509 certificate
- * @ret cert		X.509 certificate
- */
-static struct x509_certificate *
-certstore_found ( struct x509_certificate *cert ) {
-
-	/* Mark as most recently used */
-	list_del ( &cert->store.list );
-	list_add ( &cert->store.list, &certstore.links );
-	DBGC2 ( &certstore, "CERTSTORE found certificate %s\n",
-		x509_name ( cert ) );
-
-	return cert;
-}
-
-/**
- * Find certificate in store
- *
- * @v raw		Raw certificate data
- * @ret cert		X.509 certificate, or NULL if not found
- */
-struct x509_certificate * certstore_find ( struct asn1_cursor *raw ) {
-	struct x509_certificate *cert;
-
-	/* Search for certificate within store */
-	list_for_each_entry ( cert, &certstore.links, store.list ) {
-		if ( asn1_compare ( raw, &cert->raw ) == 0 )
-			return certstore_found ( cert );
-	}
-	return NULL;
-}
-
-/**
- * Find certificate in store corresponding to a private key
- *
- * @v key		Private key
- * @ret cert		X.509 certificate, or NULL if not found
- */
-struct x509_certificate * certstore_find_key ( struct asn1_cursor *key ) {
-	struct x509_certificate *cert;
-
-	/* Search for certificate within store */
-	list_for_each_entry ( cert, &certstore.links, store.list ) {
-		if ( pubkey_match ( cert->signature_algorithm->pubkey,
-				    key->data, key->len,
-				    cert->subject.public_key.raw.data,
-				    cert->subject.public_key.raw.len ) == 0 )
-			return certstore_found ( cert );
-	}
-	return NULL;
-}
 
 /**
  * Add certificate to store
@@ -219,7 +181,7 @@ static void certstore_init ( void ) {
 
 		/* Skip if certificate already present in store */
 		raw = &certstore_raw[i];
-		if ( ( cert = certstore_find ( raw ) ) != NULL ) {
+		if ( ( cert = x509_find ( &certstore, raw ) ) != NULL ) {
 			DBGC ( &certstore, "CERTSTORE permanent certificate %d "
 			       "is a duplicate of %s\n", i, x509_name ( cert ));
 			continue;
@@ -304,3 +266,9 @@ static int certstore_apply_settings ( void ) {
 struct settings_applicator certstore_applicator __settings_applicator = {
 	.apply = certstore_apply_settings,
 };
+
+/* Drag in objects via certificate store */
+REQUIRING_SYMBOL ( certstore );
+
+/* Drag in alternative certificate sources */
+REQUIRE_OBJECT ( config_certs );

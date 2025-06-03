@@ -10,11 +10,34 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "mt" keyboard mapping */
-struct key_mapping mt_mapping[] __keymap = {
+/** "mt" basic remapping */
+static struct keymap_key mt_basic[] = {
+	{ 0x1c, 0x1e },	/* 0x1c => 0x1e */
 	{ 0x22, 0x40 },	/* '"' => '@' */
-	{ 0x23, 0x04 },	/* '#' => Ctrl-D */
 	{ 0x40, 0x22 },	/* '@' => '"' */
 	{ 0x5c, 0x23 },	/* '\\' => '#' */
 	{ 0x7c, 0x7e },	/* '|' => '~' */
+	{ 0, 0 }
+};
+
+/** "mt" AltGr remapping */
+static struct keymap_key mt_altgr[] = {
+	{ 0x26, 0x7b },	/* '&' => '{' */
+	{ 0x28, 0x5d },	/* '(' => ']' */
+	{ 0x29, 0x7d },	/* ')' => '}' */
+	{ 0x2a, 0x5b },	/* '*' => '[' */
+	{ 0x30, 0x7d },	/* '0' => '}' */
+	{ 0x37, 0x7b },	/* '7' => '{' */
+	{ 0x38, 0x5b },	/* '8' => '[' */
+	{ 0x39, 0x5d },	/* '9' => ']' */
+	{ 0x5c, 0x60 },	/* '\\' => '`' */
+	{ 0x7e, 0x60 },	/* '~' => '`' */
+	{ 0, 0 }
+};
+
+/** "mt" keyboard map */
+struct keymap mt_keymap __keymap = {
+	.name = "mt",
+	.basic = mt_basic,
+	.altgr = mt_altgr,
 };

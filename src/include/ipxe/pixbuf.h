@@ -11,7 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
 #include <ipxe/refcnt.h>
-#include <ipxe/uaccess.h>
 
 /** A pixel buffer */
 struct pixel_buffer {
@@ -22,7 +21,9 @@ struct pixel_buffer {
 	/** Height */
 	unsigned int height;
 	/** 32-bit (8:8:8:8) xRGB pixel data, in host-endian order */
-	userptr_t data;
+	uint32_t *data;
+	/** Total number of pixels */
+	unsigned int pixels;
 	/** Total length */
 	size_t len;
 };
@@ -47,6 +48,22 @@ pixbuf_get ( struct pixel_buffer *pixbuf ) {
 static inline __attribute__ (( always_inline )) void
 pixbuf_put ( struct pixel_buffer *pixbuf ) {
 	ref_put ( &pixbuf->refcnt );
+}
+
+/**
+ * Get pixel
+ *
+ * @v pixbuf		Pixel buffer
+ * @v x			X position
+ * @v y			Y position
+ * @ret pixel		Pixel
+ */
+static inline __attribute__ (( always_inline )) uint32_t *
+pixbuf_pixel ( struct pixel_buffer *pixbuf, unsigned int x, unsigned int y ) {
+	unsigned int index;
+
+	index = ( ( y * pixbuf->width ) + x );
+	return &pixbuf->data[index];
 }
 
 extern struct pixel_buffer * alloc_pixbuf ( unsigned int width,

@@ -24,11 +24,11 @@ FILE_LICENCE ( GPL2_ONLY )
 
 .equ	SYSSEG, 0x1000			/* system loaded at SYSSEG<<4 */
 
+	.section ".note.GNU-stack", "", @progbits
 	.org	0
-	.arch i386
-	.text
-	.section ".prefix", "ax", @progbits
 	.code16
+	.arch i386
+	.section ".prefix", "ax", @progbits
 	.globl	_dsk_start
 _dsk_start:
 

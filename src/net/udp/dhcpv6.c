@@ -40,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/crc32.h>
 #include <ipxe/errortab.h>
 #include <ipxe/ipv6.h>
-#include <ipxe/dhcp_arch.h>
+#include <ipxe/dhcparch.h>
 #include <ipxe/dhcpv6.h>
 
 /** @file
@@ -268,6 +268,8 @@ struct dhcpv6_settings {
 	struct settings settings;
 	/** Leased address */
 	struct in6_addr lease;
+	/** Router address */
+	struct in6_addr router;
 	/** Option list */
 	struct dhcpv6_option_list options;
 };
@@ -283,24 +285,20 @@ static int dhcpv6_applies ( struct settings *settings __unused,
 			    const struct setting *setting ) {
 
 	return ( ( setting->scope == &dhcpv6_scope ) ||
-		 ( setting_cmp ( setting, &ip6_setting ) == 0 ) );
+		 ( setting->scope == &ipv6_settings_scope ) );
 }
 
 /**
  * Fetch value of DHCPv6 leased address
  *
- * @v dhcpset		DHCPv6 settings
+ * @v dhcpv6set		DHCPv6 settings
  * @v data		Buffer to fill with setting data
  * @v len		Length of buffer
  * @ret len		Length of setting data, or negative error
  */
-static int dhcpv6_fetch_lease ( struct dhcpv6_settings *dhcpv6set,
-				void *data, size_t len ) {
+static int dhcpv6_fetch_ip6 ( struct dhcpv6_settings *dhcpv6set,
+			      void *data, size_t len ) {
 	struct in6_addr *lease = &dhcpv6set->lease;
-
-	/* Do nothing unless a leased address exists */
-	if ( IN6_IS_ADDR_UNSPECIFIED ( lease ) )
-		return -ENOENT;
 
 	/* Copy leased address */
 	if ( len > sizeof ( *lease ) )
@@ -309,6 +307,72 @@ static int dhcpv6_fetch_lease ( struct dhcpv6_settings *dhcpv6set,
 
 	return sizeof ( *lease );
 }
+
+/**
+ * Fetch value of DHCPv6 implicit address prefix length
+ *
+ * @v dhcpv6set		DHCPv6 settings
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int dhcpv6_fetch_len6 ( struct dhcpv6_settings *dhcpv6set __unused,
+			       void *data, size_t len ) {
+	uint8_t *len6 = data;
+
+	/* Default to assuming this is the only address on the link.
+	 * If the address falls within a known prefix, then the IPv6
+	 * routing table construction logic will match it against that
+	 * prefix.
+	 */
+	if ( len )
+		*len6 = IPV6_MAX_PREFIX_LEN;
+
+	return sizeof ( *len6 );
+}
+
+/**
+ * Fetch value of DHCPv6 router address
+ *
+ * @v dhcpv6set		DHCPv6 settings
+ * @v data		Buffer to fill with setting data
+ * @v len		Length of buffer
+ * @ret len		Length of setting data, or negative error
+ */
+static int dhcpv6_fetch_gateway6 ( struct dhcpv6_settings *dhcpv6set,
+				   void *data, size_t len ) {
+	struct in6_addr *router = &dhcpv6set->router;
+
+	/* Copy router address */
+	if ( len > sizeof ( *router ) )
+		len = sizeof ( *router );
+	memcpy ( data, router, len );
+
+	return sizeof ( *router );
+}
+
+/** A DHCPv6 address setting operation */
+struct dhcpv6_address_operation {
+	/** Generic setting */
+	const struct setting *setting;
+	/**
+	 * Fetch value of setting
+	 *
+	 * @v dhcpv6set		DHCPv6 settings
+	 * @v data		Buffer to fill with setting data
+	 * @v len		Length of buffer
+	 * @ret len		Length of setting data, or negative error
+	 */
+	int ( * fetch ) ( struct dhcpv6_settings *dhcpv6set,
+			  void *data, size_t len );
+};
+
+/** DHCPv6 address settings operations */
+static struct dhcpv6_address_operation dhcpv6_address_operations[] = {
+	{ &ip6_setting, dhcpv6_fetch_ip6 },
+	{ &len6_setting, dhcpv6_fetch_len6 },
+	{ &gateway6_setting, dhcpv6_fetch_gateway6 },
+};
 
 /**
  * Fetch value of DHCPv6 setting
@@ -325,11 +389,20 @@ static int dhcpv6_fetch ( struct settings *settings,
 	struct dhcpv6_settings *dhcpv6set =
 		container_of ( settings, struct dhcpv6_settings, settings );
 	const union dhcpv6_any_option *option;
+	struct dhcpv6_address_operation *op;
 	size_t option_len;
+	unsigned int i;
 
-	/* Handle leased address */
-	if ( setting_cmp ( setting, &ip6_setting ) == 0 )
-		return dhcpv6_fetch_lease ( dhcpv6set, data, len );
+	/* Handle address settings */
+	for ( i = 0 ; i < ( sizeof ( dhcpv6_address_operations ) /
+			    sizeof ( dhcpv6_address_operations[0] ) ) ; i++ ) {
+		op = &dhcpv6_address_operations[i];
+		if ( setting_cmp ( setting, op->setting ) != 0 )
+			continue;
+		if ( IN6_IS_ADDR_UNSPECIFIED ( &dhcpv6set->lease ) )
+			return -ENOENT;
+		return op->fetch ( dhcpv6set, data, len );
+	}
 
 	/* Find option */
 	option = dhcpv6_option ( &dhcpv6set->options, setting->tag );
@@ -354,11 +427,12 @@ static struct settings_operations dhcpv6_settings_operations = {
  * Register DHCPv6 options as network device settings
  *
  * @v lease		DHCPv6 leased address
+ * @v router		DHCPv6 router address
  * @v options		DHCPv6 option list
  * @v parent		Parent settings block
  * @ret rc		Return status code
  */
-static int dhcpv6_register ( struct in6_addr *lease,
+static int dhcpv6_register ( struct in6_addr *lease, struct in6_addr *router,
 			     struct dhcpv6_option_list *options,
 			     struct settings *parent ) {
 	struct dhcpv6_settings *dhcpv6set;
@@ -382,6 +456,7 @@ static int dhcpv6_register ( struct in6_addr *lease,
 	dhcpv6set->options.data = data;
 	dhcpv6set->options.len = len;
 	memcpy ( &dhcpv6set->lease, lease, sizeof ( dhcpv6set->lease ) );
+	memcpy ( &dhcpv6set->router, router, sizeof ( dhcpv6set->router ) );
 
 	/* Register settings */
 	if ( ( rc = register_settings ( &dhcpv6set->settings, parent,
@@ -501,6 +576,8 @@ struct dhcpv6_session {
 
 	/** Network device being configured */
 	struct net_device *netdev;
+	/** Router address */
+	struct in6_addr router;
 	/** Transaction ID */
 	uint8_t xid[3];
 	/** Identity association ID */
@@ -876,8 +953,8 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 	}
 
 	/* Register settings */
-	if ( ( rc = dhcpv6_register ( &dhcpv6->lease, &options,
-				      parent ) ) != 0 ) {
+	if ( ( rc = dhcpv6_register ( &dhcpv6->lease, &dhcpv6->router,
+				      &options, parent ) ) != 0 ) {
 		DBGC ( dhcpv6, "DHCPv6 %s could not register settings: %s\n",
 		       dhcpv6->netdev->name, strerror ( rc ) );
 		goto done;
@@ -915,11 +992,12 @@ static struct interface_descriptor dhcpv6_xfer_desc =
  *
  * @v job		Job control interface
  * @v netdev		Network device
+ * @v router		Router address
  * @v stateful		Perform stateful address autoconfiguration
  * @ret rc		Return status code
  */
 int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
-		   int stateful ) {
+		   struct in6_addr *router, int stateful ) {
 	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct dhcpv6_session *dhcpv6;
 	struct {
@@ -944,6 +1022,7 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 	intf_init ( &dhcpv6->job, &dhcpv6_job_desc, &dhcpv6->refcnt );
 	intf_init ( &dhcpv6->xfer, &dhcpv6_xfer_desc, &dhcpv6->refcnt );
 	dhcpv6->netdev = netdev_get ( netdev );
+	memcpy ( &dhcpv6->router, router, sizeof ( dhcpv6->router ) );
 	xid = random();
 	memcpy ( dhcpv6->xid, &xid, sizeof ( dhcpv6->xid ) );
 	dhcpv6->start = currticks();
@@ -955,7 +1034,7 @@ int start_dhcpv6 ( struct interface *job, struct net_device *netdev,
 	addresses.client.sin6.sin6_port = htons ( DHCPV6_CLIENT_PORT );
 	addresses.server.sin6.sin6_family = AF_INET6;
 	ipv6_all_dhcp_relay_and_servers ( &addresses.server.sin6.sin6_addr );
-	addresses.server.sin6.sin6_scope_id = netdev->index;
+	addresses.server.sin6.sin6_scope_id = netdev->scope_id;
 	addresses.server.sin6.sin6_port = htons ( DHCPV6_SERVER_PORT );
 
 	/* Construct client DUID from system UUID */

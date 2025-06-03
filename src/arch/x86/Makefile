@@ -3,9 +3,9 @@
 ASM_TCHAR	:= @
 ASM_TCHAR_OPS	:= @
 
-# Include common x86 headers
+# Include x86-specific headers
 #
-INCDIRS		+= arch/x86/include
+INCDIRS		:= arch/$(ARCH)/include arch/x86/include $(INCDIRS)
 
 # x86-specific directories containing source files
 #
@@ -21,9 +21,6 @@ SRCDIRS		+= arch/x86/hci/commands
 SRCDIRS		+= arch/x86/drivers/xen
 SRCDIRS		+= arch/x86/drivers/hyperv
 SRCDIRS		+= arch/x86/transitions
-
-# breaks building some of the linux-related objects
-CFLAGS		+= -Ulinux
 
 # disable valgrind
 CFLAGS		+= -DNVALGRIND

@@ -25,10 +25,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
 #include <ipxe/entropy.h>
-#include <ipxe/crc32.h>
 #include <ipxe/profile.h>
 #include <ipxe/efi/efi.h>
-#include <ipxe/efi/Protocol/Rng.h>
 
 /** @file
  *
@@ -36,22 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Random number generator protocol */
-static EFI_RNG_PROTOCOL *efirng;
-EFI_REQUEST_PROTOCOL ( EFI_RNG_PROTOCOL, &efirng );
-
-/** Minimum number of bytes to request from RNG
- *
- * The UEFI spec states (for no apparently good reason) that "When a
- * Deterministic Random Bit Generator (DRBG) is used on the output of
- * a (raw) entropy source, its security level must be at least 256
- * bits."  The EDK2 codebase (mis)interprets this to mean that the
- * call to GetRNG() should fail if given a buffer less than 32 bytes.
- *
- * Incidentally, nothing in the EFI RNG protocol provides any way to
- * report the actual amount of entropy returned by GetRNG().
- */
-#define EFI_ENTROPY_RNG_LEN 32
+struct entropy_source efitick_entropy __entropy_source ( ENTROPY_FALLBACK );
 
 /** Time (in 100ns units) to delay waiting for timer tick
  *
@@ -76,9 +59,6 @@ static int efi_entropy_enable ( void ) {
 	EFI_STATUS efirc;
 	int rc;
 
-	DBGC ( &tick, "ENTROPY %s RNG protocol\n",
-	       ( efirng ? "has" : "has no" ) );
-
 	/* Drop to external TPL to allow timer tick event to take place */
 	bs->RestoreTPL ( efi_external_tpl );
 
@@ -90,6 +70,12 @@ static int efi_entropy_enable ( void ) {
 		       strerror ( rc ) );
 		return rc;
 	}
+
+	/* We use essentially the same mechanism as for the BIOS
+	 * RTC-based entropy source, and so assume the same
+	 * min-entropy per sample.
+	 */
+	entropy_init ( &efitick_entropy, MIN_ENTROPY ( 1.3 ) );
 
 	return 0;
 }
@@ -104,8 +90,8 @@ static void efi_entropy_disable ( void ) {
 	/* Close timer tick event */
 	bs->CloseEvent ( tick );
 
-	/* Return to TPL_CALLBACK */
-	bs->RaiseTPL ( TPL_CALLBACK );
+	/* Return to internal TPL */
+	bs->RaiseTPL ( efi_internal_tpl );
 }
 
 /**
@@ -147,7 +133,7 @@ static int efi_entropy_tick ( void ) {
  * @ret noise		Noise sample
  * @ret rc		Return status code
  */
-static int efi_get_noise_ticks ( noise_sample_t *noise ) {
+static int efi_get_noise ( noise_sample_t *noise ) {
 	int before;
 	int after;
 	int rc;
@@ -172,70 +158,10 @@ static int efi_get_noise_ticks ( noise_sample_t *noise ) {
 	return 0;
 }
 
-/**
- * Get noise sample from RNG protocol
- *
- * @ret noise		Noise sample
- * @ret rc		Return status code
- */
-static int efi_get_noise_rng ( noise_sample_t *noise ) {
-	static uint8_t prev[EFI_ENTROPY_RNG_LEN];
-	uint8_t buf[EFI_ENTROPY_RNG_LEN];
-	EFI_STATUS efirc;
-	int rc;
-
-	/* Fail if we have no EFI RNG protocol */
-	if ( ! efirng )
-		return -ENOTSUP;
-
-	/* Get the minimum allowed number of random bytes */
-	if ( ( efirc = efirng->GetRNG ( efirng, NULL, EFI_ENTROPY_RNG_LEN,
-					buf ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( &tick, "ENTROPY could not read from RNG: %s\n",
-		       strerror ( rc ) );
-		return rc;
-	}
-
-	/* Fail (and permanently disable the EFI RNG) if we get
-	 * consecutive identical results.
-	 */
-	if ( memcmp ( buf, prev, sizeof ( buf ) ) == 0 ) {
-		DBGC ( &tick, "ENTROPY detected broken EFI RNG:\n" );
-		DBGC_HDA ( &tick, 0, buf, sizeof ( buf ) );
-		efirng = NULL;
-		return -EIO;
-	}
-	memcpy ( prev, buf, sizeof ( prev ) );
-
-	/* Reduce random bytes to a single noise sample.  This seems
-	 * like overkill, but we have no way of knowing how much
-	 * entropy is actually present in the bytes returned by the
-	 * RNG protocol.
-	 */
-	*noise = crc32_le ( 0, buf, sizeof ( buf ) );
-
-	return 0;
-}
-
-/**
- * Get noise sample
- *
- * @ret noise		Noise sample
- * @ret rc		Return status code
- */
-static int efi_get_noise ( noise_sample_t *noise ) {
-	int rc;
-
-	/* Try RNG first, falling back to timer ticks */
-	if ( ( ( rc = efi_get_noise_rng ( noise ) ) != 0 ) &&
-	     ( ( rc = efi_get_noise_ticks ( noise ) ) != 0 ) )
-		return rc;
-
-	return 0;
-}
-
-PROVIDE_ENTROPY_INLINE ( efi, min_entropy_per_sample );
-PROVIDE_ENTROPY ( efi, entropy_enable, efi_entropy_enable );
-PROVIDE_ENTROPY ( efi, entropy_disable, efi_entropy_disable );
-PROVIDE_ENTROPY ( efi, get_noise, efi_get_noise );
+/** EFI entropy source */
+struct entropy_source efitick_entropy __entropy_source ( ENTROPY_FALLBACK ) = {
+	.name = "efitick",
+	.enable = efi_entropy_enable,
+	.disable = efi_entropy_disable,
+	.get_noise = efi_get_noise,
+};

@@ -1,3 +1,6 @@
+#ifndef _IPXE_EFI_CONSOLECONTROL_H
+#define _IPXE_EFI_CONSOLECONTROL_H
+
 /*++
 
 Copyright (c) 2004 - 2010, Intel Corporation. All rights reserved.<BR>
@@ -122,3 +125,5 @@ struct _EFI_CONSOLE_CONTROL_PROTOCOL {
 extern EFI_GUID gEfiConsoleControlProtocolGuid;
 
 #endif
+
+#endif /* _IPXE_EFI_CONSOLECONTROL_H */

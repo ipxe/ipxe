@@ -31,7 +31,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/uaccess.h>
 #include <ipxe/gdbstub.h>
 #include <librm.h>
-#include <gdbmach.h>
 
 /** @file
  *

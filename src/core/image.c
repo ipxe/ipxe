@@ -27,11 +27,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <errno.h>
 #include <assert.h>
 #include <libgen.h>
 #include <syslog.h>
 #include <ipxe/list.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/uri.h>
 #include <ipxe/image.h>
@@ -55,8 +57,15 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** List of registered images */
 struct list_head images = LIST_HEAD_INIT ( images );
 
+/** Image selected for execution */
+struct image_tag selected_image __image_tag = {
+	.name = "SELECTED",
+};
+
 /** Currently-executing image */
-struct image *current_image;
+struct image_tag current_image __image_tag = {
+	.name = "CURRENT",
+};
 
 /** Current image trust requirement */
 static int require_trusted_images = 0;
@@ -68,17 +77,41 @@ static int require_trusted_images_permanent = 0;
  * Free executable image
  *
  * @v refcnt		Reference counter
+ *
+ * Image consumers must call image_put() rather than calling
+ * free_image() directly.  This function is exposed for use only by
+ * static images.
  */
-static void free_image ( struct refcnt *refcnt ) {
+void free_image ( struct refcnt *refcnt ) {
 	struct image *image = container_of ( refcnt, struct image, refcnt );
+	struct image_tag *tag;
 
+	/* Sanity check: free_image() should not be called directly on
+	 * dynamically allocated images.
+	 */
+	assert ( refcnt->count < 0 );
 	DBGC ( image, "IMAGE %s freed\n", image->name );
-	free ( image->name );
+
+	/* Clear any tag weak references */
+	for_each_table_entry ( tag, IMAGE_TAGS ) {
+		if ( tag->image == image )
+			tag->image = NULL;
+	}
+
+	/* Free dynamic allocations used by both static and dynamic images */
 	free ( image->cmdline );
 	uri_put ( image->uri );
-	ufree ( image->data );
 	image_put ( image->replacement );
-	free ( image );
+
+	/* Free image name, if dynamically allocated */
+	if ( ! ( image->flags & IMAGE_STATIC_NAME ) )
+		free ( image->name );
+
+	/* Free image data and image itself, if dynamically allocated */
+	if ( ! ( image->flags & IMAGE_STATIC ) ) {
+		ufree ( image->rwdata );
+		free ( image );
+	}
 }
 
 /**
@@ -121,10 +154,13 @@ int image_set_uri ( struct image *image, struct uri *uri ) {
 	int rc;
 
 	/* Set name, if image does not already have one */
-	if ( uri->path && ( ! ( image->name && image->name[0] ) ) ) {
-		name = basename ( ( char * ) uri->path );
-		if ( ( rc = image_set_name ( image, name ) ) != 0 )
-			return rc;
+	if ( ! ( image->name && image->name[0] ) ) {
+		name = ( uri->path ? uri->path : uri->opaque );
+		if ( name ) {
+			name = basename ( ( char * ) name );
+			if ( ( rc = image_set_name ( image, name ) ) != 0 )
+				return rc;
+		}
 	}
 
 	/* Update image URI */
@@ -149,11 +185,34 @@ int image_set_name ( struct image *image, const char *name ) {
 	if ( ! name_copy )
 		return -ENOMEM;
 
+	/* Free existing name, if not statically allocated */
+	if ( ! ( image->flags & IMAGE_STATIC_NAME ) )
+		free ( image->name );
+
 	/* Replace existing name */
-	free ( image->name );
 	image->name = name_copy;
+	image->flags &= ~IMAGE_STATIC_NAME;
 
 	return 0;
+}
+
+/**
+ * Strip dot suffix from image name, if present
+ *
+ * @v image		Image
+ * @ret sep		Position of old dot separator, or NULL
+ */
+char * image_strip_suffix ( struct image *image ) {
+	char *dot;
+
+	/* Locate and strip suffix, if present */
+	if ( image->name &&
+	     ( ( dot = strrchr ( image->name, '.' ) ) != NULL ) ) {
+		*dot = '\0';
+		return dot;
+	}
+
+	return NULL;
 }
 
 /**
@@ -172,6 +231,51 @@ int image_set_cmdline ( struct image *image, const char *cmdline ) {
 		if ( ! image->cmdline )
 			return -ENOMEM;
 	}
+	return 0;
+}
+
+/**
+ * Set image length
+ *
+ * @v image		Image
+ * @v len		Length of image data
+ * @ret rc		Return status code
+ */
+int image_set_len ( struct image *image, size_t len ) {
+	void *new;
+
+	/* Refuse to reallocate static images */
+	if ( image->flags & IMAGE_STATIC )
+		return -ENOTTY;
+
+	/* (Re)allocate image data */
+	new = urealloc ( image->rwdata, len );
+	if ( ! new )
+		return -ENOMEM;
+	image->rwdata = new;
+	image->len = len;
+
+	return 0;
+}
+
+/**
+ * Set image data
+ *
+ * @v image		Image
+ * @v data		Image data
+ * @v len		Length of image data
+ * @ret rc		Return status code
+ */
+int image_set_data ( struct image *image, const void *data, size_t len ) {
+	int rc;
+
+	/* Set image length */
+	if ( ( rc = image_set_len ( image, len ) ) != 0 )
+		return rc;
+
+	/* Copy in new image data */
+	memcpy ( image->rwdata, data, len );
+
 	return 0;
 }
 
@@ -212,6 +316,13 @@ int register_image ( struct image *image ) {
 	char name[8]; /* "imgXXXX" */
 	int rc;
 
+	/* Sanity checks */
+	if ( image->flags & IMAGE_STATIC ) {
+		assert ( ( image->name == NULL ) ||
+			 ( image->flags & IMAGE_STATIC_NAME ) );
+		assert ( image->cmdline == NULL );
+	}
+
 	/* Create image name if it doesn't already have one */
 	if ( ! image->name ) {
 		snprintf ( name, sizeof ( name ), "img%d", imgindex++ );
@@ -219,19 +330,13 @@ int register_image ( struct image *image ) {
 			return rc;
 	}
 
-	/* Avoid ending up with multiple "selected" images on
-	 * re-registration
-	 */
-	if ( image_find_selected() )
-		image->flags &= ~IMAGE_SELECTED;
-
 	/* Add to image list */
 	image_get ( image );
 	image->flags |= IMAGE_REGISTERED;
 	list_add_tail ( &image->list, &images );
 	DBGC ( image, "IMAGE %s at [%lx,%lx) registered\n",
-	       image->name, user_to_phys ( image->data, 0 ),
-	       user_to_phys ( image->data, image->len ) );
+	       image->name, virt_to_phys ( image->data ),
+	       ( virt_to_phys ( image->data ) + image->len ) );
 
 	/* Try to detect image type, if applicable.  Ignore failures,
 	 * since we expect to handle some unrecognised images
@@ -270,8 +375,25 @@ void unregister_image ( struct image *image ) {
 struct image * find_image ( const char *name ) {
 	struct image *image;
 
-	list_for_each_entry ( image, &images, list ) {
+	for_each_image ( image ) {
 		if ( strcmp ( image->name, name ) == 0 )
+			return image;
+	}
+
+	return NULL;
+}
+
+/**
+ * Find image by tag
+ *
+ * @v tag		Image tag
+ * @ret image		Executable image, or NULL
+ */
+struct image * find_image_tag ( struct image_tag *tag ) {
+	struct image *image;
+
+	for_each_image ( image ) {
+		if ( tag->image == image )
 			return image;
 	}
 
@@ -297,18 +419,20 @@ int image_exec ( struct image *image ) {
 	/* Sanity check */
 	assert ( image->flags & IMAGE_REGISTERED );
 
-	/* Switch current working directory to be that of the image itself */
-	old_cwuri = uri_get ( cwuri );
-	churi ( image->uri );
-
-	/* Preserve record of any currently-running image */
-	saved_current_image = current_image;
-
-	/* Take out a temporary reference to the image.  This allows
-	 * the image to unregister itself if necessary, without
-	 * automatically freeing itself.
+	/* Switch current working directory to be that of the image
+	 * itself, if applicable
 	 */
-	current_image = image_get ( image );
+	old_cwuri = uri_get ( cwuri );
+	if ( image->uri )
+		churi ( image->uri );
+
+	/* Set as currently running image */
+	saved_current_image = image_tag ( image, &current_image );
+
+	/* Take out a temporary reference to the image, so that it
+	 * does not get freed when temporarily unregistered.
+	 */
+	image_get ( image );
 
 	/* Check that this image can be executed */
 	if ( ! ( image->type && image->type->exec ) ) {
@@ -326,6 +450,9 @@ int image_exec ( struct image *image ) {
 	/* Record boot attempt */
 	syslog ( LOG_NOTICE, "Executing \"%s\"\n", image->name );
 
+	/* Temporarily unregister the image during its execution */
+	unregister_image ( image );
+
 	/* Try executing the image */
 	if ( ( rc = image->type->exec ( image ) ) != 0 ) {
 		DBGC ( image, "IMAGE %s could not execute: %s\n",
@@ -342,6 +469,10 @@ int image_exec ( struct image *image ) {
 			 image->name, strerror ( rc ) );
 	}
 
+	/* Re-register image (unless due to be replaced) */
+	if ( ! image->replacement )
+		register_image ( image );
+
 	/* Pick up replacement image before we drop the original
 	 * image's temporary reference.  The replacement image must
 	 * already be registered, so we don't need to hold a temporary
@@ -350,6 +481,10 @@ int image_exec ( struct image *image ) {
 	replacement = image->replacement;
 	if ( replacement )
 		assert ( replacement->flags & IMAGE_REGISTERED );
+
+	/* Clear any recorded replacement image */
+	image_put ( image->replacement );
+	image->replacement = NULL;
 
  err:
 	/* Unregister image if applicable */
@@ -368,7 +503,7 @@ int image_exec ( struct image *image ) {
 	image_put ( image );
 
 	/* Restore previous currently-running image */
-	current_image = saved_current_image;
+	image_tag ( saved_current_image, &current_image );
 
 	/* Reset current working directory */
 	churi ( old_cwuri );
@@ -391,7 +526,7 @@ int image_exec ( struct image *image ) {
  * registered until the currently-executing image returns.
  */
 int image_replace ( struct image *replacement ) {
-	struct image *image = current_image;
+	struct image *image = current_image.image;
 	int rc;
 
 	/* Sanity check */
@@ -427,35 +562,15 @@ int image_replace ( struct image *replacement ) {
  * @ret rc		Return status code
  */
 int image_select ( struct image *image ) {
-	struct image *tmp;
-
-	/* Unselect all other images */
-	for_each_image ( tmp )
-		tmp->flags &= ~IMAGE_SELECTED;
 
 	/* Check that this image can be executed */
 	if ( ! ( image->type && image->type->exec ) )
 		return -ENOEXEC;
 
 	/* Mark image as selected */
-	image->flags |= IMAGE_SELECTED;
+	image_tag ( image, &selected_image );
 
 	return 0;
-}
-
-/**
- * Find selected image
- *
- * @ret image		Executable image, or NULL
- */
-struct image * image_find_selected ( void ) {
-	struct image *image;
-
-	for_each_image ( image ) {
-		if ( image->flags & IMAGE_SELECTED )
-			return image;
-	}
-	return NULL;
 }
 
 /**
@@ -480,4 +595,79 @@ int image_set_trust ( int require_trusted, int permanent ) {
 		return -EACCES_PERMANENT;
 
 	return 0;
+}
+
+/**
+ * Create registered image from block of memory
+ *
+ * @v name		Name
+ * @v data		Image data
+ * @v len		Length
+ * @ret image		Image, or NULL on error
+ */
+struct image * image_memory ( const char *name, const void *data,
+			      size_t len ) {
+	struct image *image;
+	int rc;
+
+	/* Allocate image */
+	image = alloc_image ( NULL );
+	if ( ! image ) {
+		rc = -ENOMEM;
+		goto err_alloc_image;
+	}
+
+	/* Set name */
+	if ( ( rc = image_set_name ( image, name ) ) != 0 )
+		goto err_set_name;
+
+	/* Set data */
+	if ( ( rc = image_set_data ( image, data, len ) ) != 0 )
+		goto err_set_data;
+
+	/* Register image */
+	if ( ( rc = register_image ( image ) ) != 0 )
+		goto err_register;
+
+	/* Drop local reference to image */
+	image_put ( image );
+
+	return image;
+
+ err_register:
+ err_set_data:
+ err_set_name:
+	image_put ( image );
+ err_alloc_image:
+	return NULL;
+}
+
+/**
+ * Find argument within image command line
+ *
+ * @v image		Image
+ * @v key		Argument search key (including trailing delimiter)
+ * @ret value		Argument value, or NULL if not found
+ */
+const char * image_argument ( struct image *image, const char *key ) {
+	const char *cmdline = image->cmdline;
+	const char *search;
+	const char *match;
+	const char *next;
+
+	/* Find argument */
+	for ( search = cmdline ; search ; search = next ) {
+
+		/* Find next occurrence, if any */
+		match = strstr ( search, key );
+		if ( ! match )
+			break;
+		next = ( match + strlen ( key ) );
+
+		/* Check preceding delimiter, if any */
+		if ( ( match == cmdline ) || isspace ( match[-1] ) )
+			return next;
+	}
+
+	return NULL;
 }

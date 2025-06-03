@@ -100,20 +100,40 @@ static int show_exec ( int argc, char **argv ) {
 }
 
 /** "set", "clear", and "read" options */
-struct set_core_options {};
+struct set_core_options {
+	/** Timeout */
+	unsigned long timeout;
+};
 
 /** "set", "clear", and "read" option list */
-static struct option_descriptor set_core_opts[] = {};
+static union {
+	/* "set" takes no options */
+	struct option_descriptor set[0];
+	/* "clear" takes no options */
+	struct option_descriptor clear[0];
+	/* "read" takes --timeout option */
+	struct option_descriptor read[1];
+} set_core_opts = {
+	.read = {
+		OPTION_DESC ( "timeout", 't', required_argument,
+			      struct set_core_options, timeout, parse_timeout ),
+	},
+};
 
 /** "set" command descriptor */
 static struct command_descriptor set_cmd =
-	COMMAND_DESC ( struct set_core_options, set_core_opts, 1, MAX_ARGUMENTS,
-		       "<setting> <value>" );
+	COMMAND_DESC ( struct set_core_options, set_core_opts.set,
+		       1, MAX_ARGUMENTS, "<setting> <value>" );
 
-/** "clear" and "read" command descriptor */
-static struct command_descriptor clear_read_cmd =
-	COMMAND_DESC ( struct set_core_options, set_core_opts, 1, 1,
-		       "<setting>" );
+/** "clear" command descriptor */
+static struct command_descriptor clear_cmd =
+	COMMAND_DESC ( struct set_core_options, set_core_opts.clear,
+		       1, 1, "<setting>" );
+
+/** "read" command descriptor */
+static struct command_descriptor read_cmd =
+	COMMAND_DESC ( struct set_core_options, set_core_opts.read,
+		       1, 1, "<setting>" );
 
 /**
  * "set", "clear", and "read" command
@@ -127,6 +147,7 @@ static struct command_descriptor clear_read_cmd =
 static int set_core_exec ( int argc, char **argv,
 			   struct command_descriptor *cmd,
 			   int ( * get_value ) ( struct named_setting *setting,
+						 struct set_core_options *opts,
 						 char **args, char **value ) ) {
 	struct set_core_options opts;
 	struct named_setting setting;
@@ -143,7 +164,8 @@ static int set_core_exec ( int argc, char **argv,
 		goto err_parse_setting;
 
 	/* Parse setting value */
-	if ( ( rc = get_value ( &setting, &argv[ optind + 1 ], &value ) ) != 0 )
+	if ( ( rc = get_value ( &setting, &opts, &argv[ optind + 1 ],
+				&value ) ) != 0 )
 		goto err_get_value;
 
 	/* Apply default type if necessary */
@@ -170,11 +192,13 @@ static int set_core_exec ( int argc, char **argv,
  * Get setting value for "set" command
  *
  * @v setting		Named setting
+ * @v opts		Options list
  * @v args		Remaining arguments
  * @ret value		Setting value
  * @ret rc		Return status code
  */
 static int set_value ( struct named_setting *setting __unused,
+		       struct set_core_options *opts __unused,
 		       char **args, char **value ) {
 
 	*value = concat_args ( args );
@@ -200,10 +224,12 @@ static int set_exec ( int argc, char **argv ) {
  *
  * @v setting		Named setting
  * @v args		Remaining arguments
+ * @v opts		Options list
  * @ret value		Setting value
  * @ret rc		Return status code
  */
 static int clear_value ( struct named_setting *setting __unused,
+			 struct set_core_options *opts __unused,
 			 char **args __unused, char **value ) {
 
 	*value = NULL;
@@ -218,7 +244,7 @@ static int clear_value ( struct named_setting *setting __unused,
  * @ret rc		Return status code
  */
 static int clear_exec ( int argc, char **argv ) {
-	return set_core_exec ( argc, argv, &clear_read_cmd, clear_value );
+	return set_core_exec ( argc, argv, &clear_cmd, clear_value );
 }
 
 /**
@@ -226,11 +252,13 @@ static int clear_exec ( int argc, char **argv ) {
  *
  * @v setting		Named setting
  * @v args		Remaining arguments
+ * @v opts		Options list
  * @ret value		Setting value
  * @ret rc		Return status code
  */
-static int read_value ( struct named_setting *setting, char **args __unused,
-			char **value ) {
+static int read_value ( struct named_setting *setting,
+			struct set_core_options *opts,
+			char **args __unused, char **value ) {
 	char *existing;
 	int rc;
 
@@ -241,7 +269,8 @@ static int read_value ( struct named_setting *setting, char **args __unused,
 			      NULL, &setting->setting, &existing );
 
 	/* Read new value */
-	if ( ( rc = readline_history ( NULL, existing, NULL, value ) ) != 0 )
+	if ( ( rc = readline_history ( NULL, existing, NULL, opts->timeout,
+				       value ) ) != 0 )
 		goto err_readline;
 
  err_readline:
@@ -257,7 +286,7 @@ static int read_value ( struct named_setting *setting, char **args __unused,
  * @ret rc		Return status code
  */
 static int read_exec ( int argc, char **argv ) {
-	return set_core_exec ( argc, argv, &clear_read_cmd, read_value );
+	return set_core_exec ( argc, argv, &read_cmd, read_value );
 }
 
 /** "inc" options */

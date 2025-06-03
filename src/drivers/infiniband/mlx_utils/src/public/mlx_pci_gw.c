@@ -32,7 +32,7 @@ mlx_status
 mlx_pci_gw_check_capability_id(
 							IN mlx_utils *utils,
 							IN mlx_uint8 cap_pointer,
-							OUT mlx_boolean *bool
+							OUT mlx_boolean *result
 							)
 {
 	mlx_status 		status = MLX_SUCCESS;
@@ -41,7 +41,7 @@ mlx_pci_gw_check_capability_id(
 	status = mlx_pci_read(utils, MlxPciWidthUint8, offset,
 				1, &id);
 	MLX_CHECK_STATUS(utils, status, read_err,"failed to read capability id");
-	*bool = ( id == PCI_GW_CAPABILITY_ID );
+	*result = ( id == PCI_GW_CAPABILITY_ID );
 read_err:
 	return status;
 }

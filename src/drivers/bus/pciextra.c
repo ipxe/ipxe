@@ -1,7 +1,9 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
+#include <ipxe/timer.h>
 #include <ipxe/pci.h>
+#include <ipxe/pcibackup.h>
 
 static int pci_find_capability_common ( struct pci_device *pci,
 					uint8_t pos, int cap ) {
@@ -111,4 +113,29 @@ unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
 	/* Find the lowest bit set */
 	size = size & ~( size - 1 );
 	return size;
+}
+
+/**
+ * Perform PCI Express function-level reset (FLR)
+ *
+ * @v pci		PCI device
+ * @v exp		PCI Express Capability address
+ */
+void pci_reset ( struct pci_device *pci, unsigned int exp ) {
+	struct pci_config_backup backup;
+	uint16_t control;
+
+	/* Back up configuration space */
+	pci_backup ( pci, &backup, PCI_CONFIG_BACKUP_STANDARD, NULL );
+
+	/* Perform a PCIe function-level reset */
+	pci_read_config_word ( pci, ( exp + PCI_EXP_DEVCTL ), &control );
+	control |= PCI_EXP_DEVCTL_FLR;
+	pci_write_config_word ( pci, ( exp + PCI_EXP_DEVCTL ), control );
+
+	/* Allow time for reset to complete */
+	mdelay ( PCI_EXP_FLR_DELAY_MS );
+
+	/* Restore configuration */
+	pci_restore ( pci, &backup, PCI_CONFIG_BACKUP_STANDARD, NULL );
 }

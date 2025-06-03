@@ -75,6 +75,9 @@ static int rbg_startup ( void ) {
 	int len;
 	int rc;
 
+	/* Record that startup has been attempted (even if unsuccessful) */
+	rbg.started = 1;
+
 	/* Try to obtain system UUID for use as personalisation
 	 * string, in accordance with ANS X9.82 Part 3-2007 Section
 	 * 8.5.2.  If no UUID is available, proceed without a
@@ -98,6 +101,33 @@ static int rbg_startup ( void ) {
 }
 
 /**
+ * Generate bits using RBG
+ *
+ * @v additional	Additional input
+ * @v additional_len	Length of additional input
+ * @v prediction_resist	Prediction resistance is required
+ * @v data		Output buffer
+ * @v len		Length of output buffer
+ * @ret rc		Return status code
+ *
+ * This is the RBG_Generate function defined in ANS X9.82 Part 4
+ * (April 2011 Draft) Section 9.1.2.2.
+ */
+int rbg_generate ( const void *additional, size_t additional_len,
+		   int prediction_resist, void *data, size_t len ) {
+
+	/* Attempt startup, if not already attempted */
+	if ( ! rbg.started )
+		rbg_startup();
+
+	/* Generate bits.  The DRBG will itself return an error if it
+	 * is not valid (e.g. due to an instantiation failure).
+	 */
+	return drbg_generate ( &rbg.state, additional, additional_len,
+			       prediction_resist, data, len );
+}
+
+/**
  * Shut down RBG
  *
  */
@@ -105,16 +135,21 @@ static void rbg_shutdown ( void ) {
 
 	/* Uninstantiate DRBG */
 	drbg_uninstantiate ( &rbg.state );
+
+	/* Clear startup attempted flag */
+	rbg.started = 0;
 }
 
 /** RBG startup function */
 static void rbg_startup_fn ( void ) {
 
-	/* Start up RBG.  There is no way to report an error at this
-	 * stage, but a failed startup will result in an invalid DRBG
-	 * that refuses to generate bits.
+	/* Start up RBG (if not already started on demand).  There is
+	 * no way to report an error at this stage, but a failed
+	 * startup will result in an invalid DRBG that refuses to
+	 * generate bits.
 	 */
-	rbg_startup();
+	if ( ! rbg.started )
+		rbg_startup();
 }
 
 /** RBG shutdown function */

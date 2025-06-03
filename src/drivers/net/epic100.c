@@ -51,7 +51,7 @@ struct epic_tx_desc {
 
 static void	epic100_open(void);
 static void	epic100_init_ring(void);
-static void	epic100_disable(struct nic *nic);
+static void	epic100_disable(struct nic *nic, void *hwdev);
 static int	epic100_poll(struct nic *nic, int retrieve);
 static void	epic100_transmit(struct nic *nic, const char *destaddr,
 				 unsigned int type, unsigned int len, const char *data);
@@ -419,7 +419,7 @@ epic100_poll(struct nic *nic, int retrieve)
 }
 
 
-static void epic100_disable ( struct nic *nic __unused ) {
+static void epic100_disable ( struct nic *nic __unused, void *hwdev __unused ) {
 	/* Soft reset the chip. */
 	outl(GC_SOFT_RESET, genctl);
 }

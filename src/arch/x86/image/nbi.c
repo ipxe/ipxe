@@ -1,3 +1,4 @@
+#include <string.h>
 #include <errno.h>
 #include <assert.h>
 #include <realmode.h>
@@ -106,12 +107,12 @@ struct ebinfo {
  * @ret rc		Return status code
  */
 static int nbi_prepare_segment ( struct image *image, size_t offset __unused,
-				 userptr_t dest, size_t filesz, size_t memsz ){
+				 void *dest, size_t filesz, size_t memsz ) {
 	int rc;
 
 	if ( ( rc = prep_segment ( dest, filesz, memsz ) ) != 0 ) {
-		DBGC ( image, "NBI %p could not prepare segment: %s\n",
-		       image, strerror ( rc ) );
+		DBGC ( image, "NBI %s could not prepare segment: %s\n",
+		       image->name, strerror ( rc ) );
 		return rc;
 	}
 
@@ -129,9 +130,9 @@ static int nbi_prepare_segment ( struct image *image, size_t offset __unused,
  * @ret rc		Return status code
  */
 static int nbi_load_segment ( struct image *image, size_t offset,
-			      userptr_t dest, size_t filesz,
+			      void *dest, size_t filesz,
 			      size_t memsz __unused ) {
-	memcpy_user ( dest, 0, image->data, offset, filesz );
+	memcpy ( dest, ( image->data + offset ), filesz );
 	return 0;
 }
 
@@ -144,22 +145,22 @@ static int nbi_load_segment ( struct image *image, size_t offset,
  * @ret rc		Return status code
  */
 static int nbi_process_segments ( struct image *image,
-				  struct imgheader *imgheader,
+				  const struct imgheader *imgheader,
 				  int ( * process ) ( struct image *image,
 						      size_t offset,
-						      userptr_t dest,
+						      void *dest,
 						      size_t filesz,
 						      size_t memsz ) ) {
-	struct segheader sh;
+	const struct segheader *sh;
 	size_t offset = 0;
 	size_t sh_off;
-	userptr_t dest;
+	void *dest;
 	size_t filesz;
 	size_t memsz;
 	int rc;
 	
 	/* Copy image header to target location */
-	dest = real_to_user ( imgheader->location.segment,
+	dest = real_to_virt ( imgheader->location.segment,
 			      imgheader->location.offset );
 	filesz = memsz = NBI_HEADER_LENGTH;
 	if ( ( rc = process ( image, offset, dest, filesz, memsz ) ) != 0 )
@@ -170,32 +171,32 @@ static int nbi_process_segments ( struct image *image,
 	sh_off = NBI_LENGTH ( imgheader->length );
 	do {
 		/* Read segment header */
-		copy_from_user ( &sh, image->data, sh_off, sizeof ( sh ) );
-		if ( sh.length == 0 ) {
+		sh = ( image->data + sh_off );
+		if ( sh->length == 0 ) {
 			/* Avoid infinite loop? */
-			DBGC ( image, "NBI %p invalid segheader length 0\n",
-			       image );
+			DBGC ( image, "NBI %s invalid segheader length 0\n",
+			       image->name );
 			return -ENOEXEC;
 		}
 		
 		/* Calculate segment load address */
-		switch ( NBI_LOADADDR_FLAGS ( sh.flags ) ) {
+		switch ( NBI_LOADADDR_FLAGS ( sh->flags ) ) {
 		case NBI_LOADADDR_ABS:
-			dest = phys_to_user ( sh.loadaddr );
+			dest = phys_to_virt ( sh->loadaddr );
 			break;
 		case NBI_LOADADDR_AFTER:
-			dest = userptr_add ( dest, memsz + sh.loadaddr );
+			dest = ( dest + memsz + sh->loadaddr );
 			break;
 		case NBI_LOADADDR_BEFORE:
-			dest = userptr_add ( dest, -sh.loadaddr );
+			dest = ( dest - sh->loadaddr );
 			break;
 		case NBI_LOADADDR_END:
 			/* Not correct according to the spec, but
 			 * maintains backwards compatibility with
 			 * previous versions of Etherboot.
 			 */
-			dest = phys_to_user ( ( extmemsize() + 1024 ) * 1024
-					      - sh.loadaddr );
+			dest = phys_to_virt ( ( extmemsize() + 1024 ) * 1024
+					      - sh->loadaddr );
 			break;
 		default:
 			/* Cannot be reached */
@@ -203,10 +204,11 @@ static int nbi_process_segments ( struct image *image,
 		}
 
 		/* Process this segment */
-		filesz = sh.imglength;
-		memsz = sh.memlength;
+		filesz = sh->imglength;
+		memsz = sh->memlength;
 		if ( ( offset + filesz ) > image->len ) {
-			DBGC ( image, "NBI %p segment outside file\n", image );
+			DBGC ( image, "NBI %s segment outside file\n",
+			       image->name );
 			return -ENOEXEC;
 		}
 		if ( ( rc = process ( image, offset, dest,
@@ -216,17 +218,18 @@ static int nbi_process_segments ( struct image *image,
 		offset += filesz;
 
 		/* Next segheader */
-		sh_off += NBI_LENGTH ( sh.length );
+		sh_off += NBI_LENGTH ( sh->length );
 		if ( sh_off >= NBI_HEADER_LENGTH ) {
-			DBGC ( image, "NBI %p header overflow\n", image );
+			DBGC ( image, "NBI %s header overflow\n",
+			       image->name );
 			return -ENOEXEC;
 		}
 
-	} while ( ! NBI_LAST_SEGHEADER ( sh.flags ) );
+	} while ( ! NBI_LAST_SEGHEADER ( sh->flags ) );
 
 	if ( offset != image->len ) {
-		DBGC ( image, "NBI %p length wrong (file %zd, metadata %zd)\n",
-		       image, image->len, offset );
+		DBGC ( image, "NBI %s length wrong (file %zd, metadata %zd)\n",
+		       image->name, image->len, offset );
 		return -ENOEXEC;
 	}
 
@@ -239,12 +242,13 @@ static int nbi_process_segments ( struct image *image,
  * @v imgheader		Image header information
  * @ret rc		Return status code, if image returns
  */
-static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
+static int nbi_boot16 ( struct image *image,
+			const struct imgheader *imgheader ) {
 	int discard_D, discard_S, discard_b;
 	int32_t rc;
 
-	DBGC ( image, "NBI %p executing 16-bit image at %04x:%04x\n", image,
-	       imgheader->execaddr.segoff.segment,
+	DBGC ( image, "NBI %s executing 16-bit image at %04x:%04x\n",
+	       image->name, imgheader->execaddr.segoff.segment,
 	       imgheader->execaddr.segoff.offset );
 
 	__asm__ __volatile__ (
@@ -277,7 +281,8 @@ static int nbi_boot16 ( struct image *image, struct imgheader *imgheader ) {
  * @v imgheader		Image header information
  * @ret rc		Return status code, if image returns
  */
-static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
+static int nbi_boot32 ( struct image *image,
+			const struct imgheader *imgheader ) {
 	struct ebinfo loaderinfo = {
 		product_major_version, product_minor_version,
 		0
@@ -285,8 +290,8 @@ static int nbi_boot32 ( struct image *image, struct imgheader *imgheader ) {
 	int discard_D, discard_S, discard_b;
 	int32_t rc;
 
-	DBGC ( image, "NBI %p executing 32-bit image at %lx\n",
-	       image, imgheader->execaddr.linear );
+	DBGC ( image, "NBI %s executing 32-bit image at %lx\n",
+	       image->name, imgheader->execaddr.linear );
 
 	/* Jump to OS with flat physical addressing */
 	__asm__ __volatile__ (
@@ -321,14 +326,15 @@ static int nbi_prepare_dhcp ( struct image *image ) {
 
 	boot_netdev = last_opened_netdev();
 	if ( ! boot_netdev ) {
-		DBGC ( image, "NBI %p could not identify a network device\n",
-		       image );
+		DBGC ( image, "NBI %s could not identify a network device\n",
+		       image->name );
 		return -ENODEV;
 	}
 
 	if ( ( rc = create_fakedhcpack ( boot_netdev, basemem_packet,
 					 sizeof ( basemem_packet ) ) ) != 0 ) {
-		DBGC ( image, "NBI %p failed to build DHCP packet\n", image );
+		DBGC ( image, "NBI %s failed to build DHCP packet\n",
+		       image->name );
 		return rc;
 	}
 
@@ -342,15 +348,15 @@ static int nbi_prepare_dhcp ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int nbi_exec ( struct image *image ) {
-	struct imgheader imgheader;
+	const struct imgheader *imgheader;
 	int may_return;
 	int rc;
 
 	/* Retrieve image header */
-	copy_from_user ( &imgheader, image->data, 0, sizeof ( imgheader ) );
+	imgheader = image->data;
 
-	DBGC ( image, "NBI %p placing header at %hx:%hx\n", image,
-	       imgheader.location.segment, imgheader.location.offset );
+	DBGC ( image, "NBI %s placing header at %hx:%hx\n", image->name,
+	       imgheader->location.segment, imgheader->location.offset );
 
 	/* NBI files can have overlaps between segments; the bss of
 	 * one segment may overlap the initialised data of another.  I
@@ -359,10 +365,10 @@ static int nbi_exec ( struct image *image ) {
 	 * passes: first to initialise the segments, then to copy the
 	 * data.  This avoids zeroing out already-copied data.
 	 */
-	if ( ( rc = nbi_process_segments ( image, &imgheader,
+	if ( ( rc = nbi_process_segments ( image, imgheader,
 					   nbi_prepare_segment ) ) != 0 )
 		return rc;
-	if ( ( rc = nbi_process_segments ( image, &imgheader,
+	if ( ( rc = nbi_process_segments ( image, imgheader,
 					   nbi_load_segment ) ) != 0 )
 		return rc;
 
@@ -371,25 +377,25 @@ static int nbi_exec ( struct image *image ) {
 		return rc;
 
 	/* Shut down now if NBI image will not return */
-	may_return = NBI_PROGRAM_RETURNS ( imgheader.flags );
+	may_return = NBI_PROGRAM_RETURNS ( imgheader->flags );
 	if ( ! may_return )
 		shutdown_boot();
 
 	/* Execute NBI image */
-	if ( NBI_LINEAR_EXEC_ADDR ( imgheader.flags ) ) {
-		rc = nbi_boot32 ( image, &imgheader );
+	if ( NBI_LINEAR_EXEC_ADDR ( imgheader->flags ) ) {
+		rc = nbi_boot32 ( image, imgheader );
 	} else {
-	        rc = nbi_boot16 ( image, &imgheader );
+	        rc = nbi_boot16 ( image, imgheader );
 	}
 
 	if ( ! may_return ) {
 		/* Cannot continue after shutdown() called */
-		DBGC ( image, "NBI %p returned %d from non-returnable image\n",
-		       image, rc  );
+		DBGC ( image, "NBI %s returned %d from non-returnable image\n",
+		       image->name, rc  );
 		while ( 1 ) {}
 	}
 
-	DBGC ( image, "NBI %p returned %d\n", image, rc );
+	DBGC ( image, "NBI %s returned %d\n", image->name, rc );
 
 	return rc;
 }
@@ -401,18 +407,19 @@ static int nbi_exec ( struct image *image ) {
  * @ret rc		Return status code
  */
 static int nbi_probe ( struct image *image ) {
-	struct imgheader imgheader;
+	const struct imgheader *imgheader;
 
 	/* If we don't have enough data give up */
 	if ( image->len < NBI_HEADER_LENGTH ) {
-		DBGC ( image, "NBI %p too short for an NBI image\n", image );
+		DBGC ( image, "NBI %s too short for an NBI image\n",
+		       image->name );
 		return -ENOEXEC;
 	}
+	imgheader = image->data;
 
 	/* Check image header */
-	copy_from_user ( &imgheader, image->data, 0, sizeof ( imgheader ) );
-	if ( imgheader.magic != NBI_MAGIC ) {
-		DBGC ( image, "NBI %p has no NBI signature\n", image );
+	if ( imgheader->magic != NBI_MAGIC ) {
+		DBGC ( image, "NBI %s has no NBI signature\n", image->name );
 		return -ENOEXEC;
 	}
 

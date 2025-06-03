@@ -1,10 +1,10 @@
 nrv2b
-zbin
+zbin32
+zbin64
 hijack
 prototester
 elf2efi32
 elf2efi64
 efirom
 efifatbin
-iccfix
 einfo

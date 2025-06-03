@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/x509.h>
 
+extern const int allow_trust_override;
 extern struct x509_root root_certificates;
 
 #endif /* _IPXE_ROOTCERT_H */

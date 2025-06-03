@@ -20,10 +20,33 @@ struct aoe_device;
 struct fcp_description;
 struct ib_srp_device;
 struct usb_function;
+union uuid;
 
+/**
+ * Terminate device path
+ *
+ * @v end		End of device path to fill in
+ */
+static inline void efi_path_terminate ( EFI_DEVICE_PATH_PROTOCOL *end ) {
+
+	end->Type = END_DEVICE_PATH_TYPE;
+	end->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
+	end->Length[0] = sizeof ( *end );
+	end->Length[1] = 0;
+}
+
+extern EFI_DEVICE_PATH_PROTOCOL *
+efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern EFI_DEVICE_PATH_PROTOCOL *
+efi_path_prev ( EFI_DEVICE_PATH_PROTOCOL *path,
+		EFI_DEVICE_PATH_PROTOCOL *curr );
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern void * efi_path_mac ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern int efi_path_guid ( EFI_DEVICE_PATH_PROTOCOL *path, union uuid *uuid );
+extern struct uri * efi_path_uri ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first,
 					      ... );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev );

@@ -24,13 +24,13 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <syslog.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/job.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/image.h>
 #include <ipxe/xferbuf.h>
@@ -67,6 +67,7 @@ static void downloader_free ( struct refcnt *refcnt ) {
 	struct downloader *downloader =
 		container_of ( refcnt, struct downloader, refcnt );
 
+	xferbuf_free ( &downloader->buffer );
 	image_put ( downloader->image );
 	free ( downloader );
 }
@@ -78,18 +79,21 @@ static void downloader_free ( struct refcnt *refcnt ) {
  * @v rc		Reason for termination
  */
 static void downloader_finished ( struct downloader *downloader, int rc ) {
+	struct xfer_buffer *buffer = &downloader->buffer;
+	struct image *image = downloader->image;
 
 	/* Log download status */
 	if ( rc == 0 ) {
-		syslog ( LOG_NOTICE, "Downloaded \"%s\"\n",
-			 downloader->image->name );
+		syslog ( LOG_NOTICE, "Downloaded \"%s\"\n", image->name );
 	} else {
 		syslog ( LOG_ERR, "Download of \"%s\" failed: %s\n",
-			 downloader->image->name, strerror ( rc ) );
+			 image->name, strerror ( rc ) );
 	}
 
-	/* Update image length */
-	downloader->image->len = downloader->buffer.len;
+	/* Transfer ownership from data transfer buffer to image */
+	image->data = buffer->data;
+	image->len = buffer->len;
+	xferbuf_detach ( buffer );
 
 	/* Shut down interfaces */
 	intf_shutdown ( &downloader->xfer, rc );
@@ -269,7 +273,7 @@ int create_downloader ( struct interface *job, struct image *image ) {
 	intf_init ( &downloader->xfer, &downloader_xfer_desc,
 		    &downloader->refcnt );
 	downloader->image = image_get ( image );
-	xferbuf_umalloc_init ( &downloader->buffer, &image->data );
+	xferbuf_umalloc_init ( &downloader->buffer );
 
 	/* Instantiate child objects and attach to our interfaces */
 	if ( ( rc = xfer_open_uri ( &downloader->xfer, image->uri ) ) != 0 )

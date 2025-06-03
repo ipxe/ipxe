@@ -27,7 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <realmode.h>
 #include <bios.h>
 #include <basemem.h>
-#include <ipxe/hidemem.h>
+#include <ipxe/memmap.h>
 
 /** @file
  *

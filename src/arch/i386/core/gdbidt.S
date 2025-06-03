@@ -9,6 +9,7 @@
  * Interrupt handlers
  ****************************************************************************
  */
+	.section ".note.GNU-stack", "", @progbits
 	.section ".text", "ax", @progbits
 	.code32
 

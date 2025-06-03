@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <getopt.h>
 #include <ipxe/image.h>
 #include <ipxe/command.h>

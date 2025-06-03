@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <ctype.h>
 
 /** @file
@@ -205,11 +206,24 @@ int strncmp ( const char *first, const char *second, size_t max ) {
  * @ret diff		Difference
  */
 int strcasecmp ( const char *first, const char *second ) {
+
+	return strncasecmp ( first, second, ~( ( size_t ) 0 ) );
+}
+
+/**
+ * Compare case-insensitive strings
+ *
+ * @v first		First string
+ * @v second		Second string
+ * @v max		Maximum length to compare
+ * @ret diff		Difference
+ */
+int strncasecmp ( const char *first, const char *second, size_t max ) {
 	const uint8_t *first_bytes = ( ( const uint8_t * ) first );
 	const uint8_t *second_bytes = ( ( const uint8_t * ) second );
 	int diff;
 
-	for ( ; ; first_bytes++, second_bytes++ ) {
+	for ( ; max-- ; first_bytes++, second_bytes++ ) {
 		diff = ( toupper ( *first_bytes ) -
 			 toupper ( *second_bytes ) );
 		if ( diff )
@@ -217,6 +231,7 @@ int strcasecmp ( const char *first, const char *second ) {
 		if ( ! *first_bytes )
 			return 0;
 	}
+	return 0;
 }
 
 /**
@@ -306,9 +321,9 @@ char * strstr ( const char *haystack, const char *needle ) {
  *
  * @v dest		Destination string
  * @v src		Source string
- * @ret dest		Destination string
+ * @ret dnul		Terminating NUL of destination string
  */
-char * strcpy ( char *dest, const char *src ) {
+char * stpcpy ( char *dest, const char *src ) {
 	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
 	uint8_t *dest_bytes = ( ( uint8_t * ) dest );
 
@@ -318,6 +333,19 @@ char * strcpy ( char *dest, const char *src ) {
 		if ( ! *dest_bytes )
 			break;
 	}
+	return ( ( char * ) dest_bytes );
+}
+
+/**
+ * Copy string
+ *
+ * @v dest		Destination string
+ * @v src		Source string
+ * @ret dest		Destination string
+ */
+char * strcpy ( char *dest, const char *src ) {
+
+	stpcpy ( dest, src );
 	return dest;
 }
 

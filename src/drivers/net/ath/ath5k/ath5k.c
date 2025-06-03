@@ -65,14 +65,11 @@ FILE_LICENCE ( BSD3 );
 
 /* Known PCI ids */
 static struct pci_device_id ath5k_nics[] = {
-	PCI_ROM(0x168c, 0x0207, "ath5210e", "Atheros 5210 early", AR5K_AR5210),
+	PCI_ROM(0x10b7, 0x0013, "rdag675", "3com 3CRDAG675", AR5K_AR5212),
 	PCI_ROM(0x168c, 0x0007, "ath5210", "Atheros 5210", AR5K_AR5210),
 	PCI_ROM(0x168c, 0x0011, "ath5311", "Atheros 5311 (AHB)", AR5K_AR5211),
 	PCI_ROM(0x168c, 0x0012, "ath5211", "Atheros 5211", AR5K_AR5211),
 	PCI_ROM(0x168c, 0x0013, "ath5212", "Atheros 5212", AR5K_AR5212),
-	PCI_ROM(0xa727, 0x0013, "ath5212c","3com Ath 5212", AR5K_AR5212),
-	PCI_ROM(0x10b7, 0x0013, "rdag675", "3com 3CRDAG675", AR5K_AR5212),
-	PCI_ROM(0x168c, 0x1014, "ath5212m", "Ath 5212 miniPCI", AR5K_AR5212),
 	PCI_ROM(0x168c, 0x0014, "ath5212x14", "Atheros 5212 x14", AR5K_AR5212),
 	PCI_ROM(0x168c, 0x0015, "ath5212x15", "Atheros 5212 x15", AR5K_AR5212),
 	PCI_ROM(0x168c, 0x0016, "ath5212x16", "Atheros 5212 x16", AR5K_AR5212),
@@ -83,6 +80,9 @@ static struct pci_device_id ath5k_nics[] = {
 	PCI_ROM(0x168c, 0x001b, "ath5413", "Atheros 5413 Eagle", AR5K_AR5212),
 	PCI_ROM(0x168c, 0x001c, "ath5212e", "Atheros 5212 PCI-E", AR5K_AR5212),
 	PCI_ROM(0x168c, 0x001d, "ath2417", "Atheros 2417 Nala", AR5K_AR5212),
+	PCI_ROM(0x168c, 0x0207, "ath5210e", "Atheros 5210 early", AR5K_AR5210),
+	PCI_ROM(0x168c, 0x1014, "ath5212m", "Ath 5212 miniPCI", AR5K_AR5212),
+	PCI_ROM(0xa727, 0x0013, "ath5212c","3com Ath 5212", AR5K_AR5212),
 };
 
 #define ATH5K_SPMBL_NO   1

@@ -31,8 +31,9 @@ static int _ecb_name ## _setkey ( void *ctx, const void *key,		\
 				  size_t keylen ) {			\
 	return cipher_setkey ( &_raw_cipher, ctx, key, keylen );	\
 }									\
-static void _ecb_name ## _setiv ( void *ctx, const void *iv ) {		\
-	cipher_setiv ( &_raw_cipher, ctx, iv );				\
+static void _ecb_name ## _setiv ( void *ctx, const void *iv,		\
+				  size_t ivlen ) {			\
+	cipher_setiv ( &_raw_cipher, ctx, iv, ivlen );			\
 }									\
 static void _ecb_name ## _encrypt ( void *ctx, const void *src,		\
 				    void *dst, size_t len ) {		\
@@ -46,10 +47,13 @@ struct cipher_algorithm _ecb_cipher = {					\
 	.name		= #_ecb_name,					\
 	.ctxsize	= sizeof ( _raw_context ),			\
 	.blocksize	= _blocksize,					\
+	.alignsize	= _blocksize,					\
+	.authsize	= 0,						\
 	.setkey		= _ecb_name ## _setkey,				\
 	.setiv		= _ecb_name ## _setiv,				\
 	.encrypt	= _ecb_name ## _encrypt,			\
 	.decrypt	= _ecb_name ## _decrypt,			\
+	.auth		= cipher_null_auth,				\
 };
 
 #endif /* _IPXE_ECB_H */

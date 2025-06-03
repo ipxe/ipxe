@@ -2,10 +2,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 #include <config/console.h>
 
-	.text
+	.section ".note.GNU-stack", "", @progbits
+	.code16
 	.arch i386
 	.section ".prefix", "awx", @progbits
-	.code16
 	.org 0
 
 #include "mbr.S"

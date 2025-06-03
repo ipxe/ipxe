@@ -55,12 +55,12 @@ extern void pxe_int_1a ( void );
 static int int_1a_hooked = 0;
 
 /** Real-mode code segment size */
-extern char _text16_memsz[];
-#define _text16_memsz ( ( size_t ) _text16_memsz )
+extern size_t ABS_SYMBOL ( _text16_memsz );
+#define _text16_memsz ABS_VALUE ( _text16_memsz )
 
 /** Real-mode data segment size */
-extern char _data16_memsz[];
-#define _data16_memsz ( ( size_t ) _data16_memsz )
+extern size_t ABS_SYMBOL (_data16_memsz );
+#define _data16_memsz ABS_VALUE ( _data16_memsz )
 
 /** PXENV_UNDI_TRANSMIT API call profiler */
 static struct profiler pxe_api_tx_profiler __profiler =
@@ -144,10 +144,10 @@ static struct profiler * pxe_api_profiler ( unsigned int opcode ) {
  */
 __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
 	uint16_t opcode = ix86->regs.bx;
-	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
 	struct profiler *profiler = pxe_api_profiler ( opcode );
+	union u_PXENV_ANY *params =
+		real_to_virt ( ix86->segs.es, ix86->regs.di );
 	struct pxe_api_call *call;
-	union u_PXENV_ANY params;
 	PXENV_EXIT_t ret;
 
 	/* Start profiling */
@@ -160,17 +160,13 @@ __asmcall void pxe_api_call ( struct i386_all_regs *ix86 ) {
 		call = &pxenv_unknown_api;
 	}
 
-	/* Copy parameter block from caller */
-	copy_from_user ( &params, uparams, 0, call->params_len );
-
 	/* Set default status in case child routine fails to do so */
-	params.Status = PXENV_STATUS_FAILURE;
+	params->Status = PXENV_STATUS_FAILURE;
 
 	/* Hand off to relevant API routine */
-	ret = call->entry ( &params );
+	ret = call->entry ( params );
 
-	/* Copy modified parameter block back to caller and return */
-	copy_to_user ( uparams, 0, &params, call->params_len );
+	/* Return exit code in %ax */
 	ix86->regs.ax = ret;
 
 	/* Stop profiling, if applicable */
@@ -195,24 +191,20 @@ int pxe_api_call_weak ( struct i386_all_regs *ix86 ) {
  * @ret ax		PXE exit code
  */
 __asmcall void pxe_loader_call ( struct i386_all_regs *ix86 ) {
-	userptr_t uparams = real_to_user ( ix86->segs.es, ix86->regs.di );
-	struct s_UNDI_LOADER params;
+	struct s_UNDI_LOADER *params =
+		real_to_virt ( ix86->segs.es, ix86->regs.di );
 	PXENV_EXIT_t ret;
-
-	/* Copy parameter block from caller */
-	copy_from_user ( &params, uparams, 0, sizeof ( params ) );
 
 	/* Fill in ROM segment address */
 	ppxe.UNDIROMID.segment = ix86->segs.ds;
 
 	/* Set default status in case child routine fails to do so */
-	params.Status = PXENV_STATUS_FAILURE;
+	params->Status = PXENV_STATUS_FAILURE;
 
 	/* Call UNDI loader */
-	ret = undi_loader ( &params );
+	ret = undi_loader ( params );
 
-	/* Copy modified parameter block back to caller and return */
-	copy_to_user ( uparams, 0, &params, sizeof ( params ) );
+	/* Return exit code in %ax */
 	ix86->regs.ax = ret;
 }
 
@@ -375,9 +367,10 @@ int pxe_start_nbp ( void ) {
  * Notify BIOS of existence of network device
  *
  * @v netdev		Network device
+ * @v priv		Private data
  * @ret rc		Return status code
  */
-static int pxe_notify ( struct net_device *netdev ) {
+static int pxe_notify ( struct net_device *netdev, void *priv __unused ) {
 
 	/* Do nothing if we already have a network device */
 	if ( pxe_netdev )

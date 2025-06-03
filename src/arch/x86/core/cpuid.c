@@ -84,8 +84,8 @@ int cpuid_supported ( uint32_t function ) {
 		return rc;
 
 	/* Find highest supported function number within this family */
-	cpuid ( ( function & CPUID_EXTENDED ), 0, &max_function, &discard_b,
-		&discard_c, &discard_d );
+	cpuid ( ( function & ( CPUID_EXTENDED | CPUID_HYPERVISOR ) ), 0,
+		  &max_function, &discard_b, &discard_c, &discard_d );
 
 	/* Fail if maximum function number is meaningless (e.g. if we
 	 * are attempting to call an extended function on a CPU which

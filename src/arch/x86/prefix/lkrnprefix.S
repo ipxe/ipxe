@@ -4,9 +4,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 #define BZI_LOAD_HIGH_ADDR 0x100000
 
-	.text
-	.arch i386
+	.section ".note.GNU-stack", "", @progbits
 	.code16
+	.arch i386
 	.section ".prefix", "ax", @progbits
 	.globl	_lkrn_start
 _lkrn_start:
@@ -104,6 +104,7 @@ hardware_subarch:
 hardware_subarch_data:
 	.byte	0, 0, 0, 0, 0, 0, 0, 0
 
+	.section ".prefix.data", "aw", @progbits
 version_string:
 	.asciz	VERSION
 
@@ -113,6 +114,7 @@ version_string:
  *
  */
 
+	.section ".prefix", "ax", @progbits
 setup:
 	/* Fix up code segment */
 	pushw	%ds

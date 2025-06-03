@@ -8,8 +8,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #ifndef ASSEMBLY
 
+/** Unprefixed constant operand modifier */
+#define ASM_NO_PREFIX "c"
+
 /** Declare a function with standard calling conventions */
-#define __asmcall __attribute__ (( used, cdecl, regparm(0) ))
+#define __asmcall __attribute__ (( cdecl, regparm(0) ))
 
 /**
  * Declare a function with libgcc implicit linkage

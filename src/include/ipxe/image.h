@@ -12,7 +12,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/tables.h>
 #include <ipxe/list.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/refcnt.h>
 
 struct uri;
@@ -30,15 +29,28 @@ struct image {
 
 	/** URI of image */
 	struct uri *uri;
-	/** Name */
+	/** Name
+	 *
+	 * If the @c IMAGE_STATIC_NAME flag is set, then this is a
+	 * statically allocated string.
+	 */
 	char *name;
 	/** Flags */
 	unsigned int flags;
 
 	/** Command line to pass to image */
 	char *cmdline;
-	/** Raw file image */
-	userptr_t data;
+	/** Raw file image
+	 *
+	 * If the @c IMAGE_STATIC flag is set, then this is a
+	 * statically allocated image.
+	 */
+	union {
+		/** Read-only data */
+		const void *data;
+		/** Writable data */
+		void *rwdata;
+	};
 	/** Length of raw file image */
 	size_t len;
 
@@ -61,16 +73,22 @@ struct image {
 };
 
 /** Image is registered */
-#define IMAGE_REGISTERED 0x00001
-
-/** Image is selected for execution */
-#define IMAGE_SELECTED 0x0002
+#define IMAGE_REGISTERED 0x0001
 
 /** Image is trusted */
-#define IMAGE_TRUSTED 0x0004
+#define IMAGE_TRUSTED 0x0002
 
 /** Image will be automatically unregistered after execution */
-#define IMAGE_AUTO_UNREGISTER 0x0008
+#define IMAGE_AUTO_UNREGISTER 0x0004
+
+/** Image will be hidden from enumeration */
+#define IMAGE_HIDDEN 0x0008
+
+/** Image is statically allocated */
+#define IMAGE_STATIC 0x0010
+
+/** Image name is statically allocated */
+#define IMAGE_STATIC_NAME 0x0020
 
 /** An executable image type */
 struct image_type {
@@ -113,6 +131,14 @@ struct image_type {
 	 */
 	int ( * asn1 ) ( struct image *image, size_t offset,
 			 struct asn1_cursor **cursor );
+	/**
+	 * Extract archive image
+	 *
+	 * @v image		Image
+	 * @v extracted		Extracted image
+	 * @ret rc		Return status code
+	 */
+	int ( * extract ) ( struct image *image, struct image *extracted );
 };
 
 /**
@@ -142,8 +168,23 @@ struct image_type {
 /** An executable image type */
 #define __image_type( probe_order ) __table_entry ( IMAGE_TYPES, probe_order )
 
+/** An image tag */
+struct image_tag {
+	/** Name */
+	const char *name;
+	/** Image (weak reference, nullified when image is freed) */
+	struct image *image;
+};
+
+/** Image tag table */
+#define IMAGE_TAGS __table ( struct image_tag, "image_tags" )
+
+/** An image tag */
+#define __image_tag __table_entry ( IMAGE_TAGS, 01 )
+
 extern struct list_head images;
-extern struct image *current_image;
+extern struct image_tag current_image;
+extern struct image_tag selected_image;
 
 /** Iterate over all registered images */
 #define for_each_image( image ) \
@@ -154,15 +195,6 @@ extern struct image *current_image;
 	list_for_each_entry_safe ( (image), (tmp), &images, list )
 
 /**
- * Test for existence of images
- *
- * @ret existence	Some images exist
- */
-static inline int have_images ( void ) {
-	return ( ! list_empty ( &images ) );
-}
-
-/**
  * Retrieve first image
  *
  * @ret image		Image, or NULL
@@ -171,21 +203,32 @@ static inline struct image * first_image ( void ) {
 	return list_first_entry ( &images, struct image, list );
 }
 
+extern void free_image ( struct refcnt *refcnt );
 extern struct image * alloc_image ( struct uri *uri );
 extern int image_set_uri ( struct image *image, struct uri *uri );
 extern int image_set_name ( struct image *image, const char *name );
+extern char * image_strip_suffix ( struct image *image );
 extern int image_set_cmdline ( struct image *image, const char *cmdline );
+extern int image_set_len ( struct image *image, size_t len );
+extern int image_set_data ( struct image *image, const void *data,
+			    size_t len );
 extern int register_image ( struct image *image );
 extern void unregister_image ( struct image *image );
-struct image * find_image ( const char *name );
+extern struct image * find_image ( const char *name );
+extern struct image * find_image_tag ( struct image_tag *tag );
 extern int image_exec ( struct image *image );
 extern int image_replace ( struct image *replacement );
 extern int image_select ( struct image *image );
-extern struct image * image_find_selected ( void );
 extern int image_set_trust ( int require_trusted, int permanent );
+extern struct image * image_memory ( const char *name, const void *data,
+				     size_t len );
+extern const char * image_argument ( struct image *image, const char *key );
 extern int image_pixbuf ( struct image *image, struct pixel_buffer **pixbuf );
 extern int image_asn1 ( struct image *image, size_t offset,
 			struct asn1_cursor **cursor );
+extern int image_extract ( struct image *image, const char *name,
+			   struct image **extracted );
+extern int image_extract_exec ( struct image *image );
 
 /**
  * Increment reference count on an image
@@ -232,6 +275,30 @@ static inline void image_trust ( struct image *image ) {
  */
 static inline void image_untrust ( struct image *image ) {
 	image->flags &= ~IMAGE_TRUSTED;
+}
+
+/**
+ * Mark image as hidden
+ *
+ * @v image		Image
+ */
+static inline void image_hide ( struct image *image ) {
+	image->flags |= IMAGE_HIDDEN;
+}
+
+/**
+ * Tag image
+ *
+ * @v image		Image
+ * @v tag		Image tag
+ * @ret prev		Previous tagged image (if any)
+ */
+static inline struct image * image_tag ( struct image *image,
+					 struct image_tag *tag ) {
+	struct image *prev = tag->image;
+
+	tag->image = image;
+	return prev;
 }
 
 #endif /* _IPXE_IMAGE_H */

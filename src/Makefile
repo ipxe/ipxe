@@ -10,6 +10,7 @@ LDFLAGS		:=
 HOST_CFLAGS	:=
 MAKEDEPS	:= Makefile
 CROSS_COMPILE	?= $(CROSS)
+SYMBOL_PREFIX	:=
 
 ###############################################################################
 #
@@ -23,17 +24,19 @@ CP		:= cp
 ECHO		:= echo
 PRINTF		:= printf
 PERL		:= perl
+PYTHON		:= python
 TRUE		:= true
-CC		:= $(CROSS_COMPILE)gcc
-CPP		:= $(CC) -E
-AS		:= $(CROSS_COMPILE)as
-LD		:= $(CROSS_COMPILE)ld
-SIZE		:= $(CROSS_COMPILE)size
-AR		:= $(CROSS_COMPILE)ar
-RANLIB		:= $(CROSS_COMPILE)ranlib
-OBJCOPY		:= $(CROSS_COMPILE)objcopy
-NM		:= $(CROSS_COMPILE)nm
-OBJDUMP		:= $(CROSS_COMPILE)objdump
+TRUNCATE	:= truncate
+CC		= $(CROSS_COMPILE)gcc
+CPP		= $(CC) -E
+AS		= $(CROSS_COMPILE)as
+LD		= $(CROSS_COMPILE)ld
+SIZE		= $(CROSS_COMPILE)size
+AR		= $(CROSS_COMPILE)ar
+RANLIB		= $(CROSS_COMPILE)ranlib
+OBJCOPY		= $(CROSS_COMPILE)objcopy
+NM		= $(CROSS_COMPILE)nm
+OBJDUMP		= $(CROSS_COMPILE)objdump
 OPENSSL		:= openssl
 CSPLIT		:= csplit
 PARSEROM	:= ./util/parserom.pl
@@ -43,14 +46,14 @@ SORTOBJDUMP	:= ./util/sortobjdump.pl
 PADIMG		:= ./util/padimg.pl
 LICENCE		:= ./util/licence.pl
 NRV2B		:= ./util/nrv2b
-ZBIN		:= ./util/zbin
+ZBIN32		:= ./util/zbin32
+ZBIN64		:= ./util/zbin64
 ELF2EFI32	:= ./util/elf2efi32
 ELF2EFI64	:= ./util/elf2efi64
 EFIROM		:= ./util/efirom
 EFIFATBIN	:= ./util/efifatbin
-ICCFIX		:= ./util/iccfix
 EINFO		:= ./util/einfo
-GENKEYMAP	:= ./util/genkeymap.pl
+GENKEYMAP	:= ./util/genkeymap.py
 DOXYGEN		:= doxygen
 LCAB		:= lcab
 QEMUIMG		:= qemu-img
@@ -76,6 +79,7 @@ SRCDIRS		+= drivers/net/efi
 SRCDIRS		+= drivers/net/tg3
 SRCDIRS		+= drivers/net/bnxt
 SRCDIRS		+= drivers/net/sfc
+SRCDIRS		+= drivers/net/marvell
 SRCDIRS		+= drivers/block
 SRCDIRS		+= drivers/nvs
 SRCDIRS		+= drivers/bitbash
@@ -190,7 +194,7 @@ vmware : bin/8086100f.mrom bin/808610d3.mrom bin/10222000.rom bin/15ad07b0.rom
 	@$(ECHO) '    bin/10222000.rom  -- vlance/pcnet32'
 	@$(ECHO) '    bin/15ad07b0.rom  -- vmxnet3'
 	@$(ECHO) 
-	@$(ECHO) 'For more information, see http://ipxe.org/howto/vmware'
+	@$(ECHO) 'For more information, see https://ipxe.org/howto/vmware'
 	@$(ECHO)
 	@$(ECHO) '==========================================================='
 

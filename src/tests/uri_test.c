@@ -92,15 +92,17 @@ struct uri_churi_test {
 	const char *expected;
 };
 
-/** A form parameter URI test list */
+/** A request parameter URI test list */
 struct uri_params_test_list {
 	/** Key */
 	const char *key;
 	/** Value */
 	const char *value;
+	/** Flags */
+	unsigned int flags;
 };
 
-/** A form parameter URI test */
+/** A request parameter URI test */
 struct uri_params_test {
 	/** URI string */
 	const char *string;
@@ -149,8 +151,10 @@ static void uri_okx ( struct uri *uri, struct uri *expected, const char *file,
 	okx ( uristrcmp ( uri->host, expected->host ) == 0, file, line );
 	okx ( uristrcmp ( uri->port, expected->port ) == 0, file, line );
 	okx ( uristrcmp ( uri->path, expected->path ) == 0, file, line );
-	okx ( uristrcmp ( uri->query, expected->query ) == 0, file, line );
-	okx ( uristrcmp ( uri->fragment, expected->fragment ) == 0, file, line);
+	okx ( uristrcmp ( uri->epath, expected->epath ) == 0, file, line );
+	okx ( uristrcmp ( uri->equery, expected->equery ) == 0, file, line );
+	okx ( uristrcmp ( uri->efragment, expected->efragment ) == 0,
+	      file, line);
 	okx ( uri->params == expected->params, file, line );
 }
 #define uri_ok( uri, expected ) uri_okx ( uri, expected, __FILE__, __LINE__ )
@@ -401,9 +405,9 @@ static void uri_churi_okx ( struct uri_churi_test *test, const char *file,
 #define uri_churi_ok( test ) uri_churi_okx ( test, __FILE__, __LINE__ )
 
 /**
- * Report form parameter URI test list result
+ * Report request parameter URI test list result
  *
- * @v test		Form parameter URI test
+ * @v test		Request parameter URI test
  * @v uri		URI
  * @v file		Test code file
  * @v line		Test code line
@@ -426,6 +430,7 @@ static void uri_params_list_okx ( struct uri_params_test *test,
 			      file, line );
 			okx ( strcmp ( param->value, list->value ) == 0,
 			      file, line );
+			okx ( param->flags == list->flags, file, line );
 			list++;
 		}
 		okx ( list->key == NULL, file, line );
@@ -435,9 +440,9 @@ static void uri_params_list_okx ( struct uri_params_test *test,
 	uri_params_list_okx ( test, __FILE__, __LINE__ )
 
 /**
- * Report form parameter URI test result
+ * Report request parameter URI test result
  *
- * @v test		Form parameter URI test
+ * @v test		Request parameter URI test
  * @v file		Test code file
  * @v line		Test code line
  */
@@ -454,7 +459,8 @@ static void uri_params_okx ( struct uri_params_test *test, const char *file,
 	okx ( params != NULL, file, line );
 	if ( params ) {
 		for ( list = test->list ; list->key ; list++ ) {
-			param = add_parameter ( params, list->key, list->value);
+			param = add_parameter ( params, list->key, list->value,
+						list->flags );
 			okx ( param != NULL, file, line );
 		}
 	}
@@ -490,25 +496,33 @@ static struct uri_test uri_empty = {
 /** Basic HTTP URI */
 static struct uri_test uri_boot_ipxe_org = {
 	"http://boot.ipxe.org/demo/boot.php",
-	{ .scheme = "http", .host = "boot.ipxe.org", .path = "/demo/boot.php" }
+	{ .scheme = "http", .host = "boot.ipxe.org",
+	  .path = "/demo/boot.php", .epath = "/demo/boot.php" },
 };
 
 /** Basic opaque URI */
 static struct uri_test uri_mailto = {
 	"mailto:ipxe-devel@lists.ipxe.org",
-	{ .scheme = "mailto", .opaque = "ipxe-devel@lists.ipxe.org" }
+	{ .scheme = "mailto", .opaque = "ipxe-devel@lists.ipxe.org" },
+};
+
+/** Basic host-only URI */
+static struct uri_test uri_host = {
+	"http://boot.ipxe.org",
+	{ .scheme = "http", .host = "boot.ipxe.org" },
 };
 
 /** Basic path-only URI */
 static struct uri_test uri_path = {
 	"/var/lib/tftpboot/pxelinux.0",
-	{ .path = "/var/lib/tftpboot/pxelinux.0" },
+	{ .path = "/var/lib/tftpboot/pxelinux.0",
+	  .epath ="/var/lib/tftpboot/pxelinux.0" },
 };
 
 /** Path-only URI with escaped characters */
 static struct uri_test uri_path_escaped = {
 	"/hello%20world%3F",
-	{ .path = "/hello world?" },
+	{ .path = "/hello world?", .epath = "/hello%20world%3F" },
 };
 
 /** HTTP URI with all the trimmings */
@@ -521,8 +535,9 @@ static struct uri_test uri_http_all = {
 		.host = "example.com",
 		.port = "3001",
 		.path = "/~foo/cgi-bin/foo.pl",
-		.query = "a=b&c=d",
-		.fragment = "bit",
+		.epath = "/~foo/cgi-bin/foo.pl",
+		.equery = "a=b&c=d",
+		.efragment = "bit",
 	},
 };
 
@@ -533,8 +548,9 @@ static struct uri_test uri_http_escaped = {
 		.scheme = "https",
 		.host = "test.ipxe.org",
 		.path = "/wtf?\n",
-		.query = "kind#of/uri is",
-		.fragment = "this?",
+		.epath = "/wtf%3F%0A",
+		.equery = "kind%23of/uri%20is",
+		.efragment = "this%3F",
 	},
 };
 
@@ -550,8 +566,9 @@ static struct uri_test uri_http_escaped_improper = {
 		.scheme = "https",
 		.host = "test.ipxe.org",
 		.path = "/wtf?\n",
-		.query = "kind#of/uri is",
-		.fragment = "this?",
+		.epath = "/wt%66%3f\n",
+		.equery = "kind%23of/uri is",
+		.efragment = "this?",
 	},
 };
 
@@ -562,6 +579,7 @@ static struct uri_test uri_ipv6 = {
 		.scheme = "http",
 		.host = "[2001:ba8:0:1d4::6950:5845]",
 		.path = "/",
+		.epath = "/",
 	},
 };
 
@@ -573,6 +591,7 @@ static struct uri_test uri_ipv6_port = {
 		.host = "[2001:ba8:0:1d4::6950:5845]",
 		.port = "8001",
 		.path = "/boot",
+		.epath = "/boot",
 	},
 };
 
@@ -583,6 +602,7 @@ static struct uri_test uri_ipv6_local = {
 		.scheme = "http",
 		.host = "[fe80::69ff:fe50:5845%net0]",
 		.path = "/ipxe",
+		.epath = "/ipxe",
 	},
 };
 
@@ -598,6 +618,7 @@ static struct uri_test uri_ipv6_local_non_conforming = {
 		.scheme = "http",
 		.host = "[fe80::69ff:fe50:5845%net0]",
 		.path = "/ipxe",
+		.epath = "/ipxe",
 	},
 };
 
@@ -625,6 +646,7 @@ static struct uri_test uri_file_absolute = {
 	{
 		.scheme = "file",
 		.path = "/boot/script.ipxe",
+		.epath = "/boot/script.ipxe",
 	},
 };
 
@@ -635,6 +657,16 @@ static struct uri_test uri_file_volume = {
 		.scheme = "file",
 		.host = "hpilo",
 		.path = "/boot/script.ipxe",
+		.epath = "/boot/script.ipxe",
+	},
+};
+
+/** Relative URI with colons in path */
+static struct uri_test uri_colons = {
+	"/boot/52:54:00:12:34:56/boot.ipxe",
+	{
+		.path = "/boot/52:54:00:12:34:56/boot.ipxe",
+		.epath = "/boot/52:54:00:12:34:56/boot.ipxe",
 	},
 };
 
@@ -722,6 +754,20 @@ static struct uri_resolve_test uri_fragment = {
 	"http://192.168.0.254/test#bar",
 };
 
+/** Empty relative URI resolution test */
+static struct uri_resolve_test uri_self = {
+	"http://192.168.0.1/path/to/me",
+	"",
+	"http://192.168.0.1/path/to/me",
+};
+
+/** Current directory URI resolution test */
+static struct uri_resolve_test uri_cwd = {
+	"http://192.168.0.1/path/to/me",
+	".",
+	"http://192.168.0.1/path/to/",
+};
+
 /** PXE URI with absolute URI */
 static struct uri_pxe_test uri_pxe_absolute = {
 	{
@@ -736,6 +782,7 @@ static struct uri_pxe_test uri_pxe_absolute = {
 		.scheme = "http",
 		.host = "not.a.tftp",
 		.path = "/uri",
+		.epath = "/uri",
 	},
 	"http://not.a.tftp/uri",
 };
@@ -754,6 +801,7 @@ static struct uri_pxe_test uri_pxe_absolute_path = {
 		.scheme = "tftp",
 		.host = "192.168.0.2",
 		.path = "//absolute/path",
+		.epath = "//absolute/path",
 	},
 	"tftp://192.168.0.2//absolute/path",
 };
@@ -772,6 +820,7 @@ static struct uri_pxe_test uri_pxe_relative_path = {
 		.scheme = "tftp",
 		.host = "192.168.0.3",
 		.path = "/relative/path",
+		.epath = "/relative/path",
 	},
 	"tftp://192.168.0.3/relative/path",
 };
@@ -790,8 +839,9 @@ static struct uri_pxe_test uri_pxe_icky = {
 		.scheme = "tftp",
 		.host = "10.0.0.6",
 		.path = "/C:\\tftpboot\\icky#path",
+		.epath = "/C:\\tftpboot\\icky#path",
 	},
-	"tftp://10.0.0.6/C%3A\\tftpboot\\icky%23path",
+	"tftp://10.0.0.6/C:\\tftpboot\\icky#path",
 };
 
 /** PXE URI with custom port */
@@ -810,6 +860,7 @@ static struct uri_pxe_test uri_pxe_port = {
 		.host = "192.168.0.1",
 		.port = "4069",
 		.path = "//another/path",
+		.epath = "//another/path",
 	},
 	"tftp://192.168.0.1:4069//another/path",
 };
@@ -846,55 +897,63 @@ static struct uri_churi_test uri_churi[] = {
 	}
 };
 
-/** Form parameter URI test list */
+/** Request parameter URI test list */
 static struct uri_params_test_list uri_params_list[] = {
 	{
 		"vendor",
 		"10ec",
+		PARAMETER_FORM,
 	},
 	{
 		"device",
 		"8139",
+		PARAMETER_FORM,
 	},
 	{
 		"uuid",
 		"f59fac00-758f-498f-9fe5-87d790045d94",
+		PARAMETER_HEADER,
 	},
 	{
 		NULL,
 		NULL,
+		0,
 	}
 };
 
-/** Form parameter URI test */
+/** Request parameter URI test */
 static struct uri_params_test uri_params = {
 	"http://boot.ipxe.org/demo/boot.php##params",
 	{
 		.scheme = "http",
 		.host = "boot.ipxe.org",
 		.path = "/demo/boot.php",
+		.epath = "/demo/boot.php",
 	},
 	NULL,
 	uri_params_list,
 };
 
-/** Named form parameter URI test list */
+/** Named request parameter URI test list */
 static struct uri_params_test_list uri_named_params_list[] = {
 	{
 		"mac",
 		"00:1e:65:80:d3:b6",
+		PARAMETER_FORM,
 	},
 	{
 		"serial",
 		"LXTQ20Z1139322762F2000",
+		PARAMETER_FORM,
 	},
 	{
 		NULL,
 		NULL,
+		0,
 	}
 };
 
-/** Named form parameter URI test */
+/** Named request parameter URI test */
 static struct uri_params_test uri_named_params = {
 	"http://192.168.100.4:3001/register##params=foo",
 	{
@@ -902,6 +961,7 @@ static struct uri_params_test uri_named_params = {
 		.host = "192.168.100.4",
 		.port = "3001",
 		.path = "/register",
+		.epath = "/register",
 	},
 	"foo",
 	uri_named_params_list,
@@ -917,6 +977,7 @@ static void uri_test_exec ( void ) {
 	uri_parse_format_dup_ok ( &uri_empty );
 	uri_parse_format_dup_ok ( &uri_boot_ipxe_org );
 	uri_parse_format_dup_ok ( &uri_mailto );
+	uri_parse_format_dup_ok ( &uri_host );
 	uri_parse_format_dup_ok ( &uri_path );
 	uri_parse_format_dup_ok ( &uri_path_escaped );
 	uri_parse_format_dup_ok ( &uri_http_all );
@@ -930,6 +991,7 @@ static void uri_test_exec ( void ) {
 	uri_parse_format_dup_ok ( &uri_file_relative );
 	uri_parse_format_dup_ok ( &uri_file_absolute );
 	uri_parse_format_dup_ok ( &uri_file_volume );
+	uri_parse_format_dup_ok ( &uri_colons );
 
 	/** URI port number tests */
 	uri_port_ok ( &uri_explicit_port );
@@ -948,6 +1010,8 @@ static void uri_test_exec ( void ) {
 	uri_resolve_ok ( &uri_absolute_uri_path );
 	uri_resolve_ok ( &uri_query );
 	uri_resolve_ok ( &uri_fragment );
+	uri_resolve_ok ( &uri_self );
+	uri_resolve_ok ( &uri_cwd );
 
 	/* PXE URI construction tests */
 	uri_pxe_ok ( &uri_pxe_absolute );
@@ -959,7 +1023,7 @@ static void uri_test_exec ( void ) {
 	/* Current working URI tests */
 	uri_churi_ok ( uri_churi );
 
-	/* Form parameter URI tests */
+	/* Request parameter URI tests */
 	uri_params_ok ( &uri_params );
 	uri_params_ok ( &uri_named_params );
 }

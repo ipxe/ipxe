@@ -254,15 +254,14 @@ int select ( fd_set *readfds, int wait ) {
 /**
  * Read data from file
  *
- * @v buffer		Data buffer
- * @v offset		Starting offset within data buffer
- * @v len		Maximum length to read
+ * @v buf		Data buffer
+ * @v max_len		Maximum length to read
  * @ret len		Actual length read, or negative error number
  *
  * This call is non-blocking; if no data is available to read then
  * -EWOULDBLOCK will be returned.
  */
-ssize_t read_user ( int fd, userptr_t buffer, off_t offset, size_t max_len ) {
+ssize_t read ( int fd, void *buf, size_t max_len ) {
 	struct posix_file *file;
 	struct io_buffer *iobuf;
 	size_t len;
@@ -281,7 +280,7 @@ ssize_t read_user ( int fd, userptr_t buffer, off_t offset, size_t max_len ) {
 		len = iob_len ( iobuf );
 		if ( len > max_len )
 			len = max_len;
-		copy_to_user ( buffer, offset, iobuf->data, len );
+		memcpy ( buf, iobuf->data, len );
 		iob_pull ( iobuf, len );
 		if ( ! iob_len ( iobuf ) ) {
 			list_del ( &iobuf->list );

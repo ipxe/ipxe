@@ -28,7 +28,7 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 #include <ipxe/init.h>
 #include <ipxe/keys.h>
-#include <linux_api.h>
+#include <ipxe/linux_api.h>
 
 #include <linux/termios.h>
 #include <asm/errno.h>

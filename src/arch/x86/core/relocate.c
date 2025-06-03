@@ -1,4 +1,5 @@
-#include <ipxe/io.h>
+#include <ipxe/uaccess.h>
+#include <ipxe/memmap.h>
 #include <registers.h>
 
 /*
@@ -41,82 +42,73 @@ extern char _etextdata[];
  * to the prefix in %edi.
  */
 __asmcall void relocate ( struct i386_all_regs *ix86 ) {
-	struct memory_map memmap;
-	uint32_t start, end, size, padded_size, max;
-	uint32_t new_start, new_end;
-	unsigned i;
+	struct memmap_region region;
+	physaddr_t start, end, max;
+	physaddr_t new_start, new_end;
+	physaddr_t r_start, r_end;
+	size_t size, padded_size;
 
-	/* Get memory map and current location */
-	get_memmap ( &memmap );
+	/* Show whole memory map (for debugging) */
+	memmap_dump_all ( 0 );
+
+	/* Get current location */
 	start = virt_to_phys ( _textdata );
 	end = virt_to_phys ( _etextdata );
 	size = ( end - start );
 	padded_size = ( size + ALIGN - 1 );
 
-	DBG ( "Relocate: currently at [%x,%x)\n"
-	      "...need %x bytes for %d-byte alignment\n",
-	      start, end, padded_size, ALIGN );
+	DBGC ( &region, "Relocate: currently at [%#08lx,%#08lx)\n"
+	       "...need %#zx bytes for %d-byte alignment\n",
+	       start, end, padded_size, ALIGN );
 
 	/* Determine maximum usable address */
 	max = MAX_ADDR;
 	if ( ix86->regs.ebp < max ) {
 		max = ix86->regs.ebp;
-		DBG ( "Limiting relocation to [0,%x)\n", max );
+		DBGC ( &region, "Limiting relocation to [0,%#08lx)\n", max );
 	}
 
 	/* Walk through the memory map and find the highest address
-	 * below 4GB that iPXE will fit into.
+	 * above the current iPXE and below 4GB that iPXE will fit
+	 * into.
 	 */
 	new_end = end;
-	for ( i = 0 ; i < memmap.count ; i++ ) {
-		struct memory_region *region = &memmap.regions[i];
-		uint32_t r_start, r_end;
+	for_each_memmap_from ( &region, end, 0 ) {
 
-		DBG ( "Considering [%llx,%llx)\n", region->start, region->end);
-		
 		/* Truncate block to maximum address.  This will be
-		 * less than 4GB, which means that we can get away
-		 * with using just 32-bit arithmetic after this stage.
+		 * strictly less than 4GB, which means that we can get
+		 * away with using just 32-bit arithmetic after this
+		 * stage.
 		 */
-		if ( region->start > max ) {
-			DBG ( "...starts after max=%x\n", max );
+		DBGC_MEMMAP ( &region, &region );
+		if ( region.min > max ) {
+			DBGC ( &region, "...starts after max=%#08lx\n", max );
+			break;
+		}
+		r_start = region.min;
+		if ( ! memmap_is_usable ( &region ) ) {
+			DBGC ( &region, "...not usable\n" );
 			continue;
 		}
-		r_start = region->start;
-		if ( region->end > max ) {
-			DBG ( "...end truncated to max=%x\n", max );
+		r_end = ( r_start + memmap_size ( &region ) );
+		if ( ( r_end == 0 ) || ( r_end > max ) ) {
+			DBGC ( &region, "...end truncated to max=%#08lx\n",
+			       max );
 			r_end = max;
-		} else {
-			r_end = region->end;
 		}
-		DBG ( "...usable portion is [%x,%x)\n", r_start, r_end );
-
-		/* If we have rounded down r_end below r_ start, skip
-		 * this block.
-		 */
-		if ( r_end < r_start ) {
-			DBG ( "...truncated to negative size\n" );
-			continue;
-		}
+		DBGC ( &region, "...usable portion is [%#08lx,%#08lx)\n",
+		       r_start, r_end );
 
 		/* Check that there is enough space to fit in iPXE */
-		if ( ( r_end - r_start ) < size ) {
-			DBG ( "...too small (need %x bytes)\n", size );
+		if ( ( r_end - r_start ) < padded_size ) {
+			DBGC ( &region, "...too small (need %#zx bytes)\n",
+			       padded_size );
 			continue;
 		}
 
-		/* If the start address of the iPXE we would
-		 * place in this block is higher than the end address
-		 * of the current highest block, use this block.
-		 *
-		 * Note that this avoids overlaps with the current
-		 * iPXE, as well as choosing the highest of all viable
-		 * blocks.
-		 */
-		if ( ( r_end - size ) > new_end ) {
-			new_end = r_end;
-			DBG ( "...new best block found.\n" );
-		}
+		/* Use highest block with enough space */
+		new_end = r_end;
+		DBGC ( &region, "...new best block found.\n" );
 	}
 
 	/* Calculate new location of iPXE, and align it to the
@@ -126,9 +118,9 @@ __asmcall void relocate ( struct i386_all_regs *ix86 ) {
 	new_start += ( ( start - new_start ) & ( ALIGN - 1 ) );
 	new_end = new_start + size;
 
-	DBG ( "Relocating from [%x,%x) to [%x,%x)\n",
-	      start, end, new_start, new_end );
-	
+	DBGC ( &region, "Relocating from [%#08lx,%#08lx) to [%#08lx,%#08lx)\n",
+	       start, end, new_start, new_end );
+
 	/* Let prefix know what to copy */
 	ix86->regs.esi = start;
 	ix86->regs.edi = new_start;

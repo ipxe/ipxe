@@ -60,6 +60,21 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define ATTR_DEFAULT		ATTR_FCOL_WHITE
 
+/** Maximum keycode subject to remapping
+ *
+ * This allows us to avoid remapping the numeric keypad, which is
+ * necessary for keyboard layouts such as "fr" that swap the shifted
+ * and unshifted digit keys.
+ */
+#define SCANCODE_RSHIFT		0x36
+
+/** Scancode for the "non-US \ and |" key
+ *
+ * This is the key that appears between Left Shift and Z on non-US
+ * keyboards.
+ */
+#define SCANCODE_NON_US		0x56
+
 /* Set default console usage if applicable */
 #if ! ( defined ( CONSOLE_PCBIOS ) && CONSOLE_EXPLICIT ( CONSOLE_PCBIOS ) )
 #undef CONSOLE_PCBIOS
@@ -275,29 +290,38 @@ static const char *bios_ansi_input = "";
 struct bios_key {
 	/** Scancode */
 	uint8_t scancode;
-	/** Key code */
-	uint16_t key;
+	/** Relative key value */
+	uint16_t rkey;
 } __attribute__ (( packed ));
+
+/**
+ * Define a BIOS key mapping
+ *
+ * @v scancode		Scancode
+ * @v key		iPXE key code
+ * @v bioskey		BIOS key mapping
+ */
+#define BIOS_KEY( scancode, key ) { scancode, KEY_REL ( key ) }
 
 /** Mapping from BIOS scan codes to iPXE key codes */
 static const struct bios_key bios_keys[] = {
-	{ 0x53, KEY_DC },
-	{ 0x48, KEY_UP },
-	{ 0x50, KEY_DOWN },
-	{ 0x4b, KEY_LEFT },
-	{ 0x4d, KEY_RIGHT },
-	{ 0x47, KEY_HOME },
-	{ 0x4f, KEY_END },
-	{ 0x49, KEY_PPAGE },
-	{ 0x51, KEY_NPAGE },
-	{ 0x3f, KEY_F5 },
-	{ 0x40, KEY_F6 },
-	{ 0x41, KEY_F7 },
-	{ 0x42, KEY_F8 },
-	{ 0x43, KEY_F9 },
-	{ 0x44, KEY_F10 },
-	{ 0x85, KEY_F11 },
-	{ 0x86, KEY_F12 },
+	BIOS_KEY ( 0x53, KEY_DC ),
+	BIOS_KEY ( 0x48, KEY_UP ),
+	BIOS_KEY ( 0x50, KEY_DOWN ),
+	BIOS_KEY ( 0x4b, KEY_LEFT ),
+	BIOS_KEY ( 0x4d, KEY_RIGHT ),
+	BIOS_KEY ( 0x47, KEY_HOME ),
+	BIOS_KEY ( 0x4f, KEY_END ),
+	BIOS_KEY ( 0x49, KEY_PPAGE ),
+	BIOS_KEY ( 0x51, KEY_NPAGE ),
+	BIOS_KEY ( 0x3f, KEY_F5 ),
+	BIOS_KEY ( 0x40, KEY_F6 ),
+	BIOS_KEY ( 0x41, KEY_F7 ),
+	BIOS_KEY ( 0x42, KEY_F8 ),
+	BIOS_KEY ( 0x43, KEY_F9 ),
+	BIOS_KEY ( 0x44, KEY_F10 ),
+	BIOS_KEY ( 0x85, KEY_F11 ),
+	BIOS_KEY ( 0x86, KEY_F12 ),
 };
 
 /**
@@ -308,7 +332,7 @@ static const struct bios_key bios_keys[] = {
  */
 static const char * bios_ansi_seq ( unsigned int scancode ) {
 	static char buf[ 5 /* "[" + two digits + terminator + NUL */ ];
-	unsigned int key;
+	unsigned int rkey;
 	unsigned int terminator;
 	unsigned int n;
 	unsigned int i;
@@ -323,9 +347,9 @@ static const char * bios_ansi_seq ( unsigned int scancode ) {
 			continue;
 
 		/* Construct escape sequence */
-		key = bios_keys[i].key;
-		n = KEY_ANSI_N ( key );
-		terminator = KEY_ANSI_TERMINATOR ( key );
+		rkey = bios_keys[i].rkey;
+		n = KEY_ANSI_N ( rkey );
+		terminator = KEY_ANSI_TERMINATOR ( rkey );
 		*(tmp++) = '[';
 		if ( n )
 			tmp += sprintf ( tmp, "%d", n );
@@ -340,28 +364,15 @@ static const char * bios_ansi_seq ( unsigned int scancode ) {
 }
 
 /**
- * Map a key
- *
- * @v character		Character read from console
- * @ret character	Mapped character
- */
-static int bios_keymap ( unsigned int character ) {
-	struct key_mapping *mapping;
-
-	for_each_table_entry ( mapping, KEYMAP ) {
-		if ( mapping->from == character )
-			return mapping->to;
-	}
-	return character;
-}
-
-/**
  * Get character from BIOS console
  *
  * @ret character	Character read from console
  */
 static int bios_getchar ( void ) {
 	uint16_t keypress;
+	uint8_t kb0;
+	uint8_t kb2;
+	unsigned int scancode;
 	unsigned int character;
 	const char *ansi_seq;
 
@@ -383,11 +394,42 @@ static int bios_getchar ( void ) {
 			       : "=a" ( keypress )
 			       : "a" ( 0x1000 ), "m" ( bios_inject_lock ) );
 	bios_inject_lock--;
+	scancode = ( keypress >> 8 );
 	character = ( keypress & 0xff );
+	get_real ( kb0, BDA_SEG, BDA_KB0 );
+	get_real ( kb2, BDA_SEG, BDA_KB2 );
 
-	/* If it's a normal character, just map and return it */
-	if ( character && ( character < 0x80 ) )
-		return bios_keymap ( character );
+	/* If it's a normal character, map (if applicable) and return it */
+	if ( character && ( character < 0x80 ) ) {
+
+		/* Handle special scancodes */
+		if ( scancode == SCANCODE_NON_US ) {
+			/* Treat as "\|" with high bit set */
+			character |= KEYMAP_PSEUDO;
+		} else if ( scancode >= SCANCODE_RSHIFT ) {
+			/* Non-remappable scancode (e.g. numeric keypad) */
+			return character;
+		}
+
+		/* Apply modifiers */
+		if ( kb0 & BDA_KB0_CTRL )
+			character |= KEYMAP_CTRL;
+		if ( kb0 & BDA_KB0_CAPSLOCK )
+			character |= KEYMAP_CAPSLOCK_REDO;
+		if ( kb2 & BDA_KB2_RALT )
+			character |= KEYMAP_ALTGR;
+
+		/* Treat LShift+RShift as AltGr since many BIOSes will
+		 * not return ASCII characters when AltGr is pressed.
+		 */
+		if ( ( kb0 & ( BDA_KB0_LSHIFT | BDA_KB0_RSHIFT ) ) ==
+		     ( BDA_KB0_LSHIFT | BDA_KB0_RSHIFT ) ) {
+			character |= KEYMAP_ALTGR;
+		}
+
+		/* Map and return */
+		return key_remap ( character );
+	}
 
 	/* Otherwise, check for a special key that we know about */
 	if ( ( ansi_seq = bios_ansi_seq ( keypress >> 8 ) ) ) {
@@ -443,9 +485,10 @@ struct console_driver bios_console __console_driver = {
  *
  * @v ix86		Registers as passed to INT 16
  */
-static __asmcall void bios_inject ( struct i386_all_regs *ix86 ) {
+static __asmcall __used void bios_inject ( struct i386_all_regs *ix86 ) {
 	unsigned int discard_a;
 	unsigned int scancode;
+	unsigned int rkey;
 	unsigned int i;
 	uint16_t keypress;
 	int key;
@@ -488,9 +531,10 @@ static __asmcall void bios_inject ( struct i386_all_regs *ix86 ) {
 
 		/* Handle special keys */
 		if ( key >= KEY_MIN ) {
+			rkey = KEY_REL ( key );
 			for ( i = 0 ; i < ( sizeof ( bios_keys ) /
 					    sizeof ( bios_keys[0] ) ) ; i++ ) {
-				if ( bios_keys[i].key == key ) {
+				if ( bios_keys[i].rkey == rkey ) {
 					scancode = bios_keys[i].scancode;
 					keypress = ( scancode << 8 );
 					break;

@@ -1,13 +1,13 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
-	.arch i386
+	.section ".note.GNU-stack", "", @progbits
 
 /****************************************************************************
  * Internal stack
  ****************************************************************************
  */
 	.section ".stack16", "aw", @nobits
-	.align 8
+	.balign 8
 	.globl _stack16
 _stack16:
 	.space 4096

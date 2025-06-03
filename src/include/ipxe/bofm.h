@@ -328,6 +328,9 @@ struct bofm_operations {
 #define __bofm_driver
 #endif
 
+/** Declare a BOFM test driver */
+#define __bofm_test_driver __table_entry ( BOFM_DRIVERS, 02 )
+
 /**
  * Initialise BOFM device
  *
@@ -345,7 +348,7 @@ bofm_init ( struct bofm_device *bofm, struct pci_device *pci,
 extern int bofm_register ( struct bofm_device *bofm );
 extern void bofm_unregister ( struct bofm_device *bofm );
 extern int bofm_find_driver ( struct pci_device *pci );
-extern int bofm ( userptr_t bofmtab, struct pci_device *pci );
+extern int bofm ( void *bofmtab, struct pci_device *pci );
 extern void bofm_test ( struct pci_device *pci );
 
 #endif /* _IPXE_BOFM_H */

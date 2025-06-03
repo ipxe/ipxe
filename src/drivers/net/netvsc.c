@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * bus (VMBus).  It provides a transport layer for RNDIS packets.
  */
 
+#include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <byteswap.h>
@@ -622,7 +623,7 @@ static int netvsc_buffer_copy ( struct vmbus_xfer_pages *pages, void *data,
 		return -ERANGE;
 
 	/* Copy data from buffer */
-	copy_from_user ( data, buffer->data, offset, len );
+	memcpy ( data, ( buffer->data + offset ), len );
 
 	return 0;
 }

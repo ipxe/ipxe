@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <ipxe/uaccess.h>
+#include <byteswap.h>
 #include <ipxe/init.h>
 #include <ipxe/pci.h>
 #include <ipxe/ethernet.h>
@@ -111,7 +111,7 @@ void bofm_test ( struct pci_device *pci ) {
 	printf ( "BOFMTEST performing harvest\n" );
 	bofmtab_harvest.en.busdevfn = pci->busdevfn;
 	DBG_HDA ( 0, &bofmtab_harvest, sizeof ( bofmtab_harvest ) );
-	bofmrc = bofm ( virt_to_user ( &bofmtab_harvest ), pci );
+	bofmrc = bofm ( &bofmtab_harvest, pci );
 	printf ( "BOFMTEST harvest result %08x\n", bofmrc );
 	if ( bofmtab_harvest.en.options & BOFM_EN_HVST ) {
 		printf ( "BOFMTEST harvested MAC address %s\n",
@@ -125,7 +125,7 @@ void bofm_test ( struct pci_device *pci ) {
 	printf ( "BOFMTEST performing update\n" );
 	bofmtab_update.en.busdevfn = pci->busdevfn;
 	DBG_HDA ( 0, &bofmtab_update, sizeof ( bofmtab_update ) );
-	bofmrc = bofm ( virt_to_user ( &bofmtab_update ), pci );
+	bofmrc = bofm ( &bofmtab_update, pci );
 	printf ( "BOFMTEST update result %08x\n", bofmrc );
 	if ( bofmtab_update.en.options & BOFM_EN_CSM_SUCCESS ) {
 		printf ( "BOFMTEST updated MAC address to %s\n",
@@ -135,6 +135,109 @@ void bofm_test ( struct pci_device *pci ) {
 	}
 	DBG_HDA ( 0, &bofmtab_update, sizeof ( bofmtab_update ) );
 }
+
+/**
+ * Harvest dummy Ethernet MAC
+ *
+ * @v bofm		BOFM device
+ * @v mport		Multi-port index
+ * @v mac		MAC to fill in
+ * @ret rc		Return status code
+ */
+static int bofm_dummy_harvest ( struct bofm_device *bofm, unsigned int mport,
+				uint8_t *mac ) {
+	struct {
+		uint16_t vendor;
+		uint16_t device;
+		uint16_t mport;
+	} __attribute__ (( packed )) dummy_mac;
+
+	/* Construct dummy MAC address */
+	dummy_mac.vendor = cpu_to_be16 ( bofm->pci->vendor );
+	dummy_mac.device = cpu_to_be16 ( bofm->pci->device );
+	dummy_mac.mport = cpu_to_be16 ( mport );
+	memcpy ( mac, &dummy_mac, sizeof ( dummy_mac ) );
+	printf ( "BOFMTEST mport %d constructed dummy MAC %s\n",
+		 mport, eth_ntoa ( mac ) );
+
+	return 0;
+}
+
+/**
+ * Update Ethernet MAC for BOFM
+ *
+ * @v bofm		BOFM device
+ * @v mport		Multi-port index
+ * @v mac		MAC to fill in
+ * @ret rc		Return status code
+ */
+static int bofm_dummy_update ( struct bofm_device *bofm __unused,
+			       unsigned int mport, const uint8_t *mac ) {
+
+	printf ( "BOFMTEST mport %d asked to update MAC to %s\n",
+		 mport, eth_ntoa ( mac ) );
+	return 0;
+}
+
+/** Dummy BOFM operations */
+static struct bofm_operations bofm_dummy_operations = {
+	.harvest = bofm_dummy_harvest,
+	.update = bofm_dummy_update,
+};
+
+/** Dummy BOFM device */
+static struct bofm_device bofm_dummy;
+
+/**
+ * Probe dummy BOFM device
+ *
+ * @v pci		PCI device
+ * @v id		PCI ID
+ * @ret rc		Return status code
+ */
+static int bofm_dummy_probe ( struct pci_device *pci ) {
+	int rc;
+
+	/* Ignore probe for any other devices */
+	if ( pci->busdevfn != bofm_dummy.pci->busdevfn )
+		return 0;
+
+	/* Register BOFM device */
+	if ( ( rc = bofm_register ( &bofm_dummy ) ) != 0 )
+		return rc;
+
+	printf ( "BOFMTEST using dummy BOFM driver\n" );
+	return 0;
+}
+
+/**
+ * Remove dummy BOFM device
+ *
+ * @v pci		PCI device
+ */
+static void bofm_dummy_remove ( struct pci_device *pci ) {
+
+	/* Ignore removal for any other devices */
+	if ( pci->busdevfn != bofm_dummy.pci->busdevfn )
+		return;
+
+	/* Unregister BOFM device */
+	bofm_unregister ( &bofm_dummy );
+}
+
+/** Dummy BOFM driver PCI IDs */
+static struct pci_device_id bofm_dummy_ids[1] = {
+	{ .name = "dummy" },
+};
+
+/** Dummy BOFM driver */
+struct pci_driver bofm_dummy_driver __bofm_test_driver = {
+	.ids = bofm_dummy_ids,
+	.id_count = ( sizeof ( bofm_dummy_ids ) /
+		      sizeof ( bofm_dummy_ids[0] ) ),
+	.probe = bofm_dummy_probe,
+	.remove = bofm_dummy_remove,
+};
 
 /**
  * Perform BOFM test at initialisation time
@@ -149,7 +252,7 @@ static void bofm_test_init ( void ) {
 	 * bus:dev.fn address in order to perform a BOFM test at
 	 * initialisation time.
 	 */
-	// busdevfn = PCI_BUSDEVFN ( <bus>, <dev>, <fn> );
+	// busdevfn = PCI_BUSDEVFN ( <segment>, <bus>, <dev>, <fn> );
 
 	/* Skip test if no PCI bus:dev.fn is defined */
 	if ( busdevfn < 0 )
@@ -163,6 +266,11 @@ static void bofm_test_init ( void ) {
 			 PCI_ARGS ( &pci ), strerror ( rc ) );
 		return;
 	}
+
+	/* Initialise dummy BOFM device */
+	bofm_init ( &bofm_dummy, &pci, &bofm_dummy_operations );
+	bofm_dummy_ids[0].vendor = pci.vendor;
+	bofm_dummy_ids[0].device = pci.device;
 
 	/* Perform test */
 	bofm_test ( &pci );

@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/uri.h>
 #include <ipxe/xferbuf.h>
@@ -129,6 +130,7 @@ static int peermux_info_deliver ( struct peerdist_multiplexer *peermux,
  * @v rc		Reason for close
  */
 static void peermux_info_close ( struct peerdist_multiplexer *peermux, int rc ){
+	struct xfer_buffer *buffer = &peermux->buffer;
 	struct peerdist_info *info = &peermux->cache.info;
 	size_t len;
 
@@ -145,8 +147,7 @@ static void peermux_info_close ( struct peerdist_multiplexer *peermux, int rc ){
 	intf_shutdown ( &peermux->info, rc );
 
 	/* Parse content information */
-	if ( ( rc = peerdist_info ( info->raw.data, peermux->buffer.len,
-				    info ) ) != 0 ) {
+	if ( ( rc = peerdist_info ( buffer->data, buffer->len, info ) ) != 0 ) {
 		DBGC ( peermux, "PEERMUX %p could not parse content info: %s\n",
 		       peermux, strerror ( rc ) );
 		goto err;
@@ -422,8 +423,7 @@ int peermux_filter ( struct interface *xfer, struct interface *info,
 	intf_init ( &peermux->xfer, &peermux_xfer_desc, &peermux->refcnt );
 	intf_init ( &peermux->info, &peermux_info_desc, &peermux->refcnt );
 	peermux->uri = uri_get ( uri );
-	xferbuf_umalloc_init ( &peermux->buffer,
-			       &peermux->cache.info.raw.data );
+	xferbuf_umalloc_init ( &peermux->buffer );
 	process_init_stopped ( &peermux->process, &peermux_process_desc,
 			       &peermux->refcnt );
 	INIT_LIST_HEAD ( &peermux->busy );

@@ -9,9 +9,9 @@
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/udp.h>
-#include <ipxe/uaccess.h>
 #include <ipxe/process.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/malloc.h>
 #include <realmode.h>
 #include <pxe.h>
 
@@ -295,7 +295,7 @@ pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 	};
 	size_t len;
 	struct io_buffer *iobuf;
-	userptr_t buffer;
+	const void *buffer;
 	int rc;
 
 	DBG ( "PXENV_UDP_WRITE" );
@@ -327,9 +327,9 @@ pxenv_udp_write ( struct s_PXENV_UDP_WRITE *pxenv_udp_write ) {
 		pxenv_udp_write->Status = PXENV_STATUS_OUT_OF_RESOURCES;
 		return PXENV_EXIT_FAILURE;
 	}
-	buffer = real_to_user ( pxenv_udp_write->buffer.segment,
+	buffer = real_to_virt ( pxenv_udp_write->buffer.segment,
 				pxenv_udp_write->buffer.offset );
-	copy_from_user ( iob_put ( iobuf, len ), buffer, 0, len );
+	memcpy ( iob_put ( iobuf, len ), buffer, len );
 
 	DBG ( " %04x:%04x+%x %d->%s:%d\n", pxenv_udp_write->buffer.segment,
 	      pxenv_udp_write->buffer.offset, pxenv_udp_write->buffer_size,
@@ -399,7 +399,7 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	struct pxe_udp_pseudo_header *pshdr;
 	uint16_t d_port_wanted = pxenv_udp_read->d_port;
 	uint16_t d_port;
-	userptr_t buffer;
+	void *buffer;
 	size_t len;
 
 	/* Try receiving a packet, if the queue is empty */
@@ -437,12 +437,12 @@ static PXENV_EXIT_t pxenv_udp_read ( struct s_PXENV_UDP_READ *pxenv_udp_read ) {
 	}
 
 	/* Copy packet to buffer and record length */
-	buffer = real_to_user ( pxenv_udp_read->buffer.segment,
+	buffer = real_to_virt ( pxenv_udp_read->buffer.segment,
 				pxenv_udp_read->buffer.offset );
 	len = iob_len ( iobuf );
 	if ( len > pxenv_udp_read->buffer_size )
 		len = pxenv_udp_read->buffer_size;
-	copy_to_user ( buffer, 0, iobuf->data, len );
+	memcpy ( buffer, iobuf->data, len );
 	pxenv_udp_read->buffer_size = len;
 
 	/* Fill in source/dest information */
@@ -481,4 +481,29 @@ struct pxe_api_call pxe_udp_api[] __pxe_api_call = {
 		       struct s_PXENV_UDP_WRITE ),
 	PXE_API_CALL ( PXENV_UDP_READ, pxenv_udp_read,
 		       struct s_PXENV_UDP_READ ),
+};
+
+/**
+ * Discard some cached PXE UDP data
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int pxe_udp_discard ( void ) {
+	struct io_buffer *iobuf;
+	unsigned int discarded = 0;
+
+	/* Try to discard the oldest received UDP packet */
+	iobuf = list_first_entry ( &pxe_udp.list, struct io_buffer, list );
+	if ( iobuf ) {
+		list_del ( &iobuf->list );
+		free_iob ( iobuf );
+		discarded++;
+	}
+
+	return discarded;
+}
+
+/** PXE UDP cache discarder */
+struct cache_discarder pxe_udp_discarder __cache_discarder ( CACHE_NORMAL ) = {
+	.discard = pxe_udp_discard,
 };

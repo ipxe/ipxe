@@ -83,6 +83,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define if64 if 0
 #endif
 
+	.section ".note.GNU-stack", "", @progbits
+
 /****************************************************************************
  * Global descriptor table
  *
@@ -99,7 +101,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  ****************************************************************************
  */
 	.section ".data16.gdt", "aw", @progbits
-	.align 16
+	.balign 16
 gdt:
 gdtr:		/* The first GDT entry is unused, the GDTR can fit here. */
 gdt_limit:		.word gdt_length - 1
@@ -210,9 +212,7 @@ VC_TMP_CR3:		.space	4
 VC_TMP_CR4:		.space	4
 VC_TMP_EMER:		.space	8
 .endif
-#ifdef TIVOLI_VMM_WORKAROUND
 VC_TMP_FXSAVE:		.space	512
-#endif
 VC_TMP_END:
 	.previous
 
@@ -224,7 +224,7 @@ RC_TMP_END:
 
 	/* Shared temporary static buffer */
 	.section ".bss16.rm_tmpbuf", "aw", @nobits
-	.align 16
+	.balign 16
 rm_tmpbuf:
 	.space	VC_TMP_END
 	.size	rm_tmpbuf, . - rm_tmpbuf
@@ -350,6 +350,13 @@ init_librm_rmode:
 	/* Initialise IDT */
 	virtcall init_idt
 
+#ifdef TIVOLI_VMM_WORKAROUND
+	/* Check for FXSAVE/FXRSTOR */
+	clc
+	virtcall check_fxsr
+	setnc	fxsr_supported
+#endif
+
 	/* Restore registers */
 	popl	%edi
 	popl	%ebx
@@ -365,6 +372,10 @@ set_seg_base:
 	movb	%ah, 7(%bx)
 	roll	$16, %eax
 	ret
+
+	.section ".data16.fxsr_supported", "awx", @progbits
+fxsr_supported:		/* FXSAVE/FXRSTOR instructions supported */
+	.byte	0
 
 /****************************************************************************
  * real_to_prot (real-mode near call, 32-bit virtual return address)
@@ -1007,10 +1018,11 @@ virt_call:
 	cli
 	movw	%cs:rm_ds, %ds
 
-#ifdef TIVOLI_VMM_WORKAROUND
 	/* Preserve FPU, MMX and SSE state in temporary static buffer */
+	testb	$0xff, fxsr_supported
+	jz	1f
 	fxsave	( rm_tmpbuf + VC_TMP_FXSAVE )
-#endif
+1:
 	/* Preserve GDT and IDT in temporary static buffer */
 	sidt	( rm_tmpbuf + VC_TMP_IDT )
 	sgdt	( rm_tmpbuf + VC_TMP_GDT )
@@ -1077,10 +1089,11 @@ vc_rmode:
 	wrmsr
 .endif
 
-#ifdef TIVOLI_VMM_WORKAROUND
 	/* Restore FPU, MMX and SSE state from temporary static buffer */
+	testb	$0xff, fxsr_supported
+	jz	1f
 	fxrstor	( rm_tmpbuf + VC_TMP_FXSAVE )
-#endif
+1:
 	/* Restore registers and flags and return */
 	popl	%eax /* skip %cs and %ss */
 	popw	%ds
@@ -1470,7 +1483,7 @@ interrupt_wrapper:
  ****************************************************************************
  */
 	.section ".pages", "aw", @nobits
-	.align	SIZEOF_PT
+	.balign	SIZEOF_PT
 
 	/* Page map level 4 entries (PML4Es)
 	 *
@@ -1619,3 +1632,70 @@ init_pages:
 
 	/* Return */
 	ret
+
+/****************************************************************************
+ * sipi (real-mode jump)
+ *
+ * Handle Startup IPI
+ *
+ * This code must be copied to a page-aligned boundary in base memory.
+ * It will be entered with %cs:0000 pointing to the start of the code.
+ * The stack pointer is undefined and so no stack space can be used.
+ *
+ ****************************************************************************
+ */
+	.section ".text16.sipi", "ax", @progbits
+	.code16
+	.globl	sipi
+sipi:
+	/* Retrieve rm_ds from copy */
+	movw	%cs:( sipi_ds - sipi ), %ax
+	movw	%ax, %ds
+
+	/* Load GDT and switch to protected mode */
+	data32 lgdt gdtr
+	movl	%cr0, %eax
+	orb	$CR0_PE, %al
+	movl	%eax, %cr0
+	data32 ljmp $VIRTUAL_CS, $VIRTUAL(1f)
+
+	/* Copy of rm_ds required to access GDT */
+	.globl	sipi_ds
+sipi_ds:
+	.word	0
+
+	/* Length of real-mode SIPI handler to be copied */
+	.globl	sipi_len
+	.equ	sipi_len, . - sipi
+
+	.section ".text.sipi", "ax", @progbits
+	.code32
+1:	/* Set up protected-mode segment registers (with no stack) */
+	movw	$VIRTUAL_DS, %ax
+	movw	%ax, %ds
+	movw	%ax, %ss
+	movw	$PHYSICAL_DS, %ax
+	movw	%ax, %es
+	movw	%ax, %fs
+	movw	%ax, %gs
+
+	/* Load register state and clear stack pointer */
+	movl	$VIRTUAL(sipi_regs), %esp
+	popal
+
+	/* Switch to flat physical addressing */
+	movw	$PHYSICAL_DS, %sp
+	movw	%sp, %ds
+	movw	%sp, %ss
+
+	/* Clear stack pointer */
+	xorl	%esp, %esp
+
+	/* Jump to protected-mode SIPI handler */
+	ljmp	%cs:*VIRTUAL(sipi_handler)
+
+	/* Protected-mode SIPI handler vector */
+	.section ".data.sipi_handler", "aw", @progbits
+	.globl	sipi_handler
+sipi_handler:
+	.long	0, PHYSICAL_CS

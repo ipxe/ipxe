@@ -78,6 +78,15 @@ struct console_driver bios_console __attribute__ (( weak ));
 /** Font corresponding to selected character width and height */
 #define VESAFB_FONT VBE_FONT_8x16
 
+/** Number of ASCII glyphs within the font */
+#define VESAFB_ASCII 128
+
+/** Glyph to render for non-ASCII characters
+ *
+ * We choose to use one of the box-drawing glyphs.
+ */
+#define VESAFB_UNKNOWN 0xfe
+
 /* Forward declaration */
 struct console_driver vesafb_console __console_driver;
 
@@ -94,7 +103,7 @@ struct vesafb {
 	/** Font definition */
 	struct fbcon_font font;
 	/** Character glyphs */
-	struct segoff glyphs;
+	const uint8_t *glyphs;
 	/** Saved VGA mode */
 	uint8_t saved_mode;
 };
@@ -130,14 +139,23 @@ static int vesafb_rc ( unsigned int status ) {
 /**
  * Get character glyph
  *
- * @v character		Character
- * @v glyph		Character glyph to fill in
+ * @v character		Unicode character
+ * @ret glyph		Character glyph
  */
-static void vesafb_glyph ( unsigned int character, uint8_t *glyph ) {
-	size_t offset = ( character * VESAFB_CHAR_HEIGHT );
+static const uint8_t * vesafb_glyph ( unsigned int character ) {
+	unsigned int index;
 
-	copy_from_real ( glyph, vesafb.glyphs.segment,
-			 ( vesafb.glyphs.offset + offset ), VESAFB_CHAR_HEIGHT);
+	/* Identify glyph */
+	if ( character < VESAFB_ASCII ) {
+		/* ASCII character: use corresponding glyph */
+		index = character;
+	} else {
+		/* Non-ASCII character: use "unknown" glyph */
+		index = VESAFB_UNKNOWN;
+	}
+
+	/* Return glyph in BIOS font table */
+	return &vesafb.glyphs[ index * VESAFB_CHAR_HEIGHT ];
 }
 
 /**
@@ -145,6 +163,7 @@ static void vesafb_glyph ( unsigned int character, uint8_t *glyph ) {
  *
  */
 static void vesafb_font ( void ) {
+	struct segoff glyphs;
 
 	/* Get font information
 	 *
@@ -165,12 +184,13 @@ static void vesafb_font ( void ) {
 					   "movw %%es, %%cx\n\t"
 					   "movw %%bp, %%dx\n\t"
 					   "popw %%bp\n\t" /* gcc bug */ )
-			       : "=c" ( vesafb.glyphs.segment ),
-				 "=d" ( vesafb.glyphs.offset )
+			       : "=c" ( glyphs.segment ),
+				 "=d" ( glyphs.offset )
 			       : "a" ( VBE_GET_FONT ),
 				 "b" ( VESAFB_FONT ) );
 	DBGC ( &vbe_buf, "VESAFB has font %04x at %04x:%04x\n",
-	       VESAFB_FONT, vesafb.glyphs.segment, vesafb.glyphs.offset );
+	       VESAFB_FONT, glyphs.segment, glyphs.offset );
+	vesafb.glyphs = real_to_virt ( glyphs.segment, glyphs.offset );
 	vesafb.font.height = VESAFB_CHAR_HEIGHT;
 	vesafb.font.glyph = vesafb_glyph;
 }
@@ -185,8 +205,8 @@ static void vesafb_font ( void ) {
  */
 static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 	struct vbe_controller_info *controller = &vbe_buf.controller;
-	userptr_t video_mode_ptr;
-	uint16_t mode_number;
+	const uint16_t *video_mode_ptr;
+	const uint16_t *mode_number;
 	uint16_t status;
 	size_t len;
 	int rc;
@@ -222,20 +242,18 @@ static int vesafb_mode_list ( uint16_t **mode_numbers ) {
 	       controller->video_mode_ptr.offset );
 
 	/* Calculate length of mode list */
-	video_mode_ptr = real_to_user ( controller->video_mode_ptr.segment,
+	video_mode_ptr = real_to_virt ( controller->video_mode_ptr.segment,
 					controller->video_mode_ptr.offset );
-	len = 0;
-	do {
-		copy_from_user ( &mode_number, video_mode_ptr, len,
-				 sizeof ( mode_number ) );
-		len += sizeof ( mode_number );
-	} while ( mode_number != VBE_MODE_END );
+	mode_number = video_mode_ptr;
+	while ( *(mode_number++) != VBE_MODE_END ) {}
+	len = ( ( ( const void * ) mode_number ) -
+		( ( const void * ) video_mode_ptr ) );
 
 	/* Allocate and fill mode list */
 	*mode_numbers = malloc ( len );
 	if ( ! *mode_numbers )
 		return -ENOMEM;
-	copy_from_user ( *mode_numbers, video_mode_ptr, 0, len );
+	memcpy ( *mode_numbers, video_mode_ptr, len );
 
 	return 0;
 }
@@ -452,7 +470,7 @@ static int vesafb_init ( struct console_configuration *config ) {
 	vesafb_font();
 
 	/* Initialise frame buffer console */
-	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_user ( vesafb.start ),
+	if ( ( rc = fbcon_init ( &vesafb.fbcon, phys_to_virt ( vesafb.start ),
 				 &vesafb.pixel, &vesafb.map, &vesafb.font,
 				 config ) ) != 0 )
 		goto err_fbcon_init;

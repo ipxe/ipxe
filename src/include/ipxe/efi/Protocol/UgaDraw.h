@@ -3,22 +3,15 @@
 
   Abstraction of a very simple graphics device.
 
-  Copyright (c) 2006 - 2008, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #ifndef __UGA_DRAW_H__
 #define __UGA_DRAW_H__
 
-FILE_LICENCE ( BSD3 );
-
+FILE_LICENCE ( BSD2_PATENT );
 
 #define EFI_UGA_DRAW_PROTOCOL_GUID \
   { \
@@ -75,15 +68,15 @@ EFI_STATUS
   );
 
 typedef struct {
-  UINT8 Blue;
-  UINT8 Green;
-  UINT8 Red;
-  UINT8 Reserved;
+  UINT8    Blue;
+  UINT8    Green;
+  UINT8    Red;
+  UINT8    Reserved;
 } EFI_UGA_PIXEL;
 
 typedef union {
-  EFI_UGA_PIXEL Pixel;
-  UINT32        Raw;
+  EFI_UGA_PIXEL    Pixel;
+  UINT32           Raw;
 } EFI_UGA_PIXEL_UNION;
 
 ///
@@ -135,14 +128,14 @@ typedef enum {
 
     @retval EFI_SUCCESS           - The Blt operation completed.
     @retval EFI_INVALID_PARAMETER - BltOperation is not valid.
-    @retval EFI_DEVICE_ERROR      - A hardware error occured writting to the video buffer.
+    @retval EFI_DEVICE_ERROR      - A hardware error occurred writting to the video buffer.
 
 **/
 typedef
 EFI_STATUS
 (EFIAPI *EFI_UGA_DRAW_PROTOCOL_BLT)(
-  IN  EFI_UGA_DRAW_PROTOCOL                   * This,
-  IN  EFI_UGA_PIXEL                           * BltBuffer, OPTIONAL
+  IN  EFI_UGA_DRAW_PROTOCOL                   *This,
+  IN  EFI_UGA_PIXEL                           *BltBuffer  OPTIONAL,
   IN  EFI_UGA_BLT_OPERATION                   BltOperation,
   IN  UINTN                                   SourceX,
   IN  UINTN                                   SourceY,
@@ -158,11 +151,11 @@ EFI_STATUS
 /// copy pixels to and from the graphics controller's frame buffer.
 ///
 struct _EFI_UGA_DRAW_PROTOCOL {
-  EFI_UGA_DRAW_PROTOCOL_GET_MODE  GetMode;
-  EFI_UGA_DRAW_PROTOCOL_SET_MODE  SetMode;
-  EFI_UGA_DRAW_PROTOCOL_BLT       Blt;
+  EFI_UGA_DRAW_PROTOCOL_GET_MODE    GetMode;
+  EFI_UGA_DRAW_PROTOCOL_SET_MODE    SetMode;
+  EFI_UGA_DRAW_PROTOCOL_BLT         Blt;
 };
 
-extern EFI_GUID gEfiUgaDrawProtocolGuid;
+extern EFI_GUID  gEfiUgaDrawProtocolGuid;
 
 #endif

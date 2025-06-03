@@ -23,9 +23,9 @@ NON_AUTO_MEDIA	+= efidrv
 NON_AUTO_MEDIA	+= drv.efi
 NON_AUTO_MEDIA	+= efirom
 
-# Include SNP driver in the all-drivers build
+# Include SNP and MNP drivers in the all-drivers build
 #
-DRIVERS_net += snp
+DRIVERS_net += snp mnp
 
 # Rules for building EFI files
 #
@@ -43,12 +43,17 @@ $(BIN)/%.drv.efi : $(BIN)/%.efidrv
 
 $(BIN)/%.efirom : $(BIN)/%.efidrv $(EFIROM)
 	$(QM)$(ECHO) "  [FINISH] $@"
-	$(Q)$(EFIROM) -v $(TGT_PCI_VENDOR) -d $(TGT_PCI_DEVICE) $< $@
+	$(Q)$(EFIROM) -v $(firstword $(TGT_PCI_VENDOR) 0) \
+		      -d $(firstword $(TGT_PCI_DEVICE) 0) -c $< $@
 
 $(BIN)/efidrv.cab : $(BIN)/alldrv.efis # $(ALL_drv.efi) is not yet defined
 	$(QM)$(ECHO) "  [CAB] $@"
 	$(Q)$(LCAB) -n -q $(ALL_drv.efi) $@
 
-$(BIN)/%.usb : $(BIN)/%.efi
-	$(QM)$(ECHO) "  [GENEFIDSK] $@"
-	$(Q)bash util/genefidsk -o $@ -b $(EFI_BOOT_FILE) $<
+$(BIN)/%.iso : $(BIN)/%.efi util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<
+
+$(BIN)/%.usb : $(BIN)/%.efi util/genfsimg
+	$(QM)$(ECHO) "  [GENFSIMG] $@"
+	$(Q)util/genfsimg -o $@ $<

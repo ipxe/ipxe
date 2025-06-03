@@ -78,6 +78,9 @@ REQUIRE_OBJECT ( vmconsole );
 #ifdef CONSOLE_DEBUGCON
 REQUIRE_OBJECT ( debugcon );
 #endif
+#ifdef CONSOLE_SBI
+REQUIRE_OBJECT ( sbi_console );
+#endif
 
 /*
  * Drag in all requested network protocols
@@ -182,6 +185,15 @@ REQUIRE_OBJECT ( efi_image );
 #ifdef IMAGE_SDI
 REQUIRE_OBJECT ( sdi );
 #endif
+#ifdef IMAGE_ZLIB
+REQUIRE_OBJECT ( zlib );
+#endif
+#ifdef IMAGE_GZIP
+REQUIRE_OBJECT ( gzip );
+#endif
+#ifdef IMAGE_UCODE
+REQUIRE_OBJECT ( ucode );
+#endif
 
 /*
  * Drag in all requested commands
@@ -216,7 +228,10 @@ REQUIRE_OBJECT ( dhcp_cmd );
 REQUIRE_OBJECT ( sanboot_cmd );
 #endif
 #ifdef MENU_CMD
-REQUIRE_OBJECT ( menu_cmd );
+REQUIRE_OBJECT ( dynui_cmd );
+#endif
+#ifdef FORM_CMD
+REQUIRE_OBJECT ( dynui_cmd );
 #endif
 #ifdef LOGIN_CMD
 REQUIRE_OBJECT ( login_cmd );
@@ -281,6 +296,21 @@ REQUIRE_OBJECT ( ntp_cmd );
 #ifdef CERT_CMD
 REQUIRE_OBJECT ( cert_cmd );
 #endif
+#ifdef IMAGE_MEM_CMD
+REQUIRE_OBJECT ( image_mem_cmd );
+#endif
+#ifdef SHIM_CMD
+REQUIRE_OBJECT ( shim_cmd );
+#endif
+#ifdef IMAGE_CRYPT_CMD
+REQUIRE_OBJECT ( image_crypt_cmd );
+#endif
+#ifdef USB_CMD
+REQUIRE_OBJECT ( usb_cmd );
+#endif
+#ifdef FDT_CMD
+REQUIRE_OBJECT ( fdt_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects
@@ -325,9 +355,6 @@ REQUIRE_OBJECT ( efi_bofm );
 /*
  * Drag in relevant settings sources
  */
-#ifdef PCI_SETTINGS
-REQUIRE_OBJECT ( pci_settings );
-#endif
 #ifdef VMWARE_SETTINGS
 REQUIRE_OBJECT ( guestinfo );
 #endif
@@ -342,6 +369,9 @@ REQUIRE_OBJECT ( vram_settings );
 #endif
 #ifdef ACPI_SETTINGS
 REQUIRE_OBJECT ( acpi_settings );
+#endif
+#ifdef EFI_SETTINGS
+REQUIRE_OBJECT ( efi_settings );
 #endif
 
 /*

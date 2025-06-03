@@ -3,6 +3,22 @@
 echo Amazon EC2 - iPXE boot via user-data
 echo CPU: ${cpuvendor} ${cpumodel}
 ifstat ||
-dhcp ||
+
+set attempt:int8 1
+:dhcp_retry
+echo DHCP attempt ${attempt}
+dhcp --timeout 5000 && goto dhcp_ok ||
+ifstat ||
+inc attempt
+iseq ${attempt} 10 || goto dhcp_retry
+
+:dhcp_fail
+echo DHCP failed - rebooting
+reboot ||
+exit
+
+:dhcp_ok
 route ||
-chain -ar http://169.254.169.254/latest/user-data
+chain -ar http://169.254.169.254/latest/user-data ||
+ifstat ||
+exit

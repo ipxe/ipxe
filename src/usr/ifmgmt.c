@@ -110,10 +110,11 @@ static void ifstat_errors ( struct net_device_stats *stats,
  * @v netdev		Network device
  */
 void ifstat ( struct net_device *netdev ) {
-	printf ( "%s: %s using %s on %s (%s)\n"
+	printf ( "%s: %s using %s on %s (%s) [%s]\n"
 		 "  [Link:%s%s, TX:%d TXE:%d RX:%d RXE:%d]\n",
 		 netdev->name, netdev_addr ( netdev ),
 		 netdev->dev->driver_name, netdev->dev->name,
+		 netdev->ll_protocol->name,
 		 ( netdev_is_open ( netdev ) ? "open" : "closed" ),
 		 ( netdev_link_ok ( netdev ) ? "up" : "down" ),
 		 ( netdev_link_blocked ( netdev ) ? " (blocked)" : "" ),
@@ -214,17 +215,20 @@ static int iflinkwait_progress ( struct ifpoller *ifpoller ) {
  *
  * @v netdev		Network device
  * @v timeout		Timeout period, in ticks
+ * @v verbose		Always display progress message
+ * @ret rc		Return status code
  */
-int iflinkwait ( struct net_device *netdev, unsigned long timeout ) {
+int iflinkwait ( struct net_device *netdev, unsigned long timeout,
+		 int verbose ) {
 	int rc;
 
 	/* Ensure device is open */
 	if ( ( rc = ifopen ( netdev ) ) != 0 )
 		return rc;
 
-	/* Return immediately if link is already up */
+	/* Return immediately if link is already up, unless being verbose */
 	netdev_poll ( netdev );
-	if ( netdev_link_ok ( netdev ) )
+	if ( netdev_link_ok ( netdev ) && ( ! verbose ) )
 		return 0;
 
 	/* Wait for link-up */
@@ -276,7 +280,7 @@ int ifconf ( struct net_device *netdev,
 	struct in_addr ip;
 
 	/* Ensure device is open and link is up */
-	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_TIMEOUT ) ) != 0 )
+	if ( ( rc = iflinkwait ( netdev, LINK_WAIT_TIMEOUT, 0 ) ) != 0 )
 		return rc;
 
 	/* Start configuration */

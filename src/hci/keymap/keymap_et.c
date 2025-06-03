@@ -10,12 +10,13 @@ FILE_LICENCE ( PUBLIC_DOMAIN );
 
 #include <ipxe/keymap.h>
 
-/** "et" keyboard mapping */
-struct key_mapping et_mapping[] __keymap = {
+/** "et" basic remapping */
+static struct keymap_key et_basic[] = {
 	{ 0x26, 0x2f },	/* '&' => '/' */
 	{ 0x28, 0x29 },	/* '(' => ')' */
 	{ 0x29, 0x3d },	/* ')' => '=' */
 	{ 0x2a, 0x28 },	/* '*' => '(' */
+	{ 0x2b, 0x60 },	/* '+' => '`' */
 	{ 0x2d, 0x2b },	/* '-' => '+' */
 	{ 0x2f, 0x2d },	/* '/' => '-' */
 	{ 0x3c, 0x3b },	/* '<' => ';' */
@@ -25,6 +26,34 @@ struct key_mapping et_mapping[] __keymap = {
 	{ 0x5c, 0x27 },	/* '\\' => '\'' */
 	{ 0x5e, 0x26 },	/* '^' => '&' */
 	{ 0x5f, 0x3f },	/* '_' => '?' */
+	{ 0x60, 0x5e },	/* '`' => '^' */
 	{ 0x7c, 0x2a },	/* '|' => '*' */
-	{ 0x7f, 0x1b },	/* 0x7f => 0x1b */
+	{ 0xdc, 0x3c },	/* Pseudo-'\\' => '<' */
+	{ 0xfc, 0x3e },	/* Pseudo-'|' => '>' */
+	{ 0, 0 }
+};
+
+/** "et" AltGr remapping */
+static struct keymap_key et_altgr[] = {
+	{ 0x26, 0x7b },	/* '&' => '{' */
+	{ 0x28, 0x5d },	/* '(' => ']' */
+	{ 0x29, 0x7d },	/* ')' => '}' */
+	{ 0x2a, 0x5b },	/* '*' => '[' */
+	{ 0x2d, 0x5c },	/* '-' => '\\' */
+	{ 0x30, 0x7d },	/* '0' => '}' */
+	{ 0x32, 0x40 },	/* '2' => '@' */
+	{ 0x34, 0x24 },	/* '4' => '$' */
+	{ 0x37, 0x7b },	/* '7' => '{' */
+	{ 0x38, 0x5b },	/* '8' => '[' */
+	{ 0x39, 0x5d },	/* '9' => ']' */
+	{ 0x5f, 0x5c },	/* '_' => '\\' */
+	{ 0xdc, 0x7c },	/* Pseudo-'\\' => '|' */
+	{ 0, 0 }
+};
+
+/** "et" keyboard map */
+struct keymap et_keymap __keymap = {
+	.name = "et",
+	.basic = et_basic,
+	.altgr = et_altgr,
 };

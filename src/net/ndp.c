@@ -46,6 +46,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 /** Router discovery maximum timeout */
 #define IPV6CONF_MAX_TIMEOUT ( TICKS_PER_SEC * 3 )
 
+/** Router discovery blocked link retry timeout */
+#define IPV6CONF_BLOCK_TIMEOUT ( TICKS_PER_SEC )
+
+/** Router discovery maximum number of deferrals */
+#define IPV6CONF_MAX_DEFERRALS 180
+
 static struct ipv6conf * ipv6conf_demux ( struct net_device *netdev );
 static int
 ipv6conf_rx_router_advertisement ( struct net_device *netdev,
@@ -134,7 +140,7 @@ static int ndp_tx_request ( struct net_device *netdev,
 	/* Construct multicast destination address */
 	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
 	sin6_dest.sin6_family = AF_INET6;
-	sin6_dest.sin6_scope_id = netdev->index;
+	sin6_dest.sin6_scope_id = netdev->scope_id;
 	ipv6_solicited_node ( &sin6_dest.sin6_addr, net_dest );
 
 	/* Construct neighbour header */
@@ -171,7 +177,7 @@ static int ndp_tx_router_solicitation ( struct net_device *netdev ) {
 	/* Construct multicast destination address */
 	memset ( &sin6_dest, 0, sizeof ( sin6_dest ) );
 	sin6_dest.sin6_family = AF_INET6;
-	sin6_dest.sin6_scope_id = netdev->index;
+	sin6_dest.sin6_scope_id = netdev->scope_id;
 	ipv6_all_routers ( &sin6_dest.sin6_addr );
 
 	/* Construct router solicitation */
@@ -783,29 +789,43 @@ static int ndp_prefix_fetch_ip6 ( struct settings *settings, void *data,
 		container_of ( ndpset->settings.parent, struct net_device,
 			       settings.settings );
 	struct ndp_prefix_information_option *prefix = prefset->prefix;
-	struct in6_addr ip6;
+	struct in6_addr *ip6 = &prefix->prefix;
+	struct in6_addr slaac;
 	int prefix_len;
+	int rc;
 
 	/* Skip dead prefixes */
 	if ( ! prefix->valid )
 		return -ENOENT;
 
 	/* Construct IPv6 address via SLAAC, if applicable */
-	memcpy ( &ip6, &prefix->prefix, sizeof ( ip6 ) );
 	if ( prefix->flags & NDP_PREFIX_AUTONOMOUS ) {
-		prefix_len = ipv6_eui64 ( &ip6, netdev );
-		if ( prefix_len < 0 )
-			return prefix_len;
-		if ( prefix_len != prefix->prefix_len )
-			return -EINVAL;
+		memcpy ( &slaac, ip6, sizeof ( slaac ) );
+		prefix_len = ipv6_eui64 ( &slaac, netdev );
+		if ( prefix_len == prefix->prefix_len ) {
+			/* Correctly configured prefix: use SLAAC address */
+			ip6 = &slaac;
+		} else if ( prefix_len < 0 ) {
+			/* Link layer does not support SLAAC */
+			rc = prefix_len;
+			DBGC ( netdev, "NDP %s does not support SLAAC: %s\n",
+			       netdev->name, strerror ( rc ) );
+		} else {
+			/* Prefix length incorrect: assume a badly
+			 * configured router and ignore SLAAC address.
+			 */
+			DBGC ( netdev, "NDP %s ignoring misconfigured SLAAC "
+			       "on prefix %s/%d\n", netdev->name,
+			       inet6_ntoa ( ip6 ), prefix->prefix_len );
+		}
 	}
 
 	/* Fill in IPv6 address */
-	if ( len > sizeof ( ip6 ) )
-		len = sizeof ( ip6 );
-	memcpy ( data, &ip6, len );
+	if ( len > sizeof ( *ip6 ) )
+		len = sizeof ( *ip6 );
+	memcpy ( data, ip6, len );
 
-	return sizeof ( ip6 );
+	return sizeof ( *ip6 );
 }
 
 /**
@@ -1068,6 +1088,9 @@ struct ipv6conf {
 
 	/** Retransmission timer */
 	struct retry_timer timer;
+
+	/** Deferred discovery counter */
+	unsigned int deferred;
 };
 
 /** List of IPv6 configurators */
@@ -1131,6 +1154,7 @@ static void ipv6conf_done ( struct ipv6conf *ipv6conf, int rc ) {
 static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
 	struct ipv6conf *ipv6conf =
 		container_of ( timer, struct ipv6conf, timer );
+	struct net_device *netdev = ipv6conf->netdev;
 
 	/* If we have failed, terminate autoconfiguration */
 	if ( fail ) {
@@ -1140,7 +1164,15 @@ static void ipv6conf_expired ( struct retry_timer *timer, int fail ) {
 
 	/* Otherwise, transmit router solicitation and restart timer */
 	start_timer ( &ipv6conf->timer );
-	ndp_tx_router_solicitation ( ipv6conf->netdev );
+	ndp_tx_router_solicitation ( netdev );
+
+	/* If link is blocked, defer router discovery timeout */
+	if ( netdev_link_blocked ( netdev ) &&
+	     ( ipv6conf->deferred++ <= IPV6CONF_MAX_DEFERRALS ) ) {
+		DBGC ( netdev, "NDP %s deferring discovery timeout\n",
+		       netdev->name );
+		start_timer_fixed ( &ipv6conf->timer, IPV6CONF_BLOCK_TIMEOUT );
+	}
 }
 
 /**
@@ -1189,7 +1221,7 @@ ipv6conf_rx_router_advertisement ( struct net_device *netdev,
 	/* Start DHCPv6 if required */
 	if ( radv->flags & ( NDP_ROUTER_MANAGED | NDP_ROUTER_OTHER ) ) {
 		stateful = ( radv->flags & NDP_ROUTER_MANAGED );
-		if ( ( rc = start_dhcpv6 ( &ipv6conf->dhcp, netdev,
+		if ( ( rc = start_dhcpv6 ( &ipv6conf->dhcp, netdev, router,
 					   stateful ) ) != 0 ) {
 			DBGC ( netdev, "NDP %s could not start state%s DHCPv6: "
 			       "%s\n", netdev->name,

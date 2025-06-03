@@ -23,6 +23,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+#include <string.h>
 #include <ipxe/uaccess.h>
 #include <ipxe/settings.h>
 
@@ -47,12 +48,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret len		Length of setting data, or negative error
  */
 static int vram_fetch ( void *data, size_t len ) {
-	userptr_t vram = phys_to_user ( VRAM_BASE );
+	const void *vram = phys_to_virt ( VRAM_BASE );
 
 	/* Copy video RAM */
 	if ( len > VRAM_LEN )
 		len = VRAM_LEN;
-	copy_from_user ( data, vram, 0, len );
+	memcpy ( data, vram, len );
 
 	return VRAM_LEN;
 }

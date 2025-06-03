@@ -15,13 +15,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define IOAPI_PREFIX_arm __arm_
 #endif
 
+#include <ipxe/dummy_pio.h>
+
 /*
  * Memory space mappings
  *
  */
-
-/** Page shift */
-#define PAGE_SHIFT 12
 
 /*
  * Physical<->Bus address mappings
@@ -81,55 +80,6 @@ ARM_WRITEX ( l, uint32_t, "", "" );
 #endif
 
 /*
- * Dummy PIO reads and writes up to 32 bits
- *
- * There is no common standard for I/O-space access for ARM, and
- * non-MMIO peripherals are vanishingly rare.  Provide dummy
- * implementations that will allow code to link and should cause
- * drivers to simply fail to detect hardware at runtime.
- *
- */
-
-#define ARM_INX( _suffix, _type )					      \
-static inline __always_inline _type					      \
-IOAPI_INLINE ( arm, in ## _suffix ) ( volatile _type *io_addr __unused) {     \
-	return ~( (_type) 0 );						      \
-}									      \
-static inline __always_inline void					      \
-IOAPI_INLINE ( arm, ins ## _suffix ) ( volatile _type *io_addr __unused,      \
-				       _type *data, unsigned int count ) {    \
-	memset ( data, 0xff, count * sizeof ( *data ) );		      \
-}
-ARM_INX ( b, uint8_t );
-ARM_INX ( w, uint16_t );
-ARM_INX ( l, uint32_t );
-
-#define ARM_OUTX( _suffix, _type )					      \
-static inline __always_inline void					      \
-IOAPI_INLINE ( arm, out ## _suffix ) ( _type data __unused,		      \
-				       volatile _type *io_addr __unused ) {   \
-	/* Do nothing */						      \
-}									      \
-static inline __always_inline void					      \
-IOAPI_INLINE ( arm, outs ## _suffix ) ( volatile _type *io_addr __unused,     \
-					const _type *data __unused,	      \
-					unsigned int count __unused ) {	      \
-	/* Do nothing */						      \
-}
-ARM_OUTX ( b, uint8_t );
-ARM_OUTX ( w, uint16_t );
-ARM_OUTX ( l, uint32_t );
-
-/*
- * Slow down I/O
- *
- */
-static inline __always_inline void
-IOAPI_INLINE ( arm, iodelay ) ( void ) {
-	/* Nothing to do */
-}
-
-/*
  * Memory barrier
  *
  */
@@ -142,5 +92,8 @@ IOAPI_INLINE ( arm, mb ) ( void ) {
 	__asm__ __volatile__ ( "dmb" );
 #endif
 }
+
+/* Dummy PIO */
+DUMMY_PIO ( arm );
 
 #endif /* _IPXE_ARM_IO_H */

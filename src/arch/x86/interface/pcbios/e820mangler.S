@@ -23,9 +23,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
-	.text
-	.arch i386
+	.section ".note.GNU-stack", "", @progbits
 	.code16
+	.arch i386
 
 #define SMAP 0x534d4150
 
@@ -67,7 +67,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
  ****************************************************************************
  */
 	.section ".data16", "aw", @progbits
-	.align 16
+	.balign 16
 	.globl hidemem_base
 	.globl hidemem_umalloc
 	.globl hidemem_textdata
@@ -564,6 +564,8 @@ int15_88:
 int15:
 	/* See if we want to intercept this call */
 	pushfw
+	cmpb	$0, %cs:int15_intercept_flag
+	je	3f
 	cmpw	$0xe820, %ax
 	jne	1f
 	cmpl	$SMAP, %edx
@@ -587,3 +589,9 @@ int15:
 int15_vector:
 	.long 0
 	.size int15_vector, . - int15_vector
+
+	.section ".text16.data", "aw", @progbits
+	.globl int15_intercept_flag
+int15_intercept_flag:
+	.byte 1
+	.size int15_intercept_flag, . - int15_intercept_flag

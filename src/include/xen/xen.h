@@ -1,25 +1,8 @@
+/* SPDX-License-Identifier: MIT */
 /******************************************************************************
  * xen.h
  *
  * Guest OS interface to Xen.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2004, K A Fraser
  */
@@ -36,7 +19,7 @@ FILE_LICENCE ( MIT );
 #elif defined(__arm__) || defined (__aarch64__)
 #include "arch-arm.h"
 #else
-#error "Unsupported architecture"
+#include <bits/xen.h>
 #endif
 
 #ifndef __ASSEMBLY__
@@ -54,6 +37,33 @@ DEFINE_XEN_GUEST_HANDLE(void);
 DEFINE_XEN_GUEST_HANDLE(uint64_t);
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
+
+/* Define a variable length array (depends on compiler). */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+#define XEN_FLEX_ARRAY_DIM
+#elif defined(__GNUC__)
+#define XEN_FLEX_ARRAY_DIM  0
+#else
+#define XEN_FLEX_ARRAY_DIM  1 /* variable size */
+#endif
+
+/* Turn a plain number into a C unsigned (long (long)) constant. */
+#define __xen_mk_uint(x)  x ## U
+#define __xen_mk_ulong(x) x ## UL
+#ifndef __xen_mk_ullong
+# define __xen_mk_ullong(x) x ## ULL
+#endif
+#define xen_mk_uint(x)    __xen_mk_uint(x)
+#define xen_mk_ulong(x)   __xen_mk_ulong(x)
+#define xen_mk_ullong(x)  __xen_mk_ullong(x)
+
+#else
+
+/* In assembly code we cannot use C numeric constant suffixes. */
+#define xen_mk_uint(x)   x
+#define xen_mk_ulong(x)  x
+#define xen_mk_ullong(x) x
+
 #endif
 
 /*
@@ -102,7 +112,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_domctl               36
 #define __HYPERVISOR_kexec_op             37
 #define __HYPERVISOR_tmem_op              38
-#define __HYPERVISOR_xc_reserved_op       39 /* reserved for XenClient */
+#define __HYPERVISOR_argo_op              39
+#define __HYPERVISOR_xenpmu_op            40
+#define __HYPERVISOR_dm_op                41
+#define __HYPERVISOR_hypfs_op             42
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48
@@ -159,9 +172,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
 #define VIRQ_CON_RING   8  /* G. (DOM0) Bytes received on console            */
 #define VIRQ_PCPU_STATE 9  /* G. (DOM0) PCPU state changed                   */
-#define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
-#define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
+#define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occurred          */
+#define VIRQ_ARGO       11 /* G. Argo interdomain message notification       */
 #define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
+#define VIRQ_XENPMU     13 /* V.  PMC interrupt                              */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
@@ -249,6 +263,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  * As MMU_NORMAL_PT_UPDATE above, but A/D bits currently in the PTE are ORed
  * with those in @val.
  *
+ * ptr[1:0] == MMU_PT_UPDATE_NO_TRANSLATE:
+ * As MMU_NORMAL_PT_UPDATE above, but @val is not translated though FD
+ * page tables.
+ *
  * @val is usually the machine frame number along with some attributes.
  * The attributes by default follow the architecture defined bits. Meaning that
  * if this is a X86_64 machine and four page table layout is used, the layout
@@ -315,9 +333,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *
  * PAT (bit 7 on) --> PWT (bit 3 on) and clear bit 7.
  */
-#define MMU_NORMAL_PT_UPDATE      0 /* checked '*ptr = val'. ptr is MA.      */
-#define MMU_MACHPHYS_UPDATE       1 /* ptr = MA of frame to modify entry for */
-#define MMU_PT_UPDATE_PRESERVE_AD 2 /* atomically: *ptr = val | (*ptr&(A|D)) */
+#define MMU_NORMAL_PT_UPDATE       0 /* checked '*ptr = val'. ptr is MA.      */
+#define MMU_MACHPHYS_UPDATE        1 /* ptr = MA of frame to modify entry for */
+#define MMU_PT_UPDATE_PRESERVE_AD  2 /* atomically: *ptr = val | (*ptr&(A|D)) */
+#define MMU_PT_UPDATE_NO_TRANSLATE 3 /* checked '*ptr = val'. ptr is MA.      */
+                                     /* val never translated.                 */
 
 /*
  * MMU EXTENDED OPERATIONS
@@ -451,17 +471,38 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
 /* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
 /* ` enum uvm_flags { */
-#define UVMF_NONE               (0UL<<0) /* No flushing at all.   */
-#define UVMF_TLB_FLUSH          (1UL<<0) /* Flush entire TLB(s).  */
-#define UVMF_INVLPG             (2UL<<0) /* Flush only one entry. */
-#define UVMF_FLUSHTYPE_MASK     (3UL<<0)
-#define UVMF_MULTI              (0UL<<2) /* Flush subset of TLBs. */
-#define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
-#define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
+#define UVMF_NONE           (xen_mk_ulong(0)<<0) /* No flushing at all.   */
+#define UVMF_TLB_FLUSH      (xen_mk_ulong(1)<<0) /* Flush entire TLB(s).  */
+#define UVMF_INVLPG         (xen_mk_ulong(2)<<0) /* Flush only one entry. */
+#define UVMF_FLUSHTYPE_MASK (xen_mk_ulong(3)<<0)
+#define UVMF_MULTI          (xen_mk_ulong(0)<<2) /* Flush subset of TLBs. */
+#define UVMF_LOCAL          (xen_mk_ulong(0)<<2) /* Flush local TLB.      */
+#define UVMF_ALL            (xen_mk_ulong(1)<<2) /* Flush all TLBs.       */
 /* ` } */
 
 /*
- * Commands to HYPERVISOR_console_io().
+ * ` int
+ * ` HYPERVISOR_console_io(unsigned int cmd,
+ * `                       unsigned int count,
+ * `                       char buffer[]);
+ *
+ * @cmd: Command (see below)
+ * @count: Size of the buffer to read/write
+ * @buffer: Pointer in the guest memory
+ *
+ * List of commands:
+ *
+ *  * CONSOLEIO_write: Write the buffer to Xen console.
+ *      For the hardware domain, all the characters in the buffer will
+ *      be written. Characters will be printed directly to the console.
+ *      For all the other domains, only the printable characters will be
+ *      written. Characters may be buffered until a newline (i.e '\n') is
+ *      found.
+ *      @return 0 on success, otherwise return an error code.
+ *  * CONSOLEIO_read: Attempts to read up to @count characters from Xen
+ *      console. The maximum buffer size (i.e. @count) supported is 2GB.
+ *      @return the number of characters read on success, otherwise return
+ *      an error code.
  */
 #define CONSOLEIO_write         0
 #define CONSOLEIO_read          1
@@ -488,17 +529,42 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* x86/PAE guests: support PDPTs above 4GB. */
 #define VMASST_TYPE_pae_extended_cr3     3
 
+/*
+ * x86 guests: Sane behaviour for virtual iopl
+ *  - virtual iopl updated from do_iret() hypercalls.
+ *  - virtual iopl reported in bounce frames.
+ *  - guest kernels assumed to be level 0 for the purpose of iopl checks.
+ */
+#define VMASST_TYPE_architectural_iopl   4
+
+/*
+ * All guests: activate update indicator in vcpu_runstate_info
+ * Enable setting the XEN_RUNSTATE_UPDATE flag in guest memory mapped
+ * vcpu_runstate_info during updates of the runstate information.
+ */
+#define VMASST_TYPE_runstate_update_flag 5
+
+/*
+ * x86/64 guests: strictly hide M2P from user mode.
+ * This allows the guest to control respective hypervisor behavior:
+ * - when not set, L4 tables get created with the respective slot blank,
+ *   and whenever the L4 table gets used as a kernel one the missing
+ *   mapping gets inserted,
+ * - when set, L4 tables get created with the respective slot initialized
+ *   as before, and whenever the L4 table gets used as a user one the
+ *   mapping gets zapped.
+ */
+#define VMASST_TYPE_m2p_strict           32
+
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
 #define MAX_VMASST_TYPE                  3
-
-#ifndef __ASSEMBLY__
-
-typedef uint16_t domid_t;
+#endif
 
 /* Domain ids >= DOMID_FIRST_RESERVED cannot be used for ordinary domains. */
-#define DOMID_FIRST_RESERVED (0x7FF0U)
+#define DOMID_FIRST_RESERVED xen_mk_uint(0x7FF0)
 
 /* DOMID_SELF is used in certain contexts to refer to oneself. */
-#define DOMID_SELF (0x7FF0U)
+#define DOMID_SELF           xen_mk_uint(0x7FF0)
 
 /*
  * DOMID_IO is used to restrict page-table updates to mapping I/O memory.
@@ -506,28 +572,40 @@ typedef uint16_t domid_t;
  * is useful to ensure that no mappings to the OS's own heap are accidentally
  * installed. (e.g., in Linux this could cause havoc as reference counts
  * aren't adjusted on the I/O-mapping code path).
- * This only makes sense in MMUEXT_SET_FOREIGNDOM, but in that context can
- * be specified by any calling domain.
+ * This only makes sense as HYPERVISOR_mmu_update()'s and
+ * HYPERVISOR_update_va_mapping_otherdomain()'s "foreigndom" argument. For
+ * HYPERVISOR_mmu_update() context it can be specified by any calling domain,
+ * otherwise it's only permitted if the caller is privileged.
  */
-#define DOMID_IO   (0x7FF1U)
+#define DOMID_IO             xen_mk_uint(0x7FF1)
 
 /*
  * DOMID_XEN is used to allow privileged domains to map restricted parts of
  * Xen's heap space (e.g., the machine_to_phys table).
- * This only makes sense in MMUEXT_SET_FOREIGNDOM, and is only permitted if
- * the caller is privileged.
+ * This only makes sense as
+ * - HYPERVISOR_mmu_update()'s, HYPERVISOR_mmuext_op()'s, or
+ *   HYPERVISOR_update_va_mapping_otherdomain()'s "foreigndom" argument,
+ * - with XENMAPSPACE_gmfn_foreign,
+ * and is only permitted if the caller is privileged.
  */
-#define DOMID_XEN  (0x7FF2U)
+#define DOMID_XEN            xen_mk_uint(0x7FF2)
 
 /*
  * DOMID_COW is used as the owner of sharable pages */
-#define DOMID_COW  (0x7FF3U)
+#define DOMID_COW            xen_mk_uint(0x7FF3)
 
 /* DOMID_INVALID is used to identify pages with unknown owner. */
-#define DOMID_INVALID (0x7FF4U)
+#define DOMID_INVALID        xen_mk_uint(0x7FF4)
 
 /* Idle domain. */
-#define DOMID_IDLE (0x7FFFU)
+#define DOMID_IDLE           xen_mk_uint(0x7FFF)
+
+/* Mask for valid domain id values */
+#define DOMID_MASK           xen_mk_uint(0x7FFF)
+
+#ifndef __ASSEMBLY__
+
+typedef uint16_t domid_t;
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().
@@ -587,9 +665,17 @@ struct vcpu_time_info {
      */
     uint32_t tsc_to_system_mul;
     int8_t   tsc_shift;
+#if __XEN_INTERFACE_VERSION__ > 0x040600
+    uint8_t  flags;
+    uint8_t  pad1[2];
+#else
     int8_t   pad1[3];
+#endif
 }; /* 32 bytes */
 typedef struct vcpu_time_info vcpu_time_info_t;
+
+#define XEN_PVCLOCK_TSC_STABLE_BIT     (1 << 0)
+#define XEN_PVCLOCK_GUEST_STOPPED      (1 << 1)
 
 struct vcpu_info {
     /*
@@ -625,7 +711,7 @@ struct vcpu_info {
 #endif /* XEN_HAVE_PV_UPCALL_MASK */
     xen_ulong_t evtchn_pending_sel;
     struct arch_vcpu_info arch;
-    struct vcpu_time_info time;
+    vcpu_time_info_t time;
 }; /* 64 bytes (x86) */
 #ifndef __XEN__
 typedef struct vcpu_info vcpu_info_t;
@@ -678,12 +764,23 @@ struct shared_info {
     xen_ulong_t evtchn_mask[sizeof(xen_ulong_t) * 8];
 
     /*
-     * Wallclock time: updated only by control software. Guests should base
-     * their gettimeofday() syscall on this wallclock-base value.
+     * Wallclock time: updated by control software or RTC emulation.
+     * Guests should base their gettimeofday() syscall on this
+     * wallclock-base value.
+     * The values of wc_sec and wc_nsec are offsets from the Unix epoch
+     * adjusted by the domain's 'time offset' (in seconds) as set either
+     * by XEN_DOMCTL_settimeoffset, or adjusted via a guest write to the
+     * emulated RTC.
      */
     uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
-    uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+    uint32_t wc_sec;
+    uint32_t wc_nsec;
+#if !defined(__i386__)
+    uint32_t wc_sec_hi;
+# define xen_wc_sec_hi wc_sec_hi
+#elif !defined(__XEN__) && !defined(__XEN_TOOLS__)
+# define xen_wc_sec_hi arch.wc_sec_hi
+#endif
 
     struct arch_shared_info arch;
 
@@ -700,24 +797,27 @@ typedef struct shared_info shared_info_t;
  *  3. This the order of bootstrap elements in the initial virtual region:
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
+ *         (may be omitted)
  *      c. list of allocated page frames [mfn_list, nr_pages]
  *         (unless relocated due to XEN_ELFNOTE_INIT_P2M)
- *      d. start_info_t structure        [register ESI (x86)]
- *      e. bootstrap page tables         [pt_base and CR3 (x86)]
- *      f. bootstrap stack               [register ESP (x86)]
+ *      d. start_info_t structure        [register rSI (x86)]
+ *         in case of dom0 this page contains the console info, too
+ *      e. unless dom0: xenstore ring page
+ *      f. unless dom0: console ring page
+ *      g. bootstrap page tables         [pt_base and CR3 (x86)]
+ *      h. bootstrap stack               [register ESP (x86)]
  *  4. Bootstrap elements are packed together, but each is 4kB-aligned.
- *  5. The initial ram disk may be omitted.
- *  6. The list of page frames forms a contiguous 'pseudo-physical' memory
+ *  5. The list of page frames forms a contiguous 'pseudo-physical' memory
  *     layout for the domain. In particular, the bootstrap virtual-memory
  *     region is a 1:1 mapping to the first section of the pseudo-physical map.
- *  7. All bootstrap elements are mapped read-writable for the guest OS. The
+ *  6. All bootstrap elements are mapped read-writable for the guest OS. The
  *     only exception is the bootstrap page table, which is mapped read-only.
- *  8. There is guaranteed to be at least 512kB padding after the final
+ *  7. There is guaranteed to be at least 512kB padding after the final
  *     bootstrap element. If necessary, the bootstrap virtual region is
  *     extended by an extra 4MB to ensure this.
  *
  * Note: Prior to 25833:bb85bbccb1c9. ("x86/32-on-64 adjust Dom0 initial page
- * table layout") a bug caused the pt_base (3.e above) and cr3 to not point
+ * table layout") a bug caused the pt_base (3.g above) and cr3 to not point
  * to the start of the guest page tables (it was offset by two pages).
  * This only manifested itself on 32-on-64 dom0 kernels and not 32-on-64 domU
  * or 64-bit kernels of any colour. The page tables for a 32-on-64 dom0 got
@@ -773,6 +873,8 @@ typedef struct start_info start_info_t;
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
 #define SIF_MULTIBOOT_MOD (1<<2)  /* Is mod_start a multiboot module? */
 #define SIF_MOD_START_PFN (1<<3)  /* Is mod_start a PFN? */
+#define SIF_VIRT_P2M_4TOOLS (1<<4) /* Do Xen tools understand a virt. mapped */
+                                   /* P->M making the 3 level tree obsolete? */
 #define SIF_PM_MASK       (0xFF<<8) /* reserve 1 byte for xen-pm options */
 
 /*
@@ -844,6 +946,11 @@ typedef struct dom0_vga_console_info {
             uint32_t gbl_caps;
             /* Mode attributes (offset 0x0, VESA command 0x4f01). */
             uint16_t mode_attrs;
+            uint16_t pad;
+#endif
+#if __XEN_INTERFACE_VERSION__ >= 0x00040d00
+            /* high 32 bits of lfb_base */
+            uint32_t ext_lfb_base;
 #endif
         } vesa_lfb;
     } u;
@@ -853,25 +960,50 @@ typedef struct dom0_vga_console_info {
 
 typedef uint8_t xen_domain_handle_t[16];
 
-/* Turn a plain number into a C unsigned long constant. */
-#define __mk_unsigned_long(x) x ## UL
-#define mk_unsigned_long(x) __mk_unsigned_long(x)
-
 __DEFINE_XEN_GUEST_HANDLE(uint8,  uint8_t);
 __DEFINE_XEN_GUEST_HANDLE(uint16, uint16_t);
 __DEFINE_XEN_GUEST_HANDLE(uint32, uint32_t);
 __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 
-#else /* __ASSEMBLY__ */
+typedef struct {
+    uint8_t a[16];
+} xen_uuid_t;
 
-/* In assembly code we cannot use C numeric constant suffixes. */
-#define mk_unsigned_long(x) x
+/*
+ * XEN_DEFINE_UUID(0x00112233, 0x4455, 0x6677, 0x8899,
+ *                 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff)
+ * will construct UUID 00112233-4455-6677-8899-aabbccddeeff presented as
+ * {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+ * 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+ *
+ * NB: This is compatible with Linux kernel and with libuuid, but it is not
+ * compatible with Microsoft, as they use mixed-endian encoding (some
+ * components are little-endian, some are big-endian).
+ */
+#define XEN_DEFINE_UUID_(a, b, c, d, e1, e2, e3, e4, e5, e6)            \
+    {{((a) >> 24) & 0xFF, ((a) >> 16) & 0xFF,                           \
+      ((a) >>  8) & 0xFF, ((a) >>  0) & 0xFF,                           \
+      ((b) >>  8) & 0xFF, ((b) >>  0) & 0xFF,                           \
+      ((c) >>  8) & 0xFF, ((c) >>  0) & 0xFF,                           \
+      ((d) >>  8) & 0xFF, ((d) >>  0) & 0xFF,                           \
+                e1, e2, e3, e4, e5, e6}}
+
+#if defined(__STDC_VERSION__) ? __STDC_VERSION__ >= 199901L : defined(__GNUC__)
+#define XEN_DEFINE_UUID(a, b, c, d, e1, e2, e3, e4, e5, e6)             \
+    ((xen_uuid_t)XEN_DEFINE_UUID_(a, b, c, d, e1, e2, e3, e4, e5, e6))
+#else
+#define XEN_DEFINE_UUID(a, b, c, d, e1, e2, e3, e4, e5, e6)             \
+    XEN_DEFINE_UUID_(a, b, c, d, e1, e2, e3, e4, e5, e6)
+#endif /* __STDC_VERSION__ / __GNUC__ */
 
 #endif /* !__ASSEMBLY__ */
 
 /* Default definitions for macros used by domctl/sysctl. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
+#ifndef int64_aligned_t
+#define int64_aligned_t int64_t
+#endif
 #ifndef uint64_aligned_t
 #define uint64_aligned_t uint64_t
 #endif
@@ -884,6 +1016,7 @@ struct xenctl_bitmap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
     uint32_t nr_bits;
 };
+typedef struct xenctl_bitmap xenctl_bitmap_t;
 #endif
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */

@@ -3,7 +3,7 @@
 
 /** @file
  *
- * Form parameters
+ * Request parameters
  *
  */
 
@@ -12,7 +12,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/list.h>
 #include <ipxe/refcnt.h>
 
-/** A form parameter list */
+/** A request parameter list */
 struct parameters {
 	/** Reference count */
 	struct refcnt refcnt;
@@ -24,18 +24,26 @@ struct parameters {
 	struct list_head entries;
 };
 
-/** A form parameter */
+/** A request parameter */
 struct parameter {
-	/** List of form parameters */
+	/** List of request parameters */
 	struct list_head list;
 	/** Key */
 	const char *key;
 	/** Value */
 	const char *value;
+	/** Flags */
+	unsigned int flags;
 };
 
+/** Request parameter is a form parameter */
+#define PARAMETER_FORM 0x0001
+
+/** Request parameter is a header parameter */
+#define PARAMETER_HEADER 0x0002
+
 /**
- * Increment form parameter list reference count
+ * Increment request parameter list reference count
  *
  * @v params		Parameter list, or NULL
  * @ret params		Parameter list as passed in
@@ -47,7 +55,7 @@ params_get ( struct parameters *params ) {
 }
 
 /**
- * Decrement form parameter list reference count
+ * Decrement request parameter list reference count
  *
  * @v params		Parameter list, or NULL
  */
@@ -57,7 +65,7 @@ params_put ( struct parameters *params ) {
 }
 
 /**
- * Claim ownership of form parameter list
+ * Claim ownership of request parameter list
  *
  * @v params		Parameter list
  * @ret params		Parameter list
@@ -71,13 +79,14 @@ claim_parameters ( struct parameters *params ) {
 	return params;
 }
 
-/** Iterate over all form parameters in a list */
+/** Iterate over all request parameters in a list */
 #define for_each_param( param, params )				\
 	list_for_each_entry ( (param), &(params)->entries, list )
 
 extern struct parameters * find_parameters ( const char *name );
 extern struct parameters * create_parameters ( const char *name );
 extern struct parameter * add_parameter ( struct parameters *params,
-					  const char *key, const char *value );
+					  const char *key, const char *value,
+					  unsigned int flags );
 
 #endif /* _IPXE_PARAMS_H */

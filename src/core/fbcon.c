@@ -36,6 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/ansiesc.h>
 #include <ipxe/image.h>
 #include <ipxe/pixbuf.h>
+#include <ipxe/uaccess.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/console.h>
 #include <ipxe/fbcon.h>
@@ -103,47 +104,42 @@ static void fbcon_set_default_background ( struct fbcon *fbcon ) {
 }
 
 /**
+ * Get character cell
+ *
+ * @v fbcon		Frame buffer console
+ * @v xpos		X position
+ * @v ypos		Y position
+ * @ret cell		Text cell
+ */
+static inline struct fbcon_text_cell * fbcon_cell ( struct fbcon *fbcon,
+						    unsigned int xpos,
+						    unsigned int ypos ) {
+	unsigned int index;
+
+	index = ( ( ypos * fbcon->character.width ) + xpos );
+	return &fbcon->text.cells[index];
+}
+
+/**
  * Clear rows of characters
  *
  * @v fbcon		Frame buffer console
  * @v ypos		Starting Y position
  */
 static void fbcon_clear ( struct fbcon *fbcon, unsigned int ypos ) {
-	struct fbcon_text_cell cell = {
-		.foreground = fbcon->foreground,
-		.background = fbcon->background,
-		.character = ' ',
-	};
-	size_t offset;
+	struct fbcon_text_cell *cell;
 	unsigned int xpos;
 
 	/* Clear stored character array */
+	cell = fbcon_cell ( fbcon, 0, ypos );
 	for ( ; ypos < fbcon->character.height ; ypos++ ) {
-		offset = ( ypos * fbcon->character.width * sizeof ( cell ) );
 		for ( xpos = 0 ; xpos < fbcon->character.width ; xpos++ ) {
-			copy_to_user ( fbcon->text.start, offset, &cell,
-				       sizeof ( cell ) );
-			offset += sizeof ( cell );
+			cell->foreground = fbcon->foreground;
+			cell->background = fbcon->background;
+			cell->character = ' ';
+			cell++;
 		}
 	}
-}
-
-/**
- * Store character at specified position
- *
- * @v fbcon		Frame buffer console
- * @v cell		Text cell
- * @v xpos		X position
- * @v ypos		Y position
- */
-static void fbcon_store ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
-			  unsigned int xpos, unsigned int ypos ) {
-	size_t offset;
-
-	/* Store cell */
-	offset = ( ( ( ypos * fbcon->character.width ) + xpos ) *
-		   sizeof ( *cell ) );
-	copy_to_user ( fbcon->text.start, offset, cell, sizeof ( *cell ) );
 }
 
 /**
@@ -156,7 +152,7 @@ static void fbcon_store ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
  */
 static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 			 unsigned int xpos, unsigned int ypos ) {
-	uint8_t glyph[fbcon->font->height];
+	const uint8_t *glyph;
 	size_t offset;
 	size_t pixel_len;
 	size_t skip_len;
@@ -164,10 +160,10 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 	unsigned int column;
 	uint8_t bitmask;
 	int transparent;
-	void *src;
+	const void *src;
 
 	/* Get font character */
-	fbcon->font->glyph ( cell->character, glyph );
+	glyph = fbcon->font->glyph ( cell->character );
 
 	/* Calculate pixel geometry */
 	offset = ( fbcon->indent +
@@ -185,12 +181,12 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 		/* Draw background picture, if applicable */
 		if ( transparent ) {
 			if ( fbcon->picture.start ) {
-				memcpy_user ( fbcon->start, offset,
-					      fbcon->picture.start, offset,
-					      fbcon->character.len );
+				memcpy ( ( fbcon->start + offset ),
+					 ( fbcon->picture.start + offset ),
+					 fbcon->character.len );
 			} else {
-				memset_user ( fbcon->start, offset, 0,
-					      fbcon->character.len );
+				memset ( ( fbcon->start + offset ), 0,
+					 fbcon->character.len );
 			}
 		}
 
@@ -204,7 +200,7 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 			} else {
 				continue;
 			}
-			copy_to_user ( fbcon->start, offset, src, pixel_len );
+			memcpy ( ( fbcon->start + offset ), src, pixel_len );
 		}
 
 		/* Move to next row */
@@ -218,18 +214,16 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
  * @v fbcon		Frame buffer console
  */
 static void fbcon_redraw ( struct fbcon *fbcon ) {
-	struct fbcon_text_cell cell;
-	size_t offset = 0;
+	struct fbcon_text_cell *cell;
 	unsigned int xpos;
 	unsigned int ypos;
 
 	/* Redraw characters */
+	cell = fbcon_cell ( fbcon, 0, 0 );
 	for ( ypos = 0 ; ypos < fbcon->character.height ; ypos++ ) {
 		for ( xpos = 0 ; xpos < fbcon->character.width ; xpos++ ) {
-			copy_from_user ( &cell, fbcon->text.start, offset,
-					 sizeof ( cell ) );
-			fbcon_draw ( fbcon, &cell, xpos, ypos );
-			offset += sizeof ( cell );
+			fbcon_draw ( fbcon, cell, xpos, ypos );
+			cell++;
 		}
 	}
 }
@@ -240,22 +234,46 @@ static void fbcon_redraw ( struct fbcon *fbcon ) {
  * @v fbcon		Frame buffer console
  */
 static void fbcon_scroll ( struct fbcon *fbcon ) {
-	size_t row_len;
+	const struct fbcon_text_cell *old;
+	struct fbcon_text_cell *new;
+	unsigned int xpos;
+	unsigned int ypos;
+	unsigned int character;
+	uint32_t foreground;
+	uint32_t background;
 
 	/* Sanity check */
 	assert ( fbcon->ypos == fbcon->character.height );
 
 	/* Scroll up character array */
-	row_len = ( fbcon->character.width * sizeof ( struct fbcon_text_cell ));
-	memmove_user ( fbcon->text.start, 0, fbcon->text.start, row_len,
-		       ( row_len * ( fbcon->character.height - 1 ) ) );
-	fbcon_clear ( fbcon, ( fbcon->character.height - 1 ) );
+	new = fbcon_cell ( fbcon, 0, 0 );
+	old = fbcon_cell ( fbcon, 0, 1 );
+	for ( ypos = 0 ; ypos < ( fbcon->character.height - 1 ) ; ypos++ ) {
+		for ( xpos = 0 ; xpos < fbcon->character.width ; xpos++ ) {
+			/* Redraw character (if changed) */
+			character = old->character;
+			foreground = old->foreground;
+			background = old->background;
+			if ( ( new->character != character ) ||
+			     ( new->foreground != foreground ) ||
+			     ( new->background != background ) ) {
+				new->character = character;
+				new->foreground = foreground;
+				new->background = background;
+				fbcon_draw ( fbcon, new, xpos, ypos );
+			}
+			new++;
+			old++;
+		}
+	}
+
+	/* Clear bottom row */
+	fbcon_clear ( fbcon, ypos );
+	for ( xpos = 0 ; xpos < fbcon->character.width ; xpos++ )
+		fbcon_draw ( fbcon, new++, xpos, ypos );
 
 	/* Update cursor position */
 	fbcon->ypos--;
-
-	/* Redraw all characters */
-	fbcon_redraw ( fbcon );
 }
 
 /**
@@ -265,18 +283,19 @@ static void fbcon_scroll ( struct fbcon *fbcon ) {
  * @v show_cursor	Show cursor
  */
 static void fbcon_draw_cursor ( struct fbcon *fbcon, int show_cursor ) {
-	struct fbcon_text_cell cell;
-	size_t offset;
+	struct fbcon_text_cell *cell;
+	struct fbcon_text_cell cursor;
 
-	offset = ( ( ( fbcon->ypos * fbcon->character.width ) + fbcon->xpos ) *
-		   sizeof ( cell ) );
-	copy_from_user ( &cell, fbcon->text.start, offset, sizeof ( cell ) );
+	cell = fbcon_cell ( fbcon, fbcon->xpos, fbcon->ypos );
 	if ( show_cursor ) {
-		cell.background = fbcon->foreground;
-		cell.foreground = ( ( fbcon->background == FBCON_TRANSPARENT ) ?
-				    0 : fbcon->background );
+		cursor.background = fbcon->foreground;
+		cursor.foreground =
+			( ( fbcon->background == FBCON_TRANSPARENT ) ?
+			  0 : fbcon->background );
+		cursor.character = cell->character;
+		cell = &cursor;
 	}
-	fbcon_draw ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
+	fbcon_draw ( fbcon, cell, fbcon->xpos, fbcon->ypos );
 }
 
 /**
@@ -439,11 +458,16 @@ static struct ansiesc_handler fbcon_ansiesc_handlers[] = {
  * @v character		Character
  */
 void fbcon_putchar ( struct fbcon *fbcon, int character ) {
-	struct fbcon_text_cell cell;
+	struct fbcon_text_cell *cell;
 
 	/* Intercept ANSI escape sequences */
 	character = ansiesc_process ( &fbcon->ctx, character );
 	if ( character < 0 )
+		return;
+
+	/* Accumulate Unicode characters */
+	character = utf8_accumulate ( &fbcon->utf8, character );
+	if ( character == 0 )
 		return;
 
 	/* Handle control characters */
@@ -468,11 +492,11 @@ void fbcon_putchar ( struct fbcon *fbcon, int character ) {
 		break;
 	default:
 		/* Print character at current cursor position */
-		cell.foreground = ( fbcon->foreground | fbcon->bold );
-		cell.background = fbcon->background;
-		cell.character = character;
-		fbcon_store ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
-		fbcon_draw ( fbcon, &cell, fbcon->xpos, fbcon->ypos );
+		cell = fbcon_cell ( fbcon, fbcon->xpos, fbcon->ypos );
+		cell->foreground = ( fbcon->foreground | fbcon->bold );
+		cell->background = fbcon->background;
+		cell->character = character;
+		fbcon_draw ( fbcon, cell, fbcon->xpos, fbcon->ypos );
 
 		/* Advance cursor */
 		fbcon->xpos++;
@@ -503,12 +527,9 @@ static int fbcon_picture_init ( struct fbcon *fbcon,
 	struct fbcon_geometry *pixel = fbcon->pixel;
 	struct fbcon_picture *picture = &fbcon->picture;
 	size_t len;
-	size_t pixbuf_stride;
 	size_t indent;
-	size_t pixbuf_indent;
 	size_t offset;
-	size_t pixbuf_offset;
-	uint32_t rgb;
+	const uint32_t *rgb;
 	uint32_t raw;
 	unsigned int x;
 	unsigned int y;
@@ -529,13 +550,10 @@ static int fbcon_picture_init ( struct fbcon *fbcon,
 	}
 
 	/* Centre picture on console */
-	pixbuf_stride = ( pixbuf->width * sizeof ( rgb ) );
 	xgap = ( ( ( int ) ( pixel->width - pixbuf->width ) ) / 2 );
 	ygap = ( ( ( int ) ( pixel->height - pixbuf->height ) ) / 2 );
 	indent = ( ( ( ( ygap >= 0 ) ? ygap : 0 ) * pixel->stride ) +
 		   ( ( ( xgap >= 0 ) ? xgap : 0 ) * pixel->len ) );
-	pixbuf_indent =	( ( ( ( ygap < 0 ) ? -ygap : 0 ) * pixbuf_stride ) +
-			  ( ( ( xgap < 0 ) ? -xgap : 0 ) * sizeof ( rgb ) ) );
 	width = pixbuf->width;
 	if ( width > pixel->width )
 		width = pixel->width;
@@ -547,18 +565,17 @@ static int fbcon_picture_init ( struct fbcon *fbcon,
 	       ( ygap + pixbuf->height ) );
 
 	/* Convert to frame buffer raw format */
-	memset_user ( picture->start, 0, 0, len );
+	memset ( picture->start, 0, len );
 	for ( y = 0 ; y < height ; y++ ) {
 		offset = ( indent + ( y * pixel->stride ) );
-		pixbuf_offset = ( pixbuf_indent + ( y * pixbuf_stride ) );
+		rgb = pixbuf_pixel ( pixbuf, ( ( xgap < 0 ) ? -xgap : 0 ),
+				     ( ( ( ygap < 0 ) ? -ygap : 0 ) + y ) );
 		for ( x = 0 ; x < width ; x++ ) {
-			copy_from_user ( &rgb, pixbuf->data, pixbuf_offset,
-					 sizeof ( rgb ) );
-			raw = fbcon_colour ( fbcon, rgb );
-			copy_to_user ( picture->start, offset, &raw,
-				       pixel->len );
+			raw = fbcon_colour ( fbcon, *rgb );
+			memcpy ( ( picture->start + offset ), &raw,
+				 pixel->len );
 			offset += pixel->len;
-			pixbuf_offset += sizeof ( rgb );
+			rgb++;
 		}
 	}
 
@@ -580,7 +597,7 @@ static int fbcon_picture_init ( struct fbcon *fbcon,
  * @v config		Console configuration
  * @ret rc		Return status code
  */
-int fbcon_init ( struct fbcon *fbcon, userptr_t start,
+int fbcon_init ( struct fbcon *fbcon, void *start,
 		 struct fbcon_geometry *pixel,
 		 struct fbcon_colour_map *map,
 		 struct fbcon_font *font,
@@ -608,8 +625,8 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 	/* Derive overall length */
 	fbcon->len = ( pixel->height * pixel->stride );
 	DBGC ( fbcon, "FBCON %p at [%08lx,%08lx)\n", fbcon,
-	       user_to_phys ( fbcon->start, 0 ),
-	       user_to_phys ( fbcon->start, fbcon->len ) );
+	       virt_to_phys ( fbcon->start ),
+	       ( virt_to_phys ( fbcon->start ) + fbcon->len ) );
 
 	/* Calculate margin.  If the actual screen size is larger than
 	 * the requested screen size, then update the margins so that
@@ -669,17 +686,17 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 	fbcon_set_default_background ( fbcon );
 
 	/* Allocate and initialise stored character array */
-	fbcon->text.start = umalloc ( fbcon->character.width *
+	fbcon->text.cells = umalloc ( fbcon->character.width *
 				      fbcon->character.height *
-				      sizeof ( struct fbcon_text_cell ) );
-	if ( ! fbcon->text.start ) {
+				      sizeof ( fbcon->text.cells[0] ) );
+	if ( ! fbcon->text.cells ) {
 		rc = -ENOMEM;
 		goto err_text;
 	}
 	fbcon_clear ( fbcon, 0 );
 
 	/* Set framebuffer to all black (including margins) */
-	memset_user ( fbcon->start, 0, 0, fbcon->len );
+	memset ( fbcon->start, 0, fbcon->len );
 
 	/* Generate pixel buffer from background image, if applicable */
 	if ( config->pixbuf &&
@@ -687,10 +704,8 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 		goto err_picture;
 
 	/* Draw background picture (including margins), if applicable */
-	if ( fbcon->picture.start ) {
-		memcpy_user ( fbcon->start, 0, fbcon->picture.start, 0,
-			      fbcon->len );
-	}
+	if ( fbcon->picture.start )
+		memcpy ( fbcon->start, fbcon->picture.start, fbcon->len );
 
 	/* Update console width and height */
 	console_set_size ( fbcon->character.width, fbcon->character.height );
@@ -699,7 +714,7 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
 
 	ufree ( fbcon->picture.start );
  err_picture:
-	ufree ( fbcon->text.start );
+	ufree ( fbcon->text.cells );
  err_text:
  err_margin:
 	return rc;
@@ -712,6 +727,6 @@ int fbcon_init ( struct fbcon *fbcon, userptr_t start,
  */
 void fbcon_fini ( struct fbcon *fbcon ) {
 
-	ufree ( fbcon->text.start );
+	ufree ( fbcon->text.cells );
 	ufree ( fbcon->picture.start );
 }
