@@ -77,24 +77,32 @@ static struct profiler ipv4_rx_profiler __profiler = { .name = "ipv4.rx" };
  *
  * @v netdev		Network device
  * @v address		IPv4 address
+ * @v network		Subnet address
  * @v netmask		Subnet mask
  * @v gateway		Gateway address (if any)
  * @ret rc		Return status code
  */
-static int add_ipv4_miniroute ( struct net_device *netdev,
-				struct in_addr address, struct in_addr netmask,
+static int ipv4_add_miniroute ( struct net_device *netdev,
+				struct in_addr address,
+				struct in_addr network,
+				struct in_addr netmask,
 				struct in_addr gateway ) {
 	struct ipv4_miniroute *miniroute;
+	struct ipv4_miniroute *before;
 	struct in_addr hostmask;
 	struct in_addr broadcast;
 
 	/* Calculate host mask */
-	hostmask.s_addr = ( IN_IS_SMALL ( netmask.s_addr ) ?
-			    INADDR_NONE : ~netmask.s_addr );
-	broadcast.s_addr = ( address.s_addr | hostmask.s_addr );
+	if ( gateway.s_addr || IN_IS_SMALL ( netmask.s_addr ) ) {
+		hostmask.s_addr = INADDR_NONE;
+	} else {
+		hostmask.s_addr = ~netmask.s_addr;
+	}
+	broadcast.s_addr = ( network.s_addr | hostmask.s_addr );
 
 	/* Print debugging information */
 	DBGC ( netdev, "IPv4 add %s", inet_ntoa ( address ) );
+	DBGC ( netdev, " for %s", inet_ntoa ( network ) );
 	DBGC ( netdev, "/%s ", inet_ntoa ( netmask ) );
 	DBGC ( netdev, "bc %s ", inet_ntoa ( broadcast ) );
 	if ( gateway.s_addr )
@@ -111,18 +119,49 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
 	/* Record routing information */
 	miniroute->netdev = netdev_get ( netdev );
 	miniroute->address = address;
+	miniroute->network = network;
 	miniroute->netmask = netmask;
 	miniroute->hostmask = hostmask;
 	miniroute->gateway = gateway;
 
-	/* Add to end of list if we have a gateway, otherwise
-	 * to start of list.
-	 */
-	if ( gateway.s_addr ) {
-		list_add_tail ( &miniroute->list, &ipv4_miniroutes );
-	} else {
-		list_add ( &miniroute->list, &ipv4_miniroutes );
+	/* Add to routing table ahead of any less specific routes */
+	list_for_each_entry ( before, &ipv4_miniroutes, list ) {
+		if ( netmask.s_addr & ~before->netmask.s_addr )
+			break;
 	}
+	list_add_tail ( &miniroute->list, &before->list );
+
+	return 0;
+}
+
+/**
+ * Add IPv4 minirouting table entries
+ *
+ * @v netdev		Network device
+ * @v address		IPv4 address
+ * @v netmask		Subnet mask
+ * @v gateway		Gateway address (if any)
+ * @ret rc		Return status code
+ */
+static int ipv4_add_miniroutes ( struct net_device *netdev,
+				 struct in_addr address,
+				 struct in_addr netmask,
+				 struct in_addr gateway ) {
+	struct in_addr none = { 0 };
+	struct in_addr network;
+	int rc;
+
+	/* Add local address */
+	network.s_addr = ( address.s_addr & netmask.s_addr );
+	if ( ( rc = ipv4_add_miniroute ( netdev, address, network, netmask,
+					 none ) ) != 0 )
+		return rc;
+
+	/* Add default gateway, if applicable */
+	if ( gateway.s_addr &&
+	     ( ( rc = ipv4_add_miniroute ( netdev, address, none, none,
+					   gateway ) ) != 0 ) )
+		return rc;
 
 	return 0;
 }
@@ -132,10 +171,11 @@ static int add_ipv4_miniroute ( struct net_device *netdev,
  *
  * @v miniroute		Routing table entry
  */
-static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
+static void ipv4_del_miniroute ( struct ipv4_miniroute *miniroute ) {
 	struct net_device *netdev = miniroute->netdev;
 
 	DBGC ( netdev, "IPv4 del %s", inet_ntoa ( miniroute->address ) );
+	DBGC ( netdev, " for %s", inet_ntoa ( miniroute->network ) );
 	DBGC ( netdev, "/%s ", inet_ntoa ( miniroute->netmask ) );
 	if ( miniroute->gateway.s_addr )
 		DBGC ( netdev, "gw %s ", inet_ntoa ( miniroute->gateway ) );
@@ -144,6 +184,19 @@ static void del_ipv4_miniroute ( struct ipv4_miniroute *miniroute ) {
 	netdev_put ( miniroute->netdev );
 	list_del ( &miniroute->list );
 	free ( miniroute );
+}
+
+/**
+ * Delete IPv4 minirouting table entries
+ *
+ */
+static void ipv4_del_miniroutes ( void ) {
+	struct ipv4_miniroute *miniroute;
+	struct ipv4_miniroute *tmp;
+
+	/* Delete all existing routes */
+	list_for_each_entry_safe ( miniroute, tmp, &ipv4_miniroutes, list )
+		ipv4_del_miniroute ( miniroute );
 }
 
 /**
@@ -170,27 +223,23 @@ struct ipv4_miniroute * ipv4_route ( unsigned int scope_id,
 
 		if ( IN_IS_MULTICAST ( dest->s_addr ) ) {
 
-			/* If destination is non-global, and the scope ID
-			 * matches this network device, then use this route.
+			/* If destination is non-global, and the scope
+			 * ID matches this network device, then use
+			 * the first matching route.
 			 */
 			if ( miniroute->netdev->scope_id == scope_id )
 				return miniroute;
 
 		} else {
 
-			/* If destination is an on-link global
-			 * address, then use this route.
+			/* If destination is global, then use the
+			 * first matching route (via its gateway if
+			 * specified).
 			 */
-			if ( ( ( dest->s_addr ^ miniroute->address.s_addr )
-			       & miniroute->netmask.s_addr ) == 0 )
-				return miniroute;
-
-			/* If destination is an off-link global
-			 * address, and we have a default gateway,
-			 * then use this route.
-			 */
-			if ( miniroute->gateway.s_addr ) {
-				*dest = miniroute->gateway;
+			if ( ( ( dest->s_addr ^ miniroute->network.s_addr )
+			       & miniroute->netmask.s_addr ) == 0 ) {
+				if ( miniroute->gateway.s_addr )
+					*dest = miniroute->gateway;
 				return miniroute;
 			}
 		}
@@ -913,20 +962,17 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
  *
  * @ret rc		Return status code
  */
-static int ipv4_create_routes ( void ) {
-	struct ipv4_miniroute *miniroute;
-	struct ipv4_miniroute *tmp;
+static int ipv4_apply_routes ( void ) {
 	int rc;
 
 	/* Send gratuitous ARPs for any new IPv4 addresses */
 	ipv4_settings ( ipv4_gratuitous_arp );
 
 	/* Delete all existing routes */
-	list_for_each_entry_safe ( miniroute, tmp, &ipv4_miniroutes, list )
-		del_ipv4_miniroute ( miniroute );
+	ipv4_del_miniroutes();
 
-	/* Create a route for each configured network device */
-	if ( ( rc = ipv4_settings ( add_ipv4_miniroute ) ) != 0 )
+	/* Create routes for each configured network device */
+	if ( ( rc = ipv4_settings ( ipv4_add_miniroutes ) ) != 0 )
 		return rc;
 
 	return 0;
@@ -934,7 +980,7 @@ static int ipv4_create_routes ( void ) {
 
 /** IPv4 settings applicator */
 struct settings_applicator ipv4_settings_applicator __settings_applicator = {
-	.apply = ipv4_create_routes,
+	.apply = ipv4_apply_routes,
 };
 
 /* Drag in objects via ipv4_protocol */

@@ -297,6 +297,36 @@ static void ipv4_test_exec ( void ) {
 			"192.168.87.1", &net4, "192.168.86.1", 0 );
 	ipv4_route_ok ( "192.168.96.1", NULL, NULL, NULL, NULL, 0 );
 	testnet_remove_ok ( &net4 );
+
+	/* Multiple interfaces */
+	testnet_ok ( &net0 );
+	testnet_ok ( &net1 );
+	testnet_ok ( &net2 );
+	testnet_close_ok ( &net1 );
+	ipv4_route_ok ( "192.168.0.9", NULL,
+			"192.168.0.9", &net0, "192.168.0.1", 0 );
+	ipv4_route_ok ( "10.31.31.1", NULL,
+			"10.31.31.1", &net2, "10.31.31.0", 0 );
+	testnet_close_ok ( &net0 );
+	testnet_open_ok ( &net1 );
+	ipv4_route_ok ( "192.168.0.9", NULL,
+			"192.168.0.9", &net1, "192.168.0.2", 0 );
+	ipv4_route_ok ( "10.31.31.1", NULL,
+			"10.31.31.1", &net2, "10.31.31.0", 0 );
+	testnet_close_ok ( &net2 );
+	ipv4_route_ok ( "8.8.8.8", NULL,
+			"192.168.0.254", &net1, "192.168.0.2", 0 );
+	testnet_close_ok ( &net1 );
+	testnet_open_ok ( &net0 );
+	ipv4_route_ok ( "8.8.8.8", NULL,
+			"192.168.0.254", &net0, "192.168.0.1", 0 );
+	testnet_close_ok ( &net0 );
+	testnet_open_ok ( &net2 );
+	ipv4_route_ok ( "8.8.8.8", NULL,
+			"10.31.31.1", &net2, "10.31.31.0", 0 );
+	testnet_remove_ok ( &net2 );
+	testnet_remove_ok ( &net1 );
+	testnet_remove_ok ( &net0 );
 }
 
 /** IPv4 self-test */

@@ -54,38 +54,83 @@ struct ipv4_pseudo_header {
 	uint16_t len;
 };
 
-/** An IPv4 address/routing table entry */
+/** An IPv4 address/routing table entry
+ *
+ * Routing table entries are maintained in order of specificity.  For
+ * a given destination address, the first matching table entry will be
+ * used as the egress route.
+ */
 struct ipv4_miniroute {
 	/** List of miniroutes */
 	struct list_head list;
 
-	/** Network device */
+	/** Network device
+	 *
+	 * When this routing table entry is matched, this is the
+	 * egress network device to be used.
+	 */
 	struct net_device *netdev;
 
-	/** IPv4 address */
+	/** IPv4 address
+	 *
+	 * When this routing table entry is matched, this is the
+	 * source address to be used.
+	 *
+	 * The presence of this routing table entry also indicates
+	 * that this address is a valid local destination address for
+	 * the matching network device.
+	 */
 	struct in_addr address;
+	/** Subnet network address
+	 *
+	 * A subnet is a range of addresses defined by a network
+	 * address and subnet mask.  A destination address with all of
+	 * the subnet mask bits in common with the network address is
+	 * within the subnet and therefore matches this routing table
+	 * entry.
+	 */
+	struct in_addr network;
 	/** Subnet mask
 	 *
-	 * An address with all of these bits in common with our IPv4
-	 * address is in the local subnet.
+	 * An address with all of these bits in common with the
+	 * network address matches this routing table entry.
 	 */
 	struct in_addr netmask;
+	/** Gateway address, or zero
+	 *
+	 * When this routing table entry is matched and this address
+	 * is non-zero, it will be used as the next-hop address.
+	 *
+	 * When this routing table entry is matched and this address
+	 * is zero, the subnet is local (on-link) and the next-hop
+	 * address will be the original destination address.
+	 */
+	struct in_addr gateway;
 	/** Host mask
 	 *
-	 * An address in the local subnet with all of these bits set
-	 * to zero represents the network address, and an address in
-	 * the local subnet with all of these bits set to one
-	 * represents the directed broadcast address.  All other
-	 * addresses in the local subnet are valid host addresses.
+	 * An address in a local subnet with all of these bits set to
+	 * zero represents the network address, and an address in a
+	 * local subnet with all of these bits set to one represents
+	 * the local directed broadcast address.  All other addresses
+	 * in a local subnet are valid host addresses.
 	 *
-	 * For most subnets, this is the inverse of the subnet mask.
-	 * In a small subnet (/31 or /32) there is no network address
-	 * or directed broadcast address, and all addresses in the
-	 * subnet are valid host addresses.
+	 * For most local subnets, this is the inverse of the subnet
+	 * mask.  In a small subnet (/31 or /32) there is no network
+	 * address or directed broadcast address, and all addresses in
+	 * the subnet are valid host addresses.
+	 *
+	 * When this routing table entry is matched and the subnet is
+	 * local, a next-hop address with all of these bits set to one
+	 * will be treated as a local broadcast address.  All other
+	 * next-hop addresses will be treated as unicast addresses.
+	 *
+	 * When this routing table entry is matched and the subnet is
+	 * non-local, the next-hop address is always a unicast
+	 * address.  The host mask for non-local subnets is therefore
+	 * set to @c INADDR_NONE to allow the same logic to be used as
+	 * for local subnets.
 	 */
 	struct in_addr hostmask;
-	/** Gateway address, or zero for no gateway */
-	struct in_addr gateway;
 };
 
 extern struct list_head ipv4_miniroutes;
