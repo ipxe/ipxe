@@ -34,9 +34,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 #include <byteswap.h>
 #include <ipxe/in.h>
+#include <ipxe/ip.h>
 #include <ipxe/test.h>
+#include "netdev_test.h"
 
 /** Define inline IPv4 address */
 #define IPV4(a,b,c,d) \
@@ -105,6 +108,113 @@ static void inet_aton_fail_okx ( const char *text, const char *file,
 	inet_aton_fail_okx ( text, __FILE__, __LINE__ )
 
 /**
+ * Report an ipv4_route() test result
+ *
+ * @v dest		Destination address
+ * @v scope		Destination scope test network device, or NULL
+ * @v next		Expected next hop address (on success)
+ * @v egress		Expected egress device, or NULL to expect failure
+ * @v src		Expected source address (on success)
+ * @v bcast		Expected broadcast packet (on success)
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static void ipv4_route_okx ( const char *dest, struct testnet *scope,
+			     const char *next, struct testnet *egress,
+			     const char *src, int bcast,
+			     const char *file, unsigned int line ) {
+	struct ipv4_miniroute *miniroute;
+	struct in_addr in_dest;
+	struct in_addr in_src;
+	struct in_addr in_next;
+	struct in_addr actual;
+	unsigned int scope_id;
+
+	/* Sanity checks */
+	assert ( ( scope == NULL ) || ( scope->netdev != NULL ) );
+	assert ( ( egress == NULL ) == ( src == NULL ) );
+
+	/* Parse addresses */
+	okx ( inet_aton ( dest, &in_dest ) != 0, file, line );
+	if ( src )
+		okx ( inet_aton ( src, &in_src ) != 0, file, line );
+	if ( next ) {
+		okx ( inet_aton ( next, &in_next ) != 0, file, line );
+	} else {
+		in_next.s_addr = in_dest.s_addr;
+	}
+
+	/* Perform routing */
+	actual.s_addr = in_dest.s_addr;
+	scope_id = ( scope ? scope->netdev->scope_id : 0 );
+	miniroute = ipv4_route ( scope_id, &actual );
+
+	/* Validate result */
+	if ( src ) {
+
+		/* Check that a route was found */
+		okx ( miniroute != NULL, file, line );
+		DBG ( "ipv4_route ( %s, %s ) = %s",
+		      ( scope ? scope->dev.name : "<any>" ), dest,
+		      inet_ntoa ( actual ) );
+		DBG ( " from %s via %s\n",
+		      inet_ntoa ( miniroute->address ), egress->dev.name );
+
+		/* Check that expected network device was used */
+		okx ( miniroute->netdev == egress->netdev, file, line );
+
+		/* Check that expected source address was used */
+		okx ( miniroute->address.s_addr == in_src.s_addr, file, line );
+
+		/* Check that expected next hop address was used */
+		okx ( actual.s_addr == in_next.s_addr, file, line );
+
+		/* Check that expected broadcast choice was used */
+		okx ( ( ! ( ( ~actual.s_addr ) & miniroute->hostmask.s_addr ) )
+		      == ( !! bcast ), file, line );
+
+	} else {
+
+		/* Routing is expected to fail */
+		okx ( miniroute == NULL, file, line );
+		DBG ( "ipv4_route ( %s, %s ) = <unreachable>\n",
+		      ( scope ? scope->dev.name : "<any>" ), dest );
+	}
+}
+#define ipv4_route_ok( dest, scope, next, egress, src, bcast )		\
+	ipv4_route_okx ( dest, scope, next, egress, src, bcast,		\
+			 __FILE__, __LINE__ )
+
+/** net0: Single address and gateway (DHCP assignment) */
+TESTNET ( net0,
+	  { "dhcp/ip", "192.168.0.1" },
+	  { "dhcp/netmask", "255.255.255.0" },
+	  { "dhcp/gateway", "192.168.0.254" } );
+
+/** net1: Single address and gateway (DHCP assignment) */
+TESTNET ( net1,
+	  { "dhcp/ip", "192.168.0.2" },
+	  { "dhcp/netmask", "255.255.255.0" },
+	  { "dhcp/gateway", "192.168.0.254" } );
+
+/** net2: Small /31 subnet mask */
+TESTNET ( net2,
+	  { "ip", "10.31.31.0" },
+	  { "netmask", "255.255.255.254" },
+	  { "gateway", "10.31.31.1" } );
+
+/** net3: Small /32 subnet mask */
+TESTNET ( net3,
+	  { "ip", "10.32.32.32" },
+	  { "netmask", "255.255.255.255" },
+	  { "gateway", "192.168.32.254" } );
+
+/** net4: Local subnet with no gateway */
+TESTNET ( net4,
+	  { "ip", "192.168.86.1" },
+	  { "netmask", "255.255.240.0" } );
+
+/**
  * Perform IPv4 self-tests
  *
  */
@@ -145,6 +255,48 @@ static void ipv4_test_exec ( void ) {
 	inet_aton_fail_ok ( "127.0.0" ); /* Too short */
 	inet_aton_fail_ok ( "1.2.3.a" ); /* Invalid characters */
 	inet_aton_fail_ok ( "127.0..1" ); /* Missing bytes */
+
+	/* Single address and gateway */
+	testnet_ok ( &net0 );
+	ipv4_route_ok ( "192.168.0.10", NULL,
+			"192.168.0.10", &net0, "192.168.0.1", 0 );
+	ipv4_route_ok ( "10.0.0.6", NULL,
+			"192.168.0.254", &net0, "192.168.0.1", 0 );
+	ipv4_route_ok ( "192.168.0.255", NULL,
+			"192.168.0.255", &net0, "192.168.0.1", 1 );
+	testnet_remove_ok ( &net0 );
+
+	/* Overridden DHCP-assigned address */
+	testnet_ok ( &net1 );
+	ipv4_route_ok ( "192.168.1.3", NULL,
+			"192.168.0.254", &net1, "192.168.0.2", 0 );
+	testnet_set_ok ( &net1, "ip", "192.168.1.2" );
+	ipv4_route_ok ( "192.168.1.3", NULL,
+			"192.168.1.3", &net1, "192.168.1.2", 0 );
+	testnet_remove_ok ( &net1 );
+
+	/* Small /31 subnet */
+	testnet_ok ( &net2 );
+	ipv4_route_ok ( "10.31.31.1", NULL,
+			"10.31.31.1", &net2, "10.31.31.0", 0 );
+	ipv4_route_ok ( "212.13.204.60", NULL,
+			"10.31.31.1", &net2, "10.31.31.0", 0 );
+	testnet_remove_ok ( &net2 );
+
+	/* Small /32 subnet */
+	testnet_ok ( &net3 );
+	ipv4_route_ok ( "10.32.32.31", NULL,
+			"192.168.32.254", &net3, "10.32.32.32", 0 );
+	ipv4_route_ok ( "8.8.8.8", NULL,
+			"192.168.32.254", &net3, "10.32.32.32", 0 );
+	testnet_remove_ok ( &net3 );
+
+	/* No gateway */
+	testnet_ok ( &net4 );
+	ipv4_route_ok ( "192.168.87.1", NULL,
+			"192.168.87.1", &net4, "192.168.86.1", 0 );
+	ipv4_route_ok ( "192.168.96.1", NULL, NULL, NULL, NULL, 0 );
+	testnet_remove_ok ( &net4 );
 }
 
 /** IPv4 self-test */
