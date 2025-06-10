@@ -135,35 +135,131 @@ static int ipv4_add_miniroute ( struct net_device *netdev,
 }
 
 /**
+ * Add static route minirouting table entries
+ *
+ * @v netdev		Network device
+ * @v address		IPv4 address
+ * @v routes		Static routes
+ * @v len		Length of static routes
+ * @ret rc		Return status code
+ */
+static int ipv4_add_static ( struct net_device *netdev, struct in_addr address,
+			     const void *routes, size_t len ) {
+	const struct {
+		struct in_addr address;
+	} __attribute__ (( packed )) *encoded;
+	struct in_addr netmask;
+	struct in_addr network;
+	struct in_addr gateway;
+	unsigned int width;
+	unsigned int masklen;
+	size_t remaining;
+	const void *data;
+	int rc;
+
+	/* Parse and add static routes */
+	for ( data = routes, remaining = len ; remaining ; ) {
+
+		/* Extract subnet mask width */
+		width = *( ( uint8_t * ) data );
+		data++;
+		remaining--;
+		masklen = ( ( width + 7 ) / 8 );
+
+		/* Check remaining length */
+		if ( ( masklen + sizeof ( gateway ) ) > remaining ) {
+			DBGC ( netdev, "IPv4 invalid static route:\n" );
+			DBGC_HDA ( netdev, 0, routes, len );
+			return -EINVAL;
+		}
+
+		/* Calculate subnet mask */
+		if ( width ) {
+			netmask.s_addr = htonl ( -1UL << ( 32 - width ) );
+		} else {
+			netmask.s_addr = 0;
+		}
+
+		/* Extract network address */
+		encoded = data;
+		network.s_addr = ( encoded->address.s_addr & netmask.s_addr );
+		data += masklen;
+		remaining -= masklen;
+
+		/* Extract gateway address */
+		encoded = data;
+		gateway.s_addr = encoded->address.s_addr;
+		data += sizeof ( gateway );
+		remaining -= sizeof ( gateway );
+
+		/* Add route */
+		if ( ( rc = ipv4_add_miniroute ( netdev, address, network,
+						 netmask, gateway ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Add IPv4 minirouting table entries
  *
  * @v netdev		Network device
  * @v address		IPv4 address
- * @v netmask		Subnet mask
- * @v gateway		Gateway address (if any)
  * @ret rc		Return status code
  */
 static int ipv4_add_miniroutes ( struct net_device *netdev,
-				 struct in_addr address,
-				 struct in_addr netmask,
-				 struct in_addr gateway ) {
+				 struct in_addr address ) {
+	struct settings *settings = netdev_settings ( netdev );
 	struct in_addr none = { 0 };
+	struct in_addr netmask;
+	struct in_addr gateway;
 	struct in_addr network;
+	void *routes;
+	int len;
 	int rc;
+
+	/* Get subnet mask */
+	fetch_ipv4_setting ( settings, &netmask_setting, &netmask );
+
+	/* Calculate default netmask, if necessary */
+	if ( ! netmask.s_addr ) {
+		if ( IN_IS_CLASSA ( address.s_addr ) ) {
+			netmask.s_addr = INADDR_NET_CLASSA;
+		} else if ( IN_IS_CLASSB ( address.s_addr ) ) {
+			netmask.s_addr = INADDR_NET_CLASSB;
+		} else if ( IN_IS_CLASSC ( address.s_addr ) ) {
+			netmask.s_addr = INADDR_NET_CLASSC;
+		}
+	}
+
+	/* Get default gateway, if present */
+	fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
+
+	/* Get static routes, if present */
+	len = fetch_raw_setting_copy ( settings, &static_route_setting,
+				       &routes );
 
 	/* Add local address */
 	network.s_addr = ( address.s_addr & netmask.s_addr );
 	if ( ( rc = ipv4_add_miniroute ( netdev, address, network, netmask,
 					 none ) ) != 0 )
-		return rc;
+		goto done;
 
-	/* Add default gateway, if applicable */
-	if ( gateway.s_addr &&
-	     ( ( rc = ipv4_add_miniroute ( netdev, address, none, none,
-					   gateway ) ) != 0 ) )
-		return rc;
+	/* Add static routes or default gateway, as applicable */
+	if ( len >= 0 ) {
+		if ( ( rc = ipv4_add_static ( netdev, address, routes,
+					      len ) ) != 0 )
+			goto done;
+	} else if ( gateway.s_addr ) {
+		if ( ( rc = ipv4_add_miniroute ( netdev, address, none, none,
+						 gateway ) ) != 0 )
+			goto done;
+	}
 
-	return 0;
+ done:
+	free ( routes );
+	return rc;
 }
 
 /**
@@ -871,19 +967,24 @@ const struct setting gateway_setting __setting ( SETTING_IP4, gateway ) = {
 	.type = &setting_type_ipv4,
 };
 
+/** Classless static routes setting */
+const struct setting static_route_setting __setting ( SETTING_IP4,
+						      static_routes ) = {
+	.name = "static-routes",
+	.description = "Static routes",
+	.tag = DHCP_STATIC_ROUTES,
+	.type = &setting_type_hex,
+};
+
 /**
  * Send gratuitous ARP, if applicable
  *
  * @v netdev		Network device
  * @v address		IPv4 address
- * @v netmask		Subnet mask
- * @v gateway		Gateway address (if any)
  * @ret rc		Return status code
  */
 static int ipv4_gratuitous_arp ( struct net_device *netdev,
-				 struct in_addr address,
-				 struct in_addr netmask __unused,
-				 struct in_addr gateway __unused ) {
+				 struct in_addr address ) {
 	int rc;
 
 	/* Do nothing if network device already has this IPv4 address */
@@ -910,14 +1011,10 @@ static int ipv4_gratuitous_arp ( struct net_device *netdev,
  * @ret rc		Return status code
  */
 static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
-					     struct in_addr address,
-					     struct in_addr netmask,
-					     struct in_addr gateway ) ) {
+					     struct in_addr address ) ) {
 	struct net_device *netdev;
 	struct settings *settings;
-	struct in_addr address = { 0 };
-	struct in_addr netmask = { 0 };
-	struct in_addr gateway = { 0 };
+	struct in_addr address;
 	int rc;
 
 	/* Process settings for each network device */
@@ -927,30 +1024,12 @@ static int ipv4_settings ( int ( * apply ) ( struct net_device *netdev,
 		settings = netdev_settings ( netdev );
 
 		/* Get IPv4 address */
-		address.s_addr = 0;
 		fetch_ipv4_setting ( settings, &ip_setting, &address );
 		if ( ! address.s_addr )
 			continue;
 
-		/* Get subnet mask */
-		fetch_ipv4_setting ( settings, &netmask_setting, &netmask );
-
-		/* Calculate default netmask, if necessary */
-		if ( ! netmask.s_addr ) {
-			if ( IN_IS_CLASSA ( address.s_addr ) ) {
-				netmask.s_addr = INADDR_NET_CLASSA;
-			} else if ( IN_IS_CLASSB ( address.s_addr ) ) {
-				netmask.s_addr = INADDR_NET_CLASSB;
-			} else if ( IN_IS_CLASSC ( address.s_addr ) ) {
-				netmask.s_addr = INADDR_NET_CLASSC;
-			}
-		}
-
-		/* Get default gateway, if present */
-		fetch_ipv4_setting ( settings, &gateway_setting, &gateway );
-
 		/* Apply settings */
-		if ( ( rc = apply ( netdev, address, netmask, gateway ) ) != 0 )
+		if ( ( rc = apply ( netdev, address ) ) != 0 )
 			return rc;
 	}
 

@@ -344,6 +344,9 @@ struct dhcp_client_uuid {
 /** DNS domain search list */
 #define DHCP_DOMAIN_SEARCH 119
 
+/** Classless static routes */
+#define DHCP_STATIC_ROUTES 121
+
 /** Etherboot-specific encapsulated options
  *
  * This encapsulated options field is used to contain all options

@@ -214,6 +214,17 @@ TESTNET ( net4,
 	  { "ip", "192.168.86.1" },
 	  { "netmask", "255.255.240.0" } );
 
+/** net5: Static routes */
+TESTNET ( net5,
+	  { "ip", "10.42.0.1" },
+	  { "netmask", "255.255.0.0" },
+	  { "gateway", "10.42.0.254" /* should be ignored */ },
+	  { "static-routes",
+	    "19:0a:2b:2b:80:0a:2a:2b:2b:" /* 10.43.43.128/25 via 10.42.43.43 */
+	    "10:c0:a8:0a:2a:c0:a8:" /* 192.168.0.0/16 via 10.42.192.168 */
+	    "18:c0:a8:00:00:00:00:00:" /* 192.168.0.0/24 on-link */
+	    "00:0a:2a:01:01" /* default via 10.42.1.1 */ } );
+
 /**
  * Perform IPv4 self-tests
  *
@@ -327,6 +338,24 @@ static void ipv4_test_exec ( void ) {
 	testnet_remove_ok ( &net2 );
 	testnet_remove_ok ( &net1 );
 	testnet_remove_ok ( &net0 );
+
+	/* Static routes */
+	testnet_ok ( &net5 );
+	ipv4_route_ok ( "10.42.99.0", NULL,
+			"10.42.99.0", &net5, "10.42.0.1", 0 );
+	ipv4_route_ok ( "8.8.8.8", NULL,
+			"10.42.1.1", &net5, "10.42.0.1", 0 );
+	ipv4_route_ok ( "10.43.43.1", NULL,
+			"10.42.1.1", &net5, "10.42.0.1", 0 );
+	ipv4_route_ok ( "10.43.43.129", NULL,
+			"10.42.43.43", &net5, "10.42.0.1", 0 );
+	ipv4_route_ok ( "192.168.54.8", NULL,
+			"10.42.192.168", &net5, "10.42.0.1", 0 );
+	ipv4_route_ok ( "192.168.0.8", NULL,
+			"192.168.0.8", &net5, "10.42.0.1", 0 );
+	ipv4_route_ok ( "192.168.0.255", NULL,
+			"192.168.0.255", &net5, "10.42.0.1", 1 );
+	testnet_remove_ok ( &net5 );
 }
 
 /** IPv4 self-test */

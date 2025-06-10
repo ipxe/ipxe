@@ -437,6 +437,8 @@ netmask_setting __setting ( SETTING_IP4, netmask );
 extern const struct setting
 gateway_setting __setting ( SETTING_IP4, gateway );
 extern const struct setting
+static_route_setting __setting ( SETTING_IP4, static_routes );
+extern const struct setting
 dns_setting __setting ( SETTING_IP4_EXTRA, dns );
 extern const struct setting
 ip6_setting __setting ( SETTING_IP6, ip6 );
