@@ -62,6 +62,9 @@ struct used_region fdtmem_used __used_region = {
 /** Maximum accessible physical address */
 static physaddr_t fdtmem_max;
 
+/** Maximum 32-bit physical address */
+#define FDTMEM_MAX32 0xffffffff
+
 /**
  * Update memory region descriptor based on device tree node
  *
@@ -249,9 +252,9 @@ static size_t fdtmem_len ( struct fdt *fdt ) {
  * @v max		Maximum accessible physical address
  * @ret new		New physical address for relocation
  *
- * Find a suitably aligned address towards the top of existent memory
- * to which iPXE may be relocated, along with a copy of the system
- * device tree.
+ * Find a suitably aligned address towards the top of existent 32-bit
+ * memory to which iPXE may be relocated, along with a copy of the
+ * system device tree.
  *
  * This function may be called very early in initialisation, before
  * .data is writable or .bss has been zeroed.  Neither this function
@@ -288,6 +291,16 @@ physaddr_t fdtmem_relocate ( struct fdt_header *hdr, physaddr_t max ) {
 	assert ( len > 0 );
 	DBGC ( hdr, "FDTMEM requires %#zx + %#zx => %#zx bytes for "
 	       "relocation\n", memsz, fdt.len, len );
+
+	/* Limit relocation to 32-bit address space
+	 *
+	 * Devices with only 32-bit DMA addressing are relatively
+	 * common even on systems with 64-bit CPUs.  Limit relocation
+	 * of iPXE to 32-bit address space so that I/O buffers and
+	 * other DMA allocations will be accessible by 32-bit devices.
+	 */
+	if ( max > FDTMEM_MAX32 )
+		max = FDTMEM_MAX32;
 
 	/* Construct memory map and choose a relocation address */
 	new = old;
