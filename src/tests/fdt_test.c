@@ -213,6 +213,10 @@ static void fdt_test_exec ( void ) {
 	ok ( strcmp ( string, "sifive,uart0" ) == 0 );
 	ok ( fdt_path ( &fdt, "/nonexistent", &offset ) != 0 );
 	ok ( fdt_path ( &fdt, "/cpus/nonexistent", &offset ) != 0 );
+	ok ( fdt_path ( &fdt, "/soc/serial@10010000:115200n8",
+			&offset ) == 0 );
+	ok ( ( string = fdt_string ( &fdt, offset, "compatible" ) ) != NULL );
+	ok ( strcmp ( string, "sifive,uart0" ) == 0 );
 
 	/* Verify 64-bit integer properties */
 	ok ( fdt_u64 ( &fdt, 0, "#address-cells", &u64 ) == 0 );
@@ -249,6 +253,9 @@ static void fdt_test_exec ( void ) {
 	ok ( ( string = fdt_string ( &fdt, offset, "compatible" ) ) != NULL );
 	ok ( strcmp ( string, "sifive,uart0" ) == 0 );
 	ok ( fdt_alias ( &fdt, "nonexistent0", &offset ) != 0 );
+	ok ( fdt_alias ( &fdt, "ethernet0:params", &offset ) == 0 );
+	ok ( ( string = fdt_string ( &fdt, offset, "phy-mode" ) ) != NULL );
+	ok ( strcmp ( string, "gmii" ) == 0 );
 
 	/* Verify node description */
 	ok ( fdt_path ( &fdt, "/memory@80000000", &offset ) == 0 );

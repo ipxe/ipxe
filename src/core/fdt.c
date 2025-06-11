@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
@@ -49,6 +50,33 @@ struct image_tag fdt_image __image_tag = {
 
 /** Amount of free space to add whenever we have to reallocate a tree */
 #define FDT_INSERT_PAD 1024
+
+/**
+ * Check if character is permitted in a name
+ *
+ * @v ch		Character
+ * @ret is_permitted	Character is permitted in a name
+ */
+static int fdt_permitted ( char ch ) {
+	static const char permitted[] = ",._+?#-";
+
+	return ( isalnum ( ch ) || strchr ( permitted, ch ) );
+}
+
+/**
+ * Compare node name
+ *
+ * @v desc		Token descriptor
+ * @v name		Name (terminated by NUL or any non-permitted character)
+ * @ret is_match	Name matches token descriptor
+ */
+static int fdt_match ( const struct fdt_descriptor *desc, const char *name ) {
+	size_t len = strlen ( desc->name );
+
+	/* Check name and terminator */
+	return ( ( memcmp ( desc->name, name, len ) == 0 ) &&
+		 ( ! ( name[len] && fdt_permitted ( name[len] ) ) ) );
+}
 
 /**
  * Describe device tree token
@@ -318,14 +346,8 @@ int fdt_parent ( struct fdt *fdt, unsigned int offset, unsigned int *parent ) {
 static int fdt_child ( struct fdt *fdt, unsigned int offset, const char *name,
 		       unsigned int *child ) {
 	struct fdt_descriptor desc;
-	const char *sep;
-	size_t name_len;
 	int depth;
 	int rc;
-
-	/* Determine length of name (may be terminated with NUL or '/') */
-	sep = strchr ( name, '/' );
-	name_len = ( sep ? ( ( size_t ) ( sep - name ) ) : strlen ( name ) );
 
 	/* Enter node */
 	if ( ( rc = fdt_enter ( fdt, offset, &desc ) ) != 0 )
@@ -346,8 +368,7 @@ static int fdt_child ( struct fdt *fdt, unsigned int offset, const char *name,
 			DBGC2 ( fdt, "FDT +%#04x has child node \"%s\" at "
 				"+%#04x\n", offset, desc.name, desc.offset );
 			assert ( desc.depth > 0 );
-			if ( ( strlen ( desc.name ) == name_len ) &&
-			     ( memcmp ( name, desc.name, name_len ) == 0 ) ) {
+			if ( fdt_match ( &desc, name ) ) {
 				*child = desc.offset;
 				return 0;
 			}
@@ -495,7 +516,7 @@ static int fdt_property ( struct fdt *fdt, unsigned int offset,
 				"+%#04x len %#zx\n", offset, desc->name,
 				desc->offset, desc->len );
 			assert ( desc->depth == 0 );
-			if ( strcmp ( name, desc->name ) == 0 ) {
+			if ( fdt_match ( desc, name ) ) {
 				DBGC2_HDA ( fdt, 0, desc->data, desc->len );
 				return 0;
 			}
