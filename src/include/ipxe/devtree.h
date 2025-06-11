@@ -15,12 +15,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** A devicetree device */
 struct dt_device {
+	/** Device name */
+	const char *name;
 	/** Generic device */
 	struct device dev;
 	/** DMA device */
 	struct dma_device dma;
-	/** Device path */
-	const char *path;
 	/** Driver for this device */
 	struct dt_driver *driver;
 	/** Driver-private data */
@@ -79,5 +79,7 @@ static inline void * dt_get_drvdata ( struct dt_device *dt ) {
 
 extern void * dt_ioremap ( struct dt_device *dt, unsigned int offset,
 			   unsigned int index, size_t len );
+extern int dt_probe_node ( struct device *parent, unsigned int offset );
+extern void dt_remove_node ( struct device *parent );
 
 #endif /* _IPXE_DEVTREE_H */
