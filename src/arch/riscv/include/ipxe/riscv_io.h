@@ -128,7 +128,7 @@ RISCV_WRITEX ( w, uint16_t, "h" );
  */
 static inline __always_inline void
 IOAPI_INLINE ( riscv, mb ) ( void ) {
-	__asm__ __volatile__ ( "fence rw, rw" );
+	__asm__ __volatile__ ( "fence" : : : "memory" );
 }
 
 /* Dummy PIO */
