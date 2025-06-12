@@ -2170,6 +2170,7 @@ static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
 
 	if ( bnxt_tx_avail ( bp ) < 1 ) {
 		DBGP ( "- %s (  ): Failed no bd's available\n", __func__ );
+		udelay ( 10000 );
 		return -ENOBUFS;
 	}
 
@@ -2231,8 +2232,13 @@ static void bnxt_service_cq ( struct net_device *dev )
 	u16 old_cid = bp->cq.cons_id;
 	int done = SERVICE_NEXT_CQ_BD;
 	u32 cq_type;
+	u16 cmd_reg = 0;
+	u16 cq_retry = 0;
 
 	while ( done == SERVICE_NEXT_CQ_BD ) {
+		if ( bp->pci_flush_req ) {
+			pci_read_word16 ( bp->pdev, PCI_COMMAND, &cmd_reg );
+		}
 		cmp = ( struct cmpl_base * )BD_NOW ( CQ_DMA_ADDR ( bp ),
 						bp->cq.cons_id,
 						sizeof ( struct cmpl_base ) );
@@ -2263,7 +2269,13 @@ static void bnxt_service_cq ( struct net_device *dev )
 			bnxt_adv_cq_index ( bp, 1 );
 			break;
 		default:
-			done = NO_MORE_CQ_BD_TO_SERVICE;
+			udelay ( 1000 );
+			bp->pci_flush_req = 1;
+			if (cq_retry > 5 ) {
+				done = NO_MORE_CQ_BD_TO_SERVICE;
+				break;
+			}
+			cq_retry++;
 			break;
 		}
 	}
@@ -2325,6 +2337,7 @@ static void bnxt_close ( struct net_device *dev )
 
 	DBGP ( "%s\n", __func__ );
 	bnxt_down_nic (bp);
+	bp->pci_flush_req = 0;
 
 	/* iounmap PCI BAR ( s ) */
 	bnxt_down_pci(bp);
