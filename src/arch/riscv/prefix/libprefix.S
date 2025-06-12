@@ -245,6 +245,32 @@ early_uart_sifive_wait_\@:
 
 /*****************************************************************************
  *
+ * Print single character to early UART (from C code)
+ *
+ *****************************************************************************
+ *
+ * This function is called by the SBI console driver to output a
+ * character to the early UART (if enabled).
+ *
+ * The standard C ABI applies to this function.
+ *
+ * Parameters:
+ *
+ *   a0 - Character to print
+ *
+ * Returns: none
+ *
+ */
+
+	.section ".prefix.early_uart_putchar", "ax", @progbits
+	.globl	early_uart_putchar
+early_uart_putchar:
+	print_char_uart
+	ret
+	.size	early_uart_putchar, . - early_uart_putchar
+
+/*****************************************************************************
+ *
  * Print message to debug console
  *
  *****************************************************************************

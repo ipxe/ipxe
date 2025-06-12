@@ -41,6 +41,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define CONSOLE_SBI ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
+extern void early_uart_putchar ( int character );
+
 /** Buffered input character (if any) */
 static unsigned char sbi_console_input;
 
@@ -51,6 +53,9 @@ static unsigned char sbi_console_input;
  */
 static void sbi_putchar ( int character ) {
 	struct sbi_return ret;
+
+	/* Write byte to early UART, if enabled */
+	early_uart_putchar ( character );
 
 	/* Write byte to console */
 	ret = sbi_ecall_1 ( SBI_DBCN, SBI_DBCN_WRITE_BYTE, character );
