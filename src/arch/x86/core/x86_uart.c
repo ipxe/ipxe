@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2025 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -29,41 +29,45 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-#include <errno.h>
-#include <ipxe/uart.h>
+#include <string.h>
+#include <ipxe/serial.h>
+#include <ipxe/ns16550.h>
 
-/** UART port bases */
-static uint16_t uart_base[] = {
-	[COM1] = 0x3f8,
-	[COM2] = 0x2f8,
-	[COM3] = 0x3e8,
-	[COM4] = 0x2e8,
-};
+/** Define a fixed ISA UART */
+#define ISA_UART( NAME, BASE )						\
+	struct ns16550_uart NAME = {					\
+		.uart = {						\
+			.refcnt = REF_INIT ( ref_no_free ),		\
+			.name = #NAME,					\
+			.op = &ns16550_operations,			\
+		},							\
+		.base = ( ( void * ) (BASE) ),				\
+	}
+
+/* Fixed ISA UARTs */
+ISA_UART ( com1, COM1_BASE );
+ISA_UART ( com2, COM2_BASE );
+ISA_UART ( com3, COM3_BASE );
+ISA_UART ( com4, COM4_BASE );
 
 /**
- * Select UART port
+ * Register fixed ISA UARTs
  *
- * @v uart		UART
- * @v port		Port number, or 0 to disable
  * @ret rc		Return status code
  */
-int uart_select ( struct uart *uart, unsigned int port ) {
+int uart_register_fixed ( void ) {
+	static struct uart *ports[] = { COM1, COM2, COM3, COM4 };
+	unsigned int i;
 	int rc;
 
-	/* Set new UART base */
-	if ( port >= ( sizeof ( uart_base ) / sizeof ( uart_base[0] ) ) ) {
-		rc = -ENODEV;
-		goto err;
+	/* Register all fixed ISA UARTs */
+	for ( i = 0 ; i < ( sizeof ( ports ) / sizeof ( ports[0] ) ) ; i++ ) {
+		if ( ( rc = uart_register ( ports[i] ) ) != 0 ) {
+			DBGC ( ports[i], "UART could not register %s: %s\n",
+			       ports[i]->name, strerror ( rc ) );
+			return rc;
+		}
 	}
-	uart->base = ( ( void * ) ( intptr_t ) uart_base[port] );
-
-	/* Check that UART exists */
-	if ( ( rc = uart_exists ( uart ) ) != 0 )
-		goto err;
 
 	return 0;
-
- err:
-	uart->base = NULL;
-	return rc;
 }

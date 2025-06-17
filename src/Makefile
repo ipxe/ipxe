@@ -94,6 +94,7 @@ SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_link_speed
 SRCDIRS		+= drivers/infiniband/mlx_utils/mlx_lib/mlx_mtu
 SRCDIRS		+= drivers/infiniband/mlx_nodnic/src
 SRCDIRS		+= drivers/usb
+SRCDIRS		+= drivers/uart
 SRCDIRS		+= interface/pxe interface/efi interface/smbios
 SRCDIRS		+= interface/bofm
 SRCDIRS		+= interface/xen

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2025 Michael Brown <mbrown@fensystems.co.uk>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -25,125 +25,139 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
  *
- * 16550-compatible UART
+ * Generic UARTs
  *
  */
 
-#include <unistd.h>
+#include <stdlib.h>
+#include <strings.h>
 #include <errno.h>
 #include <ipxe/uart.h>
 
-/** Timeout for transmit holding register to become empty */
-#define UART_THRE_TIMEOUT_MS 100
+/** List of registered UARTs */
+LIST_HEAD ( uarts );
 
-/** Timeout for transmitter to become empty */
-#define UART_TEMT_TIMEOUT_MS 1000
+static void null_uart_transmit ( struct uart *uart __unused,
+				 uint8_t byte __unused ) {
+}
+
+static int null_uart_data_ready ( struct uart *uart __unused ) {
+	return 0;
+}
+
+static uint8_t null_uart_receive ( struct uart *uart __unused ) {
+	return 0;
+}
+
+static int null_uart_init ( struct uart *uart __unused,
+			    unsigned int baud __unused ) {
+	return 0;
+}
+
+static void null_uart_flush ( struct uart *uart __unused ) {
+}
+
+/** Null UART operations */
+struct uart_operations null_uart_operations = {
+	.transmit = null_uart_transmit,
+	.data_ready = null_uart_data_ready,
+	.receive = null_uart_receive,
+	.init = null_uart_init,
+	.flush = null_uart_flush,
+};
 
 /**
- * Transmit data
+ * Allocate UART
  *
- * @v uart		UART
- * @v data		Data
+ * @v priv_len		Length of private data
+ * @ret uart		UART, or NULL on error
  */
-void uart_transmit ( struct uart *uart, uint8_t data ) {
-	unsigned int i;
-	uint8_t lsr;
+struct uart * alloc_uart ( size_t priv_len ) {
+	struct uart *uart;
 
-	/* Wait for transmitter holding register to become empty */
-	for ( i = 0 ; i < UART_THRE_TIMEOUT_MS ; i++ ) {
-		lsr = uart_read ( uart, UART_LSR );
-		if ( lsr & UART_LSR_THRE )
-			break;
-		mdelay ( 1 );
-	}
+	/* Allocate and initialise UART */
+	uart = zalloc ( sizeof ( *uart ) + priv_len );
+	if ( ! uart )
+		return NULL;
+	uart->priv = ( ( ( void * ) uart ) + sizeof ( *uart ) );
 
-	/* Transmit data (even if we timed out) */
-	uart_write ( uart, UART_THR, data );
+	return uart;
 }
 
 /**
- * Flush data
+ * Register fixed UARTs (when not provided by platform)
  *
- * @v uart		UART
- */
-void uart_flush ( struct uart *uart ) {
-	unsigned int i;
-	uint8_t lsr;
-
-	/* Wait for transmitter and receiver to become empty */
-	for ( i = 0 ; i < UART_TEMT_TIMEOUT_MS ; i++ ) {
-		uart_read ( uart, UART_RBR );
-		lsr = uart_read ( uart, UART_LSR );
-		if ( ( lsr & UART_LSR_TEMT ) && ! ( lsr & UART_LSR_DR ) )
-			break;
-	}
-}
-
-/**
- * Check for existence of UART
- *
- * @v uart		UART
  * @ret rc		Return status code
  */
-int uart_exists ( struct uart *uart ) {
-
-	/* Fail if no UART port is defined */
-	if ( ! uart->base )
-		return -ENODEV;
-
-	/* Fail if UART scratch register seems not to be present */
-	uart_write ( uart, UART_SCR, 0x18 );
-	if ( uart_read ( uart, UART_SCR ) != 0x18 )
-		return -ENODEV;
-	uart_write ( uart, UART_SCR, 0xae );
-	if ( uart_read ( uart, UART_SCR ) != 0xae )
-		return -ENODEV;
+__weak int uart_register_fixed ( void ) {
 
 	return 0;
 }
 
 /**
- * Initialise UART
+ * Register UART
  *
  * @v uart		UART
- * @v baud		Baud rate, or zero to leave unchanged
  * @ret rc		Return status code
  */
-int uart_init ( struct uart *uart, unsigned int baud ) {
-	uint8_t dlm;
-	uint8_t dll;
+int uart_register ( struct uart *uart ) {
+
+	/* Add to list of registered UARTs */
+	uart_get ( uart );
+	list_add_tail ( &uart->list, &uarts );
+	DBGC ( uart, "UART %s registered\n", uart->name );
+
+	return 0;
+}
+
+/**
+ * Unregister UART
+ *
+ * @v uart		UART
+ */
+void uart_unregister ( struct uart *uart ) {
+
+	/* Remove from list of registered UARTs */
+	list_del ( &uart->list );
+	uart_put ( uart );
+}
+
+/**
+ * Find named UART
+ *
+ * @v name		UART name
+ * @ret uart		UART, or NULL if not found
+ */
+struct uart * uart_find ( const char *name ) {
+	struct uart *uart;
+	unsigned int index;
+	char *endp;
 	int rc;
 
-	/* Check for existence of UART */
-	if ( ( rc = uart_exists ( uart ) ) != 0 )
-		return rc;
-
-	/* Configure divisor and line control register, if applicable */
-	uart_write ( uart, UART_LCR, ( UART_LCR_8N1 | UART_LCR_DLAB ) );
-	if ( baud ) {
-		uart->divisor = ( UART_MAX_BAUD / baud );
-		dlm = ( ( uart->divisor >> 8 ) & 0xff );
-		dll = ( ( uart->divisor >> 0 ) & 0xff );
-		uart_write ( uart, UART_DLM, dlm );
-		uart_write ( uart, UART_DLL, dll );
-	} else {
-		dlm = uart_read ( uart, UART_DLM );
-		dll = uart_read ( uart, UART_DLL );
-		uart->divisor = ( ( dlm << 8 ) | dll );
+	/* Register fixed platform UARTs if not already registered */
+	if ( list_empty ( &uarts ) ) {
+		if ( ( rc = uart_register_fixed() ) != 0 ) {
+			DBGC ( &uarts, "UART could not register fixed UARTs: "
+			       "%s\n", strerror ( rc ) );
+			/* Continue anyway */
+		}
 	}
-	uart_write ( uart, UART_LCR, UART_LCR_8N1 );
 
-	/* Disable interrupts */
-	uart_write ( uart, UART_IER, 0 );
+	/* Try parsing name as a numeric index */
+	index = strtoul ( name, &endp, 10 );
 
-	/* Enable FIFOs */
-	uart_write ( uart, UART_FCR, UART_FCR_FE );
+	/* Find matching UART, if any */
+	list_for_each_entry ( uart, &uarts, list ) {
 
-	/* Assert DTR and RTS */
-	uart_write ( uart, UART_MCR, ( UART_MCR_DTR | UART_MCR_RTS ) );
+		/* Check for a matching name */
+		if ( strcasecmp ( name, uart->name ) == 0 )
+			return uart;
 
-	/* Flush any stale data */
-	uart_flush ( uart );
+		/* Check for a matching numeric index */
+		if ( ( *endp == '\0' ) && ( index-- == 0 ) )
+			return uart;
+	}
 
-	return 0;
+	DBGC ( &uarts, "UART %s not found\n", name );
+	return NULL;
 }

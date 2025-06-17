@@ -25,19 +25,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <assert.h>
 #include <ipxe/uart.h>
 #include <ipxe/gdbstub.h>
 #include <ipxe/gdbserial.h>
 #include <config/serial.h>
-
-/* UART port number */
-#ifdef COMCONSOLE
-#define GDBSERIAL_PORT COMCONSOLE
-#else
-#define GDBSERIAL_PORT 0
-#endif
 
 /* UART baud rate */
 #ifdef COMPRESERVE
@@ -47,37 +39,30 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #endif
 
 /** GDB serial UART */
-static struct uart gdbserial_uart;
+static struct uart *gdbserial_uart;
 
 struct gdb_transport serial_gdb_transport __gdb_transport;
 
 static size_t gdbserial_recv ( char *buf, size_t len ) {
 
 	assert ( len > 0 );
-	while ( ! uart_data_ready ( &gdbserial_uart ) ) {}
-	buf[0] = uart_receive ( &gdbserial_uart );
+	while ( ! uart_data_ready ( gdbserial_uart ) ) {}
+	buf[0] = uart_receive ( gdbserial_uart );
 	return 1;
 }
 
 static void gdbserial_send ( const char *buf, size_t len ) {
 
 	while ( len-- > 0 ) {
-		uart_transmit ( &gdbserial_uart, *buf++ );
+		uart_transmit ( gdbserial_uart, *buf++ );
 	}
 }
 
 static int gdbserial_init ( int argc, char **argv ) {
-	unsigned int port;
-	char *endp;
+	const char *port;
 
-	if ( argc == 0 ) {
-		port = GDBSERIAL_PORT;
-	} else if ( argc == 1 ) {
-		port = strtoul ( argv[0], &endp, 10 );
-		if ( *endp ) {
-			printf ( "serial: invalid port\n" );
-			return 1;
-		}
+	if ( argc == 1 ) {
+		port = argv[0];
 	} else {
 		printf ( "serial: syntax <port>\n" );
 		return 1;
@@ -98,14 +83,19 @@ struct gdb_transport serial_gdb_transport __gdb_transport = {
 	.send = gdbserial_send,
 };
 
-struct gdb_transport * gdbserial_configure ( unsigned int port,
+struct gdb_transport * gdbserial_configure ( const char *name,
 					     unsigned int baud ) {
 	int rc;
 
-	if ( ( rc = uart_select ( &gdbserial_uart, port ) ) != 0 )
-		return NULL;
+	uart_put ( gdbserial_uart );
+	gdbserial_uart = NULL;
 
-	if ( ( rc = uart_init ( &gdbserial_uart, baud ) ) != 0 )
+	gdbserial_uart = uart_find ( name );
+	if ( ! gdbserial_uart )
+		return NULL;
+	uart_get ( gdbserial_uart );
+
+	if ( ( rc = uart_init ( gdbserial_uart, baud ) ) != 0 )
 		return NULL;
 
 	return &serial_gdb_transport;

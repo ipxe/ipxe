@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/posix_io.h>
 #include <ipxe/process.h>
 #include <ipxe/serial.h>
+#include <ipxe/ns16550.h>
 #include <ipxe/init.h>
 #include <ipxe/image.h>
 #include <ipxe/version.h>
@@ -253,8 +254,8 @@ static __asmcall __used void int21 ( struct i386_all_regs *ix86 ) {
 		break;
 
 	case 0x04: /* Write Character to Serial Port */
-		if ( serial_console.base ) {
-			uart_transmit ( &serial_console, ix86->regs.dl );
+		if ( serial_console ) {
+			uart_transmit ( serial_console, ix86->regs.dl );
 			ix86->flags &= ~CF;
 		}
 		break;
@@ -445,9 +446,13 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 		break;
 
 	case 0x000B: /* Get Serial Console Configuration */
-		if ( serial_console.base ) {
-			ix86->regs.dx = ( ( intptr_t ) serial_console.base );
-			ix86->regs.cx = serial_console.divisor;
+		if ( serial_console ) {
+			struct ns16550_uart *comport =
+				container_of ( serial_console,
+					       struct ns16550_uart, uart );
+
+			ix86->regs.dx = ( ( intptr_t ) comport->base );
+			ix86->regs.cx = comport->divisor;
 			ix86->regs.bx = 0;
 			ix86->flags &= ~CF;
 		}
@@ -685,4 +690,4 @@ void unhook_comboot_interrupts ( ) {
 }
 
 /* Avoid dragging in serial console support unconditionally */
-struct uart serial_console __attribute__ (( weak ));
+struct uart *serial_console __attribute__ (( weak ));
