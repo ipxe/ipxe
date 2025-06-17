@@ -9,12 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <stdint.h>
-
 struct gdb_transport;
 
 extern struct gdb_transport * gdbserial_configure ( unsigned int port,
-						    unsigned int baud,
-						    uint8_t lcr );
+						    unsigned int baud );
 
 #endif /* _IPXE_GDBSERIAL_H */

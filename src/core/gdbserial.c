@@ -46,13 +46,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define GDBSERIAL_BAUD COMSPEED
 #endif
 
-/* UART line control register value */
-#ifdef COMPRESERVE
-#define GDBSERIAL_LCR 0
-#else
-#define GDBSERIAL_LCR UART_LCR_WPS ( COMDATA, COMPARITY, COMSTOP )
-#endif
-
 /** GDB serial UART */
 static struct uart gdbserial_uart;
 
@@ -90,7 +83,7 @@ static int gdbserial_init ( int argc, char **argv ) {
 		return 1;
 	}
 
-	if ( ! gdbserial_configure ( port, GDBSERIAL_BAUD, GDBSERIAL_LCR ) ) {
+	if ( ! gdbserial_configure ( port, GDBSERIAL_BAUD ) ) {
 		printf ( "serial: unable to configure\n" );
 		return 1;
 	}
@@ -106,13 +99,13 @@ struct gdb_transport serial_gdb_transport __gdb_transport = {
 };
 
 struct gdb_transport * gdbserial_configure ( unsigned int port,
-					     unsigned int baud, uint8_t lcr ) {
+					     unsigned int baud ) {
 	int rc;
 
 	if ( ( rc = uart_select ( &gdbserial_uart, port ) ) != 0 )
 		return NULL;
 
-	if ( ( rc = uart_init ( &gdbserial_uart, baud, lcr ) ) != 0 )
+	if ( ( rc = uart_init ( &gdbserial_uart, baud ) ) != 0 )
 		return NULL;
 
 	return &serial_gdb_transport;

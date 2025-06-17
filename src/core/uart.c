@@ -107,10 +107,9 @@ int uart_exists ( struct uart *uart ) {
  *
  * @v uart		UART
  * @v baud		Baud rate, or zero to leave unchanged
- * @v lcr		Line control register value, or zero to leave unchanged
  * @ret rc		Return status code
  */
-int uart_init ( struct uart *uart, unsigned int baud, uint8_t lcr ) {
+int uart_init ( struct uart *uart, unsigned int baud ) {
 	uint8_t dlm;
 	uint8_t dll;
 	int rc;
@@ -120,10 +119,7 @@ int uart_init ( struct uart *uart, unsigned int baud, uint8_t lcr ) {
 		return rc;
 
 	/* Configure divisor and line control register, if applicable */
-	if ( ! lcr )
-		lcr = uart_read ( uart, UART_LCR );
-	uart->lcr = lcr;
-	uart_write ( uart, UART_LCR, ( lcr | UART_LCR_DLAB ) );
+	uart_write ( uart, UART_LCR, ( UART_LCR_8N1 | UART_LCR_DLAB ) );
 	if ( baud ) {
 		uart->divisor = ( UART_MAX_BAUD / baud );
 		dlm = ( ( uart->divisor >> 8 ) & 0xff );
@@ -135,7 +131,7 @@ int uart_init ( struct uart *uart, unsigned int baud, uint8_t lcr ) {
 		dll = uart_read ( uart, UART_DLL );
 		uart->divisor = ( ( dlm << 8 ) | dll );
 	}
-	uart_write ( uart, UART_LCR, ( lcr & ~UART_LCR_DLAB ) );
+	uart_write ( uart, UART_LCR, UART_LCR_8N1 );
 
 	/* Disable interrupts */
 	uart_write ( uart, UART_IER, 0 );

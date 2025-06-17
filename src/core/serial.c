@@ -58,13 +58,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define CONSOLE_BAUD COMSPEED
 #endif
 
-/* UART line control register value */
-#ifdef COMPRESERVE
-#define CONSOLE_LCR 0
-#else
-#define CONSOLE_LCR UART_LCR_WPS ( COMDATA, COMPARITY, COMSTOP )
-#endif
-
 /** Serial console UART */
 struct uart serial_console;
 
@@ -149,10 +142,9 @@ static void serial_init ( void ) {
 	}
 
 	/* Initialise UART */
-	if ( ( rc = uart_init ( &serial_console, CONSOLE_BAUD,
-				CONSOLE_LCR ) ) != 0 ) {
-		DBG ( "Could not initialise UART %d baud %d LCR %#02x: %s\n",
-		      CONSOLE_PORT, CONSOLE_BAUD, CONSOLE_LCR, strerror ( rc ));
+	if ( ( rc = uart_init ( &serial_console, CONSOLE_BAUD ) ) != 0 ) {
+		DBG ( "Could not initialise UART %d baud %d: %s\n",
+		      CONSOLE_PORT, CONSOLE_BAUD, strerror ( rc ) );
 		return;
 	}
 }
