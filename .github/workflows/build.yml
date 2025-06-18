@@ -1,4 +1,4 @@
-name: Build
+name: Build and Release
 
 on: push
 
@@ -26,96 +26,92 @@ jobs:
                            libc6-dev-i386 valgrind \
                            gcc-arm-none-eabi gcc-aarch64-linux-gnu
 
-  x86:
-    name: x86
+  build:
+    name: Build on ${{ matrix.arch }}
     runs-on: ubuntu-22.04
     needs: cache
+    strategy:
+      matrix:
+        include:
+          - arch: x86
+            packages: "mtools syslinux isolinux libc6-dev-i386 valgrind libgcc-s1:i386 libc6-dbg:i386"
+            build_commands: |
+              make -j 4 -C src
+              make -j 4 -C src everything
+          - arch: arm32
+            packages: "mtools syslinux isolinux gcc-arm-none-eabi"
+            build_commands: |
+              make -j 4 -C src CROSS=arm-none-eabi- bin-arm32-efi/intel.efi bin-arm32-efi/intel.usb bin-arm32-efi/intel.iso
+          - arch: arm64
+            packages: "mtools syslinux isolinux gcc-aarch64-linux-gnu"
+            build_commands: |
+              make -j 4 -C src CROSS=aarch64-linux-gnu- bin-arm64-efi/ipxe.efi bin-arm64-efi/ipxe.usb bin-arm64-efi/ipxe.iso
     steps:
       - name: Check out code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Cache permissions
         run: |
           sudo chown $(id -un) /var/cache/apt/archives
+
       - name: Cache packages
         uses: actions/cache/restore@v4
         with:
           path: /var/cache/apt/archives/*.deb
           key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Install packages
         run: |
           sudo dpkg --add-architecture i386
           sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux \
-                           libc6-dev-i386 valgrind \
-                           libgcc-s1:i386 libc6-dbg:i386
-      - name: Build (BIOS)
-        run: |
-          make -j 4 -C src
-      - name: Build (Everything)
-        run: |
-          make -j 4 -C src everything
-      - name: Test
-        run: |
-          valgrind ./src/bin-i386-linux/tests.linux
-          valgrind ./src/bin-x86_64-linux/tests.linux
+          sudo apt install -y -o Acquire::Retries=50 ${{ matrix.packages }}
 
-  arm32:
-    name: ARM32
+      - name: Build
+        run: |
+          ${{ matrix.build_commands }}
+
+      - name: Upload artifacts to workflow
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.arch }}-artifacts
+          path: |
+            src/bin-*
+
+  release:
+    name: Release and Upload Artifacts
     runs-on: ubuntu-22.04
-    needs: cache
+    needs: build
     steps:
       - name: Check out code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
-        run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-arm-none-eabi
-      - name: Build
-        run: |
-          make -j 4 -C src CROSS=arm-none-eabi- \
-               bin-arm32-efi/intel.efi \
-               bin-arm32-efi/intel.usb \
-               bin-arm32-efi/intel.iso
 
-  arm64:
-    name: ARM64
-    runs-on: ubuntu-22.04
-    needs: cache
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
+      - name: Bump version
+        id: bump_version
+        uses: anothrNick/github-tag-action@1.67.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INITIAL_VERSION: 1.21.1
+          DEFAULT_BUMP: minor
+          PRERELEASE: true
+          PRERELEASE_SUFFIX: ${{ env.BRANCH_NAME }}
+          RELEASE_BRANCHES: master
+          WITH_V: true
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          fetch-depth: 0
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
-        run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-aarch64-linux-gnu
-      - name: Build
-        run: |
-          make -j 4 -C src CROSS=aarch64-linux-gnu- \
-               bin-arm64-efi/ipxe.efi \
-               bin-arm64-efi/ipxe.usb \
-               bin-arm64-efi/ipxe.iso
+          tag_name: ${{ steps.bump_version.outputs.tag }}
+          release_name: Release ${{ steps.bump_version.outputs.tag }}
+          draft: false
+          prerelease: false
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
+
