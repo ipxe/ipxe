@@ -82,6 +82,8 @@ struct ns16550_uart {
 	struct uart uart;
 	/** Register base address */
 	void *base;
+	/** Register shift */
+	unsigned int shift;
 	/** Baud rate divisor */
 	uint16_t divisor;
 };
