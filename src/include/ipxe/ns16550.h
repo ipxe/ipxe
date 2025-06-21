@@ -78,8 +78,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** A 16550-compatible UART */
 struct ns16550_uart {
-	/** Generic UART */
-	struct uart uart;
 	/** Register base address */
 	void *base;
 	/** Register shift */

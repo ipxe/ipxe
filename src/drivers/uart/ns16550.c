@@ -47,8 +47,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v data		Data
  */
 static void ns16550_transmit ( struct uart *uart, uint8_t data ) {
-	struct ns16550_uart *ns16550 =
-		container_of ( uart, struct ns16550_uart, uart );
+	struct ns16550_uart *ns16550 = uart->priv;
 	unsigned int i;
 	uint8_t lsr;
 
@@ -71,8 +70,7 @@ static void ns16550_transmit ( struct uart *uart, uint8_t data ) {
  * @ret ready		Data is ready
  */
 static int ns16550_data_ready ( struct uart *uart ) {
-	struct ns16550_uart *ns16550 =
-		container_of ( uart, struct ns16550_uart, uart );
+	struct ns16550_uart *ns16550 = uart->priv;
 	uint8_t lsr;
 
 	/* Check for receive data ready */
@@ -87,8 +85,7 @@ static int ns16550_data_ready ( struct uart *uart ) {
  * @ret data		Data
  */
 static uint8_t ns16550_receive ( struct uart *uart ) {
-	struct ns16550_uart *ns16550 =
-		container_of ( uart, struct ns16550_uart, uart );
+	struct ns16550_uart *ns16550 = uart->priv;
 	uint8_t rbr;
 
 	/* Receive byte */
@@ -102,8 +99,7 @@ static uint8_t ns16550_receive ( struct uart *uart ) {
  * @v uart		UART
  */
 static void ns16550_flush ( struct uart *uart ) {
-	struct ns16550_uart *ns16550 =
-		container_of ( uart, struct ns16550_uart, uart );
+	struct ns16550_uart *ns16550 = uart->priv;
 	unsigned int i;
 	uint8_t lsr;
 
@@ -123,8 +119,7 @@ static void ns16550_flush ( struct uart *uart ) {
  * @ret rc		Return status code
  */
 static int ns16550_init ( struct uart *uart, unsigned int baud ) {
-	struct ns16550_uart *ns16550 =
-		container_of ( uart, struct ns16550_uart, uart );
+	struct ns16550_uart *ns16550 = uart->priv;
 	uint8_t dlm;
 	uint8_t dll;
 

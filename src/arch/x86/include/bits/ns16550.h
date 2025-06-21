@@ -46,15 +46,15 @@ ns16550_read ( struct ns16550_uart *ns16550, unsigned int address ) {
 #define COM4_BASE 0x2e8
 
 /* Fixed ISA serial ports */
-extern struct ns16550_uart com1;
-extern struct ns16550_uart com2;
-extern struct ns16550_uart com3;
-extern struct ns16550_uart com4;
+extern struct uart com1;
+extern struct uart com2;
+extern struct uart com3;
+extern struct uart com4;
 
 /* Fixed ISA serial port names */
-#define COM1 &com1.uart
-#define COM2 &com2.uart
-#define COM3 &com3.uart
-#define COM4 &com4.uart
+#define COM1 &com1
+#define COM2 &com2
+#define COM3 &com3
+#define COM4 &com4
 
 #endif /* _BITS_NS16550_H */

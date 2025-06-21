@@ -35,13 +35,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Define a fixed ISA UART */
 #define ISA_UART( NAME, BASE )						\
-	struct ns16550_uart NAME = {					\
-		.uart = {						\
-			.refcnt = REF_INIT ( ref_no_free ),		\
-			.name = #NAME,					\
-			.op = &ns16550_operations,			\
-		},							\
+	static struct ns16550_uart ns16550_ ## NAME = {			\
 		.base = ( ( void * ) (BASE) ),				\
+	};								\
+	struct uart NAME = {						\
+		.refcnt = REF_INIT ( ref_no_free ),			\
+		.name = #NAME,						\
+		.op = &ns16550_operations,				\
+		.priv = &ns16550_ ## NAME,				\
 	}
 
 /* Fixed ISA UARTs */

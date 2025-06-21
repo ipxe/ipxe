@@ -447,9 +447,7 @@ static __asmcall __used void int22 ( struct i386_all_regs *ix86 ) {
 
 	case 0x000B: /* Get Serial Console Configuration */
 		if ( serial_console ) {
-			struct ns16550_uart *comport =
-				container_of ( serial_console,
-					       struct ns16550_uart, uart );
+			struct ns16550_uart *comport = serial_console->priv;
 
 			ix86->regs.dx = ( ( intptr_t ) comport->base );
 			ix86->regs.cx = comport->divisor;
