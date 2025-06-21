@@ -143,10 +143,10 @@
 #define DEFAULT_NUMBER_OF_RX_RINGS              0x01
 #define DEFAULT_NUMBER_OF_RING_GRPS             0x01
 #define DEFAULT_NUMBER_OF_STAT_CTXS             0x01
-#define NUM_RX_BUFFERS                          8
-#define MAX_RX_DESC_CNT                         16
-#define MAX_TX_DESC_CNT                         16
-#define MAX_CQ_DESC_CNT                         64
+#define NUM_RX_BUFFERS                          16
+#define MAX_RX_DESC_CNT                         32 
+#define MAX_TX_DESC_CNT                         32
+#define MAX_CQ_DESC_CNT                         128
 #define TX_RING_BUFFER_SIZE (MAX_TX_DESC_CNT * sizeof(struct tx_bd_short))
 #define RX_RING_BUFFER_SIZE \
 	(MAX_RX_DESC_CNT * sizeof(struct rx_prod_pkt_bd))
@@ -1017,6 +1017,7 @@ struct bnxt {
 	u16                       num_rx_rings;
 	u16                       num_stat_ctxs;
 	u16                       num_hw_ring_grps;
+	u8                        pci_flush_req;
 };
 
 /* defines required to rsolve checkpatch errors / warnings */
