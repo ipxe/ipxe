@@ -47,7 +47,8 @@ IOAPI_INLINE ( riscv, bus_to_phys ) ( unsigned long bus_addr ) {
 static inline __always_inline _type					\
 IOAPI_INLINE ( riscv, read ## _suffix ) ( volatile _type *io_addr ) {	\
 	unsigned long data;						\
-	__asm__ __volatile__ ( "l" _insn_suffix " %0, %1"		\
+	__asm__ __volatile__ ( "fence io, io\n\t"			\
+			       "l" _insn_suffix " %0, %1\n\t"		\
 			       : "=r" ( data ) : "m" ( *io_addr ) );	\
 	return data;							\
 }
@@ -57,7 +58,8 @@ IOAPI_INLINE ( riscv, read ## _suffix ) ( volatile _type *io_addr ) {	\
 static inline __always_inline void					\
 IOAPI_INLINE ( riscv, write ## _suffix ) ( _type data,			\
 					   volatile _type *io_addr ) {	\
-	__asm__ __volatile__ ( "s" _insn_suffix " %0, %1"		\
+	__asm__ __volatile__ ( "fence io, io\n\t"			\
+			       "s" _insn_suffix " %0, %1\n\t"		\
 			       : : "r" ( data ), "m" ( *io_addr ) );	\
 }
 
@@ -69,7 +71,8 @@ IOAPI_INLINE ( riscv, read ## _suffix ) ( volatile _type *io_addr ) {	\
 		unsigned long half[2];					\
 	        _type data;						\
 	} u;								\
-	__asm__ __volatile__ ( "l" _insn_suffix " %0, 0(%2)\n\t"	\
+	__asm__ __volatile__ ( "fence io, io\n\t"			\
+			       "l" _insn_suffix " %0, 0(%2)\n\t"	\
 			       "l" _insn_suffix " %1, %3(%2)\n\t"	\
 			       : "=&r" ( u.half[0] ),			\
 				 "=&r" ( u.half[1] )			\
@@ -87,7 +90,8 @@ IOAPI_INLINE ( riscv, write ## _suffix ) ( _type data,			\
 		unsigned long half[2];					\
 		_type data;						\
 	} u = { .data = data };						\
-	__asm__ __volatile__ ( "s" _insn_suffix " %0, 0(%2)\n\t"	\
+	__asm__ __volatile__ ( "fence io, io\n\t"			\
+			       "s" _insn_suffix " %0, 0(%2)\n\t"	\
 			       "s" _insn_suffix " %1, %3(%2)\n\t" :	\
 			       : "r" ( u.half[0] ),			\
 				 "r" ( u.half[1] ),			\
