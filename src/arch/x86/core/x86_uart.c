@@ -37,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ISA_UART( NAME, BASE )						\
 	static struct ns16550_uart ns16550_ ## NAME = {			\
 		.base = ( ( void * ) (BASE) ),				\
+		.clock = NS16550_CLK_DEFAULT,				\
 	};								\
 	struct uart NAME = {						\
 		.refcnt = REF_INIT ( ref_no_free ),			\

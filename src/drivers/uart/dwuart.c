@@ -46,6 +46,7 @@ static int dwuart_probe ( struct dt_device *dt, unsigned int offset ) {
 	struct ns16550_uart *ns16550;
 	struct uart *uart;
 	uint32_t shift;
+	uint32_t clock;
 	int rc;
 
 	/* Allocate and initialise UART */
@@ -70,6 +71,13 @@ static int dwuart_probe ( struct dt_device *dt, unsigned int offset ) {
 	if ( ( rc = fdt_u32 ( &sysfdt, offset, "reg-shift", &shift ) ) != 0 )
 		shift = 0;
 	ns16550->shift = shift;
+
+	/* Get clock rate */
+	if ( ( rc = fdt_u32 ( &sysfdt, offset, "clock-frequency",
+			      &clock ) ) != 0 ) {
+		clock = NS16550_CLK_DEFAULT;
+	}
+	ns16550->clock = clock;
 
 	/* Register UART */
 	if ( ( rc = uart_register ( uart ) ) != 0 )

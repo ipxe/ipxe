@@ -73,18 +73,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Divisor latch (most significant byte) */
 #define NS16550_DLM 0x01
 
-/** Maximum baud rate */
-#define NS16550_MAX_BAUD 115200
-
 /** A 16550-compatible UART */
 struct ns16550_uart {
 	/** Register base address */
 	void *base;
 	/** Register shift */
 	unsigned int shift;
+	/** Input clock frequency */
+	unsigned int clock;
 	/** Baud rate divisor */
 	uint16_t divisor;
 };
+
+/** Post-division clock cycles per data bit */
+#define NS16550_CLK_BIT 16
+
+/** Default input clock rate (1.8432 MHz) */
+#define NS16550_CLK_DEFAULT 1843200
 
 #include <bits/ns16550.h>
 

@@ -138,7 +138,8 @@ static int ns16550_init ( struct uart *uart, unsigned int baud ) {
 	ns16550_write ( ns16550, NS16550_LCR,
 			( NS16550_LCR_8N1 | NS16550_LCR_DLAB ) );
 	if ( baud ) {
-		ns16550->divisor = ( NS16550_MAX_BAUD / baud );
+		ns16550->divisor = ( ( ns16550->clock / baud ) /
+				     NS16550_CLK_BIT );
 		dlm = ( ( ns16550->divisor >> 8 ) & 0xff );
 		dll = ( ( ns16550->divisor >> 0 ) & 0xff );
 		ns16550_write ( ns16550, NS16550_DLM, dlm );
