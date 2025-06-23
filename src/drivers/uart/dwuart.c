@@ -108,6 +108,7 @@ static void dwuart_remove ( struct dt_device *dt ) {
 /** DesignWare UART compatible model identifiers */
 static const char * dwuart_ids[] = {
 	"snps,dw-apb-uart",
+	"ns16550a",
 };
 
 /** DesignWare UART devicetree driver */
