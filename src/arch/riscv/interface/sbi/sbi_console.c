@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/sbi.h>
 #include <ipxe/io.h>
 #include <ipxe/keys.h>
+#include <ipxe/serial.h>
 #include <ipxe/console.h>
 #include <config/console.h>
 
@@ -43,6 +44,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 extern void early_uart_putchar ( int character );
 
+/** Dummy serial console (if not present in build) */
+struct uart *serial_console __attribute__ (( weak ));
+
 /** Buffered input character (if any) */
 static unsigned char sbi_console_input;
 
@@ -53,6 +57,10 @@ static unsigned char sbi_console_input;
  */
 static void sbi_putchar ( int character ) {
 	struct sbi_return ret;
+
+	/* Do nothing if a real serial console has been enabled */
+	if ( serial_console )
+		return;
 
 	/* Write byte to early UART, if enabled */
 	early_uart_putchar ( character );
@@ -98,6 +106,10 @@ static int sbi_iskey ( void ) {
 	/* Do nothing if we already have a buffered character */
 	if ( sbi_console_input )
 		return sbi_console_input;
+
+	/* Do nothing if a real serial console has been enabled */
+	if ( serial_console )
+		return 0;
 
 	/* Read and buffer byte from console, if any */
 	ret = sbi_ecall_3 ( SBI_DBCN, SBI_DBCN_READ,
