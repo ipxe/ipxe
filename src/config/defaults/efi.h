@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define FDT_EFI
 #define MPAPI_EFI
 #define NAP_EFI
+#define SERIAL_FIXED
 
 #define	NET_PROTO_IPV6		/* IPv6 protocol */
 #define	NET_PROTO_LLDP		/* Link Layer Discovery protocol */

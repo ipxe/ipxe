@@ -13,6 +13,8 @@
 
 FILE_LICENCE ( GPL2_OR_LATER );
 
+#include <config/defaults.h>
+
 #define	COMCONSOLE	COM1		/* I/O port address */
 
 /* Keep settings from a previous user of the serial port (e.g. lilo or

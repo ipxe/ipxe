@@ -45,6 +45,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define CONSOLE_SERIAL ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )
 #endif
 
+#ifdef SERIAL_FIXED
+#define SERIAL_PREFIX_fixed
+#else
+#define SERIAL_PREFIX_fixed __fixed_
+#endif
+
 /* Serial console UART */
 #ifndef COMCONSOLE
 #define COMCONSOLE NULL
@@ -55,11 +61,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define COMSPEED 0
 #endif
 
-/** Default serial console UART */
-static struct uart * const default_serial_console = COMCONSOLE;
-
 /** Active serial console UART */
 struct uart *serial_console;
+
+/**
+ * Get fixed serial console UART
+ *
+ * @ret uart		Serial console UART, or NULL
+ */
+static struct uart * serial_comconsole ( void ) {
+
+	return COMCONSOLE;
+}
 
 /**
  * Print a character to serial console
@@ -128,10 +141,11 @@ struct console_driver serial_console_driver __console_driver = {
 
 /** Initialise serial console */
 static void serial_init ( void ) {
-	struct uart *uart = default_serial_console;
+	struct uart *uart;
 	int rc;
 
-	/* Do nothing if we have no default port */
+	/* Get default serial console, if any */
+	uart = default_serial_console();
 	if ( ! uart )
 		return;
 
@@ -174,3 +188,6 @@ struct startup_fn serial_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 	.name = "serial",
 	.shutdown = serial_shutdown,
 };
+
+PROVIDE_SERIAL_INLINE ( null, default_serial_console );
+PROVIDE_SERIAL ( fixed, default_serial_console, serial_comconsole );

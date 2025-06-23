@@ -24,6 +24,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define DMAAPI_FLAT
 #define ACPI_LINUX
 #define MPAPI_NULL
+#define SERIAL_NULL
 
 #define DRIVERS_LINUX
 
