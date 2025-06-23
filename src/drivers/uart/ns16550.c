@@ -131,6 +131,9 @@ static int ns16550_init ( struct uart *uart, unsigned int baud ) {
 	if ( ns16550_read ( ns16550, NS16550_SCR ) != 0xae )
 		return -ENODEV;
 
+	/* Wait for UART to become idle before modifying LCR */
+	ns16550_flush ( uart );
+
 	/* Configure divisor and line control register, if applicable */
 	ns16550_write ( ns16550, NS16550_LCR,
 			( NS16550_LCR_8N1 | NS16550_LCR_DLAB ) );
