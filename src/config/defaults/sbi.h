@@ -22,10 +22,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #endif
 
 #define CONSOLE_SBI
+#define CONSOLE_SERIAL
 #define REBOOT_SBI
 #define UMALLOC_UHEAP
 #define MEMMAP_FDT
-#define SERIAL_NULL
+#define SERIAL_FDT
 
 #define ACPI_NULL
 #define MPAPI_NULL
