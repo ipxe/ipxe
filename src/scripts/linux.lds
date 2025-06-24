@@ -29,6 +29,8 @@ SECTIONS {
 	. = ALIGN ( _max_align );
 	.rodata : {
 		_rodata = .;
+		*(.srodata)
+		*(.srodata.*)
 		*(.rodata)
 		*(.rodata.*)
 		_erodata = .;
@@ -45,6 +47,8 @@ SECTIONS {
 	. = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
 	.data : {
 		_data = .;
+		*(.sdata)
+		*(.sdata.*)
 		*(.data)
 		*(.data.*)
 		KEEP(*(SORT(.tbl.*)))
@@ -61,6 +65,8 @@ SECTIONS {
 	. = ALIGN ( _max_align );
 	.bss : {
 		_bss = .;
+		*(.sbss)
+		*(.sbss.*)
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)

@@ -39,6 +39,8 @@ SECTIONS {
     . = ALIGN ( _page_align );
     .rodata : {
 	_rodata = .;
+	*(.srodata)
+	*(.srodata.*)
 	*(.rodata)
 	*(.rodata.*)
 	_erodata = .;
@@ -52,6 +54,8 @@ SECTIONS {
     . = ALIGN ( _page_align );
     .data : {
 	_data = .;
+	*(.sdata)
+	*(.sdata.*)
 	*(.data)
 	*(.data.*)
 	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
@@ -68,6 +72,8 @@ SECTIONS {
     . = ALIGN ( _page_align );
     .bss : {
 	_bss = .;
+	*(.sbss)
+	*(.sbss.*)
 	*(.bss)
 	*(.bss.*)
 	*(COMMON)

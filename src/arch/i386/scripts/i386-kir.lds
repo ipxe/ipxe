@@ -88,6 +88,8 @@ SECTIONS {
 	__rodata16 = .;
 	*(.rodata16)
 	*(.rodata16.*)
+	*(.srodata)
+	*(.srodata.*)
 	*(.rodata)
 	*(.rodata.*)
     }
@@ -95,6 +97,8 @@ SECTIONS {
 	__data16 = .;
 	*(.data16)
 	*(.data16.*)
+	*(.sdata)
+	*(.sdata.*)
 	*(.data)
 	*(.data.*)
 	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
@@ -107,6 +111,8 @@ SECTIONS {
 	_bss16 = .;
 	*(.bss16)
 	*(.bss16.*)
+	*(.sbss)
+	*(.sbss.*)
 	*(.bss)
 	*(.bss.*)
 	*(COMMON)

@@ -130,8 +130,12 @@ SECTIONS {
 	. += 1;				/* Prevent NULL being valid */
 	*(.text)
 	*(.text.*)
+	*(.srodata)
+	*(.srodata.*)
 	*(.rodata)
 	*(.rodata.*)
+	*(.sdata)
+	*(.sdata.*)
 	*(.data)
 	*(.data.*)
 	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
@@ -139,6 +143,8 @@ SECTIONS {
 	KEEP(*(.provided.*))
 	_mtextdata = .;
     } .bss.textdata (NOLOAD) : AT ( _bss_textdata_lma ) {
+	*(.sbss)
+	*(.sbss.*)
 	*(.bss)
 	*(.bss.*)
 	*(COMMON)

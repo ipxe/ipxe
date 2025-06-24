@@ -38,6 +38,8 @@ SECTIONS {
     /* Read-only data */
     .rodata : {
 	_rodata = .;
+	*(.srodata)
+	*(.srodata.*)
 	*(.rodata)
 	*(.rodata.*)
 	_erodata = .;
@@ -46,6 +48,8 @@ SECTIONS {
     /* Writable data */
     .data : {
 	_data = .;
+	*(.sdata)
+	*(.sdata.*)
 	*(.data)
 	*(.data.*)
 	KEEP(*(SORT(.tbl.*)))	/* Various tables.  See include/tables.h */
@@ -78,6 +82,8 @@ SECTIONS {
 	/* Uninitialised data */
 	.bss {
 	    _bss = .;
+	    *(.sbss)
+	    *(.sbss.*)
 	    *(.bss)
 	    *(.bss.*)
 	    *(COMMON)
