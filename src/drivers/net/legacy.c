@@ -42,7 +42,8 @@ static void legacy_poll ( struct net_device *netdev ) {
 	struct nic *nic = netdev->priv;
 	struct io_buffer *iobuf;
 
-	iobuf = alloc_iob ( ETH_FRAME_LEN );
+	iobuf = alloc_iob ( ETH_FRAME_LEN + 4 /* possible VLAN */
+			    + 4 /* possible CRC */ );
 	if ( ! iobuf )
 		return;
 
