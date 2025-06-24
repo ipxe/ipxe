@@ -483,7 +483,7 @@ CFLAGS		+= -Os
 CFLAGS		+= -g
 ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -ffreestanding
-CFLAGS		+= -fcommon
+CFLAGS		+= -fno-common
 CFLAGS		+= -Wall -W -Wformat-nonliteral
 CFLAGS		+= -Wno-array-bounds -Wno-dangling-pointer
 HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral
@@ -503,17 +503,14 @@ ASFLAGS		+= --fatal-warnings
 HOST_CFLAGS	+= -Werror
 endif
 
-# Enable per-item sections and section garbage collection.  Note that
-# some older versions of gcc support -fdata-sections but treat it as
-# implying -fno-common, which would break our build.  Some other older
-# versions issue a spurious and uninhibitable warning if
-# -ffunction-sections is used with -g, which would also break our
-# build since we use -Werror.
+# Enable per-item sections and section garbage collection.  Some older
+# versions of gcc issue a spurious and uninhibitable warning if
+# -ffunction-sections is used with -g, which would break our build
+# since we use -Werror.
 #
 ifeq ($(CCTYPE),gcc)
-DS_TEST		= $(ECHO) 'char x;' | \
-		  $(CC) -fdata-sections -S -x c - -o - 2>/dev/null | \
-		  grep -E '\.comm' > /dev/null
+DS_TEST		= $(CC) -fdata-sections -c -x c /dev/null \
+		  -o /dev/null 2>/dev/null
 DS_FLAGS	:= $(shell $(DS_TEST) && $(ECHO) '-fdata-sections')
 FS_TEST		= $(CC) -ffunction-sections -g -c -x c /dev/null \
 		  -o /dev/null 2>/dev/null
