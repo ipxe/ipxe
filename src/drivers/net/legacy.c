@@ -19,7 +19,7 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-struct nic nic;
+struct nic legacy_nic;
 
 static int legacy_registered = 0;
 
@@ -86,6 +86,7 @@ int legacy_probe ( void *hwdev,
 		   int ( * probe ) ( struct nic *nic, void *hwdev ),
 		   void ( * disable ) ( struct nic *nic, void *hwdev ) ) {
 	struct net_device *netdev;
+	struct nic *nic;
 	int rc;
 
 	if ( legacy_registered )
@@ -95,15 +96,16 @@ int legacy_probe ( void *hwdev,
 	if ( ! netdev )
 		return -ENOMEM;
 	netdev_init ( netdev, &legacy_operations );
-	netdev->priv = &nic;
-	memset ( &nic, 0, sizeof ( nic ) );
+	nic = &legacy_nic;
+	netdev->priv = nic;
+	memset ( nic, 0, sizeof ( *nic ) );
 	set_drvdata ( hwdev, netdev );
 	netdev->dev = dev;
 
-	nic.node_addr = netdev->hw_addr;
-	nic.irqno = dev->desc.irq;
+	nic->node_addr = netdev->hw_addr;
+	nic->irqno = dev->desc.irq;
 
-	if ( ! probe ( &nic, hwdev ) ) {
+	if ( ! probe ( nic, hwdev ) ) {
 		rc = -ENODEV;
 		goto err_probe;
 	}
@@ -113,7 +115,7 @@ int legacy_probe ( void *hwdev,
 	 * don't support interrupts; doing this allows the timer
 	 * interrupt to be used instead.
 	 */
-	dev->desc.irq = nic.irqno;
+	dev->desc.irq = nic->irqno;
 
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
 		goto err_register;
@@ -123,13 +125,13 @@ int legacy_probe ( void *hwdev,
 
 	/* Do not remove this message */
 	printf ( "WARNING: Using legacy NIC wrapper on %s\n",
-		 netdev->ll_protocol->ntoa ( nic.node_addr ) );
+		 netdev->ll_protocol->ntoa ( nic->node_addr ) );
 
 	legacy_registered = 1;
 	return 0;
 
  err_register:
-	disable ( &nic, hwdev );
+	disable ( nic, hwdev );
  err_probe:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );

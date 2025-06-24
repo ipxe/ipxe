@@ -67,15 +67,17 @@ struct nic_operations {
 	void ( *irq ) ( struct nic *, irq_action_t );
 };
 
-extern struct nic nic;
+extern struct nic legacy_nic;
 
 static inline int eth_poll ( int retrieve ) {
-	return nic.nic_op->poll ( &nic, retrieve );
+	struct nic *nic = &legacy_nic;
+	return nic->nic_op->poll ( nic, retrieve );
 }
 
 static inline void eth_transmit ( const char *dest, unsigned int type,
 				  unsigned int size, const void *packet ) {
-	nic.nic_op->transmit ( &nic, dest, type, size, packet );
+	struct nic *nic = &legacy_nic;
+	nic->nic_op->transmit ( nic, dest, type, size, packet );
 }
 
 /*
