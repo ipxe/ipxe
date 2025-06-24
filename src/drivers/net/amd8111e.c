@@ -105,8 +105,7 @@ struct amd8111e_priv {
 	struct nic *nic;
 	void *mmio;
 };
-
-static struct amd8111e_priv amd8111e;
+#define amd8111e NIC_FAKE_BSS ( struct amd8111e_priv )
 
 
 /********************************************************
@@ -683,7 +682,7 @@ static struct pci_device_id amd8111e_nics[] = {
 PCI_DRIVER ( amd8111e_driver, amd8111e_nics, PCI_NO_CLASS );
 
 DRIVER ( "AMD8111E", nic_driver, pci_driver, amd8111e_driver,
-	 amd8111e_probe, amd8111e_disable );
+	 amd8111e_probe, amd8111e_disable, amd8111e );
 
 /*
  * Local variables:

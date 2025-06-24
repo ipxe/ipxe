@@ -426,13 +426,14 @@ struct tulip_private {
 
 #define TX_RING_SIZE	2
 #define RX_RING_SIZE	4
-struct {
+struct tulip_bss {
     struct tulip_tx_desc tx_ring[TX_RING_SIZE];
     unsigned char txb[BUFLEN];
     struct tulip_rx_desc rx_ring[RX_RING_SIZE];
     unsigned char rxb[RX_RING_SIZE * BUFLEN];
     struct tulip_private tpx;
-} tulip_bss __shared __attribute__ ((aligned(4)));
+};
+#define tulip_bss NIC_FAKE_BSS ( struct tulip_bss )
 #define tx_ring tulip_bss.tx_ring
 #define txb tulip_bss.txb
 #define rx_ring tulip_bss.rx_ring
@@ -1958,7 +1959,7 @@ PCI_ROM(0x8086, 0x0039, "intel21145",  "Intel Tulip", 0),
 PCI_DRIVER ( tulip_driver, tulip_nics, PCI_NO_CLASS );
 
 DRIVER ( "Tulip", nic_driver, pci_driver, tulip_driver,
-	 tulip_probe, tulip_disable );
+	 tulip_probe, tulip_disable, tulip_bss );
 
 /*
  * Local variables:

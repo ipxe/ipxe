@@ -179,12 +179,13 @@ struct TLanList {
 	} buffer[TLAN_BUFFERS_PER_LIST];
 };
 
-struct {
+struct tlan_bss {
 	struct TLanList tx_ring[TLAN_NUM_TX_LISTS];
 	unsigned char txb[TLAN_MAX_FRAME_SIZE * TLAN_NUM_TX_LISTS];
 	struct TLanList rx_ring[TLAN_NUM_RX_LISTS];
 	unsigned char rxb[TLAN_MAX_FRAME_SIZE * TLAN_NUM_RX_LISTS];
-} tlan_buffers __shared;
+};
+#define tlan_buffers NIC_FAKE_BSS ( struct tlan_bss )
 #define tx_ring tlan_buffers.tx_ring
 #define txb tlan_buffers.txb
 #define rx_ring tlan_buffers.rx_ring
@@ -1715,7 +1716,7 @@ static struct pci_device_id tlan_nics[] = {
 PCI_DRIVER ( tlan_driver, tlan_nics, PCI_NO_CLASS );
 
 DRIVER ( "TLAN/PCI", nic_driver, pci_driver, tlan_driver,
-	 tlan_probe, tlan_disable );
+	 tlan_probe, tlan_disable, tlan_buffers );
 
 /*
  * Local variables:

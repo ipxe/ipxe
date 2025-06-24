@@ -119,9 +119,8 @@ PCI_ROM(0xec80, 0xec00, "f5d6000",       "Belkin F5D6000", 0),
 
 PCI_DRIVER ( prism2_plx_driver, prism2_plx_nics, PCI_NO_CLASS );
 
-
 DRIVER ( "Prism2/PLX", nic_driver, pci_driver, prism2_plx_driver,
-	 prism2_plx_probe, prism2_plx_disable );
+	 prism2_plx_probe, prism2_plx_disable, no_fake_bss );
 
 /*
  * Local variables:

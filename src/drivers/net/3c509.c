@@ -316,7 +316,7 @@ static int t509_probe ( struct t509_device *t509 ) {
 	DBG ( "Adding 3c509 device %02x (I/O %04x)\n",
 	      t509->tag, t509->ioaddr );
 	return legacy_probe ( t509, legacy_t509_set_drvdata, &t509->dev,
-			      legacy_t509_probe, legacy_t509_disable );
+			      legacy_t509_probe, legacy_t509_disable, 0 );
 }
 
 /**

@@ -49,7 +49,7 @@ static struct mca_device_id el3_mca_adapters[] = {
 MCA_DRIVER ( t529_driver, el3_mca_adapters );
 
 DRIVER ( "3c529", nic_driver, mca_driver, t529_driver,
-	 t529_probe, t529_disable );
+	 t529_probe, t529_disable, no_fake_bss );
 
 ISA_ROM( "3c529", "3c529 == MCA 3c509" );
 

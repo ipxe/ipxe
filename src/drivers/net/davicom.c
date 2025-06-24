@@ -134,12 +134,13 @@ static unsigned long ioaddr;
 /* transmit descriptor and buffer */
 #define NTXD 2
 #define NRXD 4
-struct {
+struct davicom_bss {
 	struct txdesc txd[NTXD] __attribute__ ((aligned(4)));
 	unsigned char txb[BUFLEN] __attribute__ ((aligned(4)));
 	struct rxdesc rxd[NRXD] __attribute__ ((aligned(4)));
 	unsigned char rxb[NRXD * BUFLEN] __attribute__ ((aligned(4)));
-} davicom_bufs __shared;
+};
+#define davicom_bufs NIC_FAKE_BSS ( struct davicom_bss )
 #define txd davicom_bufs.txd
 #define txb davicom_bufs.txb
 #define rxd davicom_bufs.rxd
@@ -698,7 +699,7 @@ PCI_ROM(0x1282, 0x9132, "davicom9132", "Davicom 9132", 0),	/* Needs probably som
 PCI_DRIVER ( davicom_driver, davicom_nics, PCI_NO_CLASS );
 
 DRIVER ( "DAVICOM", nic_driver, pci_driver, davicom_driver,
-	 davicom_probe, davicom_disable );
+	 davicom_probe, davicom_disable, davicom_bufs );
 
 /*
  * Local variables:

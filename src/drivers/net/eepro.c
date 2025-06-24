@@ -635,7 +635,7 @@ ISA_DRIVER ( eepro_driver, eepro_probe_addrs, eepro_probe1,
 		     GENERIC_ISAPNP_VENDOR, 0x828a );
 
 DRIVER ( "eepro", nic_driver, isa_driver, eepro_driver,
-	 eepro_probe, eepro_disable );
+	 eepro_probe, eepro_disable, no_fake_bss );
 
 ISA_ROM ( "eepro", "Intel Etherexpress Pro/10" );
 

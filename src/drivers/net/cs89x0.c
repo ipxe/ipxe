@@ -725,7 +725,7 @@ ISA_DRIVER ( cs89x0_driver, cs89x0_probe_addrs, cs89x0_probe_addr,
 	     ISAPNP_VENDOR('C','S','C'), 0x0007 );
 
 DRIVER ( "cs89x0", nic_driver, isa_driver, cs89x0_driver,
-	 cs89x0_probe, cs89x0_disable );
+	 cs89x0_probe, cs89x0_disable, no_fake_bss );
 
 ISA_ROM ( "cs89x0", "Crystal Semiconductor CS89x0" );
 

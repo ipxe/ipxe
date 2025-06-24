@@ -541,7 +541,7 @@ PCI_ROM(0x10b7, 0x9805, "3c9805-1",        "3Com9805", 0),		/* Dual Port Server 
 PCI_DRIVER ( t595_driver, t595_nics, PCI_NO_CLASS );
 
 DRIVER ( "3C595", nic_driver, pci_driver, t595_driver,
-	 t595_probe, t595_disable );
+	 t595_probe, t595_disable, no_fake_bss );
 
 /*
  * Local variables:

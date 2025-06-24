@@ -209,14 +209,15 @@ static u8 SF_mode;		/* Special Function: 1:VLAN, 2:RX Flow Control
 /**********************************************
 * Descriptor Ring and Buffer defination
 ***********************************************/
-struct {
+struct dmfe_bss {
 	struct tx_desc txd[TX_DESC_CNT] __attribute__ ((aligned(32)));
 	unsigned char txb[TX_BUF_ALLOC * TX_DESC_CNT]
 	__attribute__ ((aligned(32)));
 	struct rx_desc rxd[RX_DESC_CNT] __attribute__ ((aligned(32)));
 	unsigned char rxb[RX_ALLOC_SIZE * RX_DESC_CNT]
 	__attribute__ ((aligned(32)));
-} dmfe_bufs __shared;
+};
+#define dmfe_bufs NIC_FAKE_BSS ( struct dmfe_bss )
 #define txd dmfe_bufs.txd
 #define txb dmfe_bufs.txb
 #define rxd dmfe_bufs.rxd
@@ -1217,7 +1218,7 @@ static struct pci_device_id dmfe_nics[] = {
 PCI_DRIVER ( dmfe_driver, dmfe_nics, PCI_NO_CLASS );
 
 DRIVER ( "DMFE/PCI", nic_driver, pci_driver, dmfe_driver,
-	 dmfe_probe, dmfe_disable );
+	 dmfe_probe, dmfe_disable, dmfe_bufs );
 
 /*
  * Local variables:

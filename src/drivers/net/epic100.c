@@ -86,14 +86,15 @@ static unsigned int	cur_rx, cur_tx;		/* The next free ring entry */
 static unsigned short	eeprom[64];
 #endif
 static signed char	phys[4];		/* MII device addresses. */
-struct {
+struct epic100_bss {
 	struct epic_rx_desc	rx_ring[RX_RING_SIZE]
 	__attribute__ ((aligned(4)));
 	struct epic_tx_desc	tx_ring[TX_RING_SIZE]
 	__attribute__ ((aligned(4)));
 	unsigned char	 	rx_packet[PKT_BUF_SZ * RX_RING_SIZE];
 	unsigned char		tx_packet[PKT_BUF_SZ * TX_RING_SIZE];
-} epic100_bufs __shared;
+};
+#define epic100_bufs NIC_FAKE_BSS ( struct epic100_bss )
 #define rx_ring epic100_bufs.rx_ring
 #define tx_ring epic100_bufs.tx_ring
 #define rx_packet epic100_bufs.rx_packet
@@ -525,7 +526,7 @@ PCI_ROM(0x10b8, 0x0006, "smc-83c175", "SMC EPIC/C 83c175", 0),
 PCI_DRIVER ( epic100_driver, epic100_nics, PCI_NO_CLASS );
 
 DRIVER ( "EPIC100", nic_driver, pci_driver, epic100_driver,
-	 epic100_probe, epic100_disable );
+	 epic100_probe, epic100_disable, epic100_bufs );
 
 /*
  * Local variables:

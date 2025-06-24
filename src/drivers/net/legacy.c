@@ -84,17 +84,22 @@ int legacy_probe ( void *hwdev,
 		   void ( * set_drvdata ) ( void *hwdev, void *priv ),
 		   struct device *dev,
 		   int ( * probe ) ( struct nic *nic, void *hwdev ),
-		   void ( * disable ) ( struct nic *nic, void *hwdev ) ) {
+		   void ( * disable ) ( struct nic *nic, void *hwdev ),
+		   size_t fake_bss_len ) {
 	struct net_device *netdev;
 	struct nic *nic;
 	int rc;
 
-	if ( legacy_registered )
-		return -EBUSY;
-	
+	if ( legacy_registered ) {
+		rc = -EBUSY;
+		goto err_registered;
+	}
+
 	netdev = alloc_etherdev ( 0 );
-	if ( ! netdev )
-		return -ENOMEM;
+	if ( ! netdev ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 	netdev_init ( netdev, &legacy_operations );
 	nic = &legacy_nic;
 	netdev->priv = nic;
@@ -104,6 +109,15 @@ int legacy_probe ( void *hwdev,
 
 	nic->node_addr = netdev->hw_addr;
 	nic->irqno = dev->desc.irq;
+
+	if ( fake_bss_len ) {
+		nic->fake_bss = malloc_phys ( fake_bss_len, PAGE_SIZE );
+		if ( ! nic->fake_bss ) {
+			rc = -ENOMEM;
+			goto err_fake_bss;
+		}
+	}
+	nic->fake_bss_len = fake_bss_len;
 
 	if ( ! probe ( nic, hwdev ) ) {
 		rc = -ENODEV;
@@ -133,8 +147,13 @@ int legacy_probe ( void *hwdev,
  err_register:
 	disable ( nic, hwdev );
  err_probe:
+	if ( fake_bss_len )
+		free_phys ( nic->fake_bss, fake_bss_len );
+ err_fake_bss:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
+ err_alloc:
+ err_registered:
 	return rc;
 }
 
@@ -146,6 +165,8 @@ void legacy_remove ( void *hwdev,
 
 	unregister_netdev ( netdev );
 	disable ( nic, hwdev );
+	if ( nic->fake_bss_len )
+		free_phys ( nic->fake_bss, nic->fake_bss_len );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 	legacy_registered = 0;

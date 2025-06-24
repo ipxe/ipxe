@@ -36,13 +36,14 @@ FILE_LICENCE ( GPL_ANY );
 /* The bnx2 seems to be picky about the alignment of the receive buffers
  * and possibly the status block.
  */
-static struct bss {
+struct bss {
 	struct tx_bd tx_desc_ring[TX_DESC_CNT];
 	struct rx_bd rx_desc_ring[RX_DESC_CNT];
 	unsigned char rx_buf[RX_BUF_CNT][RX_BUF_SIZE];
 	struct status_block status_blk;
 	struct statistics_block stats_blk;
-} bnx2_bss;
+};
+#define bnx2_bss NIC_FAKE_BSS ( struct bss )
 
 static struct bnx2 bnx2;
 
@@ -2686,7 +2687,8 @@ static struct pci_device_id bnx2_nics[] = {
 
 PCI_DRIVER ( bnx2_driver, bnx2_nics, PCI_NO_CLASS );
 
-DRIVER ( "BNX2", nic_driver, pci_driver, bnx2_driver, bnx2_probe, bnx2_remove );
+DRIVER ( "BNX2", nic_driver, pci_driver, bnx2_driver,
+	 bnx2_probe, bnx2_remove, bnx2_bss );
 
 /*
 static struct pci_driver bnx2_driver __pci_driver = {

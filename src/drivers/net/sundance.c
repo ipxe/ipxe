@@ -233,10 +233,11 @@ static struct netdev_desc rx_ring[RX_RING_SIZE];
 
 /* Create a static buffer of size PKT_BUF_SZ for each RX and TX descriptor.
    All descriptors point to a part of this buffer */
-struct {
+struct sundance_bss {
 	unsigned char txb[PKT_BUF_SZ * TX_RING_SIZE];
 	unsigned char rxb[RX_RING_SIZE * PKT_BUF_SZ];
-} rx_tx_buf __shared;
+};
+#define rx_tx_buf NIC_FAKE_BSS ( struct sundance_bss )
 #define rxb rx_tx_buf.rxb
 #define txb rx_tx_buf.txb
 
@@ -888,7 +889,7 @@ static struct pci_device_id sundance_nics[] = {
 PCI_DRIVER ( sundance_driver, sundance_nics, PCI_NO_CLASS );
 
 DRIVER ( "SUNDANCE/PCI", nic_driver, pci_driver, sundance_driver,
-	 sundance_probe, sundance_disable );
+	 sundance_probe, sundance_disable, rx_tx_buf );
 
 /*
  * Local variables:

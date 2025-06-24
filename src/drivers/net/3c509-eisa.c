@@ -35,7 +35,7 @@ static struct eisa_device_id el3_eisa_adapters[] = {
 EISA_DRIVER ( el3_eisa_driver, el3_eisa_adapters );
 
 DRIVER ( "3c509 (EISA)", nic_driver, eisa_driver, el3_eisa_driver,
-	 el3_eisa_probe, el3_eisa_disable );
+	 el3_eisa_probe, el3_eisa_disable, no_fake_bss );
 
 ISA_ROM ( "3c509-eisa","3c509 (EISA)" );
 

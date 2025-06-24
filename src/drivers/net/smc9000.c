@@ -939,7 +939,7 @@ ISA_DRIVER ( smc9000_driver, smc9000_probe_addrs, smc9000_probe_addr,
 		     GENERIC_ISAPNP_VENDOR, 0x8228 );
 
 DRIVER ( "SMC9000", nic_driver, isa_driver, smc9000_driver,
-	 smc9000_probe, smc9000_disable );
+	 smc9000_probe, smc9000_disable, no_fake_bss );
 
 ISA_ROM ( "smc9000", "SMC9000" );
 

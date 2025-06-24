@@ -64,7 +64,6 @@ static void t3c515_wait(unsigned int nticks)
 /* TJL definations */
 #define HZ      100
 static int if_port;
-static struct corkscrew_private *vp;
 /* Brought directly from 3c515.c by Becker */
 #define CORKSCREW 1
 
@@ -237,6 +236,7 @@ struct corkscrew_private {
 	 full_bus_master_tx:1, full_bus_master_rx:1,	/* Boomerang  */
 	 tx_full:1;
 };
+#define vp NIC_FAKE_BSS_PTR ( struct corkscrew_private )
 
 /* The action to take with a media selection timer tick.
    Note that we deviate from the 3Com order by checking 10base2 before AUI.
@@ -759,6 +759,6 @@ static struct isapnp_device_id t515_adapters[] = {
 ISAPNP_DRIVER ( t515_driver, t515_adapters );
 
 DRIVER ( "3c515", nic_driver, isapnp_driver, t515_driver,
-	 t515_probe, t515_disable );
+	 t515_probe, t515_disable, *vp );
 
 ISA_ROM ( "3c515", "3c515 Fast EtherLink ISAPnP" );

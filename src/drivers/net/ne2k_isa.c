@@ -370,6 +370,6 @@ ISA_DRIVER ( ne_driver, ne_probe_addrs, ne_probe1,
 		GENERIC_ISAPNP_VENDOR, 0x0600 );
 
 DRIVER ( "ne", nic_driver, isapnp_driver, ne_driver,
-		ne_probe, ne_disable );
+	 ne_probe, ne_disable, no_fake_bss );
 
 ISA_ROM("ne","NE1000/2000 and clones");
