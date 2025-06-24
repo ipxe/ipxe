@@ -47,7 +47,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include "pxe_call.h"
 
 /* Avoid dragging in isapnp.o unnecessarily */
-uint16_t isapnp_read_port;
+uint16_t isapnp_read_port __attribute__ (( weak ));
 
 /** Zero-based versions of PXENV_GET_CACHED_INFO::PacketType */
 enum pxe_cached_info_indices {
