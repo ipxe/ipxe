@@ -284,51 +284,6 @@ static u16 bnxt_get_pkt_vlan ( char *src )
 	return 0;
 }
 
-static u16 bnxt_get_rx_vlan ( struct rx_pkt_cmpl *rx_cmp, struct rx_pkt_cmpl_hi *rx_cmp_hi )
-{
-	struct rx_pkt_v3_cmpl *rx_cmp_v3 = ( struct rx_pkt_v3_cmpl * )rx_cmp;
-	struct rx_pkt_v3_cmpl_hi *rx_cmp_hi_v3 = ( struct rx_pkt_v3_cmpl_hi * )rx_cmp_hi;
-	u16 rx_vlan;
-
-	/* Get VLAN ID from RX completion ring */
-	if ( ( rx_cmp_v3->flags_type & RX_PKT_V3_CMPL_TYPE_MASK ) ==
-	     RX_PKT_V3_CMPL_TYPE_RX_L2_V3 ) {
-		if ( rx_cmp_hi_v3->flags2 & RX_PKT_V3_CMPL_HI_FLAGS2_META_FORMAT_ACT_REC_PTR )
-			rx_vlan = ( rx_cmp_hi_v3->metadata0 &
-				RX_PKT_V3_CMPL_HI_METADATA0_VID_MASK );
-		else
-			rx_vlan = 0;
-	} else {
-	        if ( rx_cmp_hi->flags2 & RX_PKT_CMPL_FLAGS2_META_FORMAT_VLAN )
-			rx_vlan = ( rx_cmp_hi->metadata &
-				RX_PKT_CMPL_METADATA_VID_MASK );
-	        else
-			rx_vlan = 0;
-	}
-
-	return rx_vlan;
-}
-
-int bnxt_vlan_drop ( struct bnxt *bp, u16 rx_vlan )
-{
-	if ( rx_vlan ) {
-		if ( bp->vlan_tx ) {
-			if ( rx_vlan == bp->vlan_tx )
-				return 0;
-		} else {
-			if ( rx_vlan == bp->vlan_id )
-				return 0;
-			if ( rx_vlan && !bp->vlan_id )
-				return 0;
-		}
-	} else {
-		if ( !bp->vlan_tx && !bp->vlan_id )
-			return 0;
-	}
-
-	return 1;
-}
-
 static inline u32 bnxt_tx_avail ( struct bnxt *bp )
 {
 	u32 avail;
@@ -461,7 +416,7 @@ u8 bnxt_rx_drop ( struct bnxt *bp, struct io_buffer *iob,
 	struct rx_pkt_v3_cmpl *rx_cmp_v3 = ( struct rx_pkt_v3_cmpl * )rx_cmp;
 	struct rx_pkt_v3_cmpl_hi  *rx_cmp_hi_v3 = ( struct rx_pkt_v3_cmpl_hi * )rx_cmp_hi;
 	u8  *rx_buf = ( u8 * )iob->data;
-	u16 err_flags, rx_vlan;
+	u16 err_flags;
 	u8  ignore_chksum_err = 0;
 	int i;
 
@@ -489,16 +444,7 @@ u8 bnxt_rx_drop ( struct bnxt *bp, struct io_buffer *iob,
 		return 2;
 	}
 
-	rx_vlan = bnxt_get_rx_vlan ( rx_cmp, rx_cmp_hi );
-	dbg_rx_vlan ( bp, rx_cmp_hi->metadata, rx_cmp_hi->flags2, rx_vlan );
-	if ( bnxt_vlan_drop ( bp, rx_vlan ) ) {
-		bp->rx.drop_vlan++;
-		return 3;
-	}
 	iob_put ( iob, rx_len );
-
-	if ( rx_vlan )
-		bnxt_add_vlan ( iob, rx_vlan );
 
 	bp->rx.good++;
 	return 0;
@@ -1386,40 +1332,6 @@ static int bnxt_get_link_speed ( struct bnxt *bp )
 	return STATUS_SUCCESS;
 }
 
-static int bnxt_get_vlan ( struct bnxt *bp )
-{
-	u32 *ptr32 = ( u32 * ) DMA_DMA_ADDR ( bp );
-
-	/* If VF is set to TRUE, Do not issue this command */
-	if ( bp->vf )
-		return STATUS_SUCCESS;
-
-	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ) ) {
-		test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 1,
-			 ( u16 )FUNC_CFG_PRE_BOOT_MBA_VLAN_NUM, 1,
-			 ( u16 )bp->ordinal_value ) != STATUS_SUCCESS )
-			return STATUS_FAILURE;
-
-		bp->mba_cfg2 = SET_MBA ( *ptr32, VLAN_MASK, VLAN_SHIFT );
-		test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 16,
-			 ( u16 )FUNC_CFG_PRE_BOOT_MBA_VLAN_VALUE_NUM, 1,
-			 ( u16 )bp->ordinal_value ) != STATUS_SUCCESS )
-			return STATUS_FAILURE;
-
-		bp->mba_cfg2 |= SET_MBA ( *ptr32, VLAN_VALUE_MASK, VLAN_VALUE_SHIFT );
-		if ( bp->mba_cfg2 & FUNC_CFG_PRE_BOOT_MBA_VLAN_ENABLED )
-			bp->vlan_id = bp->mba_cfg2 & VLAN_VALUE_MASK;
-		else
-			bp->vlan_id = 0;
-
-		if ( bp->mba_cfg2 & FUNC_CFG_PRE_BOOT_MBA_VLAN_ENABLED )
-			DBGP ( "VLAN MBA Enabled ( %d )\n",
-				( bp->mba_cfg2 & VLAN_VALUE_MASK ) );
-
-	}
-	return STATUS_SUCCESS;
-}
-
 static int bnxt_hwrm_backing_store_qcfg ( struct bnxt *bp )
 {
 	u16 cmd_len = ( u16 )sizeof ( struct hwrm_func_backing_store_qcfg_input );
@@ -2045,7 +1957,6 @@ static int bnxt_hwrm_vnic_cfg ( struct bnxt *bp )
 		req->dflt_ring_grp = bp->ring_grp_id;
 	}
 
-	req->flags   = VNIC_CFG_REQ_FLAGS_VLAN_STRIP_MODE;
 	req->vnic_id = bp->vnic_id;
 	return wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 }
@@ -2091,7 +2002,6 @@ hwrm_func_t bring_up_chip[] = {
 	bnxt_hwrm_func_resource_qcaps,	/* HWRM_FUNC_RESOURCE_QCAPS	*/
 	bnxt_hwrm_port_phy_qcaps_req,	/* HWRM_PORT_PHY_QCAPS	*/
 	bnxt_hwrm_func_qcfg_req,	/* HWRM_FUNC_QCFG		*/
-	bnxt_get_vlan,			/* HWRM_NVM_GET_VARIABLE - vlan	*/
 	bnxt_hwrm_port_mac_cfg,		/* HWRM_PORT_MAC_CFG		*/
 	bnxt_hwrm_func_cfg_req,		/* HWRM_FUNC_CFG		*/
 	bnxt_query_phy_link,		/* HWRM_PORT_PHY_QCFG		*/

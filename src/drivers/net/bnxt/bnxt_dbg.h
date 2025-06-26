@@ -418,13 +418,6 @@ void dump_rx_bd(struct rx_pkt_cmpl *rx_cmp,
 #endif
 }
 
-void dbg_rx_vlan(struct bnxt *bp, u32 meta, u16 f2, u16 rx_vid)
-{
-	dbg_prn("  Rx VLAN metadata %x flags2 %x\n", meta, f2);
-	dbg_prn("  Rx VLAN MBA %d TX %d RX %d\n",
-		bp->vlan_id, bp->vlan_tx, rx_vid);
-}
-
 void dbg_alloc_rx_iob(struct io_buffer *iob, u16 id, u16 cid)
 {
 	dbg_prn("  Rx alloc_iob (%d) %p bd_virt (%d)\n",
@@ -460,13 +453,12 @@ void dbg_rxp(u8 *iob, u16 rx_len, u8 drop)
 
 void dbg_rx_stat(struct bnxt *bp)
 {
-	dbg_prn("- RX Stat Total %d Good %d Drop err %d LB %d VLAN %d\n",
+	dbg_prn("- RX Stat Total %d Good %d Drop err %d LB %d\n",
 		bp->rx.cnt, bp->rx.good,
-		bp->rx.drop_err, bp->rx.drop_lb, bp->rx.drop_vlan);
+		bp->rx.drop_err, bp->rx.drop_lb);
 }
 #else
 #define dump_rx_bd(rx_cmp, rx_cmp_hi, desc_idx)
-#define dbg_rx_vlan(bp, metadata, flags2, rx_vid)
 #define dbg_alloc_rx_iob(iob, id, cid)
 #define dbg_rx_cid(idx, cid)
 #define dbg_alloc_rx_iob_fail(iob_idx, cons_id)

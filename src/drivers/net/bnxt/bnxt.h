@@ -894,7 +894,6 @@ struct rx_info {
 	u32               good;
 	u32               drop_err;
 	u32               drop_lb;
-	u32               drop_vlan;
 	u8                epoch;
 	u8                res[3];
 };
