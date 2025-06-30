@@ -257,6 +257,26 @@ static int intel_fetch_mac ( struct intel_nic *intel, uint8_t *hw_addr ) {
  ******************************************************************************
  */
 
+ static int intel_reset_done ( struct intel_nic *intel )
+{
+	uint32_t eec, status;
+	uint32_t i = 0;
+
+	while (i < INTEL_RESET_DELAY_MS * 10) {
+		status = readl ( intel->regs + INTEL_STATUS );
+		eec = readl ( intel->regs + INTEL_EEC );
+		if ((eec & INTEL_EEC_AUTO_RD) && (status & INTEL_STATUS_PF_RST_DONE))
+			break;
+		mdelay ( 10 );
+		i++;
+	}
+
+	if (i >= INTEL_RESET_DELAY_MS*10)
+		return -ETIME;
+
+	return 0;
+}
+
 /**
  * Reset hardware
  *
@@ -270,6 +290,7 @@ static int intel_reset ( struct intel_nic *intel ) {
 	uint32_t status;
 	uint32_t orig_ctrl;
 	uint32_t orig_status;
+	uint8_t reset_done;
 
 	/* Record initial control and status register values */
 	orig_ctrl = ctrl = readl ( intel->regs + INTEL_CTRL );
@@ -306,44 +327,14 @@ static int intel_reset ( struct intel_nic *intel ) {
 	writel ( ( ctrl | INTEL_CTRL_RST ), intel->regs + INTEL_CTRL );
 	mdelay ( INTEL_RESET_DELAY_MS );
 
-	/* Set a sensible default configuration */
-	if ( ! ( intel->flags & INTEL_NO_ASDE ) )
-		ctrl |= INTEL_CTRL_ASDE;
-	ctrl |= INTEL_CTRL_SLU;
-	ctrl &= ~( INTEL_CTRL_LRST | INTEL_CTRL_FRCSPD | INTEL_CTRL_FRCDPLX );
-	writel ( ctrl, intel->regs + INTEL_CTRL );
-	mdelay ( INTEL_RESET_DELAY_MS );
-
-	/* On some models (notably ICH), the PHY reset mechanism
-	 * appears to be broken.  In particular, the PHY_CTRL register
-	 * will be correctly loaded from NVM but the values will not
-	 * be propagated to the "OEM bits" PHY register.  This
-	 * typically has the effect of dropping the link speed to
-	 * 10Mbps.
-	 *
-	 * Work around this problem by skipping the PHY reset if
-	 * either (a) the link is already up, or (b) this particular
-	 * NIC is known to be broken.
-	 */
-	status = readl ( intel->regs + INTEL_STATUS );
-	if ( ( intel->flags & INTEL_NO_PHY_RST ) ||
-	     ( status & INTEL_STATUS_LU ) ) {
-		DBGC ( intel, "INTEL %p %sMAC reset (%08x/%08x was "
-		       "%08x/%08x)\n", intel,
-		       ( ( intel->flags & INTEL_NO_PHY_RST ) ? "forced " : "" ),
-		       ctrl, status, orig_ctrl, orig_status );
-		return 0;
+	reset_done = intel_reset_done(intel);
+	if (reset_done) {
+		DBGC ( intel, "Reset timeout\n");
+		return reset_done;
 	}
 
-	/* Reset PHY and MAC simultaneously */
-	writel ( ( ctrl | INTEL_CTRL_RST | INTEL_CTRL_PHY_RST ),
-		 intel->regs + INTEL_CTRL );
-	mdelay ( INTEL_RESET_DELAY_MS );
-
-	/* PHY reset is not self-clearing on all models */
-	writel ( ctrl, intel->regs + INTEL_CTRL );
-	mdelay ( INTEL_RESET_DELAY_MS );
 	status = readl ( intel->regs + INTEL_STATUS );
+	ctrl = readl ( intel->regs + INTEL_CTRL );
 
 	DBGC ( intel, "INTEL %p MAC+PHY reset (%08x/%08x was %08x/%08x)\n",
 	       intel, ctrl, status, orig_ctrl, orig_status );
