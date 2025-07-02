@@ -29,10 +29,14 @@ static struct pci_device_id bnxt_nics[] = {
 	PCI_ROM( 0x14e4, 0x1604, "14e4-1604", "Broadcom BCM957454", 0 ),
 	PCI_ROM( 0x14e4, 0x1605, "14e4-1605", "Broadcom BCM957454 RDMA", 0 ),
 	PCI_ROM( 0x14e4, 0x1606, "14e4-1606", "Broadcom BCM957454 RDMA VF", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x1607, "bcm957454-1607", "Broadcom BCM957454 HV VF", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x1608, "bcm957454-1608", "Broadcom BCM957454 RDMA HV VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1609, "14e4-1609", "Broadcom BCM957454 VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1614, "14e4-1614", "Broadcom BCM957454", 0 ),
+	PCI_ROM( 0x14e4, 0x16bd, "bcm95741x-16bd", "Broadcom BCM95741x RDMA_HV_VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x16c0, "14e4-16c0", "Broadcom BCM957417", 0 ),
 	PCI_ROM( 0x14e4, 0x16c1, "14e4-16c1", "Broadcom BCM95741x VF", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x16c5, "bcm95741x-16c5", "Broadcom BCM95741x HV VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x16c8, "14e4-16c8", "Broadcom BCM957301", 0 ),
 	PCI_ROM( 0x14e4, 0x16c9, "14e4-16c9", "Broadcom BCM957302", 0 ),
 	PCI_ROM( 0x14e4, 0x16ca, "14e4-16ca", "Broadcom BCM957304", 0 ),
@@ -83,8 +87,8 @@ static struct pci_device_id bnxt_nics[] = {
 	PCI_ROM( 0x14e4, 0x1807, "14e4-1807", "Broadcom BCM9575xx RDMA VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1808, "14e4-1808", "Broadcom BCM9575xx HV VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1809, "14e4-1809", "Broadcom BCM9575xx RDMA HV VF", BNXT_FLAG_PCI_VF ),
-	PCI_ROM( 0x14e4, 0xd802, "14e4-d802", "14e4-d802", 0 ),
-	PCI_ROM( 0x14e4, 0xd804, "14e4-d804", "14e4-d804", 0 ),
+	PCI_ROM( 0x14e4, 0x1819, "bcm95760x-1819", "Broadcom BCM95760x VF", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x181b, "bcm95760x-181b", "Broadcom BCM95760x HV VF", BNXT_FLAG_PCI_VF ),
 };
 
 /**
