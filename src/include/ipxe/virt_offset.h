@@ -15,8 +15,11 @@
  *     physical addresses.
  *
  *   - For 64-bit builds: identity-map the required portion of the
- *     physical address space, then map iPXE itself using virtual
- *     addresses in the negative (kernel) address space.
+ *     physical address space, place iPXE within the 32-bit physical
+ *     address space, map iPXE using virtual addresses in the top part
+ *     of the negative (kernel) address space, and optionally map the
+ *     32-bit physical address space with attributes suitable for
+ *     coherent DMA accesses.
  *
  * In both cases, we can define "virt_offset" as "the value to be
  * added to an address within iPXE's own image in order to obtain its
@@ -30,15 +33,17 @@
  *     is a no-op (since all physical addresses are identity-mapped),
  *     and conversion from a virtual address to a physical address
  *     requires an addition of virt_offset if and only if the virtual
- *     address lies in the negative portion of the address space
- *     (i.e. has the MSB set).
+ *     address lies in the high negative portion of the address space
+ *     (i.e. has the MSB set, but has the MSB clear after adding
+ *     virt_offset).
  *
  * For x86_64-pcbios, we identity-map the low 4GB of address space
  * since the only accesses required above 4GB are for MMIO (typically
  * PCI devices with large memory BARs).
  *
  * For riscv64-sbi, we identity-map as much of the physical address
- * space as can be mapped by the paging model (Sv39, Sv48, or Sv57).
+ * space as can be mapped by the paging model (Sv39, Sv48, or Sv57)
+ * and create a coherent DMA mapping of the low 4GB.
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
@@ -88,6 +93,7 @@ UACCESS_INLINE ( offset, phys_to_virt ) ( unsigned long phys ) {
  */
 static inline __always_inline physaddr_t
 UACCESS_INLINE ( offset, virt_to_phys ) ( volatile const void *virt ) {
+	const physaddr_t msb = ( 1ULL << ( 8 * sizeof ( physaddr_t ) - 1 ) );
 	physaddr_t addr = ( ( physaddr_t ) virt );
 
 	/* In a 64-bit build, any valid virtual address with the MSB
@@ -98,14 +104,28 @@ UACCESS_INLINE ( offset, virt_to_phys ) ( volatile const void *virt ) {
 	 * than zero" instruction.
 	 */
 	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
-	     ( ! ( addr & ( 1ULL << ( 8 * sizeof ( physaddr_t ) - 1 ) ) ) ) ) {
+	     ( ! ( addr & msb ) ) ) {
 		return addr;
 	}
 
 	/* In a 32-bit build or in a 64-bit build with a virtual
 	 * address with the MSB set: add virt_offset
 	 */
-	return ( addr + virt_offset );
+	addr += virt_offset;
+
+	/* In a 64-bit build with an address that still has the MSB
+	 * set after adding virt_offset: truncate the original virtual
+	 * address to form a 32-bit physical address.
+	 *
+	 * This test will also typically reduce to a single "branch if
+	 * less than zero" instruction.
+	 */
+	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
+	     ( addr & msb ) ) {
+		return ( ( uint32_t ) ( physaddr_t ) virt );
+	}
+
+	return addr;
 }
 
 #endif /* _IPXE_VIRT_OFFSET_H */
