@@ -865,6 +865,19 @@ enable_paging_64:
 	la	t1, _prefix
 	sub	tp, t1, t0
 
+	/* Zero PTE[0-511] */
+	li	t0, PTE_COUNT
+	mv	a3, a0
+1:	STOREN	zero, (a3)
+	addi	a3, a3, PTE_SIZE
+	addi	t0, t0, -1
+	bgtz	t0, 1b
+
+	/* Construct PTE[511] as next level page table pointer */
+	srli	t0, a0, PTE_PPN_SHIFT
+	ori	t0, t0, PTE_V
+	STOREN	t0, -PTE_SIZE(a3)
+
 	/* Construct base page table entry for address zero */
 	li	t0, PTE_LEAF
 	STOREN	t0, (a0)
@@ -888,54 +901,6 @@ enable_paging_64:
 	or	t0, t0, t1
 	STOREN	t0, (a3)
 1:	mv	a0, a3
-
-	/* Find highest supported paging level */
-	li	a1, SATP_MODE_SV57
-enable_paging_64_loop:
-
-	/* Calculate PTE stride for identity map at this paging level
-	 *
-	 * a1 == 10 == Sv57: PPN[4] LSB is PTE bit 46  =>  stride := 1 << 46
-	 * a1 ==  9 == Sv48: PPN[3] LSB is PTE bit 37  =>  stride := 1 << 37
-	 * a1 ==  8 == Sv39: PPN[2] LSB is PTE bit 28  =>  stride := 1 << 28
-	 *
-	 * and so we calculate stride a4 := ( 1 << ( 9 * a1 - 44 ) )
-	 */
-	slli	a4, a1, 3
-	add	a4, a4, a1
-	addi	a4, a4, -44
-	li	t0, 1
-	sll	a4, t0, a4
-
-	/* Calculate size of accessible physical address space
-	 *
-	 * The identity map comprises only the lower half of the PTEs,
-	 * since virtual addresses for the higher half must have all
-	 * high bits set, and so cannot form part of an identity map.
-	 */
-	slli	a5, a4, ( PTE_PPN_SHIFT + ( PTE_COUNT_LOG2 - 1 ) )
-
-	/* Construct PTE[0-255] for identity map */
-	mv	a3, a0
-	li	t0, ( PTE_COUNT / 2 )
-	LOADN	t1, (a0)
-1:	STOREN	t1, (a3)
-	addi	a3, a3, PTE_SIZE
-	add	t1, t1, a4
-	addi	t0, t0, -1
-	bgtz	t0, 1b
-
-	/* Zero PTE[256-511] */
-	li	t0, ( PTE_COUNT / 2 )
-1:	STOREN	zero, (a3)
-	addi	a3, a3, PTE_SIZE
-	addi	t0, t0, -1
-	bgtz	t0, 1b
-
-	/* Construct PTE[511] as next level page table pointer */
-	srli	t0, a0, PTE_PPN_SHIFT
-	ori	t0, t0, PTE_V
-	STOREN	t0, -PTE_SIZE(a3)
 
 	/* Calculate PTE[x] address for iPXE virtual address map */
 	LOADN	t0, prefix_link
@@ -971,6 +936,42 @@ enable_paging_64_loop:
 	addi	a3, a3, PTE_SIZE
 	add	t0, t0, a4
 	ble	t0, t2, 1b
+
+	/* Find highest supported paging level */
+	li	a1, SATP_MODE_SV57
+enable_paging_64_loop:
+
+	/* Calculate PTE stride for identity map at this paging level
+	 *
+	 * a1 == 10 == Sv57: PPN[4] LSB is PTE bit 46  =>  stride := 1 << 46
+	 * a1 ==  9 == Sv48: PPN[3] LSB is PTE bit 37  =>  stride := 1 << 37
+	 * a1 ==  8 == Sv39: PPN[2] LSB is PTE bit 28  =>  stride := 1 << 28
+	 *
+	 * and so we calculate stride a4 := ( 1 << ( 9 * a1 - 44 ) )
+	 */
+	slli	a4, a1, 3
+	add	a4, a4, a1
+	addi	a4, a4, -44
+	li	t0, 1
+	sll	a4, t0, a4
+
+	/* Calculate size of accessible physical address space
+	 *
+	 * The identity map comprises only the lower half of the PTEs,
+	 * since virtual addresses for the higher half must have all
+	 * high bits set, and so cannot form part of an identity map.
+	 */
+	slli	a5, a4, ( PTE_PPN_SHIFT + ( PTE_COUNT_LOG2 - 1 ) )
+
+	/* Construct PTE[0-255] for identity map at this paging level */
+	mv	a3, a0
+	li	t0, ( PTE_COUNT / 2 )
+	LOADN	t1, (a0)
+1:	STOREN	t1, (a3)
+	addi	a3, a3, PTE_SIZE
+	add	t1, t1, a4
+	addi	t0, t0, -1
+	bgtz	t0, 1b
 
 	/* Attempt to enable paging, and read back active paging level */
 	slli	t0, a1, SATP_MODE_SHIFT
