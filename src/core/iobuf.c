@@ -47,22 +47,26 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 	struct io_buffer *iobuf;
+	size_t headroom;
+	size_t tailroom;
 	size_t padding;
 	size_t threshold;
 	unsigned int align_log2;
 	void *data;
 
-	/* Calculate padding required below alignment boundary to
-	 * ensure that a correctly aligned inline struct io_buffer
-	 * could fit (regardless of the requested offset).
+	/* Round up requested alignment and calculate initial headroom
+	 * and tailroom to ensure that no cachelines are shared
+	 * between I/O buffer data and other data structures.
 	 */
-	padding = ( sizeof ( *iobuf ) + __alignof__ ( *iobuf ) - 1 );
-
-	/* Round up requested alignment to at least the size of the
-	 * padding, to simplify subsequent calculations.
-	 */
-	if ( align < padding )
-		align = padding;
+	if ( align < IOB_ZLEN )
+		align = IOB_ZLEN;
+	headroom = ( offset & ( IOB_ZLEN - 1 ) );
+	tailroom = ( ( - len - offset ) & ( IOB_ZLEN - 1 ) );
+	padding = ( headroom + tailroom );
+	offset -= headroom;
+	len += padding;
+	if ( len < padding )
+		return NULL;
 
 	/* Round up alignment to the nearest power of two, avoiding
 	 * a potentially undefined shift operation.
@@ -73,19 +77,14 @@ struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 	align = ( 1UL << align_log2 );
 
 	/* Calculate length threshold */
-	assert ( align >= padding );
-	threshold = ( align - padding );
+	assert ( align >= sizeof ( *iobuf ) );
+	threshold = ( align - sizeof ( *iobuf ) );
 
 	/* Allocate buffer plus an inline descriptor as a single unit,
 	 * unless doing so would push the total size over the
 	 * alignment boundary.
 	 */
 	if ( len <= threshold ) {
-
-		/* Round up buffer length to ensure that struct
-		 * io_buffer is aligned.
-		 */
-		len += ( ( - len - offset ) & ( __alignof__ ( *iobuf ) - 1 ) );
 
 		/* Allocate memory for buffer plus descriptor */
 		data = malloc_phys_offset ( len + sizeof ( *iobuf ), align,
@@ -111,7 +110,8 @@ struct io_buffer * alloc_iob_raw ( size_t len, size_t align, size_t offset ) {
 
 	/* Populate descriptor */
 	memset ( &iobuf->map, 0, sizeof ( iobuf->map ) );
-	iobuf->head = iobuf->data = iobuf->tail = data;
+	iobuf->head = data;
+	iobuf->data = iobuf->tail = ( data + headroom );
 	iobuf->end = ( data + len );
 
 	return iobuf;
@@ -266,7 +266,7 @@ struct io_buffer * iob_concatenate ( struct list_head *list ) {
 		len += iob_len ( iobuf );
 
 	/* Allocate new I/O buffer */
-	concatenated = alloc_iob_raw ( len, __alignof__ ( *iobuf ), 0 );
+	concatenated = alloc_iob_raw ( len, IOB_ZLEN, 0 );
 	if ( ! concatenated )
 		return NULL;
 

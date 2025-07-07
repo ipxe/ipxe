@@ -62,13 +62,19 @@ static inline void alloc_iob_okx ( size_t len, size_t align, size_t offset,
 	       "offset %#zx\n", iobuf, virt_to_phys ( iobuf->data ),
 	       iob_tailroom ( iobuf ), len, align, offset );
 
-	/* Validate requested length and alignment */
+	/* Validate requested length and data alignment */
 	okx ( ( ( ( intptr_t ) iobuf ) & ( __alignof__ ( *iobuf ) - 1 ) ) == 0,
 		file, line );
 	okx ( iob_tailroom ( iobuf ) >= len, file, line );
 	okx ( ( ( align == 0 ) ||
 		( ( virt_to_phys ( iobuf->data ) & ( align - 1 ) ) ==
 		  ( offset & ( align - 1 ) ) ) ), file, line );
+
+	/* Validate overall buffer alignment */
+	okx ( ( ( ( intptr_t ) iobuf->head ) & ( IOB_ZLEN - 1 ) ) == 0,
+	      file, line );
+	okx ( ( ( ( intptr_t ) iobuf->end ) & ( IOB_ZLEN - 1 ) ) == 0,
+	      file, line );
 
 	/* Overwrite entire content of I/O buffer (for Valgrind) */
 	memset ( iob_put ( iobuf, len ), 0x55, len );
