@@ -193,6 +193,10 @@ sbi_legacy_ecall_1 ( int fid, unsigned long p0 ) {
 #define SBI_LEGACY_GETCHAR 0x02		/**< Console Get Character */
 #define SBI_LEGACY_SHUTDOWN 0x08	/**< System Shutdown */
 
+/** Base extension */
+#define SBI_BASE 0x10
+#define SBI_BASE_MVENDORID 0x04		/**< Get machine vendor ID */
+
 /** System reset extension */
 #define SBI_SRST SBI_EID ( 'S', 'R', 'S', 'T' )
 #define SBI_SRST_SYSTEM_RESET 0x00	/**< Reset system */
