@@ -36,7 +36,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/hart.h>
 #include <ipxe/xthead.h>
-#include <ipxe/iobuf.h>
 #include <ipxe/zicbom.h>
 
 /** Minimum supported cacheline size
@@ -159,18 +158,18 @@ static struct cache_extension *cache_extension = &cache_auto;
  * @v start		Start address
  * @v len		Length
  */
-void cache_clean ( struct io_buffer *iobuf ) {
+void cache_clean ( const void *start, size_t len ) {
 	const void *first;
 	const void *last;
 
 	/* Do nothing for zero-length buffers */
-	if ( ! iob_len ( iobuf ) )
+	if ( ! len )
 		return;
 
 	/* Construct address range */
 	first = ( ( const void * )
-		  ( ( ( intptr_t ) iobuf->data ) & ~( CACHE_STRIDE - 1 ) ) );
-	last = ( iobuf->tail - 1 );
+		  ( ( ( intptr_t ) start ) & ~( CACHE_STRIDE - 1 ) ) );
+	last = ( start + len - 1 );
 
 	/* Clean cache lines */
 	cache_extension->clean ( first, last );
@@ -182,18 +181,18 @@ void cache_clean ( struct io_buffer *iobuf ) {
  * @v start		Start address
  * @v len		Length
  */
-void cache_invalidate ( struct io_buffer *iobuf ) {
+void cache_invalidate ( void *start, size_t len ) {
 	void *first;
 	void *last;
 
 	/* Do nothing for zero-length buffers */
-	if ( ! iob_len ( iobuf ) )
+	if ( ! len )
 		return;
 
 	/* Construct address range */
 	first = ( ( void * )
-		  ( ( ( intptr_t ) iobuf->data ) & ~( CACHE_STRIDE - 1 ) ) );
-	last = ( iobuf->tail - 1 );
+		  ( ( ( intptr_t ) start ) & ~( CACHE_STRIDE - 1 ) ) );
+	last = ( start + len - 1 );
 
 	/* Invalidate cache lines */
 	cache_extension->invalidate ( first, last );

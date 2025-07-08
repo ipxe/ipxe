@@ -10,15 +10,16 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #define IOAPI_RISCV
-#define DMAAPI_FLAT
 #define UACCESS_OFFSET
 #define TIMER_ZICNTR
 #define ENTROPY_ZKR
 
 #if __riscv_xlen == 64
 #define IOMAP_SVPAGE
+#define DMAAPI_RISCV
 #else
 #define IOMAP_VIRT
+#define DMAAPI_FLAT
 #endif
 
 #define CONSOLE_SBI

@@ -9,9 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <ipxe/iobuf.h>
+#include <stdint.h>
 
-extern void cache_clean ( struct io_buffer *iobuf );
-extern void cache_invalidate ( struct io_buffer *iobuf );
+extern void cache_clean ( const void *start, size_t len );
+extern void cache_invalidate ( void *start, size_t len );
 
 #endif /* _IPXE_ZICBOM_H */

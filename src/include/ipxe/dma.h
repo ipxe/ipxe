@@ -345,6 +345,9 @@ DMAAPI_INLINE ( op, dma ) ( struct dma_mapping *map, void *addr ) {
 	return ( virt_to_phys ( addr ) + map->offset );
 }
 
+/* Include all architecture-dependent DMA API headers */
+#include <bits/dma.h>
+
 /**
  * Map buffer for DMA
  *
