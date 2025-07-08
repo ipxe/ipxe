@@ -455,7 +455,7 @@ PROVIDE_PCIAPI ( efi, pci_ioremap, efipci_ioremap );
  * @ret rc		Return status code
  */
 static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
-			    physaddr_t addr, size_t len, int flags ) {
+			    void *addr, size_t len, int flags ) {
 	struct efi_pci_device *efipci =
 		container_of ( dma, struct efi_pci_device, pci.dma );
 	struct pci_device *pci = &efipci->pci;
@@ -464,6 +464,7 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
 	EFI_PHYSICAL_ADDRESS bus;
 	UINTN count;
 	VOID *mapping;
+	physaddr_t phys;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -486,18 +487,19 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
 	}
 
 	/* Map buffer (if non-zero length) */
+	phys = virt_to_phys ( addr );
 	count = len;
 	if ( len ) {
-		if ( ( efirc = pci_io->Map ( pci_io, op, phys_to_virt ( addr ),
-					     &count, &bus, &mapping ) ) != 0 ) {
+		if ( ( efirc = pci_io->Map ( pci_io, op, addr, &count, &bus,
+					     &mapping ) ) != 0 ) {
 			rc = -EEFI ( efirc );
-			DBGC ( pci, "EFIPCI " PCI_FMT " cannot map %08lx+%zx: "
+			DBGC ( pci, "EFIPCI " PCI_FMT " cannot map %p+%zx: "
 			       "%s\n", PCI_ARGS ( pci ), addr, len,
 			       strerror ( rc ) );
 			goto err_map;
 		}
 	} else {
-		bus = addr;
+		bus = phys;
 		mapping = NULL;
 	}
 
@@ -508,14 +510,14 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
 	 */
 	if ( count != len ) {
 		DBGC ( pci, "EFIPCI " PCI_FMT " attempted split mapping for "
-		       "%08lx+%zx\n", PCI_ARGS ( pci ), addr, len );
+		       "%p+%zx\n", PCI_ARGS ( pci ), addr, len );
 		rc = -ENOTSUP;
 		goto err_len;
 	}
 
 	/* Populate mapping */
 	map->dma = dma;
-	map->offset = ( bus - addr );
+	map->offset = ( bus - phys );
 	map->token = mapping;
 
 	/* Increment mapping count (for debugging) */
@@ -594,8 +596,7 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 	memset ( addr, 0, ( pages * EFI_PAGE_SIZE ) );
 
 	/* Map buffer */
-	if ( ( rc = efipci_dma_map ( dma, map, virt_to_phys ( addr ),
-				     ( pages * EFI_PAGE_SIZE ),
+	if ( ( rc = efipci_dma_map ( dma, map, addr, ( pages * EFI_PAGE_SIZE ),
 				     DMA_BI ) ) != 0 )
 		goto err_map;
 

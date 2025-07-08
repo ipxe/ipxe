@@ -65,8 +65,8 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 
 	/* Map dummy target location */
 	if ( ( rc = dma_map ( intelxl->dma, &intelxl->msix.map,
-			      virt_to_phys ( &intelxl->msix.msg ),
-			      sizeof ( intelxl->msix.msg ), DMA_RX ) ) != 0 ) {
+			      &intelxl->msix.msg, sizeof ( intelxl->msix.msg ),
+			      DMA_RX ) ) != 0 ) {
 		DBGC ( intelxl, "INTELXL %p could not map MSI-X target: %s\n",
 		       intelxl, strerror ( rc ) );
 		goto err_map;

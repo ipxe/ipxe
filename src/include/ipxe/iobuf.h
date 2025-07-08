@@ -230,8 +230,7 @@ static inline void iob_populate ( struct io_buffer *iobuf,
 static inline __always_inline int iob_map ( struct io_buffer *iobuf,
 					    struct dma_device *dma,
 					    size_t len, int flags ) {
-	return dma_map ( dma, &iobuf->map, virt_to_phys ( iobuf->data ),
-			 len, flags );
+	return dma_map ( dma, &iobuf->map, iobuf->data, len, flags );
 }
 
 /**
