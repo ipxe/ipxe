@@ -16,17 +16,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #endif
 
 /**
- * Unmap buffer
- *
- * @v map		DMA mapping
- */
-static inline __always_inline void
-DMAAPI_INLINE ( riscv, dma_unmap ) ( struct dma_mapping *map __unused ) {
-
-	/* Nothing to do */
-}
-
-/**
  * Set addressable space mask
  *
  * @v dma		DMA device

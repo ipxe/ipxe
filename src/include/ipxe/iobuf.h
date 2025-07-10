@@ -276,7 +276,7 @@ static inline __always_inline physaddr_t iob_dma ( struct io_buffer *iobuf ) {
  * @ret rc		Return status code
  */
 static inline __always_inline void iob_unmap ( struct io_buffer *iobuf ) {
-	dma_unmap ( &iobuf->map );
+	dma_unmap ( &iobuf->map, iob_len ( iobuf ) );
 }
 
 extern struct io_buffer * __malloc alloc_iob_raw ( size_t len, size_t align,

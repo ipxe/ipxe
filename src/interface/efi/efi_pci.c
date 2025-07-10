@@ -537,9 +537,10 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
  *
  * @v dma		DMA device
  * @v map		DMA mapping
+ * @v len		Used length
  */
 static void efipci_dma_unmap ( struct dma_device *dma,
-			       struct dma_mapping *map ) {
+			       struct dma_mapping *map, size_t len __unused ) {
 	struct efi_pci_device *efipci =
 		container_of ( dma, struct efi_pci_device, pci.dma );
 	EFI_PCI_IO_PROTOCOL *pci_io = efipci->io;
@@ -606,7 +607,7 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 
 	return addr;
 
-	efipci_dma_unmap ( dma, map );
+	efipci_dma_unmap ( dma, map, len );
  err_map:
 	pci_io->FreeBuffer ( pci_io, pages, addr );
  err_alloc:
@@ -632,7 +633,7 @@ static void efipci_dma_free ( struct dma_device *dma, struct dma_mapping *map,
 	pages = ( ( len + EFI_PAGE_SIZE - 1 ) / EFI_PAGE_SIZE );
 
 	/* Unmap buffer */
-	efipci_dma_unmap ( dma, map );
+	efipci_dma_unmap ( dma, map, len );
 
 	/* Free buffer */
 	pci_io->FreeBuffer ( pci_io, pages, addr );

@@ -90,7 +90,7 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 
 	pci_msix_disable ( pci, &intelxl->msix.cap );
  err_enable:
-	dma_unmap ( &intelxl->msix.map );
+	dma_unmap ( &intelxl->msix.map, sizeof ( intelxl->msix.msg ) );
  err_map:
 	return rc;
 }
@@ -112,7 +112,7 @@ void intelxl_msix_disable ( struct intelxl_nic *intelxl,
 	pci_msix_disable ( pci, &intelxl->msix.cap );
 
 	/* Unmap dummy target location */
-	dma_unmap ( &intelxl->msix.map );
+	dma_unmap ( &intelxl->msix.map, sizeof ( intelxl->msix.msg ) );
 }
 
 /******************************************************************************

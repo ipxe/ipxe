@@ -79,13 +79,14 @@ static int dma_op_map ( struct dma_device *dma, struct dma_mapping *map,
  * Unmap buffer
  *
  * @v map		DMA mapping
+ * @v len		Used length
  */
-static void dma_op_unmap ( struct dma_mapping *map ) {
+static void dma_op_unmap ( struct dma_mapping *map, size_t len ) {
 	struct dma_device *dma = map->dma;
 
 	assert ( dma != NULL );
 	assert ( dma->op != NULL );
-	dma->op->unmap ( dma, map );
+	dma->op->unmap ( dma, map, len );
 }
 
 /**

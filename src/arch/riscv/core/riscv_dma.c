@@ -44,22 +44,55 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v flags		Mapping flags
  * @ret rc		Return status code
  */
-static int riscv_dma_map ( struct dma_device *dma __unused,
-			   struct dma_mapping *map __unused,
+static int riscv_dma_map ( struct dma_device *dma,
+			   struct dma_mapping *map,
 			   void *addr, size_t len, int flags ) {
 
 	/* Sanity check: we cannot support bidirectional mappings */
 	assert ( ! ( ( flags & DMA_TX ) & ( flags & DMA_RX ) ) );
 
+	/* Populate mapping */
+	map->dma = dma;
+	map->offset = 0;
+	map->token = NULL;
+
 	/* Flush cached data to transmit buffers */
 	if ( flags & DMA_TX )
 		cache_clean ( addr, len );
 
-	/* Invalidate cached data in receive buffers */
-	if ( flags & DMA_RX )
+	/* Invalidate cached data in receive buffers and record address */
+	if ( flags & DMA_RX ) {
 		cache_invalidate ( addr, len );
+		map->token = addr;
+	}
+
+	/* Increment mapping count (for debugging) */
+	if ( DBG_LOG )
+		dma->mapped++;
 
 	return 0;
+}
+
+/**
+ * Unmap buffer
+ *
+ * @v map		DMA mapping
+ * @v len		Used length
+ */
+static void riscv_dma_unmap ( struct dma_mapping *map, size_t len ) {
+	struct dma_device *dma = map->dma;
+	void *addr = map->token;
+
+	/* Invalidate cached data in receive buffers */
+	if ( addr )
+		cache_invalidate ( addr, len );
+
+	/* Clear mapping */
+	map->dma = NULL;
+
+	/* Decrement mapping count (for debugging) */
+	if ( DBG_LOG )
+		dma->mapped--;
 }
 
 /**
@@ -98,6 +131,10 @@ static void * riscv_dma_alloc ( struct dma_device *dma,
 	DBGC ( dma, "DMA allocated [%#08lx,%#08lx) via %p\n",
 	       phys, ( phys + len ), caddr );
 
+	/* Increment allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated++;
+
 	return caddr;
 }
 
@@ -111,6 +148,7 @@ static void * riscv_dma_alloc ( struct dma_device *dma,
  */
 static void riscv_dma_free ( struct dma_mapping *map,
 			     void *addr, size_t len ) {
+	struct dma_device *dma = map->dma;
 
 	/* Sanity check */
 	assert ( virt_to_phys ( addr ) == virt_to_phys ( map->token ) );
@@ -121,10 +159,14 @@ static void riscv_dma_free ( struct dma_mapping *map,
 	/* Clear mapping */
 	map->dma = NULL;
 	map->token = NULL;
+
+	/* Decrement allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated--;
 }
 
 PROVIDE_DMAAPI ( riscv, dma_map, riscv_dma_map );
-PROVIDE_DMAAPI_INLINE ( riscv, dma_unmap );
+PROVIDE_DMAAPI ( riscv, dma_unmap, riscv_dma_unmap );
 PROVIDE_DMAAPI ( riscv, dma_alloc, riscv_dma_alloc );
 PROVIDE_DMAAPI ( riscv, dma_free, riscv_dma_free );
 PROVIDE_DMAAPI ( riscv, dma_umalloc, riscv_dma_alloc );

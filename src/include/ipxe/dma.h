@@ -74,8 +74,10 @@ struct dma_operations {
 	 *
 	 * @v dma		DMA device
 	 * @v map		DMA mapping
+	 * @v len		Used length
 	 */
-	void ( * unmap ) ( struct dma_device *dma, struct dma_mapping *map );
+	void ( * unmap ) ( struct dma_device *dma, struct dma_mapping *map,
+			   size_t len );
 	/**
 	 * Allocate and map DMA-coherent buffer
 	 *
@@ -194,9 +196,11 @@ DMAAPI_INLINE ( flat, dma_map ) ( struct dma_device *dma,
  * Unmap buffer
  *
  * @v map		DMA mapping
+ * @v len		Used length
  */
 static inline __always_inline void
-DMAAPI_INLINE ( flat, dma_unmap ) ( struct dma_mapping *map ) {
+DMAAPI_INLINE ( flat, dma_unmap ) ( struct dma_mapping *map,
+				    size_t len __unused ) {
 
 	/* Decrement mapping count (for debugging) */
 	if ( DBG_LOG ) {
@@ -365,8 +369,9 @@ int dma_map ( struct dma_device *dma, struct dma_mapping *map,
  * Unmap buffer
  *
  * @v map		DMA mapping
+ * @v len		Used length
  */
-void dma_unmap ( struct dma_mapping *map );
+void dma_unmap ( struct dma_mapping *map, size_t len );
 
 /**
  * Allocate and map DMA-coherent buffer
