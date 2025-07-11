@@ -34,6 +34,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
+/** Minimum alignment for coherent DMA allocations
+ *
+ * We set this sufficiently high to ensure that we do not end up with
+ * both cached and uncached uses in the same cacheline.
+ */
+#define RISCV_DMA_ALIGN 256
+
 /**
  * Map buffer for DMA
  *
@@ -111,6 +118,11 @@ static void * riscv_dma_alloc ( struct dma_device *dma,
 	void *addr;
 	void *caddr;
 
+	/* Round up length and alignment */
+	len = ( ( len + RISCV_DMA_ALIGN - 1 ) & ~( RISCV_DMA_ALIGN - 1 ) );
+	if ( align < RISCV_DMA_ALIGN )
+		align = RISCV_DMA_ALIGN;
+
 	/* Allocate from heap */
 	addr = malloc_phys ( len, align );
 	if ( ! addr )
@@ -152,6 +164,9 @@ static void riscv_dma_free ( struct dma_mapping *map,
 
 	/* Sanity check */
 	assert ( virt_to_phys ( addr ) == virt_to_phys ( map->token ) );
+
+	/* Round up length to match allocation */
+	len = ( ( len + RISCV_DMA_ALIGN - 1 ) & ~( RISCV_DMA_ALIGN - 1 ) );
 
 	/* Free original allocation */
 	free_phys ( map->token, len );
