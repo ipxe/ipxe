@@ -35,10 +35,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * With the 64-bit paging schemes (Sv39, Sv48, and Sv57) we choose to
  * identity-map as much as possible of the physical address space via
  * PTEs 0-255, and place a recursive page table entry in PTE 511 which
- * allows PTEs 256-510 to be used to map 2MB "megapages" within the
- * top 512MB of the 64-bit address space.  At least one of these 2MB
- * PTEs will already be in use to map iPXE itself.  The remaining PTEs
- * may be used to map I/O devices.
+ * allows PTEs 256-510 to be used to map 1GB "gigapages" within the
+ * top 256GB of the 64-bit address space.  At least one of these PTEs
+ * will already be in use to map iPXE itself.  The remaining PTEs may
+ * be used to map I/O devices.
  */
 
 /** A page table */
@@ -75,17 +75,17 @@ extern struct page_table page_table;
 
 /** I/O page size
  *
- * We choose to use 2MB "megapages", since these are supported by all
+ * We choose to use 1GB "gigapages", since these are supported by all
  * paging levels.
  */
-#define IO_PAGE_SIZE 0x200000UL
+#define IO_PAGE_SIZE 0x40000000UL
 
 /** I/O page base address
  *
- * The recursive page table entry maps the high 1024MB of the 64-bit
- * address space as 2MB "megapages".
+ * The recursive page table entry maps the high 512GB of the 64-bit
+ * address space as 1GB "gigapages".
  */
-#define IO_BASE ( ( void * ) ( intptr_t ) ( -1024 * 1024 * 1024 ) )
+#define IO_BASE ( ( void * ) ( intptr_t ) ( -1ULL << 39 ) )
 
 /**
  * Map pages for I/O
