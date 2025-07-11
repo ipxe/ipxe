@@ -785,16 +785,6 @@ page_table:
  *      higher bits set, and so cannot identity-map to a 55-bit
  *      physical address).
  *
- *    - PTE[256-259] : Coherent DMA mapping
- *
- *      These are 1GB "gigapages" used to map the low 4GB of the
- *      physical address space with caching disabled, for use by
- *      coherent DMA mappings.
- *
- *      We use 1GB "gigapages" even for Sv48 and Sv57, since this
- *      allows the virtual address base 0xffffffc000000000 to remain a
- *      constant regardless of supported paging level.
- *
  *    - PTE[x-y] : Virtual address map for iPXE
  *
  *      These are 2MB "megapages" used to map the link-time virtual
@@ -887,24 +877,6 @@ enable_paging_64:
 	srli	t0, a0, PTE_PPN_SHIFT
 	ori	t0, t0, PTE_V
 	STOREN	t0, -PTE_SIZE(a3)
-
-	/* Calculate PTE stride for coherent DMA map
-	 *
-	 * PPN[2] LSB is PTE bit 28 in all paging modes, and so the
-	 * stride is always ( 1 << 28 )
-	 */
-	li	a4, 1
-	slli	a4, a4, PTE_PPN2_LSB
-
-	/* Construct PTE[256-259] for 32-bit coherent DMA map */
-	addi	a3, a3, -( ( PTE_COUNT / 2 ) * PTE_SIZE )
-	li	t0, ( 1 << ( 32 - VPN2_LSB ) )
-	li	t1, ( PTE_LEAF & ~PTE_X )
-1:	STOREN	t1, (a3)
-	addi	a3, a3, PTE_SIZE
-	add	t1, t1, a4
-	addi	t0, t0, -1
-	bgtz	t0, 1b
 
 	/* Construct base page table entry for address zero */
 	li	t0, PTE_LEAF

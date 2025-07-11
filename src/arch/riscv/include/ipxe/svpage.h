@@ -23,11 +23,6 @@ IOMAP_INLINE ( svpage, io_to_bus ) ( volatile const void *io_addr ) {
 	return ( ( intptr_t ) io_addr );
 }
 
-/** Base virtual address for coherent DMA mappings
- *
- * The 64-bit page table includes an uncached mapping of the 32-bit
- * address space at this virtual address.
- */
-#define SVPAGE_DMA32 0xffffffc000000000ULL
+extern void * svpage_dma32 ( void );
 
 #endif /* _IPXE_SVPAGE_H */

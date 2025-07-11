@@ -78,23 +78,30 @@ extern struct page_table page_table;
  * We choose to use 1GB "gigapages", since these are supported by all
  * paging levels.
  */
-#define IO_PAGE_SIZE 0x40000000UL
+#define MAP_PAGE_SIZE 0x40000000UL
 
 /** I/O page base address
  *
  * The recursive page table entry maps the high 512GB of the 64-bit
  * address space as 1GB "gigapages".
  */
-#define IO_BASE ( ( void * ) ( intptr_t ) ( -1ULL << 39 ) )
+#define MAP_BASE ( ( void * ) ( intptr_t ) ( -1ULL << 39 ) )
+
+/** Coherent DMA mapping of the 32-bit address space */
+static void *svpage_dma32_base;
+
+/** Size of the coherent DMA mapping */
+#define DMA32_LEN ( ( size_t ) 0x100000000ULL )
 
 /**
- * Map pages for I/O
+ * Map pages
  *
- * @v bus_addr		Bus address
- * @v len		Length of region
- * @ret io_addr		I/O address
+ * @v phys		Physical address
+ * @v len		Length
+ * @v attrs		Page attributes
+ * @ret virt		Mapped virtual address, or NULL on error
  */
-static void * svpage_ioremap ( unsigned long bus_addr, size_t len ) {
+static void * svpage_map ( physaddr_t phys, size_t len, unsigned long attrs ) {
 	unsigned long satp;
 	unsigned long start;
 	unsigned int count;
@@ -102,30 +109,32 @@ static void * svpage_ioremap ( unsigned long bus_addr, size_t len ) {
 	unsigned int first;
 	unsigned int i;
 	size_t offset;
-	void *io_addr;
+	void *virt;
 
-	DBGC ( &page_table, "SVPAGE mapping %#08lx+%#zx\n", bus_addr, len );
+	DBGC ( &page_table, "SVPAGE mapping %#08lx+%#zx attrs %#016lx\n",
+	       phys, len, attrs );
 
-	/* Sanity check */
+	/* Sanity checks */
 	if ( ! len )
 		return NULL;
+	assert ( attrs & PTE_V );
 
 	/* Use physical address directly if paging is disabled */
 	__asm__ ( "csrr %0, satp" : "=r" ( satp ) );
 	if ( ! satp ) {
-		io_addr = phys_to_virt ( bus_addr );
+		virt = phys_to_virt ( phys );
 		DBGC ( &page_table, "SVPAGE mapped %#08lx+%#zx to %p (no "
-		       "paging)\n", bus_addr, len, io_addr );
-		return io_addr;
+		       "paging)\n", phys, len, virt );
+		return virt;
 	}
 
 	/* Round down start address to a page boundary */
-	start = ( bus_addr & ~( IO_PAGE_SIZE - 1 ) );
-	offset = ( bus_addr - start );
-	assert ( offset < IO_PAGE_SIZE );
+	start = ( phys & ~( MAP_PAGE_SIZE - 1 ) );
+	offset = ( phys - start );
+	assert ( offset < MAP_PAGE_SIZE );
 
 	/* Calculate number of pages required */
-	count = ( ( offset + len + IO_PAGE_SIZE - 1 ) / IO_PAGE_SIZE );
+	count = ( ( offset + len + MAP_PAGE_SIZE - 1 ) / MAP_PAGE_SIZE );
 	assert ( count != 0 );
 	assert ( count < ( sizeof ( page_table.pte ) /
 			   sizeof ( page_table.pte[0] ) ) );
@@ -139,24 +148,23 @@ static void * svpage_ioremap ( unsigned long bus_addr, size_t len ) {
 				    sizeof ( page_table.pte[0] ) ) ;
 	      first += stride ) {
 
-		/* Calculate I/O address */
-		io_addr = ( IO_BASE + ( first * IO_PAGE_SIZE ) + offset );
+		/* Calculate virtual address */
+		virt = ( MAP_BASE + ( first * MAP_PAGE_SIZE ) + offset );
 
 		/* Check that page table entries are available */
 		for ( i = first ; i < ( first + count ) ; i++ ) {
 			if ( page_table.pte[i] & PTE_V ) {
-				io_addr = NULL;
+				virt = NULL;
 				break;
 			}
 		}
-		if ( ! io_addr )
+		if ( ! virt )
 			continue;
 
 		/* Create page table entries */
 		for ( i = first ; i < ( first + count ) ; i++ ) {
-			page_table.pte[i] = ( PTE_PPN ( start ) | PTE_V |
-					       PTE_R | PTE_W | PTE_A | PTE_D );
-			start += IO_PAGE_SIZE;
+			page_table.pte[i] = ( PTE_PPN ( start ) | attrs );
+			start += MAP_PAGE_SIZE;
 		}
 
 		/* Mark last page as being the last in this allocation */
@@ -165,30 +173,30 @@ static void * svpage_ioremap ( unsigned long bus_addr, size_t len ) {
 		/* Synchronise page table updates */
 		__asm__ __volatile__ ( "sfence.vma" );
 
-		/* Return I/O address */
+		/* Return virtual address */
 		DBGC ( &page_table, "SVPAGE mapped %#08lx+%#zx to %p using "
-		       "PTEs [%d-%d]\n", bus_addr, len, io_addr, first,
+		       "PTEs [%d-%d]\n", phys, len, virt, first,
 		       ( first + count - 1 ) );
-		return io_addr;
+		return virt;
 	}
 
 	DBGC ( &page_table, "SVPAGE could not map %#08lx+%#zx\n",
-	       bus_addr, len );
+	       phys, len );
 	return NULL;
 }
 
 /**
- * Unmap pages for I/O
+ * Unmap pages
  *
- * @v io_addr		I/O address
+ * @v virt		Virtual address
  */
-static void svpage_iounmap ( volatile const void *io_addr ) {
+static void svpage_unmap ( const volatile void *virt ) {
 	unsigned long satp;
 	unsigned int first;
 	unsigned int i;
 	int is_last;
 
-	DBGC ( &page_table, "SVPAGE unmapping %p\n", io_addr );
+	DBGC ( &page_table, "SVPAGE unmapping %p\n", virt );
 
 	/* Do nothing if paging is disabled */
 	__asm__ ( "csrr %0, satp" : "=r" ( satp ) );
@@ -196,7 +204,7 @@ static void svpage_iounmap ( volatile const void *io_addr ) {
 		return;
 
 	/* Calculate first page table entry */
-	first = ( ( io_addr - IO_BASE ) / IO_PAGE_SIZE );
+	first = ( ( virt - MAP_BASE ) / MAP_PAGE_SIZE );
 
 	/* Clear page table entries */
 	for ( i = first ; ; i++ ) {
@@ -219,9 +227,41 @@ static void svpage_iounmap ( volatile const void *io_addr ) {
 	__asm__ __volatile__ ( "sfence.vma" );
 
 	DBGC ( &page_table, "SVPAGE unmapped %p using PTEs [%d-%d]\n",
-	       io_addr, first, i );
+	       virt, first, i );
+}
+
+/**
+ * Map pages for I/O
+ *
+ * @v bus_addr		Bus address
+ * @v len		Length of region
+ * @ret io_addr		I/O address
+ */
+static void * svpage_ioremap ( unsigned long bus_addr, size_t len ) {
+	unsigned long attrs = ( PTE_V | PTE_R | PTE_W | PTE_A | PTE_D );
+
+	/* Map pages for I/O */
+	return svpage_map ( bus_addr, len, attrs );
+}
+
+/**
+ * Get 32-bit address space coherent DMA mapping address
+ *
+ * @ret base		Coherent DMA mapping base address
+ */
+void * svpage_dma32 ( void ) {
+	unsigned long attrs = ( PTE_V | PTE_R | PTE_W | PTE_A | PTE_D );
+
+	/* Create mapping, if necessary */
+	if ( ! svpage_dma32_base )
+		svpage_dma32_base = svpage_map ( 0, DMA32_LEN, attrs );
+
+	/* Sanity check */
+	assert ( virt_to_phys ( svpage_dma32_base ) == 0 );
+
+	return svpage_dma32_base;
 }
 
 PROVIDE_IOMAP_INLINE ( svpage, io_to_bus );
 PROVIDE_IOMAP ( svpage, ioremap, svpage_ioremap );
-PROVIDE_IOMAP ( svpage, iounmap, svpage_iounmap );
+PROVIDE_IOMAP ( svpage, iounmap, svpage_unmap );

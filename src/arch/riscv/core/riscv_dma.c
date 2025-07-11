@@ -126,7 +126,7 @@ static void * riscv_dma_alloc ( struct dma_device *dma,
 	/* Calculate coherently-mapped virtual address */
 	phys = virt_to_phys ( addr );
 	assert ( phys == ( ( uint32_t ) phys ) );
-	caddr = ( ( void * ) ( intptr_t ) ( phys + SVPAGE_DMA32 ) );
+	caddr = ( ( void * ) ( intptr_t ) ( phys + svpage_dma32() ) );
 	assert ( phys == virt_to_phys ( caddr ) );
 	DBGC ( dma, "DMA allocated [%#08lx,%#08lx) via %p\n",
 	       phys, ( phys + len ), caddr );
