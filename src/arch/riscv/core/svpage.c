@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <strings.h>
 #include <assert.h>
+#include <ipxe/hart.h>
 #include <ipxe/iomap.h>
 
 /** @file
@@ -66,6 +67,15 @@ enum pte_flags {
 	 */
 	PTE_LAST = 0x100,
 };
+
+/** Page-based memory type (Svpbmt) */
+#define PTE_SVPBMT( x ) ( ( ( unsigned long long ) (x) ) << 61 )
+
+/** Page is non-cacheable memory (Svpbmt) */
+#define PTE_SVPBMT_NC PTE_SVPBMT ( 1 )
+
+/** Page maps I/O addresses (Svpbmt) */
+#define PTE_SVPBMT_IO PTE_SVPBMT ( 2 )
 
 /** Page table entry address */
 #define PTE_PPN( addr ) ( (addr) >> 2 )
@@ -239,6 +249,11 @@ static void svpage_unmap ( const volatile void *virt ) {
  */
 static void * svpage_ioremap ( unsigned long bus_addr, size_t len ) {
 	unsigned long attrs = ( PTE_V | PTE_R | PTE_W | PTE_A | PTE_D );
+	int rc;
+
+	/* Add Svpbmt attributes if applicable */
+	if ( ( rc = hart_supported ( "_svpbmt" ) ) == 0 )
+		attrs |= PTE_SVPBMT_IO;
 
 	/* Map pages for I/O */
 	return svpage_map ( bus_addr, len, attrs );
@@ -251,6 +266,11 @@ static void * svpage_ioremap ( unsigned long bus_addr, size_t len ) {
  */
 void * svpage_dma32 ( void ) {
 	unsigned long attrs = ( PTE_V | PTE_R | PTE_W | PTE_A | PTE_D );
+	int rc;
+
+	/* Add Svpbmt attributes if applicable */
+	if ( ( rc = hart_supported ( "_svpbmt" ) ) == 0 )
+		attrs |= PTE_SVPBMT_NC;
 
 	/* Create mapping, if necessary */
 	if ( ! svpage_dma32_base )
