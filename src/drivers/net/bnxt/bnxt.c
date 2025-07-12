@@ -926,7 +926,11 @@ static int bnxt_hwrm_func_qcfg_req ( struct bnxt *bp )
 
 	if ( resp->port_partition_type &
 		FUNC_QCFG_RESP_PORT_PARTITION_TYPE_NPAR1_0 )
-		FLAG_SET ( bp->flags, BNXT_FLAG_NPAR_MODE );
+		FLAG_SET ( bp->flags, BNXT_FLAG_NPAR1_0_MODE );
+
+	if ( resp->port_partition_type &
+		FUNC_QCFG_RESP_PORT_PARTITION_TYPE_NPAR1_2 )
+		FLAG_SET ( bp->flags, BNXT_FLAG_NPAR1_2_MODE );
 
 	bp->ordinal_value = ( u8 )resp->pci_id & 0x0F;
 	bp->stat_ctx_id   = resp->stat_ctx_id;
@@ -1021,6 +1025,10 @@ static int bnxt_hwrm_func_drv_rgtr ( struct bnxt *bp )
 			FUNC_DRV_RGTR_REQ_ENABLES_ASYNC_EVENT_FWD |
 			FUNC_DRV_RGTR_REQ_ENABLES_VER;
 	req->async_event_fwd[0] |= 0x01;
+
+	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_NPAR1_2_MODE ) )
+		req->flags |= FUNC_DRV_RGTR_REQ_FLAGS_NPAR_1_2_SUPPORT;
+
 	req->os_type = FUNC_DRV_RGTR_REQ_OS_TYPE_OTHER;
 	req->ver_maj = IPXE_VERSION_MAJOR;
 	req->ver_min = IPXE_VERSION_MINOR;
@@ -2001,11 +2009,11 @@ hwrm_func_t bring_up_chip[] = {
 	bnxt_hwrm_func_reset_req,	/* HWRM_FUNC_RESET		*/
 	bnxt_hwrm_func_drv_rgtr,	/* HWRM_FUNC_DRV_RGTR		*/
 	bnxt_hwrm_func_qcaps_req,	/* HWRM_FUNC_QCAPS		*/
+	bnxt_hwrm_func_qcfg_req,	/* HWRM_FUNC_QCFG		*/
 	bnxt_hwrm_backing_store_cfg,	/* HWRM_FUNC_BACKING_STORE_CFG  */
 	bnxt_hwrm_backing_store_qcfg,	/* HWRM_FUNC_BACKING_STORE_QCFG	*/
 	bnxt_hwrm_func_resource_qcaps,	/* HWRM_FUNC_RESOURCE_QCAPS	*/
 	bnxt_hwrm_port_phy_qcaps_req,	/* HWRM_PORT_PHY_QCAPS	*/
-	bnxt_hwrm_func_qcfg_req,	/* HWRM_FUNC_QCFG		*/
 	bnxt_hwrm_port_mac_cfg,		/* HWRM_PORT_MAC_CFG		*/
 	bnxt_hwrm_func_cfg_req,		/* HWRM_FUNC_CFG		*/
 	bnxt_query_phy_link,		/* HWRM_PORT_PHY_QCFG		*/
