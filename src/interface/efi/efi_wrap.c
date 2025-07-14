@@ -121,27 +121,6 @@ static const char * efi_boolean ( BOOLEAN boolean ) {
 }
 
 /**
- * Convert EFI TPL to text
- *
- * @v tpl		Task priority level
- * @ret text		Task priority level as text
- */
-static const char * efi_tpl ( EFI_TPL tpl ) {
-	static char buf[ 19 /* "0xXXXXXXXXXXXXXXXX" + NUL */ ];
-
-	switch ( tpl ) {
-	case TPL_APPLICATION:		return "Application";
-	case TPL_CALLBACK:		return "Callback";
-	case TPL_NOTIFY:		return "Notify";
-	case TPL_HIGH_LEVEL:		return "HighLevel";
-	default:
-		snprintf ( buf, sizeof ( buf ), "%#lx",
-			   ( unsigned long ) tpl );
-		return buf;
-	}
-}
-
-/**
  * Convert EFI allocation type to text
  *
  * @v type		Allocation type
@@ -281,9 +260,9 @@ efi_raise_tpl_wrapper ( EFI_TPL new_tpl ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_TPL old_tpl;
 
-	DBGCP ( colour, "RaiseTPL ( %s ) ", efi_tpl ( new_tpl ) );
+	DBGCP ( colour, "RaiseTPL ( %s ) ", efi_tpl_name ( new_tpl ) );
 	old_tpl = bs->RaiseTPL ( new_tpl );
-	DBGCP ( colour, "= %s -> %p\n", efi_tpl ( old_tpl ), retaddr );
+	DBGCP ( colour, "= %s -> %p\n", efi_tpl_name ( old_tpl ), retaddr );
 	return old_tpl;
 }
 
@@ -296,7 +275,7 @@ efi_restore_tpl_wrapper ( EFI_TPL old_tpl ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	void *retaddr = __builtin_return_address ( 0 );
 
-	DBGCP ( colour, "RestoreTPL ( %s ) ", efi_tpl ( old_tpl ) );
+	DBGCP ( colour, "RestoreTPL ( %s ) ", efi_tpl_name ( old_tpl ) );
 	bs->RestoreTPL ( old_tpl );
 	DBGCP ( colour, "-> %p\n", retaddr );
 }
@@ -433,8 +412,8 @@ efi_create_event_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_STATUS efirc;
 
-	DBGC ( colour, "CreateEvent ( %#x, %s, %p, %p ) ",
-	       type, efi_tpl ( notify_tpl ), notify_function, notify_context );
+	DBGC ( colour, "CreateEvent ( %#x, %s, %p, %p ) ", type,
+	       efi_tpl_name ( notify_tpl ), notify_function, notify_context );
 	efirc = bs->CreateEvent ( type, notify_tpl, notify_function,
 				  notify_context, event );
 	DBGC ( colour, "= %s ( %p ) -> %p\n",
@@ -1207,8 +1186,8 @@ efi_create_event_ex_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 	EFI_STATUS efirc;
 
 	DBGC ( colour, "CreateEventEx ( %#x, %s, %p, %p, %s ) ",
-	       type, efi_tpl ( notify_tpl ), notify_function, notify_context,
-	       efi_guid_ntoa ( event_group ) );
+	       type, efi_tpl_name ( notify_tpl ), notify_function,
+	       notify_context, efi_guid_ntoa ( event_group ) );
 	efirc = bs->CreateEventEx ( type, notify_tpl, notify_function,
 				    notify_context, event_group, event );
 	DBGC ( colour, "= %s ( %p ) -> %p\n",

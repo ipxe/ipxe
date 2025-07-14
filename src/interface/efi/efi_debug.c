@@ -47,6 +47,27 @@ static EFI_DEVICE_PATH_TO_TEXT_PROTOCOL *efidpt;
 EFI_REQUEST_PROTOCOL ( EFI_DEVICE_PATH_TO_TEXT_PROTOCOL, &efidpt );
 
 /**
+ * Name EFI TPL
+ *
+ * @v tpl		Task priority level
+ * @ret text		Task priority level as text
+ */
+const __attribute__ (( pure )) char * efi_tpl_name ( EFI_TPL tpl ) {
+	static char buf[ 19 /* "0xXXXXXXXXXXXXXXXX" + NUL */ ];
+
+	switch ( tpl ) {
+	case TPL_APPLICATION:		return "Application";
+	case TPL_CALLBACK:		return "Callback";
+	case TPL_NOTIFY:		return "Notify";
+	case TPL_HIGH_LEVEL:		return "HighLevel";
+	default:
+		snprintf ( buf, sizeof ( buf ), "%#lx",
+			   ( unsigned long ) tpl );
+		return buf;
+	}
+}
+
+/**
  * Name locate search type
  *
  * @v search_type	Locate search type

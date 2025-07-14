@@ -273,6 +273,8 @@ extern int efi_shutdown_in_progress;
 extern const __attribute__ (( pure )) char *
 efi_guid_ntoa ( CONST EFI_GUID *guid );
 extern const __attribute__ (( pure )) char *
+efi_tpl_name ( EFI_TPL tpl );
+extern const __attribute__ (( pure )) char *
 efi_locate_search_type_name ( EFI_LOCATE_SEARCH_TYPE search_type );
 extern const __attribute__ (( pure )) char *
 efi_open_attributes_name ( unsigned int attributes );
