@@ -413,6 +413,8 @@ extern int efi_open_by_child_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
 				       EFI_HANDLE child, void **interface );
 extern void efi_close_by_child ( EFI_HANDLE handle, EFI_GUID *protocol,
 				 EFI_HANDLE child );
+extern int efi_connect ( EFI_HANDLE device, EFI_HANDLE driver );
+extern int efi_disconnect ( EFI_HANDLE device, EFI_HANDLE driver );
 
 /**
  * Test protocol existence

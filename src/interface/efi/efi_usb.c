@@ -1198,7 +1198,7 @@ static void efi_usb_uninstall ( struct efi_usb_interface *usbintf ) {
 	 * when uninstalling protocols.
 	 */
 	if ( ! efi_shutdown_in_progress )
-		bs->DisconnectController ( usbintf->handle, NULL, NULL );
+		efi_disconnect ( usbintf->handle, NULL );
 
 	/* Uninstall protocols */
 	if ( ( ! efi_shutdown_in_progress ) &&
@@ -1260,7 +1260,6 @@ static void efi_usb_uninstall_all ( struct efi_usb_device *efiusb ) {
  */
 static int efi_usb_probe ( struct usb_function *func,
 			   struct usb_configuration_descriptor *config ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct usb_device *usb = func->usb;
 	struct efi_usb_device *usbdev;
 	struct efi_usb_interface *usbintf;
@@ -1318,7 +1317,7 @@ static int efi_usb_probe ( struct usb_function *func,
 
 	/* Connect any external drivers */
 	list_for_each_entry ( usbintf, &usbdev->interfaces, list )
-		bs->ConnectController ( usbintf->handle, NULL, NULL, TRUE );
+		efi_connect ( usbintf->handle, NULL );
 
 	return 0;
 

@@ -122,9 +122,7 @@ static int efi_veto_disconnect ( struct efi_veto *veto ) {
 	/* Disconnect driver from all handles, in reverse order */
 	for ( i = 0 ; i < count ; i++ ) {
 		handle = handles[ count - i - 1 ];
-		efirc = bs->DisconnectController ( handle, driver, NULL );
-		if ( ( efirc != 0 ) && ( efirc != EFI_NOT_FOUND ) ) {
-			rc = -EEFI ( efirc );
+		if ( ( rc = efi_disconnect ( handle, driver ) ) != 0 ) {
 			DBGC ( driver, "EFIVETO %s could not disconnect",
 			       efi_handle_name ( driver ) );
 			DBGC ( driver, " %s: %s\n",

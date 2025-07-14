@@ -218,14 +218,10 @@ efi_block_io_flush ( EFI_BLOCK_IO_PROTOCOL *block_io ) {
  * @v handle		Block device handle
  */
 static void efi_block_connect ( unsigned int drive, EFI_HANDLE handle ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
-	EFI_STATUS efirc;
 	int rc;
 
 	/* Try to connect all possible drivers to this block device */
-	if ( ( efirc = bs->ConnectController ( handle, NULL, NULL,
-					       TRUE ) ) != 0 ) {
-		rc = -EEFI ( efirc );
+	if ( ( rc = efi_connect ( handle, NULL ) ) != 0 ) {
 		DBGC ( drive, "EFIBLK %#02x could not connect drivers: %s\n",
 		       drive, strerror ( rc ) );
 		/* May not be an error; may already be connected */
