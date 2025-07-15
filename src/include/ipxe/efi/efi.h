@@ -39,10 +39,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EFIAPI __attribute__((cdecl,regparm(0)))
 #endif
 
-/* EFI headers define EFI_HANDLE as a void pointer, which renders type
- * checking somewhat useless.  Work around this bizarre sabotage
- * attempt by redefining EFI_HANDLE as a pointer to an anonymous
- * structure.
+/* EFI headers define EFI_HANDLE and EFI_EVENT as void pointers, which
+ * renders type checking somewhat useless.  Work around this bizarre
+ * sabotage attempt by redefining both as pointers to anonymous
+ * structures.
  *
  * EFI headers perform some ABI validation checks via _Static_assert()
  * that may fail when EFI headers are included on a non-EFI platform.
@@ -50,13 +50,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
  * included.
  */
 #define EFI_HANDLE STUPID_EFI_HANDLE
+#define EFI_EVENT STUPID_EFI_EVENT
 #ifndef PLATFORM_efi
 #define _Static_assert(expr, msg)
 #endif
 #include <ipxe/efi/Uefi/UefiBaseType.h>
 #undef EFI_HANDLE
+#undef EFI_EVENT
 #undef _Static_assert
 typedef struct {} *EFI_HANDLE;
+typedef struct {} *EFI_EVENT;
 
 /* Include the top-level EFI header files */
 #include <ipxe/efi/Uefi.h>

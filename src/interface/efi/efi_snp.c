@@ -175,7 +175,7 @@ static void efi_snp_poll ( struct efi_snp_device *snpdev ) {
 	while ( ( iobuf = netdev_rx_dequeue ( snpdev->netdev ) ) ) {
 		list_add_tail ( &iobuf->list, &snpdev->rx );
 		snpdev->interrupts |= EFI_SIMPLE_NETWORK_RECEIVE_INTERRUPT;
-		bs->SignalEvent ( &snpdev->snp.WaitForPacket );
+		bs->SignalEvent ( snpdev->snp.WaitForPacket );
 	}
 }
 

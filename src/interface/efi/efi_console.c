@@ -387,7 +387,7 @@ static int efi_iskey ( void ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_SIMPLE_TEXT_INPUT_PROTOCOL *conin = efi_systab->ConIn;
 	EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *conin_ex = efi_conin_ex;
-	EFI_EVENT *event;
+	EFI_EVENT event;
 	EFI_STATUS efirc;
 
 	/* If we are mid-sequence, we are always ready */
