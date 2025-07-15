@@ -44,7 +44,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 static int mnp_supported ( EFI_HANDLE device ) {
 	EFI_GUID *binding = &efi_managed_network_service_binding_protocol_guid;
 
-	return snpnet_supported ( device, binding );
+	return snpnet_supported ( device, binding, 0 );
 }
 
 /** EFI MNP driver */

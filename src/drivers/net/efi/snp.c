@@ -41,8 +41,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret rc		Return status code
  */
 static int snp_supported ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_simple_network_protocol_guid;
 
-	return snpnet_supported ( device, &efi_simple_network_protocol_guid );
+	return snpnet_supported ( device, protocol, 1 );
 }
 
 /**
@@ -52,8 +53,9 @@ static int snp_supported ( EFI_HANDLE device ) {
  * @ret rc		Return status code
  */
 static int nii_supported ( EFI_HANDLE device ) {
+	EFI_GUID *protocol = &efi_nii31_protocol_guid;
 
-	return snpnet_supported ( device, &efi_nii31_protocol_guid );
+	return snpnet_supported ( device, protocol, 1 );
 }
 
 /** EFI SNP driver */

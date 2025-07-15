@@ -504,9 +504,11 @@ static struct net_device_operations snpnet_operations = {
  *
  * @v device		EFI device handle
  * @v protocol		Protocol GUID
+ * @v inhibit_wifi	Inhibit wireless devices
  * @ret rc		Return status code
  */
-int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
+int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol,
+		       int inhibit_wifi ) {
 	EFI_HANDLE parent;
 	int rc;
 
@@ -536,9 +538,19 @@ int snpnet_supported ( EFI_HANDLE device, EFI_GUID *protocol ) {
 		DBGC2 ( device, "%s\n", efi_handle_name ( parent ) );
 		return -ENOTTY;
 	}
-
 	DBGC ( device, "HANDLE %s is a %s device\n",
 	       efi_handle_name ( device ), efi_guid_ntoa ( protocol ) );
+
+	/* Check for wireless devices, if applicable */
+	if ( inhibit_wifi &&
+	     ( ( efi_test ( device, &efi_wifi2_protocol_guid ) ) == 0 ) ) {
+		DBGC ( device, "HANDLE %s is wireless: assuming vendor %s "
+		       "driver is too unreliable to use\n",
+		       efi_handle_name ( device ),
+		       efi_guid_ntoa ( protocol ) );
+		return -ENOTTY;
+	}
+
 	return 0;
 }
 

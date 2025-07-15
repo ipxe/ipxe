@@ -63,16 +63,20 @@ struct chained_protocol {
 	 * reinstalling the protocol instance.
 	 */
 	EFI_HANDLE device;
+	/** Assume wireless devices are unusable */
+	int inhibit_wifi;
 };
 
 /** Chainloaded SNP protocol */
 static struct chained_protocol chained_snp = {
 	.protocol = &efi_simple_network_protocol_guid,
+	.inhibit_wifi = 1,
 };
 
 /** Chainloaded NII protocol */
 static struct chained_protocol chained_nii = {
 	.protocol = &efi_nii31_protocol_guid,
+	.inhibit_wifi = 1,
 };
 
 /** Chainloaded MNP protocol */
@@ -166,10 +170,20 @@ static int chained_supported ( EFI_HANDLE device,
 			efi_guid_ntoa ( chained->protocol ) );
 		return -ENOTTY;
 	}
-
 	DBGC ( device, "CHAINED %s is the chainloaded %s\n",
 	       efi_handle_name ( device ),
 	       efi_guid_ntoa ( chained->protocol ) );
+
+	/* Check for wireless devices, if applicable */
+	if ( chained->inhibit_wifi &&
+	     ( ( efi_test ( device, &efi_wifi2_protocol_guid ) ) == 0 ) ) {
+		DBGC ( device, "CHAINED %s is wireless: assuming vendor %s "
+		       "driver is too unreliable to use\n",
+		       efi_handle_name ( device ),
+		       efi_guid_ntoa ( chained->protocol ) );
+		return -ENOTTY;
+	}
+
 	return 0;
 }
 
