@@ -86,5 +86,6 @@ static void debugcon_init ( void ) {
  * Debug port console initialisation function
  */
 struct init_fn debugcon_init_fn __init_fn ( INIT_EARLY ) = {
+	.name = "debugcon",
 	.initialise = debugcon_init,
 };

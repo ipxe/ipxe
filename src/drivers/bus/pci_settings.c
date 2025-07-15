@@ -125,5 +125,6 @@ static void pci_settings_init ( void ) {
 
 /** PCI device settings initialiser */
 struct init_fn pci_settings_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "pci",
 	.initialise = pci_settings_init,
 };

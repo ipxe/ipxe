@@ -134,5 +134,6 @@ static void vmconsole_init ( void ) {
  * VMware logfile console initialisation function
  */
 struct init_fn vmconsole_init_fn __init_fn ( INIT_CONSOLE ) = {
+	.name = "vmconsole",
 	.initialise = vmconsole_init,
 };

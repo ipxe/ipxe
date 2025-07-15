@@ -191,5 +191,6 @@ static void pcicloud_init ( void ) {
 
 /** Cloud VM PCI configuration space access initialisation function */
 struct init_fn pcicloud_init_fn __init_fn ( INIT_EARLY ) = {
+	.name = "pcicloud",
 	.initialise = pcicloud_init,
 };

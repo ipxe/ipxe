@@ -180,5 +180,6 @@ static void test_init ( void ) {
 
 /** Self-test initialisation function */
 struct init_fn test_init_fn __init_fn ( INIT_EARLY ) = {
+	.name = "test",
 	.initialise = test_init,
 };

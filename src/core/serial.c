@@ -180,6 +180,7 @@ static void serial_shutdown ( int flags __unused ) {
 
 /** Serial console initialisation function */
 struct init_fn serial_console_init_fn __init_fn ( INIT_CONSOLE ) = {
+	.name = "serial",
 	.initialise = serial_init,
 };
 

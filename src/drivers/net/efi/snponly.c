@@ -259,5 +259,6 @@ static void chained_init ( void ) {
 
 /** EFI chainloaded-device-only initialisation function */
 struct init_fn chained_init_fn __init_fn ( INIT_LATE ) = {
+	.name = "chained",
 	.initialise = chained_init,
 };

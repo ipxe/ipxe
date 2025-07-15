@@ -2819,5 +2819,6 @@ static void builtin_init ( void ) {
 
 /** Built-in settings initialiser */
 struct init_fn builtin_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "builtin",
 	.initialise = builtin_init,
 };

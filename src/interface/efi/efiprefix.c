@@ -98,6 +98,7 @@ static void efi_init_application ( void ) {
 
 /** EFI application initialisation function */
 struct init_fn efi_init_application_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "efi",
 	.initialise = efi_init_application,
 };
 

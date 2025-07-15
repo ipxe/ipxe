@@ -288,6 +288,7 @@ static void int13con_init ( void ) {
  * INT13 console initialisation function
  */
 struct init_fn int13con_init_fn __init_fn ( INIT_CONSOLE ) = {
+	.name = "int13con",
 	.initialise = int13con_init,
 };
 

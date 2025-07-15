@@ -53,8 +53,10 @@ void initialise ( void ) {
 	struct init_fn *init_fn;
 
 	/* Call registered initialisation functions */
-	for_each_table_entry ( init_fn, INIT_FNS )
+	for_each_table_entry ( init_fn, INIT_FNS ) {
+		DBGC ( colour, "INIT initialising %s...\n", init_fn->name );
 		init_fn->initialise ();
+	}
 }
 
 /**

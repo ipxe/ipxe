@@ -243,6 +243,7 @@ static void memmap_settings_init ( void ) {
 
 /** Memory map settings initialiser */
 struct init_fn memmap_settings_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "memmap",
 	.initialise = memmap_settings_init,
 };
 

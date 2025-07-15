@@ -369,6 +369,7 @@ static void des_init ( void ) {
 
 /** Initialisation function */
 struct init_fn des_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "des",
 	.initialise = des_init,
 };
 

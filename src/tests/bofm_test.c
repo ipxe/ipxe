@@ -278,5 +278,6 @@ static void bofm_test_init ( void ) {
 
 /** BOFM test initialisation function */
 struct init_fn bofm_test_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "bofm",
 	.initialise = bofm_test_init,
 };

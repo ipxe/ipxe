@@ -177,6 +177,7 @@ static void fnrec_init ( void ) {
 }
 
 struct init_fn fnrec_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "fnrec",
 	.initialise = fnrec_init,
 };
 

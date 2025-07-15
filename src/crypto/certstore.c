@@ -210,6 +210,7 @@ static void certstore_init ( void ) {
 
 /** Certificate store initialisation function */
 struct init_fn certstore_init_fn __init_fn ( INIT_LATE ) = {
+	.name = "certstore",
 	.initialise = certstore_init,
 };
 

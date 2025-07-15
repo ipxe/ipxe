@@ -173,5 +173,6 @@ static void usb_settings_init ( void ) {
 
 /** USB device settings initialiser */
 struct init_fn usb_settings_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "usb",
 	.initialise = usb_settings_init,
 };

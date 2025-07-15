@@ -257,6 +257,7 @@ static void pxe_init_structures ( void ) {
 
 /** PXE structure initialiser */
 struct init_fn pxe_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "pxe",
 	.initialise = pxe_init_structures,
 };
 

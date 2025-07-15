@@ -178,6 +178,7 @@ static void efi_cacert_init ( void ) {
 
 /** EFI CA certificates initialisation function */
 struct init_fn efi_cacert_init_fn __init_fn ( INIT_LATE ) = {
+	.name = "eficacert",
 	.initialise = efi_cacert_init,
 };
 

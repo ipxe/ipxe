@@ -448,5 +448,6 @@ static void efi_console_init ( void ) {
  * EFI console initialisation function
  */
 struct init_fn efi_console_init_fn __init_fn ( INIT_EARLY ) = {
+	.name = "eficonsole",
 	.initialise = efi_console_init,
 };

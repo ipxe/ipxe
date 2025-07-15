@@ -170,6 +170,7 @@ static void timer_probe ( void ) {
 
 /** Timer initialisation function */
 struct init_fn timer_init_fn __init_fn ( INIT_EARLY ) = {
+	.name = "timer",
 	.initialise = timer_probe,
 };
 

@@ -765,6 +765,7 @@ static void init_heap ( void ) {
 
 /** Memory allocator initialisation function */
 struct init_fn heap_init_fn __init_fn ( INIT_EARLY ) = {
+	.name = "heap",
 	.initialise = init_heap,
 };
 

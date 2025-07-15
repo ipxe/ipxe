@@ -250,6 +250,7 @@ static void cpuid_settings_init ( void ) {
 
 /** CPUID settings initialiser */
 struct init_fn cpuid_settings_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "cpuid",
 	.initialise = cpuid_settings_init,
 };
 

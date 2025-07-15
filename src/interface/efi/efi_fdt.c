@@ -77,6 +77,7 @@ static void efi_fdt_init ( void ) {
 
 /** EFI Flattened Device Tree initialisation function */
 struct init_fn efi_fdt_init_fn __init_fn ( INIT_EARLY ) = {
+	.name = "efifdt",
 	.initialise = efi_fdt_init,
 };
 

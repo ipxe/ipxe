@@ -200,6 +200,7 @@ static void smbios_init ( void ) {
 
 /** SMBIOS settings initialiser */
 struct init_fn smbios_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "smbios",
 	.initialise = smbios_init,
 };
 

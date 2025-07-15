@@ -74,5 +74,6 @@ static void cachedhcp_init ( void ) {
 
 /** Cached DHCPACK initialisation function */
 struct init_fn cachedhcp_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "cachedhcp",
 	.initialise = cachedhcp_init,
 };

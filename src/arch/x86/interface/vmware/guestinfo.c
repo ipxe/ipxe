@@ -200,6 +200,7 @@ static void guestinfo_init ( void ) {
 
 /** GuestInfo settings initialiser */
 struct init_fn guestinfo_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "guestinfo",
 	.initialise = guestinfo_init,
 };
 

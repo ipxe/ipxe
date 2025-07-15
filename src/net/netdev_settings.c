@@ -429,6 +429,7 @@ static void netdev_redirect_settings_init ( void ) {
 
 /** "netX" settings initialiser */
 struct init_fn netdev_redirect_settings_init_fn __init_fn ( INIT_LATE ) = {
+	.name = "netX",
 	.initialise = netdev_redirect_settings_init,
 };
 

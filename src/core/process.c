@@ -133,5 +133,6 @@ static void init_processes ( void ) {
 
 /** Process initialiser */
 struct init_fn process_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "process",
 	.initialise = init_processes,
 };

@@ -44,5 +44,6 @@ static void pci_autoboot_init ( void ) {
 
 /** PCI autoboot device initialisation function */
 struct init_fn pci_autoboot_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "autoboot",
 	.initialise = pci_autoboot_init,
 };

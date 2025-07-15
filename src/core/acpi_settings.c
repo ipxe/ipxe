@@ -156,5 +156,6 @@ static void acpi_settings_init ( void ) {
 
 /** ACPI settings initialiser */
 struct init_fn acpi_settings_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "acpi",
 	.initialise = acpi_settings_init,
 };

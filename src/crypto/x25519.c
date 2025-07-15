@@ -334,6 +334,7 @@ static void x25519_init_constants ( void ) {
 
 /** Initialisation function */
 struct init_fn x25519_init_fn __init_fn ( INIT_NORMAL ) = {
+	.name = "x25519",
 	.initialise = x25519_init_constants,
 };
 
