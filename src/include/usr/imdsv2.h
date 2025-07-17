@@ -7,6 +7,7 @@
  *
  */
 
+extern int get_image_data ( struct image *image, char **buffer );
 extern int url_concat ( const char *base_url, const char *path, char **url );
 extern int get_imdsv2_token ( char **token, const char *base_url );
 extern int get_imdsv2_metadata ( char *token, const char *base_url, char *metadata_path, char **response );
