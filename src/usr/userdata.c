@@ -300,10 +300,9 @@ int extract_ipxe_script ( struct image *image ) {
 		goto err_script;
 	}
 
-	/* Update image with iPXE script */
-	size_t offset = 0;
-	size_t script_size = strnlen ( ipxe_script, MAX_IPXE_SCRIPT_LEN ) + 1;
-	copy_to_user ( image->data, offset, ipxe_script, script_size );
+	/* Clean the old data in image and update with the extracted iPXE script */
+	free ( ( void * ) image->data );
+	memcpy ( ( void * ) image->data, ipxe_script, script_size );
 	image->len = script_size;
 	image->type = NULL;
 
