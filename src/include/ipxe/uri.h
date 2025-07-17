@@ -13,6 +13,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdlib.h>
 #include <ipxe/refcnt.h>
 #include <ipxe/in.h>
+#include <ipxe/http.h>
 
 struct parameters;
 
@@ -86,7 +87,22 @@ struct uri {
 	const char *efragment;
 	/** Request parameters */
 	struct parameters *params;
+	/** HTTP method */
+	struct http_method *method;
+	/** AWS token */
+	char *aws_token;
+	/** AWS token ttl */
+	char *aws_token_ttl;
 } __attribute__ (( packed ));
+
+/** Default TTL (Time To Live) value for AWS tokens in seconds */
+#define AWS_TOKEN_TTL "21600"
+
+/** Length of the AWS token TTL string */
+#define AWS_TOKEN_TTL_LEN 5
+
+/** Maximum length allowed for AWS token string */
+#define MAX_AWS_TOKEN_LEN 64
 
 /**
  * Access URI field

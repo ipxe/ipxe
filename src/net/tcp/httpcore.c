@@ -146,6 +146,11 @@ struct http_method http_post = {
 	.name = "POST",
 };
 
+/** HTTP PUT method */
+struct http_method http_put = {
+	.name = "PUT",
+};
+
 /******************************************************************************
  *
  * Utility functions
@@ -1949,11 +1954,16 @@ int http_open_uri ( struct interface *xfer, struct uri *uri ) {
 	/* Calculate length of form parameter list, if any */
 	len = ( params ? http_form_params ( params, NULL, 0 ) : 0 );
 
-	/* Use POST if and only if there are form parameters */
-	if ( len ) {
+	/* Use specified method or infer if not provided */
+	if ( uri->method ) {
+		method = uri->method;
+	} else {
+		/* Use POST if and only if there are form parameters */
+		method = len ? &http_post : &http_get;
+	}
 
-		/* Use POST */
-		method = &http_post;
+	/* Set up params */
+	if ( len ) {
 		type = "application/x-www-form-urlencoded";
 
 		/* Allocate temporary form parameter list */
@@ -1965,13 +1975,10 @@ int http_open_uri ( struct interface *xfer, struct uri *uri ) {
 
 		/* Construct temporary form parameter list */
 		check_len = http_form_params ( params, data,
-					       ( len + 1 /* NUL */ ) );
+						   ( len + 1 /* NUL */ ) );
 		assert ( check_len == len );
 
 	} else {
-
-		/* Use GET */
-		method = &http_get;
 		type = NULL;
 		data = NULL;
 	}

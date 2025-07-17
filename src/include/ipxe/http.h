@@ -104,6 +104,7 @@ struct http_method {
 extern struct http_method http_head;
 extern struct http_method http_get;
 extern struct http_method http_post;
+extern struct http_method http_put;
 
 /******************************************************************************
  *

@@ -440,6 +440,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_weierstrass	      ( ERRFILE_OTHER | 0x00660000 )
 #define ERRFILE_efi_cacert	      ( ERRFILE_OTHER | 0x00670000 )
 
+#define ERRFILE_userdata_cmd ( ERRFILE_OTHER | 0x01000000 )
+#define ERRFILE_userdata     ( ERRFILE_OTHER | 0x01010000 )
+#define ERRFILE_imdsv2       ( ERRFILE_OTHER | 0x01030000 )
 /** @} */
 
 #endif /* _IPXE_ERRFILE_H */
