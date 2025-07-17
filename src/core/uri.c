@@ -269,6 +269,10 @@ static void uri_dump ( const struct uri *uri ) {
 		DBGC ( uri, " efragment \"%s\"", uri->efragment );
 	if ( uri->params )
 		DBGC ( uri, " params \"%s\"", uri->params->name );
+	if ( uri->aws_token )
+		DBGC ( uri, " aws_token \"%s\"", uri->aws_token );
+	if ( uri->aws_token_ttl )
+		DBGC ( uri, " aws_token_ttl \"%s\"", uri->aws_token_ttl );
 }
 
 /**

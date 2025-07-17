@@ -49,3 +49,6 @@ REQUIRE_OBJECT ( peerdist );
 #ifdef HTTP_HACK_GCE
 REQUIRE_OBJECT ( httpgce );
 #endif
+#ifdef HTTP_HACK_EC2
+REQUIRE_OBJECT ( httpec2 );
+#endif

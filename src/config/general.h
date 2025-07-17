@@ -82,6 +82,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 //#define HTTP_AUTH_NTLM	/* NTLM authentication */
 //#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
 //#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
+//#define HTTP_HACK_EC2		/* Amazon Elastic Compute Cloud hacks */
 
 /*
  * 802.11 cryptosystems and handshaking protocols
@@ -174,6 +175,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SHIM_CMD		/* EFI shim command (or dummy command) */
 //#define USB_CMD		/* USB commands */
 //#define FDT_CMD		/* Flattened Device Tree commands */
+#define USERDATA_CMD		/* USERDATA command */
 
 /*
  * Certificate sources
