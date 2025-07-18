@@ -1894,9 +1894,16 @@ static size_t http_form_params ( struct parameters *params, char *buf,
 	len = 0;
 	for_each_param ( param, params ) {
 
-		/* Skip non-form parameters */
-		if ( ! ( param->flags & PARAMETER_FORM ) )
-			continue;
+		/* For JSON parameters, just return the key as-is. This
+		*  bypasses normal form encoding entirely.
+		*/
+		/* TODO: Refactor to handle JSON parameters in a separate function */
+		if ( param->flags & PARAMETER_JSON ) {
+            return ssnprintf(buf, remaining, "%s", param->key);
+        } else if ( ! ( param->flags & PARAMETER_FORM ) ) {
+            /* Skip non-form parameters */
+            continue; 
+        }
 
 		/* Add the "&", if applicable */
 		if ( len ) {

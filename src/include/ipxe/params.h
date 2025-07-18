@@ -42,6 +42,9 @@ struct parameter {
 /** Request parameter is a header parameter */
 #define PARAMETER_HEADER 0x0002
 
+/** Request parameter is a JSON parameter */
+#define PARAMETER_JSON 0x0004
+
 /**
  * Increment request parameter list reference count
  *
