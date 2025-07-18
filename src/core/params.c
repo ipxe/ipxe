@@ -154,9 +154,10 @@ struct parameter * add_parameter ( struct parameters *params,
 	/* Add to list of parameters */
 	list_add_tail ( &param->list, &params->entries );
 
-	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"%s%s\n",
+	DBGC ( params, "PARAMS \"%s\" added \"%s\"=\"%s\"%s%s%s\n",
 	       params->name, param->key, param->value,
 	       ( ( param->flags & PARAMETER_FORM ) ? " (form)" : "" ),
-	       ( ( param->flags & PARAMETER_HEADER ) ? " (header)" : "" ) );
+           ( ( param->flags & PARAMETER_HEADER ) ? " (header)" : "" ),
+           ( ( param->flags & PARAMETER_JSON ) ? " (json)" : "" ) );
 	return param;
 }
