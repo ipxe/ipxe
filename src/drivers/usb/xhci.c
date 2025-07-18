@@ -2770,6 +2770,7 @@ static int xhci_endpoint_stream ( struct usb_endpoint *ep,
  */
 static int xhci_device_open ( struct usb_device *usb ) {
 	struct xhci_device *xhci = usb_bus_get_hostdata ( usb->port->hub->bus );
+	struct usb_port *root_port = usb_root_hub_port ( usb );
 	struct usb_port *tt = usb_transaction_translator ( usb );
 	struct xhci_slot *slot;
 	struct xhci_slot *tt_slot;
@@ -2779,7 +2780,7 @@ static int xhci_device_open ( struct usb_device *usb ) {
 	int rc;
 
 	/* Determine applicable slot type */
-	type = xhci_port_slot_type ( xhci, usb->port->address );
+	type = xhci_port_slot_type ( xhci, root_port->address );
 	if ( type < 0 ) {
 		rc = type;
 		DBGC ( xhci, "XHCI %s-%d has no slot type\n",
