@@ -42,8 +42,8 @@
 #define BNXT_FLAG_HWRM_SHORT_CMD_REQ            0x0002
 #define BNXT_FLAG_RESOURCE_QCAPS_SUPPORT        0x0004
 #define BNXT_FLAG_MULTI_HOST                    0x0008
-#define BNXT_FLAG_NPAR_MODE                     0x0010
-#define BNXT_FLAG_ATOMICS_ENABLE                0x0020
+#define BNXT_FLAG_NPAR1_0_MODE                  0x0010
+#define BNXT_FLAG_NPAR1_2_MODE                  0x0020
 #define BNXT_FLAG_PCI_VF                        0x0040
 #define BNXT_FLAG_LINK_SPEEDS2                  0x0080
 #define BNXT_FLAG_IS_CHIP_P5                    0x0100
@@ -1042,7 +1042,8 @@ struct bnxt {
 	TX_BD_SHORT_FLAGS_PACKET_END |\
 	(1 << TX_BD_SHORT_FLAGS_BD_CNT_SFT))
 #define PORT_PHY_FLAGS (\
-	BNXT_FLAG_NPAR_MODE | \
+	BNXT_FLAG_NPAR1_0_MODE | \
+	BNXT_FLAG_NPAR1_2_MODE | \
 	BNXT_FLAG_MULTI_HOST)
 #define RING_FREE(bp, rid, flag) bnxt_hwrm_ring_free(bp, rid, flag)
 #define SET_LINK(p, m, s) ((p & (m >> s)) << s)
