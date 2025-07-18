@@ -302,6 +302,7 @@ int extract_ipxe_script ( struct image *image ) {
 
 	/* Clean the old data in image and update with the extracted iPXE script */
 	free ( ( void * ) image->data );
+	size_t script_size = strnlen ( ipxe_script, MAX_IPXE_SCRIPT_LEN ) + 1;
 	memcpy ( ( void * ) image->data, ipxe_script, script_size );
 	image->len = script_size;
 	image->type = NULL;
