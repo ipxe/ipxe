@@ -443,6 +443,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_userdata_cmd ( ERRFILE_OTHER | 0x01000000 )
 #define ERRFILE_userdata     ( ERRFILE_OTHER | 0x01010000 )
 #define ERRFILE_imdsv2       ( ERRFILE_OTHER | 0x01030000 )
+#define ERRFILE_json         ( ERRFILE_OTHER | 0x01040000 )
 /** @} */
 
 #endif /* _IPXE_ERRFILE_H */
