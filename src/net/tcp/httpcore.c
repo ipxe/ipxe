@@ -1003,6 +1003,19 @@ static int http_format_content_type ( struct http_transaction *http,
 				      char *buf, size_t len ) {
 
 	/* Construct content type, if applicable */
+	/* If there's already a Content-Type header, do nothing  */
+	/* TODO: Refactor to be cleaner */
+	struct parameter *param;
+    if (http->uri->params) {
+        for_each_param(param, http->uri->params) {
+            if ((param->flags & PARAMETER_HEADER) && 
+                strcmp(param->key, "Content-Type") == 0) {
+                return 0;
+            }
+        }
+    }
+
+	/* Construct content type, if applicable */
 	if ( http->request.content.type ) {
 		return snprintf ( buf, len, "%s", http->request.content.type );
 	} else {
