@@ -184,6 +184,36 @@ static physaddr_t multiboot_add_cmdline ( struct image *image ) {
 	return virt_to_phys ( mb_cmdline );
 }
 
+static int multiboot_find_new_start ( struct image *image, physaddr_t *start ) {
+	struct memory_map memmap;
+	unsigned int i;
+	unsigned int current;
+
+	get_memmap ( &memmap );
+
+	/* Find the current region: */
+	for ( i = 0 ; i < memmap.count ; i++ ) {
+		if ( *start >= memmap.regions[i].start &&
+		     *start < memmap.regions[i].end ) {
+			current = i;
+			goto found;
+		}
+	}
+
+	DBGC ( image, "MULTIBOOT could not find region for %lx\n", *start);
+	return -ENOENT;
+
+found:
+	if ( current + 1 < memmap.count ) {
+		*start = memmap.regions[current + 1].start;
+		DBGC ( image, "MULTIBOOT skipping ahead to %lx\n", *start);
+		return 0;
+	}
+
+	DBGC ( image, "MULTIBOOT no more regions to try" );
+	return -ENOMEM;
+}
+
 /**
  * Add multiboot modules
  *
@@ -214,6 +244,7 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 		if ( module_image->flags & IMAGE_HIDDEN )
 			continue;
 
+again:
 		/* Page-align the module */
 		start = ( ( start + 0xfff ) & ~0xfff );
 
@@ -224,6 +255,13 @@ static int multiboot_add_modules ( struct image *image, physaddr_t start,
 			DBGC ( image, "MULTIBOOT %s could not prepare module "
 			       "%s: %s\n", image->name, module_image->name,
 			       strerror ( rc ) );
+
+			DBGC ( image, "MULTIBOOT trying to find another "
+				"memory region\n" );
+			if ( multiboot_find_new_start ( image, &start ) == 0 ) {
+				goto again;
+			}
+
 			return rc;
 		}
 
