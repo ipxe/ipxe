@@ -1066,6 +1066,8 @@ struct xhci_scratchpad {
 struct xhci_device {
 	/** Registers */
 	void *regs;
+	/** Underlying hardware device */
+	struct device *dev;
 	/** DMA device */
 	struct dma_device *dma;
 	/** Name */
@@ -1174,5 +1176,9 @@ struct xhci_endpoint {
 	/** Transfer ring */
 	struct xhci_trb_ring ring;
 };
+
+extern void xhci_init ( struct xhci_device *xhci );
+extern int xhci_register ( struct xhci_device *xhci );
+extern void xhci_unregister ( struct xhci_device *xhci );
 
 #endif /* _IPXE_XHCI_H */

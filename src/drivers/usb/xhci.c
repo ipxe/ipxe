@@ -35,7 +35,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/usb.h>
 #include <ipxe/init.h>
 #include <ipxe/profile.h>
-#include "xhci.h"
+#include <ipxe/xhci.h>
 
 /** @file
  *
@@ -259,9 +259,8 @@ static struct profiler xhci_transfer_profiler __profiler =
  * Initialise device
  *
  * @v xhci		xHCI device
- * @v regs		MMIO registers
  */
-static void xhci_init ( struct xhci_device *xhci, void *regs ) {
+void xhci_init ( struct xhci_device *xhci ) {
 	uint32_t hcsparams1;
 	uint32_t hcsparams2;
 	uint32_t hccparams1;
@@ -270,8 +269,11 @@ static void xhci_init ( struct xhci_device *xhci, void *regs ) {
 	size_t rtsoff;
 	size_t dboff;
 
+	/* Set device name */
+	xhci->name = xhci->dev->name;
+
 	/* Locate capability, operational, runtime, and doorbell registers */
-	xhci->cap = regs;
+	xhci->cap = xhci->regs;
 	caplength = readb ( xhci->cap + XHCI_CAP_CAPLENGTH );
 	rtsoff = readl ( xhci->cap + XHCI_CAP_RTSOFF );
 	dboff = readl ( xhci->cap + XHCI_CAP_DBOFF );
@@ -310,6 +312,10 @@ static void xhci_init ( struct xhci_device *xhci, void *regs ) {
 	assert ( ( ( xhci->pagesize ) & ( xhci->pagesize - 1 ) ) == 0 );
 	DBGC2 ( xhci, "XHCI %s page size %zd bytes\n",
 		xhci->name, xhci->pagesize );
+
+	/* Configure DMA device */
+	if ( xhci->dma && xhci->addr64 )
+		dma_set_mask_64bit ( xhci->dma );
 }
 
 /**
@@ -3264,7 +3270,7 @@ static int xhci_root_clear_tt ( struct usb_hub *hub, struct usb_port *port,
 
 /******************************************************************************
  *
- * PCI interface
+ * Hardware-independent interface
  *
  ******************************************************************************
  */
@@ -3302,6 +3308,75 @@ static struct usb_host_operations xhci_operations = {
 		.clear_tt = xhci_root_clear_tt,
 	},
 };
+
+/**
+ * Register xHCI controller
+ *
+ * @v xhci		xHCI device
+ * @ret rc		Return status code
+ */
+int xhci_register ( struct xhci_device *xhci ) {
+	struct usb_port *port;
+	unsigned int i;
+	int rc;
+
+	/* Reset device */
+	if ( ( rc = xhci_reset ( xhci ) ) != 0 )
+		goto err_reset;
+
+	/* Allocate USB bus */
+	xhci->bus = alloc_usb_bus ( xhci->dev, xhci->ports, XHCI_MTU,
+				    &xhci_operations );
+	if ( ! xhci->bus ) {
+		rc = -ENOMEM;
+		goto err_alloc_bus;
+	}
+	usb_bus_set_hostdata ( xhci->bus, xhci );
+	usb_hub_set_drvdata ( xhci->bus->hub, xhci );
+
+	/* Set port protocols */
+	for ( i = 1 ; i <= xhci->ports ; i++ ) {
+		port = usb_port ( xhci->bus->hub, i );
+		port->protocol = xhci_port_protocol ( xhci, i );
+	}
+
+	/* Register USB bus */
+	if ( ( rc = register_usb_bus ( xhci->bus ) ) != 0 )
+		goto err_register;
+
+	return 0;
+
+	unregister_usb_bus ( xhci->bus );
+ err_register:
+	free_usb_bus ( xhci->bus );
+ err_alloc_bus:
+	xhci_reset ( xhci );
+ err_reset:
+	return rc;
+}
+
+/**
+ * Unregister xHCI controller
+ *
+ * @v xhci		xHCI device
+ */
+void xhci_unregister ( struct xhci_device *xhci ) {
+	struct usb_bus *bus = xhci->bus;
+
+	/* Unregister and free USB bus */
+	unregister_usb_bus ( bus );
+	free_usb_bus ( bus );
+
+	/* Reset device */
+	xhci_reset ( xhci );
+}
+
+/******************************************************************************
+ *
+ * PCI interface
+ *
+ ******************************************************************************
+ */
 
 /**
  * Fix Intel PCH-specific quirks
@@ -3365,10 +3440,8 @@ static void xhci_pch_undo ( struct xhci_device *xhci, struct pci_device *pci ) {
  */
 static int xhci_probe ( struct pci_device *pci ) {
 	struct xhci_device *xhci;
-	struct usb_port *port;
 	unsigned long bar_start;
 	size_t bar_size;
-	unsigned int i;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -3377,7 +3450,8 @@ static int xhci_probe ( struct pci_device *pci ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	xhci->name = pci->dev.name;
+	xhci->dev = &pci->dev;
+	xhci->dma = &pci->dma;
 	xhci->quirks = pci->id->driver_data;
 
 	/* Fix up PCI device */
@@ -3393,12 +3467,7 @@ static int xhci_probe ( struct pci_device *pci ) {
 	}
 
 	/* Initialise xHCI device */
-	xhci_init ( xhci, xhci->regs );
-
-	/* Configure DMA device */
-	xhci->dma = &pci->dma;
-	if ( xhci->addr64 )
-		dma_set_mask_64bit ( xhci->dma );
+	xhci_init ( xhci );
 
 	/* Initialise USB legacy support and claim ownership */
 	xhci_legacy_init ( xhci );
@@ -3408,39 +3477,15 @@ static int xhci_probe ( struct pci_device *pci ) {
 	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_fix ( xhci, pci );
 
-	/* Reset device */
-	if ( ( rc = xhci_reset ( xhci ) ) != 0 )
-		goto err_reset;
-
-	/* Allocate USB bus */
-	xhci->bus = alloc_usb_bus ( &pci->dev, xhci->ports, XHCI_MTU,
-				    &xhci_operations );
-	if ( ! xhci->bus ) {
-		rc = -ENOMEM;
-		goto err_alloc_bus;
-	}
-	usb_bus_set_hostdata ( xhci->bus, xhci );
-	usb_hub_set_drvdata ( xhci->bus->hub, xhci );
-
-	/* Set port protocols */
-	for ( i = 1 ; i <= xhci->ports ; i++ ) {
-		port = usb_port ( xhci->bus->hub, i );
-		port->protocol = xhci_port_protocol ( xhci, i );
-	}
-
-	/* Register USB bus */
-	if ( ( rc = register_usb_bus ( xhci->bus ) ) != 0 )
+	/* Register xHCI device */
+	if ( ( rc = xhci_register ( xhci ) ) != 0 )
 		goto err_register;
 
 	pci_set_drvdata ( pci, xhci );
 	return 0;
 
-	unregister_usb_bus ( xhci->bus );
+	xhci_unregister ( xhci );
  err_register:
-	free_usb_bus ( xhci->bus );
- err_alloc_bus:
-	xhci_reset ( xhci );
- err_reset:
 	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
 	xhci_legacy_release ( xhci );
@@ -3458,7 +3503,6 @@ static int xhci_probe ( struct pci_device *pci ) {
  */
 static void xhci_remove ( struct pci_device *pci ) {
 	struct xhci_device *xhci = pci_get_drvdata ( pci );
-	struct usb_bus *bus = xhci->bus;
 	uint16_t command;
 
 	/* Some systems are observed to disable bus mastering on
@@ -3473,12 +3517,10 @@ static void xhci_remove ( struct pci_device *pci ) {
 		xhci_fail ( xhci );
 	}
 
-	/* Unregister and free USB bus */
-	unregister_usb_bus ( bus );
-	free_usb_bus ( bus );
+	/* Unregister xHCI controller */
+	xhci_unregister ( xhci );
 
-	/* Reset device and undo any PCH-specific fixes */
-	xhci_reset ( xhci );
+	/* Undo any PCH-specific fixes */
 	if ( xhci->quirks & XHCI_PCH )
 		xhci_pch_undo ( xhci, pci );
 
