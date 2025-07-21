@@ -909,6 +909,47 @@ struct rx_info {
 #define VALID_L2_FILTER           0x0100
 #define VALID_RING_NQ             0x0200
 
+struct lm_error_recovery
+{
+  __le32  flags;
+  __le32  last_tick;
+  __le32  curr_tick;
+  __le32  drv_poll_freq;
+  __le32  master_wait_period;
+  __le32  normal_wait_period;
+  __le32  master_wait_post_rst;
+  __le32  max_bailout_post_rst;
+  __le32  fw_status_reg;
+  __le32  fw_hb_reg;
+  __le32  fw_rst_cnt_reg;
+  __le32  rst_inprg_reg;
+  __le32  rst_inprg_reg_mask;
+  __le32  rst_reg[16];
+  __le32  rst_reg_val[16];
+  u8   delay_after_rst[16];
+  __le32  recvry_cnt_reg;
+
+  __le32 last_fw_hb;
+  __le32 last_fw_rst_cnt;
+  __le32 fw_health_status;
+  __le32 err_recovery_cnt;
+  __le32 rst_in_progress;
+  __le16 rst_max_dsecs;
+
+  u8  master_pf;
+  u8  error_recvry_supported;
+  u8  driver_initiated_recovery;
+  u8  er_rst_on;
+
+#define ER_DFLT_FW_RST_MIN_DSECS    20
+#define ER_DFLT_FW_RST_MAX_DSECS    60
+#define FW_STATUS_REG_CODE_READY    0x8000UL
+  u8  rst_min_dsecs;
+  u8  reg_array_cnt;
+  u8  er_initiate;
+  u8  rsvd[3];
+};
+
 struct bnxt {
 /* begin "general, frequently-used members" cacheline section */
 /* If the IRQ handler (which runs lockless) needs to be
@@ -945,6 +986,7 @@ struct bnxt {
 	struct rx_info            rx; /* Rx info. */
 	struct cmp_info           cq; /* completion info. */
 	struct nq_info            nq; /* completion info. */
+	struct lm_error_recovery  er; /* error recovery. */
 	u16                       nq_ring_id;
 	u8                        queue_id;
 	u16                       last_resp_code;
@@ -991,7 +1033,7 @@ struct bnxt {
 	u16                       auto_link_speeds2_mask;
 	u32                       link_set;
 	u8                        media_detect;
-	u8                        rsvd;
+	u8                        err_rcvry_supported;
 	u16                       max_vfs;
 	u16                       vf_res_strategy;
 	u16                       min_vnics;
@@ -1024,7 +1066,9 @@ struct bnxt {
 #define write64               writeq
 #define pci_read_byte         pci_read_config_byte
 #define pci_read_word16       pci_read_config_word
-#define pci_write_word        pci_write_config_word
+#define pci_read_dword        pci_read_config_dword
+#define pci_write_word16      pci_write_config_word
+#define pci_write_dword       pci_write_config_dword
 #define SHORT_CMD_SUPPORTED   VER_GET_RESP_DEV_CAPS_CFG_SHORT_CMD_SUPPORTED
 #define SHORT_CMD_REQUIRED    VER_GET_RESP_DEV_CAPS_CFG_SHORT_CMD_REQUIRED
 #define CQ_DOORBELL_KEY_MASK(a) (\

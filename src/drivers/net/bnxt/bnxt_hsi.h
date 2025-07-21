@@ -96,6 +96,7 @@ struct hwrm_short_input {
 struct cmd_nums {
 	__le16	req_type;
 	#define HWRM_VER_GET                              0x0UL
+	#define HWRM_ER_QCFG                              0xcUL
 	#define HWRM_FUNC_DRV_IF_CHANGE                   0xdUL
 	#define HWRM_FUNC_BUF_UNRGTR                      0xeUL
 	#define HWRM_FUNC_VF_CFG                          0xfUL
@@ -559,6 +560,7 @@ struct hwrm_async_event_cmpl {
 	#define ASYNC_EVENT_CMPL_EVENT_ID_LINK_SPEED_CFG_CHANGE      0x6UL
 	#define ASYNC_EVENT_CMPL_EVENT_ID_PORT_PHY_CFG_CHANGE        0x7UL
 	#define ASYNC_EVENT_CMPL_EVENT_ID_RESET_NOTIFY               0x8UL
+	#define ASYNC_EVENT_CMPL_EVENT_ID_ERROR_RECOVERY             0x9UL
 	#define ASYNC_EVENT_CMPL_EVENT_ID_FUNC_DRVR_UNLOAD           0x10UL
 	#define ASYNC_EVENT_CMPL_EVENT_ID_FUNC_DRVR_LOAD             0x11UL
 	#define ASYNC_EVENT_CMPL_EVENT_ID_FUNC_FLR_PROC_CMPLT        0x12UL
@@ -583,6 +585,10 @@ struct hwrm_async_event_cmpl {
 	u8	timestamp_lo;
 	__le16	timestamp_hi;
 	__le32	event_data1;
+	#define ASYNC_EVENT_CMPL_ER_EVENT_DATA1_MASTER_FUNC          0x1UL
+	#define ASYNC_EVENT_CMPL_ER_EVENT_DATA1_RECOVERY_ENABLED     0x2UL
+	#define ASYNC_EVENT_CMPL_EVENT_DATA1_REASON_CODE_FATAL       (0x2UL << 8)
+	#define ASYNC_EVENT_CMPL_EVENT_DATA1_REASON_CODE_MASK        0xff00UL
 };
 
 /* hwrm_async_event_cmpl_link_status_change (size:128b/16B) */
@@ -1357,6 +1363,7 @@ struct hwrm_func_qcaps_output {
 	#define FUNC_QCAPS_RESP_FLAGS_WCB_PUSH_MODE                   0x100000UL
 	#define FUNC_QCAPS_RESP_FLAGS_DYNAMIC_TX_RING_ALLOC           0x200000UL
 	#define FUNC_QCAPS_RESP_FLAGS_HOT_RESET_CAPABLE               0x400000UL
+	#define FUNC_QCAPS_OUTPUT_FLAGS_ERROR_RECOVERY_CAPABLE        0x800000UL
 	u8	mac_address[6];
 	__le16	max_rsscos_ctx;
 	__le16	max_cmpl_rings;
@@ -1718,6 +1725,99 @@ struct hwrm_func_vf_resc_free_output {
 	u8	valid;
 };
 
+/* hwrm_error_recovery_input (size:192b/24B) */
+struct hwrm_error_recovery_qcfg_input {
+	__le16	req_type;
+	__le16	cmpl_ring;
+	__le16	seq_id;
+	__le16	target_id;
+	__le64	resp_addr;
+	u8	unused_0[8];
+};
+
+/* hwrm_error_recovery_qcfg_output (size:1664b/208B) */
+struct hwrm_error_recovery_qcfg_output {
+	__le16	error_code;
+	__le16	req_type;
+	__le16	seq_id;
+	__le16	resp_len;
+	__le32	flags;
+	#define ER_QCFG_FLAGS_HOST       0x1UL
+	#define ER_QCFG_FLAGS_CO_CPU     0x2UL
+	__le32	driver_polling_freq;
+	__le32	master_wait_period;
+	__le32	normal_wait_period;
+	__le32	master_wait_post_reset;
+	__le32	max_bailout_time;
+	__le32	fw_health_status_reg;
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_MASK    0x3UL
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_SFT     0
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_PCIE_CFG  0x0UL
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_GRC       0x1UL
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_BAR0      0x2UL
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_BAR1      0x3UL
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_LAST     ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_BAR1
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_MASK          0xfffffffcUL
+	#define ER_QCFG_FW_HEALTH_REG_ADDR_SFT           2
+	__le32	fw_heartbeat_reg;
+	#define ER_QCFG_FW_HB_REG_ADDR_SPACE_MASK    0x3UL
+	#define ER_QCFG_FW_HB_REG_ADDR_SPACE_SFT     0
+	#define ER_QCFG_FW_HB_REG_ADDR_SPACE_PCIE_CFG  0x0UL
+	#define ER_QCFG_FW_HB_REG_ADDR_SPACE_GRC       0x1UL
+	#define ER_QCFG_FW_HB_REG_ADDR_SPACE_BAR0      0x2UL
+	#define ER_QCFG_FW_HB_REG_ADDR_SPACE_BAR1      0x3UL
+	#define ER_QCFG_FW_HB_REG_ADDR_SPACE_LAST     ER_QCFG_FW_HB_REG_ADDR_SPACE_BAR1
+	#define ER_QCFG_FW_HB_REG_ADDR_MASK          0xfffffffcUL
+	#define ER_QCFG_FW_HB_REG_ADDR_SFT           2
+	__le32	fw_reset_cnt_reg;
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_MASK    0x3UL
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_SFT     0
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_PCIE_CFG  0x0UL
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_GRC       0x1UL
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_BAR0      0x2UL
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_BAR1      0x3UL
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_LAST     ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_BAR1
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_MASK          0xfffffffcUL
+	#define ER_QCFG_FW_RESET_CNT_REG_ADDR_SFT           2
+	__le32	reset_inprogress_reg;
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_MASK    0x3UL
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_SFT     0
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_PCIE_CFG  0x0UL
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_GRC       0x1UL
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_BAR0      0x2UL
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_BAR1      0x3UL
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_LAST     ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_BAR1
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_MASK          0xfffffffcUL
+	#define ER_QCFG_RESET_INPRG_REG_ADDR_SFT           2
+	__le32	reset_inprogress_reg_mask;
+	u8	unused_0[3];
+	u8	reg_array_cnt;
+	__le32	reset_reg[16];
+	#define ER_QCFG_RESET_REG_ADDR_SPACE_MASK    0x3UL
+	#define ER_QCFG_RESET_REG_ADDR_SPACE_SFT     0
+	#define ER_QCFG_RESET_REG_ADDR_SPACE_PCIE_CFG  0x0UL
+	#define ER_QCFG_RESET_REG_ADDR_SPACE_GRC       0x1UL
+	#define ER_QCFG_RESET_REG_ADDR_SPACE_BAR0      0x2UL
+	#define ER_QCFG_RESET_REG_ADDR_SPACE_BAR1      0x3UL
+	#define ER_QCFG_RESET_REG_ADDR_SPACE_LAST     ER_QCFG_RESET_REG_ADDR_SPACE_BAR1
+	#define ER_QCFG_RESET_REG_ADDR_MASK          0xfffffffcUL
+	#define ER_QCFG_RESET_REG_ADDR_SFT           2
+	__le32	reset_reg_val[16];
+	u8	delay_after_reset[16];
+	__le32	err_recovery_cnt_reg;
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_MASK    0x3UL
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_SFT     0
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_PCIE_CFG  0x0UL
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_GRC       0x1UL
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_BAR0      0x2UL
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_BAR1      0x3UL
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_LAST     ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_BAR1
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_MASK          0xfffffffcUL
+	#define ER_QCFG_RCVRY_CNT_REG_ADDR_SFT           2
+	u8	unused_1[3];
+	u8	valid;
+};
+
 /* hwrm_func_drv_rgtr_input (size:896b/112B) */
 struct hwrm_func_drv_rgtr_input {
 	__le16	req_type;
@@ -1731,6 +1831,8 @@ struct hwrm_func_drv_rgtr_input {
 	#define FUNC_DRV_RGTR_REQ_FLAGS_16BIT_VER_MODE             0x4UL
 	#define FUNC_DRV_RGTR_REQ_FLAGS_FLOW_HANDLE_64BIT_MODE     0x8UL
 	#define FUNC_DRV_RGTR_REQ_FLAGS_HOT_RESET_SUPPORT          0x10UL
+	#define FUNC_DRV_RGTR_REQ_FLAGS_ERROR_RECOVERY_SUPPORT     0x20UL
+	#define FUNC_DRV_RGTR_REQ_FLAGS_MASTER_SUPPORT             0x40UL
 	__le32	enables;
 	#define FUNC_DRV_RGTR_REQ_ENABLES_OS_TYPE             0x1UL
 	#define FUNC_DRV_RGTR_REQ_ENABLES_VER                 0x2UL
