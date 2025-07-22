@@ -483,6 +483,57 @@ int fdt_alias ( struct fdt *fdt, const char *name, unsigned int *offset ) {
 }
 
 /**
+ * Find node by package handle (phandle)
+ *
+ * @v fdt		Device tree
+ * @v phandle		Package handle
+ * @v offset		Offset to fill in
+ * @ret rc		Return status code
+ */
+int fdt_phandle ( struct fdt *fdt, uint32_t phandle, unsigned int *offset ) {
+	struct fdt_descriptor desc;
+	uint32_t value;
+	int depth;
+	int rc;
+
+	/* Initialise offset */
+	*offset = 0;
+
+	/* Find node with matching phandle */
+	for ( depth = -1 ; ; depth += desc.depth, *offset = desc.next ) {
+
+		/* Describe token */
+		if ( ( rc = fdt_describe ( fdt, *offset, &desc ) ) != 0 ) {
+			DBGC ( fdt, "FDT +%#04x has malformed node: %s\n",
+			       *offset, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Terminate when we exit the root node */
+		if ( ( depth == 0 ) && ( desc.depth < 0 ) )
+			break;
+
+		/* Ignore non-nodes */
+		if ( ( ! desc.name ) || desc.data )
+			continue;
+
+		/* Check for matching "phandle" or "linux-phandle" property */
+		if ( ( ( ( rc = fdt_u32 ( fdt, *offset, "phandle",
+					  &value ) ) == 0 ) ||
+		       ( ( rc = fdt_u32 ( fdt, *offset, "linux,phandle",
+					  &value ) ) == 0 ) ) &&
+		     ( value == phandle ) ) {
+			DBGC2 ( fdt, "FDT +%#04x has phandle %#02x\n",
+				*offset, phandle );
+			return 0;
+		}
+	}
+
+	DBGC ( fdt, "FDT has no phandle %#02x\n", phandle );
+	return -ENOENT;
+}
+
+/**
  * Find property
  *
  * @v fdt		Device tree
