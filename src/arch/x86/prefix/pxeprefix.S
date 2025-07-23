@@ -366,6 +366,14 @@ pci_physical_device:
 	movw	$10f, %si
 	call	print_message
 	call	print_pci_busdevfn
+	movb	$( ' ' ), %al
+	call	print_character
+	movw	pci_vendor, %ax
+	call	print_hex_word
+	movb	$( ':' ), %al
+	call	print_character
+	movw	pci_device, %ax
+	call	print_hex_word
 	jmp	99f
 	.section ".prefix.data", "aw", @progbits
 10:	.asciz	"PCI "
