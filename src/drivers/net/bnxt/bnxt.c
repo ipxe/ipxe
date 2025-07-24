@@ -134,23 +134,23 @@ static int bnxt_get_pci_info ( struct bnxt *bp )
 
 	DBGP ( "%s\n", __func__ );
 	/* Disable Interrupt */
-	pci_read_word16 ( bp->pdev, PCI_COMMAND, &bp->cmd_reg );
+	pci_read_config_word ( bp->pdev, PCI_COMMAND, &bp->cmd_reg );
 	cmd_reg = bp->cmd_reg | PCI_COMMAND_INTX_DISABLE;
-	pci_write_word ( bp->pdev, PCI_COMMAND, cmd_reg );
-	pci_read_word16 ( bp->pdev, PCI_COMMAND, &cmd_reg );
+	pci_write_config_word ( bp->pdev, PCI_COMMAND, cmd_reg );
+	pci_read_config_word ( bp->pdev, PCI_COMMAND, &cmd_reg );
 
 	/* SSVID */
-	pci_read_word16 ( bp->pdev,
+	pci_read_config_word ( bp->pdev,
 			PCI_SUBSYSTEM_VENDOR_ID,
 			&bp->subsystem_vendor );
 
 	/* SSDID */
-	pci_read_word16 ( bp->pdev,
+	pci_read_config_word ( bp->pdev,
 			PCI_SUBSYSTEM_ID,
 			&bp->subsystem_device );
 
 	/* Function Number */
-	pci_read_byte ( bp->pdev,
+	pci_read_config_byte ( bp->pdev,
 			PCICFG_ME_REGISTER,
 			&bp->pf_num );
 
@@ -200,7 +200,7 @@ static void dev_p5_db ( struct bnxt *bp, u32 idx, u32 xid, u32 flag )
 
 	val = ( ( u64 )DBC_MSG_XID ( xid, flag ) << 32 ) |
 		( u64 )DBC_MSG_IDX ( idx );
-	write64 ( val, off );
+	writeq ( val, off );
 }
 
 static void dev_p7_db ( struct bnxt *bp, u32 idx, u32 xid, u32 flag, u32 epoch, u32 toggle )
@@ -214,7 +214,7 @@ static void dev_p7_db ( struct bnxt *bp, u32 idx, u32 xid, u32 flag, u32 epoch, 
 	        ( u64 )DBC_MSG_IDX ( idx ) |
 	        ( u64 )DBC_MSG_EPCH ( epoch ) |
 	        ( u64 )DBC_MSG_TOGGLE ( toggle );
-	write64 ( val, off );
+	writeq ( val, off );
 }
 
 static void bnxt_db_nq ( struct bnxt *bp )
@@ -227,7 +227,7 @@ static void bnxt_db_nq ( struct bnxt *bp )
 		dev_p5_db ( bp, ( u32 )bp->nq.cons_id,
 			 ( u32 )bp->nq_ring_id, DBC_DBC_TYPE_NQ_ARM );
 	else
-		write32 ( CMPL_DOORBELL_KEY_CMPL, ( bp->bar1 + 0 ) );
+		writel ( CMPL_DOORBELL_KEY_CMPL, ( bp->bar1 + 0 ) );
 }
 
 static void bnxt_db_cq ( struct bnxt *bp )
@@ -240,7 +240,7 @@ static void bnxt_db_cq ( struct bnxt *bp )
 		dev_p5_db ( bp, ( u32 )bp->cq.cons_id,
 			 ( u32 )bp->cq_ring_id, DBC_DBC_TYPE_CQ_ARMALL );
 	else
-		write32 ( CQ_DOORBELL_KEY_IDX ( bp->cq.cons_id ),
+		writel ( CQ_DOORBELL_KEY_IDX ( bp->cq.cons_id ),
 			( bp->bar1 + 0 ) );
 }
 
@@ -252,7 +252,7 @@ static void bnxt_db_rx ( struct bnxt *bp, u32 idx )
 	else if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5 ) )
 		dev_p5_db ( bp, idx, ( u32 )bp->rx_ring_id, DBC_DBC_TYPE_SRQ );
 	else
-		write32 ( RX_DOORBELL_KEY_RX | idx, ( bp->bar1 + 0 ) );
+		writel ( RX_DOORBELL_KEY_RX | idx, ( bp->bar1 + 0 ) );
 }
 
 static void bnxt_db_tx ( struct bnxt *bp, u32 idx )
@@ -263,7 +263,7 @@ static void bnxt_db_tx ( struct bnxt *bp, u32 idx )
 	else if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5 ) )
 		dev_p5_db ( bp, idx, ( u32 )bp->tx_ring_id, DBC_DBC_TYPE_SQ );
 	else
-		write32 ( ( u32 ) ( TX_DOORBELL_KEY_TX | idx ),
+		writel ( ( u32 ) ( TX_DOORBELL_KEY_TX | idx ),
 			( bp->bar1 + 0 ) );
 }
 
@@ -655,10 +655,10 @@ static void hwrm_write_req ( struct bnxt *bp, void *req, u32 cnt )
 	u32 i = 0;
 
 	for ( i = 0; i < cnt; i++ ) {
-		write32 ( ( ( u32 * )req )[i],
+		writel ( ( ( u32 * )req )[i],
 			 ( bp->bar0 + GRC_COM_CHAN_BASE + ( i * 4 ) ) );
 	}
-	write32 ( 0x1, ( bp->bar0 + GRC_COM_CHAN_BASE + GRC_COM_CHAN_TRIG ) );
+	writel ( 0x1, ( bp->bar0 + GRC_COM_CHAN_BASE + GRC_COM_CHAN_TRIG ) );
 }
 
 static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len )
