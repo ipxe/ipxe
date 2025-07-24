@@ -868,10 +868,12 @@ static const struct undinet_irq_broken undinet_irq_broken_list[] = {
 /**
  * Check for devices with broken support for generating interrupts
  *
- * @v desc		Device description
+ * @v netdev		Net device
  * @ret irq_is_broken	Interrupt support is broken; no interrupts are generated
  */
-static int undinet_irq_is_broken ( struct device_description *desc ) {
+static int undinet_irq_is_broken ( struct net_device *netdev ) {
+	struct undi_nic *undinic = netdev->priv;
+	struct device_description *desc = &netdev->dev->desc;
 	const struct undinet_irq_broken *broken;
 	struct pci_device pci;
 	uint16_t subsys_vendor;
@@ -897,9 +899,25 @@ static int undinet_irq_is_broken ( struct device_description *desc ) {
 		       ( broken->pci_subsys_vendor == PCI_ANY_ID ) ) &&
 		     ( ( broken->pci_subsys == subsys ) ||
 		       ( broken->pci_subsys == PCI_ANY_ID ) ) ) {
+			DBGC ( undinic, "UNDINIC %p %04x:%04x subsys "
+			       "%04x:%04x has broken interrupts\n",
+			       undinic, desc->vendor, desc->device,
+			       subsys_vendor, subsys );
 			return 1;
 		}
 	}
+
+	/* Check for a PCI Express capability.  Given the number of
+	 * issues found with legacy INTx emulation on PCIe systems, we
+	 * assume that there is a high chance of interrupts not
+	 * working on any PCIe device.
+	 */
+	if ( pci_find_capability ( &pci, PCI_CAP_ID_EXP ) ) {
+		DBGC ( undinic, "UNDINIC %p is PCI Express: assuming "
+		       "interrupts are unreliable\n", undinic );
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -1022,7 +1040,7 @@ int undinet_probe ( struct undi_device *undi, struct device *dev ) {
 		       undinic );
 		undinic->hacks |= UNDI_HACK_EB54;
 	}
-	if ( undinet_irq_is_broken ( &dev->desc ) ) {
+	if ( undinet_irq_is_broken ( netdev ) ) {
 		DBGC ( undinic, "UNDINIC %p forcing polling mode due to "
 		       "broken interrupts\n", undinic );
 		undinic->irq_supported = 0;
