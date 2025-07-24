@@ -1020,11 +1020,6 @@ struct bnxt {
 
 /* defines required to rsolve checkpatch errors / warnings */
 #define test_if               if
-#define write32               writel
-#define write64               writeq
-#define pci_read_byte         pci_read_config_byte
-#define pci_read_word16       pci_read_config_word
-#define pci_write_word        pci_write_config_word
 #define SHORT_CMD_SUPPORTED   VER_GET_RESP_DEV_CAPS_CFG_SHORT_CMD_SUPPORTED
 #define SHORT_CMD_REQUIRED    VER_GET_RESP_DEV_CAPS_CFG_SHORT_CMD_REQUIRED
 #define CQ_DOORBELL_KEY_MASK(a) (\
