@@ -38,6 +38,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Version register */
 #define DWMAC_VER DWMAC_MAC_REG ( 8 )
+#define DWMAC_VER_USER_MAJOR( x ) \
+	( ( (x) >> 12 ) & 0xf )			/**< User major version */
+#define DWMAC_VER_USER_MINOR( x ) \
+	( ( (x) >> 8 ) & 0xf )			/**< User minor version */
+#define DWMAC_VER_CORE_MAJOR( x ) \
+	( ( (x) >> 4 ) & 0xf )			/**< Core major version */
+#define DWMAC_VER_CORE_MINOR( x ) \
+	( ( (x) >> 0 ) & 0xf )			/**< Core minor version */
 
 /** Debug register */
 #define DWMAC_DEBUG DWMAC_MAC_REG ( 9 )

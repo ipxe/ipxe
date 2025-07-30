@@ -552,6 +552,7 @@ static int dwmac_probe ( struct dt_device *dt, unsigned int offset ) {
 	struct net_device *netdev;
 	struct dwmac *dwmac;
 	union dwmac_mac mac;
+	uint32_t version;
 	int rc;
 
 	/* Allocate and initialise net device */
@@ -580,6 +581,12 @@ static int dwmac_probe ( struct dt_device *dt, unsigned int offset ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
+	version = readl ( dwmac->regs + DWMAC_VER );
+	DBGC ( dwmac, "DWMAC %s version %x.%x (user %x.%x)\n", dwmac->name,
+	       DWMAC_VER_CORE_MAJOR ( version ),
+	       DWMAC_VER_CORE_MINOR ( version ),
+	       DWMAC_VER_USER_MAJOR ( version ),
+	       DWMAC_VER_USER_MINOR ( version ) );
 
 	/* Fetch devicetree MAC address */
 	if ( ( rc = fdt_mac ( &sysfdt, offset, netdev ) ) != 0 ) {
