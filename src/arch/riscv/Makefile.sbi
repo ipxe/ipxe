@@ -7,6 +7,13 @@
 CFLAGS		+= -mcmodel=medany -fpie
 LDFLAGS		+= -pie --no-dynamic-linker -z combreloc
 
+# Place explicitly zero-initialised variables in the .data section
+# rather than in .bss, so that we can rely on their values even during
+# parsing of the system memory map prior to relocation (and therefore
+# prior to explicit zeroing of the .bss section).
+#
+CFLAGS		+= -fno-zero-initialized-in-bss
+
 # Linker script
 #
 LDSCRIPT	= arch/riscv/scripts/sbi.lds
