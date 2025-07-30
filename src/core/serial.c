@@ -61,8 +61,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define COMSPEED 0
 #endif
 
-/** Active serial console UART */
-struct uart *serial_console;
+/** Active serial console UART
+ *
+ * Explicitly initialised to @c NULL since this variable may be
+ * accessed before .bss has been zeroed.
+ */
+struct uart *serial_console = NULL;
 
 /**
  * Get fixed serial console UART
