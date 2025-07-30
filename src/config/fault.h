@@ -32,6 +32,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /* Experience virtual machine migration on every N watchdog checks */
 #define VM_MIGRATED_RATE 0
 
+/* Poison .bss section before early execution */
+#define POISON_BSS 0
+
 #include <config/local/fault.h>
 
 #endif /* CONFIG_FAULT_H */

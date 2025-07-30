@@ -30,6 +30,7 @@
  */
 
 #include <config/serial.h>
+#include <config/fault.h>
 
 	.section ".note.GNU-stack", "", @progbits
 	.text
@@ -1270,6 +1271,51 @@ disable_paging_32_xstart:
 
 /*****************************************************************************
  *
+ * Poison .bss section
+ *
+ *****************************************************************************
+ *
+ * Fill the .bss section with an invalid non-zero value to expose bugs
+ * in early initialisation code that erroneously relies upon variables
+ * in .bss before the section has been zeroed.
+ *
+ * We use the value 0xeb55eb55eb55eb55 ("EBSS") since this is
+ * immediately recognisable as a value in a crash dump, and will
+ * trigger a page fault if dereferenced since the address is in a
+ * non-canonical form.
+ *
+ * Poisoning the .bss will overwrite the relocation records, and so
+ * can be done only as a debugging step on a system where relocation
+ * is known to be unnecessary (e.g. because paging is supported).
+ *
+ * This function does not require a valid stack pointer, but will
+ * destroy any existing stack contents if the stack happens to be
+ * placed within the original .bss section.
+ *
+ * Parameters: none
+ *
+ * Returns: none
+ *
+ */
+
+	.equ	poison_bss_value_32, 0xeb55eb55
+	.equ	poison_bss_value_64, 0xeb55eb55eb55eb55
+	.equ	poison_bss_value, _C2 ( poison_bss_value_, __riscv_xlen )
+
+	.section ".prefix.poison_bss", "ax", @progbits
+poison_bss:
+	/* Fill .bss section */
+	la	t0, _bss
+	la	t1, _ebss
+	li	t2, poison_bss_value
+1:	STOREN	t2, (t0)
+	addi	t0, t0, ( __riscv_xlen / 8 )
+	blt	t0, t1, 1b
+	ret
+	.size	poison_bss, . - poison_bss
+
+/*****************************************************************************
+ *
  * Install iPXE to a suitable runtime address
  *
  *****************************************************************************
@@ -1327,6 +1373,11 @@ install:
 	mv	s1, a1
 	mv	s2, ra
 	la	s3, _edata
+
+	/* Poison .bss if configured to do so */
+#if POISON_BSS
+	call	poison_bss
+#endif
 
 	/* Attempt to enable paging, if we have temporary page table space */
 	mv	a0, a2
