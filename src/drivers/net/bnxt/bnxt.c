@@ -624,7 +624,7 @@ int bnxt_alloc_mem ( struct bnxt *bp )
 				     CQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
 	bp->nq.bd_virt = dma_alloc ( bp->dma, &bp->nq_mapping,
 				     NQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	test_if ( bp->hwrm_addr_req &&
+	if ( bp->hwrm_addr_req &&
 		bp->hwrm_addr_resp &&
 		bp->hwrm_addr_dma &&
 		bp->tx.bd_virt &&
@@ -693,7 +693,7 @@ static int wait_resp ( struct bnxt *bp, u32 tmo, u16 len, const char *func )
 
 	for ( idx = 0; idx < wait_cnt; idx++ ) {
 		resp_len = resp->resp_len;
-		test_if ( resp->seq_id == req->seq_id &&
+		if ( resp->seq_id == req->seq_id &&
 			resp->req_type == req->req_type &&
 			ptr[resp_len - 1] == 1 ) {
 			bp->last_resp_code = resp->error_code;
@@ -739,7 +739,7 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 		resp->chip_bond_id << 8 |
 		resp->chip_platform_type;
 	bp->chip_num = resp->chip_num;
-	test_if ( ( resp->dev_caps_cfg & SHORT_CMD_SUPPORTED ) &&
+	if ( ( resp->dev_caps_cfg & SHORT_CMD_SUPPORTED ) &&
 		 ( resp->dev_caps_cfg & SHORT_CMD_REQUIRED ) )
 		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_SUPP );
 	bp->hwrm_max_ext_req_len = resp->max_ext_req_len;
@@ -1257,24 +1257,24 @@ static int bnxt_get_link_speed ( struct bnxt *bp )
 
 	DBGP ( "%s\n", __func__ );
 	if ( ! ( FLAG_TEST (bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ) ) {
-	        test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
+	        if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
 		        ( u16 )LINK_SPEED_DRV_NUM,
 		        1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
 		        return STATUS_FAILURE;
 	        bp->link_set = SET_LINK ( *ptr32, SPEED_DRV_MASK, SPEED_DRV_SHIFT );
-	        test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
+	        if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
 		        ( u16 )D3_LINK_SPEED_FW_NUM, 1,
 		        ( u16 )bp->port_idx ) != STATUS_SUCCESS )
 		        return STATUS_FAILURE;
 	        bp->link_set |= SET_LINK ( *ptr32, D3_SPEED_FW_MASK,
 				D3_SPEED_FW_SHIFT );
 	}
-	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
+	if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
 		( u16 )LINK_SPEED_FW_NUM,
 		1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
 		return STATUS_FAILURE;
 	bp->link_set |= SET_LINK ( *ptr32, SPEED_FW_MASK, SPEED_FW_SHIFT );
-	test_if ( bnxt_hwrm_nvm_get_variable_req ( bp, 1,
+	if ( bnxt_hwrm_nvm_get_variable_req ( bp, 1,
 		 ( u16 )PORT_CFG_LINK_SETTINGS_MEDIA_AUTO_DETECT_NUM,
 		1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
 		return STATUS_FAILURE;

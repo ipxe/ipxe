@@ -1019,7 +1019,6 @@ struct bnxt {
 };
 
 /* defines required to rsolve checkpatch errors / warnings */
-#define test_if               if
 #define SHORT_CMD_SUPPORTED   VER_GET_RESP_DEV_CAPS_CFG_SHORT_CMD_SUPPORTED
 #define SHORT_CMD_REQUIRED    VER_GET_RESP_DEV_CAPS_CFG_SHORT_CMD_REQUIRED
 #define CQ_DOORBELL_KEY_MASK(a) (\

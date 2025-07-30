@@ -197,7 +197,7 @@ void dbg_fw_ver(struct hwrm_ver_get_output *resp, u32 tmo)
 		(u32)(resp->chip_metal << 16) |
 		(u32)(resp->chip_bond_id << 8) |
 		(u32)resp->chip_platform_type);
-	test_if((resp->dev_caps_cfg & SHORT_CMD_SUPPORTED) &&
+	if((resp->dev_caps_cfg & SHORT_CMD_SUPPORTED) &&
 		(resp->dev_caps_cfg & SHORT_CMD_REQUIRED))
 		dbg_prn("  SHORT_CMD_SUPPORTED\n");
 }
