@@ -219,6 +219,7 @@ int dt_probe_node ( struct device *parent, unsigned int offset ) {
 	dt->name = dt->dev.name;
 	snprintf ( dt->dev.name, sizeof ( dt->dev.name ), "%s", name );
 	dt->dev.desc.bus_type = BUS_TYPE_DT;
+	dt->dev.desc.location = fdt_phandle ( &sysfdt, offset );
 	dt->dev.parent = parent;
 	INIT_LIST_HEAD ( &dt->dev.children );
 	list_add_tail ( &dt->dev.siblings, &parent->children );

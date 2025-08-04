@@ -237,6 +237,16 @@ static void fdt_test_exec ( void ) {
 	ok ( fdt_path ( &fdt, "/soc/ethernet@10090000", &offset ) == 0 );
 	ok ( fdt_u32 ( &fdt, offset, "max-speed", &u32 ) != 0 );
 
+	/* Verify phandle properties */
+	ok ( fdt_path ( &fdt, "/cpus/cpu@0/interrupt-controller",
+			&offset ) == 0 );
+	ok ( fdt_phandle ( &fdt, offset ) == 0x03 );
+	ok ( fdt_path ( &fdt, "/soc/ethernet@10090000/ethernet-phy@0",
+			&offset ) == 0 );
+	ok ( fdt_phandle ( &fdt, offset ) == 0x08 );
+	ok ( fdt_path ( &fdt, "/soc/serial@10010000", &offset ) == 0 );
+	ok ( fdt_phandle ( &fdt, offset ) == 0 );
+
 	/* Verify cell properties */
 	ok ( fdt_path ( &fdt, "/soc/ethernet@10090000", &offset ) == 0 );
 	ok ( fdt_cells ( &fdt, offset, "reg", 4, 2, &u64 ) == 0 );
@@ -260,15 +270,6 @@ static void fdt_test_exec ( void ) {
 	ok ( fdt_alias ( &fdt, "ethernet0:params", &offset ) == 0 );
 	ok ( ( string = fdt_string ( &fdt, offset, "phy-mode" ) ) != NULL );
 	ok ( strcmp ( string, "gmii" ) == 0 );
-
-	/* Verify phandle lookup */
-	ok ( fdt_phandle ( &fdt, 0x03, &offset ) == 0 );
-	ok ( fdt_describe ( &fdt, offset, &desc ) == 0 );
-	ok ( strcmp ( desc.name, "interrupt-controller" ) == 0 );
-	ok ( fdt_phandle ( &fdt, 0x08, &offset ) == 0 );
-	ok ( fdt_describe ( &fdt, offset, &desc ) == 0 );
-	ok ( strcmp ( desc.name, "ethernet-phy@0" ) == 0 );
-	ok ( fdt_phandle ( &fdt, 0x2a, &offset ) != 0 );
 
 	/* Verify node description */
 	ok ( fdt_path ( &fdt, "/memory@80000000", &offset ) == 0 );
