@@ -239,6 +239,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_cgem		     ( ERRFILE_DRIVER | 0x00db0000 )
 #define ERRFILE_dwmac		     ( ERRFILE_DRIVER | 0x00dc0000 )
 #define ERRFILE_dwusb		     ( ERRFILE_DRIVER | 0x00dd0000 )
+#define ERRFILE_dwgpio		     ( ERRFILE_DRIVER | 0x00de0000 )
 
 #define ERRFILE_aoe			( ERRFILE_NET | 0x00000000 )
 #define ERRFILE_arp			( ERRFILE_NET | 0x00010000 )

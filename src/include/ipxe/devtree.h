@@ -77,9 +77,21 @@ static inline void * dt_get_drvdata ( struct dt_device *dt ) {
 	return dt->priv;
 }
 
+/**
+ * Get devicetree parent device
+ *
+ * @v dt		Devicetree device
+ * @ret parent		Parent devicetree device
+ */
+static inline struct dt_device * dt_parent ( struct dt_device *dt ) {
+	return container_of ( dt->dev.parent, struct dt_device, dev );
+}
+
 extern void * dt_ioremap ( struct dt_device *dt, unsigned int offset,
 			   unsigned int index, size_t len );
 extern int dt_probe_node ( struct device *parent, unsigned int offset );
 extern void dt_remove_node ( struct device *parent );
+extern int dt_probe_children ( struct dt_device *parent, unsigned int offset );
+extern void dt_remove_children ( struct dt_device *parent );
 
 #endif /* _IPXE_DEVTREE_H */

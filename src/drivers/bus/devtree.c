@@ -40,8 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 static struct dt_driver dt_node_driver __dt_driver;
 
-static void dt_remove_children ( struct dt_device *parent );
-
 /**
  * Map devicetree range
  *
@@ -267,8 +265,7 @@ void dt_remove_node ( struct device *parent ) {
  * @v offset		Starting node offset
  * @ret rc		Return status code
  */
-static int dt_probe_children ( struct dt_device *parent,
-			       unsigned int offset ) {
+int dt_probe_children ( struct dt_device *parent, unsigned int offset ) {
 	struct fdt_descriptor desc;
 	int depth;
 	int rc;
@@ -314,7 +311,7 @@ static int dt_probe_children ( struct dt_device *parent,
  *
  * @v parent		Parent device
  */
-static void dt_remove_children ( struct dt_device *parent ) {
+void dt_remove_children ( struct dt_device *parent ) {
 
 	/* Remove all child nodes */
 	while ( ! list_empty ( &parent->dev.children ) )
