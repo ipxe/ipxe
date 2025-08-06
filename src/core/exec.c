@@ -428,10 +428,7 @@ static int echo_exec ( int argc, char **argv ) {
 }
 
 /** "echo" command */
-struct command echo_command __command = {
-	.name = "echo",
-	.exec = echo_exec,
-};
+COMMAND ( echo, echo_exec );
 
 /** "exit" options */
 struct exit_options {};
@@ -472,10 +469,7 @@ static int exit_exec ( int argc, char **argv ) {
 }
 
 /** "exit" command */
-struct command exit_command __command = {
-	.name = "exit",
-	.exec = exit_exec,
-};
+COMMAND ( exit, exit_exec );
 
 /** "isset" options */
 struct isset_options {};
@@ -507,10 +501,7 @@ static int isset_exec ( int argc, char **argv ) {
 }
 
 /** "isset" command */
-struct command isset_command __command = {
-	.name = "isset",
-	.exec = isset_exec,
-};
+COMMAND ( isset, isset_exec );
 
 /** "iseq" options */
 struct iseq_options {};
@@ -544,10 +535,7 @@ static int iseq_exec ( int argc, char **argv ) {
 }
 
 /** "iseq" command */
-struct command iseq_command __command = {
-	.name = "iseq",
-	.exec = iseq_exec,
-};
+COMMAND ( iseq, iseq_exec );
 
 /** "sleep" options */
 struct sleep_options {};
@@ -587,7 +575,4 @@ static int sleep_exec ( int argc, char **argv ) {
 }
 
 /** "sleep" command */
-struct command sleep_command __command = {
-	.name = "sleep",
-	.exec = sleep_exec,
-};
+COMMAND ( sleep, sleep_exec );

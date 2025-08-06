@@ -163,13 +163,5 @@ static int imgverify_exec ( int argc, char **argv ) {
 }
 
 /** Image trust management commands */
-struct command image_trust_commands[] __command = {
-	{
-		.name = "imgtrust",
-		.exec = imgtrust_exec,
-	},
-	{
-		.name = "imgverify",
-		.exec = imgverify_exec,
-	},
-};
+COMMAND ( imgtrust, imgtrust_exec );
+COMMAND ( imgverify, imgverify_exec );

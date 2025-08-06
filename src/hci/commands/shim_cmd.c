@@ -123,9 +123,4 @@ static int shim_exec ( int argc, char **argv ) {
 }
 
 /** Shim commands */
-struct command shim_commands[] __command = {
-	{
-		.name = "shim",
-		.exec = shim_exec,
-	},
-};
+COMMAND ( shim, shim_exec );

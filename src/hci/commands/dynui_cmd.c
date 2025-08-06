@@ -350,25 +350,8 @@ static int present_exec ( int argc, char **argv ) {
 }
 
 /** Dynamic user interface commands */
-struct command dynui_commands[] __command = {
-	{
-		.name = "menu",
-		.exec = dynui_exec,
-	},
-	{
-		.name = "form",
-		.exec = dynui_exec,
-	},
-	{
-		.name = "item",
-		.exec = item_exec,
-	},
-	{
-		.name = "choose",
-		.exec = choose_exec,
-	},
-	{
-		.name = "present",
-		.exec = present_exec,
-	},
-};
+COMMAND ( menu, dynui_exec );
+COMMAND ( form, dynui_exec );
+COMMAND ( item, item_exec );
+COMMAND ( choose, choose_exec );
+COMMAND ( present, present_exec );

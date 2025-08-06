@@ -79,7 +79,4 @@ static int config_exec ( int argc, char **argv ) {
 }
 
 /** Configuration UI commands */
-struct command config_command __command = {
-	.name = "config",
-	.exec = config_exec,
-};
+COMMAND ( config, config_exec );

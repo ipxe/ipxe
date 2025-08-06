@@ -251,17 +251,6 @@ static int cpair_exec ( int argc, char **argv ) {
 }
 
 /** Console management commands */
-struct command console_commands[] __command = {
-	{
-		.name = "console",
-		.exec = console_exec,
-	},
-	{
-		.name = "colour",
-		.exec = colour_exec,
-	},
-	{
-		.name = "cpair",
-		.exec = cpair_exec,
-	},
-};
+COMMAND ( console, console_exec );
+COMMAND ( colour, colour_exec );
+COMMAND ( cpair, cpair_exec );

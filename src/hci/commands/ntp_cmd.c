@@ -75,7 +75,4 @@ static int ntp_exec ( int argc, char **argv ) {
 }
 
 /** NTP command */
-struct command ntp_command __command = {
-	.name = "ntp",
-	.exec = ntp_exec,
-};
+COMMAND ( ntp, ntp_exec );

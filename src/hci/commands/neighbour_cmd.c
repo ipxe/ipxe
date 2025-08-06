@@ -65,9 +65,4 @@ static int nstat_exec ( int argc, char **argv ) {
 }
 
 /** Neighbour management commands */
-struct command neighbour_commands[] __command = {
-	{
-		.name = "nstat",
-		.exec = nstat_exec,
-	},
-};
+COMMAND ( nstat, nstat_exec );

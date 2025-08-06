@@ -73,9 +73,4 @@ static int autoboot_exec ( int argc, char **argv ) {
 }
 
 /** Booting commands */
-struct command autoboot_commands[] __command = {
-	{
-		.name = "autoboot",
-		.exec = autoboot_exec,
-	},
-};
+COMMAND ( autoboot, autoboot_exec );

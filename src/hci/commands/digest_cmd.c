@@ -128,15 +128,8 @@ static int sha1sum_exec ( int argc, char **argv ) {
 	return digest_exec ( argc, argv, &sha1_algorithm );
 }
 
-struct command md5sum_command __command = {
-	.name = "md5sum",
-	.exec = md5sum_exec,
-};
-
-struct command sha1sum_command __command = {
-	.name = "sha1sum",
-	.exec = sha1sum_exec,
-};
+COMMAND ( md5sum, md5sum_exec );
+COMMAND ( sha1sum, sha1sum_exec );
 
 /* Drag in commands for any other enabled algorithms */
 REQUIRING_SYMBOL ( digest_exec );

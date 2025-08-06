@@ -95,7 +95,4 @@ static int cpuid_exec ( int argc, char **argv ) {
 }
 
 /** x86 CPU feature detection command */
-struct command cpuid_command __command = {
-	.name = "cpuid",
-	.exec = cpuid_exec,
-};
+COMMAND ( cpuid, cpuid_exec );

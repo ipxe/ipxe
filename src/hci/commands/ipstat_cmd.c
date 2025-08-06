@@ -66,9 +66,4 @@ static int ipstat_exec ( int argc, char **argv ) {
 }
 
 /** Routing table management commands */
-struct command ipstat_commands[] __command = {
-	{
-		.name = "ipstat",
-		.exec = ipstat_exec,
-	},
-};
+COMMAND ( ipstat, ipstat_exec );

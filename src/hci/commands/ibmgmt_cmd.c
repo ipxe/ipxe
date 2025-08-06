@@ -71,9 +71,4 @@ static int ibstat_exec ( int argc, char **argv ) {
 }
 
 /** Infiniband commands */
-struct command ibmgmt_commands[] __command = {
-	{
-		.name = "ibstat",
-		.exec = ibstat_exec,
-	},
-};
+COMMAND ( ibstat, ibstat_exec );

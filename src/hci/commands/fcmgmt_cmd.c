@@ -207,13 +207,5 @@ static int fcels_exec ( int argc, char **argv ) {
 }
 
 /** Fibre Channel management commands */
-struct command fcmgmt_commands[] __command = {
-	{
-		.name = "fcstat",
-		.exec = fcstat_exec,
-	},
-	{
-		.name = "fcels",
-		.exec = fcels_exec,
-	},
-};
+COMMAND ( fcstat, fcstat_exec );
+COMMAND ( fcels, fcels_exec );

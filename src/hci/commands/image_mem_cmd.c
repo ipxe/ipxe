@@ -89,9 +89,4 @@ static int imgmem_exec ( int argc, char **argv ) {
 }
 
 /** Read memory command */
-struct command imgmem_commands[] __command = {
-	{
-		.name = "imgmem",
-		.exec = imgmem_exec,
-	},
-};
+COMMAND ( imgmem, imgmem_exec );

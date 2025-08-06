@@ -71,7 +71,4 @@ static int login_exec ( int argc, char **argv ) {
 }
 
 /** Login commands */
-struct command login_command __command = {
-	.name = "login",
-	.exec = login_exec,
-};
+COMMAND ( login, login_exec );

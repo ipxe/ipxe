@@ -115,9 +115,4 @@ static int pciscan_exec ( int argc, char **argv ) {
 }
 
 /** PCI commands */
-struct command pci_commands[] __command = {
-	{
-		.name = "pciscan",
-		.exec = pciscan_exec,
-	},
-};
+COMMAND ( pciscan, pciscan_exec );

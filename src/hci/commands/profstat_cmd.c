@@ -66,9 +66,4 @@ static int profstat_exec ( int argc, char **argv ) {
 }
 
 /** Profiling commands */
-struct command profstat_commands[] __command = {
-	{
-		.name = "profstat",
-		.exec = profstat_exec,
-	},
-};
+COMMAND ( profstat, profstat_exec );

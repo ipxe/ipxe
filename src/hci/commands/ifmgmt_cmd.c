@@ -303,25 +303,8 @@ static int iflinkwait_exec ( int argc, char **argv ) {
 }
 
 /** Interface management commands */
-struct command ifmgmt_commands[] __command = {
-	{
-		.name = "ifopen",
-		.exec = ifopen_exec,
-	},
-	{
-		.name = "ifclose",
-		.exec = ifclose_exec,
-	},
-	{
-		.name = "ifstat",
-		.exec = ifstat_exec,
-	},
-	{
-		.name = "ifconf",
-		.exec = ifconf_exec,
-	},
-	{
-		.name = "iflinkwait",
-		.exec = iflinkwait_exec,
-	},
-};
+COMMAND ( ifopen, ifopen_exec );
+COMMAND ( ifclose, ifclose_exec );
+COMMAND ( ifstat, ifstat_exec );
+COMMAND ( ifconf, ifconf_exec );
+COMMAND ( iflinkwait, iflinkwait_exec );

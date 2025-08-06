@@ -88,9 +88,4 @@ static int fdt_exec ( int argc, char **argv ) {
 }
 
 /** Flattened Device Tree commands */
-struct command fdt_commands[] __command = {
-	{
-		.name = "fdt",
-		.exec = fdt_exec,
-	},
-};
+COMMAND ( fdt, fdt_exec );

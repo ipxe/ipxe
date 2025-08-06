@@ -352,10 +352,7 @@ static int goto_exec ( int argc, char **argv ) {
 }
 
 /** "goto" command */
-struct command goto_command __command = {
-	.name = "goto",
-	.exec = goto_exec,
-};
+COMMAND ( goto, goto_exec );
 
 /** "prompt" options */
 struct prompt_options {
@@ -418,7 +415,4 @@ static int prompt_exec ( int argc, char **argv ) {
 }
 
 /** "prompt" command */
-struct command prompt_command __command = {
-	.name = "prompt",
-	.exec = prompt_exec,
-};
+COMMAND ( prompt, prompt_exec );

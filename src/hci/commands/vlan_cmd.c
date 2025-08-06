@@ -131,13 +131,5 @@ static int vdestroy_exec ( int argc, char **argv ) {
 }
 
 /** VLAN commands */
-struct command vlan_commands[] __command = {
-	{
-		.name = "vcreate",
-		.exec = vcreate_exec,
-	},
-	{
-		.name = "vdestroy",
-		.exec = vdestroy_exec,
-	},
-};
+COMMAND ( vcreate, vcreate_exec );
+COMMAND ( vdestroy, vdestroy_exec );

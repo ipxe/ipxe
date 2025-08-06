@@ -113,13 +113,5 @@ static int iwlist_exec ( int argc, char **argv ) {
 }
 
 /** Wireless interface management commands */
-struct command iwmgmt_commands[] __command = {
-	{
-		.name = "iwstat",
-		.exec = iwstat_exec,
-	},
-	{
-		.name = "iwlist",
-		.exec = iwlist_exec,
-	},
-};
+COMMAND ( iwstat, iwstat_exec );
+COMMAND ( iwlist, iwlist_exec );

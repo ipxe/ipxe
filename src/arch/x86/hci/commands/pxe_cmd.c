@@ -105,13 +105,5 @@ static int stoppxe_exec ( int argc __unused, char **argv __unused ) {
 }
 
 /** PXE commands */
-struct command pxe_commands[] __command = {
-	{
-		.name = "startpxe",
-		.exec = startpxe_exec,
-	},
-	{
-		.name = "stoppxe",
-		.exec = stoppxe_exec,
-	},
-};
+COMMAND ( startpxe, startpxe_exec );
+COMMAND ( stoppxe, stoppxe_exec );

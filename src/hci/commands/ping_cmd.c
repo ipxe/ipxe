@@ -107,7 +107,4 @@ static int ping_exec ( int argc, char **argv ) {
 }
 
 /** Ping command */
-struct command ping_command __command = {
-	.name = "ping",
-	.exec = ping_exec,
-};
+COMMAND ( ping, ping_exec );

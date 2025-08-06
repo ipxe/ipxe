@@ -70,7 +70,4 @@ static int poweroff_exec ( int argc, char **argv ) {
 }
 
 /** "poweroff" command */
-struct command poweroff_command __command = {
-	.name = "poweroff",
-	.exec = poweroff_exec,
-};
+COMMAND ( poweroff, poweroff_exec );

@@ -72,10 +72,7 @@ static int help_exec ( int argc __unused, char **argv __unused ) {
 }
 
 /** "help" command */
-struct command help_command __command = {
-	.name = "help",
-	.exec = help_exec,
-};
+COMMAND ( help, help_exec );
 
 /**
  * Start command shell
@@ -137,7 +134,4 @@ static int shell_exec ( int argc, char **argv ) {
 }
 
 /** "shell" command */
-struct command shell_command __command = {
-	.name = "shell",
-	.exec = shell_exec,
-};
+COMMAND ( shell, shell_exec );

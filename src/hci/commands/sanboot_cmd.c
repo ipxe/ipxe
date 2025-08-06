@@ -204,17 +204,6 @@ static int sanunhook_exec ( int argc, char **argv ) {
 }
 
 /** SAN commands */
-struct command sanboot_commands[] __command = {
-	{
-		.name = "sanhook",
-		.exec = sanhook_exec,
-	},
-	{
-		.name = "sanboot",
-		.exec = sanboot_exec,
-	},
-	{
-		.name = "sanunhook",
-		.exec = sanunhook_exec,
-	},
-};
+COMMAND ( sanhook, sanhook_exec );
+COMMAND ( sanboot, sanboot_exec );
+COMMAND ( sanunhook, sanunhook_exec );

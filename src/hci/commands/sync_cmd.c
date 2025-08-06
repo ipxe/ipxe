@@ -77,7 +77,4 @@ static int sync_exec ( int argc, char **argv ) {
 }
 
 /** Sync commands */
-struct command sync_command __command = {
-	.name = "sync",
-	.exec = sync_exec,
-};
+COMMAND ( sync, sync_exec );

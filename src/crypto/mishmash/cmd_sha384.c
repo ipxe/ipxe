@@ -30,7 +30,4 @@ static int sha384sum_exec ( int argc, char **argv ) {
 	return digest_exec ( argc, argv, &sha384_algorithm );
 }
 
-struct command sha384sum_command __command = {
-	.name = "sha384sum",
-	.exec = sha384sum_exec,
-};
+COMMAND ( sha384sum, sha384sum_exec );

@@ -66,9 +66,4 @@ static int route_exec ( int argc, char **argv ) {
 }
 
 /** Routing table management commands */
-struct command route_commands[] __command = {
-	{
-		.name = "route",
-		.exec = route_exec,
-	},
-};
+COMMAND ( route, route_exec );

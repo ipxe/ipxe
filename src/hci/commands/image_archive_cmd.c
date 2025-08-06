@@ -97,9 +97,4 @@ static int imgextract_exec ( int argc, char **argv ) {
 }
 
 /** Archive image commands */
-struct command image_archive_commands[] __command = {
-	{
-		.name = "imgextract",
-		.exec = imgextract_exec,
-	},
-};
+COMMAND ( imgextract, imgextract_exec );

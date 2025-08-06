@@ -107,9 +107,4 @@ static int gdbstub_exec ( int argc, char **argv ) {
 }
 
 /** GDB stub commands */
-struct command gdbstub_commands[] __command = {
-	{
-		.name = "gdbstub",
-		.exec = gdbstub_exec,
-	},
-};
+COMMAND ( gdbstub, gdbstub_exec );

@@ -393,54 +393,22 @@ static int imgfree_exec ( int argc, char **argv ) {
 	return imgmulti_exec ( argc, argv, unregister_image );
 }
 
-/** Image management commands */
-struct command image_commands[] __command = {
-	{
-		.name = "imgfetch",
-		.exec = imgfetch_exec,
-	},
-	{
-		.name = "module",
-		.exec = imgfetch_exec, /* synonym for "imgfetch" */
-	},
-	{
-		.name = "initrd",
-		.exec = imgfetch_exec, /* synonym for "imgfetch" */
-	},
-	{
-		.name = "kernel",
-		.exec = imgselect_exec, /* synonym for "imgselect" */
-	},
-	{
-		.name = "chain",
-		.exec = imgexec_exec, /* synonym for "imgexec" */
-	},
-	{
-		.name = "imgselect",
-		.exec = imgselect_exec,
-	},
-	{
-		.name = "imgload",
-		.exec = imgselect_exec, /* synonym for "imgselect" */
-	},
-	{
-		.name = "imgargs",
-		.exec = imgargs_exec,
-	},
-	{
-		.name = "imgexec",
-		.exec = imgexec_exec,
-	},
-	{
-		.name = "boot", /* synonym for "imgexec" */
-		.exec = imgexec_exec,
-	},
-	{
-		.name = "imgstat",
-		.exec = imgstat_exec,
-	},
-	{
-		.name = "imgfree",
-		.exec = imgfree_exec,
-	},
-};
+/* "imgfetch" and synonyms */
+COMMAND ( imgfetch, imgfetch_exec );
+COMMAND ( module, imgfetch_exec );
+COMMAND ( initrd, imgfetch_exec );
+
+/* "imgselect" and synonyms */
+COMMAND ( imgselect, imgselect_exec );
+COMMAND ( imgload, imgselect_exec );
+COMMAND ( kernel, imgselect_exec );
+
+/* "imgexec" and synonyms */
+COMMAND ( imgexec, imgexec_exec );
+COMMAND ( chain, imgexec_exec );
+COMMAND ( boot, imgexec_exec );
+
+/* Other image management commands */
+COMMAND ( imgargs, imgargs_exec );
+COMMAND ( imgstat, imgstat_exec );
+COMMAND ( imgfree, imgfree_exec );

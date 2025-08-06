@@ -30,7 +30,4 @@ static int md4sum_exec ( int argc, char **argv ) {
 	return digest_exec ( argc, argv, &md4_algorithm );
 }
 
-struct command md4sum_command __command = {
-	.name = "md4sum",
-	.exec = md4sum_exec,
-};
+COMMAND ( md4sum, md4sum_exec );

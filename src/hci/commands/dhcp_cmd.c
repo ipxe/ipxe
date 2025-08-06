@@ -92,13 +92,5 @@ static int pxebs_exec ( int argc, char **argv ) {
 }
 
 /** DHCP management commands */
-struct command dhcp_commands[] __command = {
-	{
-		.name = "dhcp",
-		.exec = ifconf_exec, /* synonym for "ifconf" */
-	},
-	{
-		.name = "pxebs",
-		.exec = pxebs_exec,
-	},
-};
+COMMAND ( dhcp, ifconf_exec ); /* synonym for "ifconf" */
+COMMAND ( pxebs, pxebs_exec );

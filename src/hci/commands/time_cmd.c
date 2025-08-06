@@ -77,7 +77,4 @@ static int time_exec ( int argc, char **argv ) {
 }
 
 /** "time" command */
-struct command time_command __command = {
-	.name = "time",
-	.exec = time_exec,
-};
+COMMAND ( time, time_exec );

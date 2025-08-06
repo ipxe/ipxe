@@ -117,9 +117,4 @@ static int imgdecrypt_exec ( int argc, char **argv ) {
 }
 
 /** Image encryption management commands */
-struct command image_crypt_commands[] __command = {
-	{
-		.name = "imgdecrypt",
-		.exec = imgdecrypt_exec,
-	},
-};
+COMMAND ( imgdecrypt, imgdecrypt_exec );

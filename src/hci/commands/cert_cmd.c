@@ -289,17 +289,6 @@ static int certfree_exec ( int argc, char **argv ) {
 }
 
 /** Certificate management commands */
-struct command certmgmt_commands[] __command = {
-	{
-		.name = "certstat",
-		.exec = certstat_exec,
-	},
-	{
-		.name = "certstore",
-		.exec = certstore_exec,
-	},
-	{
-		.name = "certfree",
-		.exec = certfree_exec,
-	},
-};
+COMMAND ( certstat, certstat_exec );
+COMMAND ( certstore, certstore_exec );
+COMMAND ( certfree, certfree_exec );

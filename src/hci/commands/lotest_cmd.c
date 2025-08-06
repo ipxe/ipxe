@@ -100,7 +100,4 @@ static int lotest_exec ( int argc, char **argv ) {
 }
 
 /** Loopback testing commands */
-struct command lotest_command __command = {
-	.name = "lotest",
-	.exec = lotest_exec,
-};
+COMMAND ( lotest, lotest_exec );

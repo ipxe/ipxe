@@ -163,13 +163,5 @@ static int param_exec ( int argc, char **argv ) {
 }
 
 /** Request parameter commands */
-struct command param_commands[] __command = {
-	{
-		.name = "params",
-		.exec = params_exec,
-	},
-	{
-		.name = "param",
-		.exec = param_exec,
-	},
-};
+COMMAND ( params, params_exec );
+COMMAND ( param, param_exec );

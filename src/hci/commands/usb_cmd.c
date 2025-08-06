@@ -115,9 +115,4 @@ static int usbscan_exec ( int argc, char **argv ) {
 }
 
 /** USB commands */
-struct command usb_commands[] __command = {
-	{
-		.name = "usbscan",
-		.exec = usbscan_exec,
-	},
-};
+COMMAND ( usbscan, usbscan_exec );

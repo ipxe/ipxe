@@ -81,7 +81,4 @@ static int reboot_exec ( int argc, char **argv ) {
 }
 
 /** "reboot" command */
-struct command reboot_command __command = {
-	.name = "reboot",
-	.exec = reboot_exec,
-};
+COMMAND ( reboot, reboot_exec );
