@@ -86,7 +86,7 @@ int digest_exec ( int argc, char **argv, struct digest_algorithm *digest ) {
 
 		/* Acquire image */
 		if ( ( rc = imgacquire ( argv[i], 0, &image ) ) != 0 )
-			continue;
+			return rc;
 
 		/* Calculate digest */
 		digest_init ( digest, ctx );
