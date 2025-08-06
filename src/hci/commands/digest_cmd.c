@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
 #include <usr/imgmgmt.h>
+#include <hci/digest_cmd.h>
 
 /** @file
  *
@@ -56,8 +57,7 @@ static struct command_descriptor digest_cmd =
  * @v digest		Digest algorithm
  * @ret rc		Return status code
  */
-static int digest_exec ( int argc, char **argv,
-			 struct digest_algorithm *digest ) {
+int digest_exec ( int argc, char **argv, struct digest_algorithm *digest ) {
 	struct digest_options opts;
 	struct image *image;
 	uint8_t digest_ctx[digest->ctxsize];
@@ -90,6 +90,8 @@ static int digest_exec ( int argc, char **argv,
 	return 0;
 }
 
+/* Include "md5sum" and "sha1sum" commands unconditionally */
+
 static int md5sum_exec ( int argc, char **argv ) {
 	return digest_exec ( argc, argv, &md5_algorithm );
 }
@@ -107,3 +109,7 @@ struct command sha1sum_command __command = {
 	.name = "sha1sum",
 	.exec = sha1sum_exec,
 };
+
+/* Drag in commands for any other enabled algorithms */
+REQUIRING_SYMBOL ( digest_exec );
+REQUIRE_OBJECT ( config_digest_cmd );
