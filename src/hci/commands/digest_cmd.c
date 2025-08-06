@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
 #include <ipxe/image.h>
+#include <ipxe/settings.h>
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
@@ -39,10 +40,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
  */
 
 /** "digest" options */
-struct digest_options {};
+struct digest_options {
+	/** Setting */
+	struct named_setting setting;
+};
 
 /** "digest" option list */
-static struct option_descriptor digest_opts[] = {};
+static struct option_descriptor digest_opts[] = {
+	OPTION_DESC ( "set", 's', required_argument, struct digest_options,
+		      setting, parse_autovivified_setting ),
+};
 
 /** "digest" command descriptor */
 static struct command_descriptor digest_cmd =
@@ -60,16 +67,21 @@ static struct command_descriptor digest_cmd =
 int digest_exec ( int argc, char **argv, struct digest_algorithm *digest ) {
 	struct digest_options opts;
 	struct image *image;
-	uint8_t digest_ctx[digest->ctxsize];
-	uint8_t digest_out[digest->digestsize];
+	uint8_t ctx[digest->ctxsize];
+	uint8_t out[digest->digestsize];
+	unsigned int j;
 	int i;
-	unsigned j;
 	int rc;
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &digest_cmd, &opts ) ) != 0 )
 		return rc;
 
+	/* Use default setting type, if not specified */
+	if ( ! opts.setting.setting.type )
+		opts.setting.setting.type = &setting_type_hexraw;
+
+	/* Calculate digests for each image */
 	for ( i = optind ; i < argc ; i++ ) {
 
 		/* Acquire image */
@@ -77,14 +89,30 @@ int digest_exec ( int argc, char **argv, struct digest_algorithm *digest ) {
 			continue;
 
 		/* Calculate digest */
-		digest_init ( digest, digest_ctx );
-		digest_update ( digest, digest_ctx, image->data, image->len );
-		digest_final ( digest, digest_ctx, digest_out );
+		digest_init ( digest, ctx );
+		digest_update ( digest, ctx, image->data, image->len );
+		digest_final ( digest, ctx, out );
 
-		for ( j = 0 ; j < sizeof ( digest_out ) ; j++ )
-			printf ( "%02x", digest_out[j] );
+		/* Display or store digest as directed */
+		if ( opts.setting.settings ) {
 
-		printf ( "  %s\n", image->name );
+			/* Store digest */
+			if ( ( rc = store_setting ( opts.setting.settings,
+						    &opts.setting.setting, out,
+						    sizeof ( out ) ) ) != 0 ) {
+				printf ( "Could not store \"%s\": %s\n",
+					 opts.setting.setting.name,
+					 strerror ( rc ) );
+				return rc;
+			}
+
+		} else {
+
+			/* Print digest */
+			for ( j = 0 ; j < sizeof ( out ) ; j++ )
+				printf ( "%02x", out[j] );
+			printf ( "  %s\n", image->name );
+		}
 	}
 
 	return 0;
