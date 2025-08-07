@@ -53,10 +53,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** A DesignWare GPIO port group */
 struct dwgpio_group {
-	/** Register base */
-	void *base;
-	/** Region cell size specification */
-	struct fdt_reg_cells regs;
+	/** Registers */
+	void *regs;
 };
 
 /** A DesignWare GPIO port */

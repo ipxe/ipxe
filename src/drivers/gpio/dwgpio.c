@@ -64,14 +64,11 @@ static int dwgpio_group_probe ( struct dt_device *dt, unsigned int offset ) {
 	dt_set_drvdata ( dt, group );
 
 	/* Map registers */
-	group->base = dt_ioremap ( dt, offset, 0, 0 );
-	if ( ! group->base ) {
+	group->regs = dt_ioremap ( dt, offset, 0, 0 );
+	if ( ! group->regs ) {
 		rc = -ENODEV;
 		goto err_ioremap;
 	}
-
-	/* Get region cell size specification */
-	fdt_reg_cells ( &sysfdt, offset, &group->regs );
 
 	/* Probe child ports */
 	if ( ( rc = dt_probe_children ( dt, offset ) ) != 0 )
@@ -81,7 +78,7 @@ static int dwgpio_group_probe ( struct dt_device *dt, unsigned int offset ) {
 
 	dt_remove_children ( dt );
  err_children:
-	iounmap ( group->base );
+	iounmap ( group->regs );
  err_ioremap:
 	free ( group );
  err_alloc:
@@ -100,7 +97,7 @@ static void dwgpio_group_remove ( struct dt_device *dt ) {
 	dt_remove_children ( dt );
 
 	/* Unmap registers */
-	iounmap ( group->base );
+	iounmap ( group->regs );
 
 	/* Free device */
 	free ( group );
@@ -260,8 +257,7 @@ static int dwgpio_probe ( struct dt_device *dt, unsigned int offset ) {
 	group = dt_get_drvdata ( parent );
 
 	/* Identify port */
-	if ( ( rc = fdt_reg_address ( &sysfdt, offset, &group->regs, 0,
-				      &port ) ) != 0 ) {
+	if ( ( rc = fdt_reg ( &sysfdt, offset, &port ) ) != 0 ) {
 		DBGC ( dwgpio, "DWGPIO %s could not get port number: %s\n",
 		       dwgpio->name, strerror ( rc ) );
 		goto err_port;
@@ -271,8 +267,8 @@ static int dwgpio_probe ( struct dt_device *dt, unsigned int offset ) {
 	       dwgpio->name, parent->name, dwgpio->port, gpios->count );
 
 	/* Map registers */
-	dwgpio->swport = ( group->base + DWGPIO_SWPORT ( port ) );
-	dwgpio->ext = ( group->base + DWGPIO_EXT_PORT ( port ) );
+	dwgpio->swport = ( group->regs + DWGPIO_SWPORT ( port ) );
+	dwgpio->ext = ( group->regs + DWGPIO_EXT_PORT ( port ) );
 	dwgpio_dump ( dwgpio );
 
 	/* Record original register values */
