@@ -52,21 +52,17 @@ static struct dt_driver dt_node_driver __dt_driver;
 void * dt_ioremap ( struct dt_device *dt, unsigned int offset,
 		    unsigned int index, size_t len ) {
 	struct fdt_reg_cells regs;
-	unsigned int parent;
 	uint64_t address;
 	uint64_t size;
 	void *io_addr;
 	int rc;
 
-	/* Get parent node */
-	if ( ( rc = fdt_parent ( &sysfdt, offset, &parent ) ) != 0 ) {
-		DBGC ( dt, "DT %s could not locate parent: %s\n",
+	/* Get parent region cell size specification */
+	if ( ( rc = fdt_parent_reg_cells ( &sysfdt, offset, &regs ) ) != 0 ) {
+		DBGC ( dt, "DT %s could not get region cell sizes: %s\n",
 		       dt->name, strerror ( rc ) );
 		return NULL;
 	}
-
-	/* Read #address-cells and #size-cells, if present */
-	fdt_reg_cells ( &sysfdt, parent, &regs );
 
 	/* Read address */
 	if ( ( rc = fdt_reg_address ( &sysfdt, offset, &regs, index,
