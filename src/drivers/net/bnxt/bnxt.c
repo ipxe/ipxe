@@ -234,11 +234,11 @@ static void bnxt_db_cq ( struct bnxt *bp )
 {
 	if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P7 ) )
 		dev_p7_db ( bp, ( u32 )bp->cq.cons_id,
-			 ( u32 )bp->cq_ring_id, DBC_DBC_TYPE_CQ_ARMALL,
+			 ( u32 )bp->cq_ring_id, DBC_DBC_TYPE_CQ,
                          ( u32 )bp->cq.epoch, ( u32 )bp->nq.toggle );
 	else if ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5 ) )
 		dev_p5_db ( bp, ( u32 )bp->cq.cons_id,
-			 ( u32 )bp->cq_ring_id, DBC_DBC_TYPE_CQ_ARMALL );
+			 ( u32 )bp->cq_ring_id, DBC_DBC_TYPE_CQ);
 	else
 		writel ( CQ_DOORBELL_KEY_IDX ( bp->cq.cons_id ),
 			( bp->bar1 + 0 ) );
