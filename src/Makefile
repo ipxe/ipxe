@@ -3,30 +3,30 @@
 # Initialise various variables
 #
 
-CLEANUP		:=
-CFLAGS		:=
-ASFLAGS		:=
-LDFLAGS		:=
-HOST_CFLAGS	:=
+CLEANUP		?=
+CFLAGS		?=
+ASFLAGS		?=
+LDFLAGS		?=
+HOST_CFLAGS	?=
 MAKEDEPS	:= Makefile
 CROSS_COMPILE	?= $(CROSS)
-SYMBOL_PREFIX	:=
+SYMBOL_PREFIX	?=
 
 ###############################################################################
 #
 # Locations of tools
 #
-HOST_CC		:= gcc
-RM		:= rm -f
-TOUCH		:= touch
-MKDIR		:= mkdir
-CP		:= cp
-ECHO		:= echo
-PRINTF		:= printf
-PERL		:= perl
-PYTHON		:= python
-TRUE		:= true
-TRUNCATE	:= truncate
+HOST_CC		?= gcc
+RM		?= rm -f
+TOUCH		?= touch
+MKDIR		?= mkdir
+CP		?= cp
+ECHO		?= echo
+PRINTF		?= printf
+PERL		?= perl
+PYTHON		?= python
+TRUE		?= true
+TRUNCATE	?= truncate
 CC		= $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AS		= $(CROSS_COMPILE)as
@@ -37,8 +37,8 @@ RANLIB		= $(CROSS_COMPILE)ranlib
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 NM		= $(CROSS_COMPILE)nm
 OBJDUMP		= $(CROSS_COMPILE)objdump
-OPENSSL		:= openssl
-CSPLIT		:= csplit
+OPENSSL		?= openssl
+CSPLIT		?= csplit
 PARSEROM	:= ./util/parserom.pl
 FIXROM		:= ./util/fixrom.pl
 SYMCHECK	:= ./util/symcheck.pl
@@ -54,9 +54,9 @@ EFIROM		:= ./util/efirom
 EFIFATBIN	:= ./util/efifatbin
 EINFO		:= ./util/einfo
 GENKEYMAP	:= ./util/genkeymap.py
-DOXYGEN		:= doxygen
-LCAB		:= lcab
-QEMUIMG		:= qemu-img
+DOXYGEN		?= doxygen
+LCAB		?= lcab
+QEMUIMG		?= qemu-img
 
 ###############################################################################
 #
