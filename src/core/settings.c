@@ -693,6 +693,10 @@ int fetch_setting ( struct settings *settings, const struct setting *setting,
 		if ( ( ret = settings->op->fetch ( settings, &tmp,
 						   data, len ) ) >= 0 ) {
 
+			/* If incoming setting has a type, copy it over in
+			 * case it was overridden. */
+			if ( setting->type )
+				tmp.type = setting->type;
 			/* Default to string type, if not yet specified */
 			if ( ! tmp.type )
 				tmp.type = &setting_type_string;
@@ -1709,6 +1713,48 @@ const struct setting_type setting_type_uristring __setting_type = {
 	.parse = parse_uristring_setting,
 	.format = format_uristring_setting,
 };
+
+/**
+ * Format a URI without the path, query, and fragment portions.
+ *
+ * @v type		Setting type
+ * @v raw		Raw setting value
+ * @v raw_len		Length of raw setting value
+ * @v buf		Buffer to contain formatted value
+ * @v len		Length of buffer
+ * @ret len		Length of formatted value, or negative error
+ */
+static int format_uribase_setting ( const struct setting_type *type __unused,
+				    const void *raw, size_t raw_len,
+				    char *buf, size_t len ) {
+	char *raw_str;
+	struct uri *base_uri;
+	size_t ret;
+	raw_str = strndup((const char*)raw, raw_len);
+	if (!raw_str) {
+		return -ENOMEM;
+	}
+	base_uri = parse_uri(raw_str);
+	if (!base_uri) {
+		ret = -ENOMEM;
+		goto  err_uri_parse;
+	}
+	base_uri->path = NULL;
+	base_uri->query = NULL;
+	base_uri->fragment = NULL;
+	ret = format_uri(base_uri, buf, len);
+	uri_put(base_uri);
+err_uri_parse:
+	free(raw_str);
+	return ret;
+}
+
+/** A setting to strip path, query, and fragment from a URI */
+const struct setting_type setting_type_uribase __setting_type = {
+	.name = "uribase",
+	.format = format_uribase_setting,
+};
+
 
 /**
  * Parse IPv4 address setting value (when IPv4 support is not present)
