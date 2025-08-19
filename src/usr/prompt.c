@@ -44,27 +44,24 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * Returns success if the specified key was pressed within the
  * specified timeout period.
+ * @ret key		Key pressed, or negative error
  */
-int prompt ( const char *text, unsigned long timeout, int key ) {
-	int key_pressed;
+int prompt ( const char *text, unsigned long timeout ) {
+	int key;
 
 	/* Display prompt */
 	printf ( "%s", text );
 
 	/* Wait for key */
-	key_pressed = getkey ( timeout );
+	key = getkey ( timeout );
 
 	/* Clear the prompt line */
 	while ( *(text++) )
 		printf ( "\b \b" );
 
 	/* Check for timeout */
-	if ( key_pressed < 0 )
+	if ( key < 0 )
 		return -ETIMEDOUT;
 
-	/* Check for correct key pressed */
-	if ( key && ( key_pressed != key ) )
-		return -ECANCELED;
-
-	return 0;
+	return key;
 }
