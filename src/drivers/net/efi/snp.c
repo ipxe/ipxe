@@ -75,3 +75,7 @@ struct efi_driver nii_driver __efi_driver ( EFI_DRIVER_NII ) = {
 	.start = nii_start,
 	.stop = nii_stop,
 };
+
+/** Drag in MNP driver */
+REQUIRING_SYMBOL ( snp_driver );
+REQUIRE_SYMBOL ( mnp_driver );
