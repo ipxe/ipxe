@@ -43,6 +43,7 @@ efi_path_prev ( EFI_DEVICE_PATH_PROTOCOL *path,
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_path_end ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path );
+extern int efi_path_check ( EFI_DEVICE_PATH_PROTOCOL *path, size_t max );
 extern void * efi_path_mac ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern unsigned int efi_path_vlan ( EFI_DEVICE_PATH_PROTOCOL *path );
 extern int efi_path_guid ( EFI_DEVICE_PATH_PROTOCOL *path, union uuid *uuid );
@@ -58,6 +59,10 @@ extern EFI_DEVICE_PATH_PROTOCOL * efi_fcp_path ( struct fcp_description *desc );
 extern EFI_DEVICE_PATH_PROTOCOL *
 efi_ib_srp_path ( struct ib_srp_device *ib_srp );
 extern EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func );
+extern EFI_DEVICE_PATH_PROTOCOL * efi_load_path ( EFI_LOAD_OPTION *load,
+						  size_t len );
+extern EFI_DEVICE_PATH_PROTOCOL * efi_boot_path ( unsigned int number );
+extern EFI_DEVICE_PATH_PROTOCOL * efi_current_boot_path ( void );
 
 extern EFI_DEVICE_PATH_PROTOCOL * efi_describe ( struct interface *interface );
 #define efi_describe_TYPE( object_type ) \

@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/dhcp.h>
 #include <ipxe/efi/efi.h>
 #include <ipxe/efi/efi_driver.h>
+#include <ipxe/efi/efi_strings.h>
 #include <ipxe/efi/efi_path.h>
 
 /** @file
@@ -145,6 +146,33 @@ size_t efi_path_len ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	EFI_DEVICE_PATH_PROTOCOL *end = efi_path_end ( path );
 
 	return ( ( ( void * ) end ) - ( ( void * ) path ) );
+}
+
+/**
+ * Check that device path is well-formed
+ *
+ * @v path		Device path, or NULL
+ * @v max		Maximum device path length
+ * @ret rc		Return status code
+ */
+int efi_path_check ( EFI_DEVICE_PATH_PROTOCOL *path, size_t max ) {
+	EFI_DEVICE_PATH_PROTOCOL *next;
+	size_t remaining = max;
+	size_t len;
+
+	/* Check that path terminates within maximum length */
+	for ( ; ; path = next ) {
+		if ( remaining < sizeof ( *path ) )
+			return -EINVAL;
+		next = efi_path_next ( path );
+		if ( ! next )
+			break;
+		len = ( ( ( void * ) next ) - ( ( void * ) path ) );
+		if ( remaining < len )
+			return -EINVAL;
+	}
+
+	return 0;
 }
 
 /**
@@ -666,6 +694,177 @@ EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func ) {
 	}
 
 	return path;
+}
+
+/**
+ * Get EFI device path from load option
+ *
+ * @v load		EFI load option
+ * @v len		Length of EFI load option
+ * @ret path		EFI device path, or NULL on error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_load_path ( EFI_LOAD_OPTION *load,
+					   size_t len ) {
+	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *copy;
+	CHAR16 *wdesc;
+	size_t path_max;
+	size_t wmax;
+	size_t wlen;
+
+	/* Check basic structure size */
+	if ( len < sizeof ( *load ) ) {
+		DBGC ( load, "EFI load option too short for header:\n" );
+		DBGC_HDA ( load, 0, load, len );
+		return NULL;
+	}
+
+	/* Get length of description */
+	wdesc = ( ( ( void * ) load ) + sizeof ( *load ) );
+	wmax = ( ( len - sizeof ( *load ) ) / sizeof ( wdesc[0] ) );
+	wlen = wcsnlen ( wdesc, wmax );
+	if ( wlen == wmax ) {
+		DBGC ( load, "EFI load option has unterminated "
+		       "description:\n" );
+		DBGC_HDA ( load, 0, load, len );
+		return NULL;
+	}
+
+	/* Get inline device path */
+	path = ( ( ( void * ) load ) + sizeof ( *load ) +
+		 ( wlen * sizeof ( wdesc[0] ) ) + 2 /* wNUL */ );
+	path_max = ( len - sizeof ( *load ) - ( wlen * sizeof ( wdesc[0] ) )
+		     - 2 /* wNUL */ );
+	if ( load->FilePathListLength > path_max ) {
+		DBGC ( load, "EFI load option too short for path(s):\n" );
+		DBGC_HDA ( load, 0, load, len );
+		return NULL;
+	}
+
+	/* Check path length */
+	if ( efi_path_check ( path, path_max ) != 0 ) {
+		DBGC ( load, "EFI load option has unterminated device "
+		       "path:\n" );
+		DBGC_HDA ( load, 0, load, len );
+		return NULL;
+	}
+
+	/* Allocate copy of path */
+	copy = malloc ( path_max );
+	if ( ! copy )
+		return NULL;
+	memcpy ( copy, path, path_max );
+
+	return copy;
+}
+
+/**
+ * Get EFI device path for numbered boot option
+ *
+ * @v number		Boot option number
+ * @ret path		EFI device path, or NULL on error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_boot_path ( unsigned int number ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	EFI_GUID *guid = &efi_global_variable;
+	CHAR16 wname[ 9 /* "BootXXXX" + wNUL */ ];
+	EFI_LOAD_OPTION *load;
+	EFI_DEVICE_PATH *path;
+	UINT32 attrs;
+	UINTN size;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Construct variable name */
+	efi_snprintf ( wname, ( sizeof ( wname ) / sizeof ( wname[0] ) ),
+		       "Boot%04X", number );
+
+	/* Get variable length */
+	size = 0;
+	if ( ( efirc = rs->GetVariable ( wname, guid, &attrs, &size,
+					 NULL ) != EFI_BUFFER_TOO_SMALL ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( rs, "EFI could not get size of %ls: %s\n",
+		       wname, strerror ( rc ) );
+		goto err_size;
+	}
+
+	/* Allocate temporary buffer for EFI_LOAD_OPTION */
+	load = malloc ( size );
+	if ( ! load ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Read variable */
+	if ( ( efirc = rs->GetVariable ( wname, guid, &attrs, &size,
+					 load ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( rs, "EFI could not read %ls: %s\n",
+		       wname, strerror ( rc ) );
+		goto err_read;
+	}
+	DBGC2 ( rs, "EFI boot option %ls is:\n", wname );
+	DBGC2_HDA ( rs, 0, load, size );
+
+	/* Get device path from load option */
+	path = efi_load_path ( load, size );
+	if ( ! path ) {
+		rc = -EINVAL;
+		DBGC ( rs, "EFI could not parse %ls: %s\n",
+		       wname, strerror ( rc ) );
+		goto err_path;
+	}
+
+	/* Free temporary buffer */
+	free ( load );
+
+	return path;
+
+ err_path:
+ err_read:
+	free ( load );
+ err_alloc:
+ err_size:
+	return NULL;
+}
+
+/**
+ * Get EFI device path for current boot option
+ *
+ * @ret path		EFI device path, or NULL on error
+ *
+ * The caller is responsible for eventually calling free() on the
+ * allocated device path.
+ */
+EFI_DEVICE_PATH_PROTOCOL * efi_current_boot_path ( void ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	EFI_GUID *guid = &efi_global_variable;
+	CHAR16 wname[] = L"BootCurrent";
+	UINT16 current;
+	UINT32 attrs;
+	UINTN size;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Read current boot option index */
+	size = sizeof ( current );
+	if ( ( efirc = rs->GetVariable ( wname, guid, &attrs, &size,
+					 &current ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( rs, "EFI could not read %ls: %s\n",
+		       wname, strerror ( rc ) );
+		return NULL;
+	}
+
+	/* Get device path from this boot option */
+	return efi_boot_path ( current );
 }
 
 /**
