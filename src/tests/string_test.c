@@ -38,6 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <wchar.h>
 #include <ipxe/string.h>
 #include <ipxe/test.h>
 
@@ -322,6 +323,23 @@ static void string_test_exec ( void ) {
 			 + 17 ) * 26 + 10 ) );
 		ok ( endp == &string[6] );
 	}
+
+	/* Test wcslen() */
+	ok ( wcslen ( L"" ) == 0 );
+	ok ( wcslen ( L"Helloo" ) == 6 );
+	ok ( wcslen ( L"Helloo woorld!" ) == 14 );
+	ok ( wcslen ( L"Helloo\0woorld!" ) == 6 );
+
+	/* Test wcsnlen() */
+	ok ( wcsnlen ( L"", 0 ) == 0 );
+	ok ( wcsnlen ( L"", 10 ) == 0 );
+	ok ( wcsnlen ( L"Helloo", 0 ) == 0 );
+	ok ( wcsnlen ( L"Helloo", 3 ) == 3 );
+	ok ( wcsnlen ( L"Helloo", 5 ) == 5 );
+	ok ( wcsnlen ( L"Helloo", 16 ) == 6 );
+	ok ( wcsnlen ( L"Helloo woorld!", 5 ) == 5 );
+	ok ( wcsnlen ( L"Helloo woorld!", 11 ) == 11 );
+	ok ( wcsnlen ( L"Helloo woorld!", 16 ) == 14 );
 }
 
 /** String self-test */

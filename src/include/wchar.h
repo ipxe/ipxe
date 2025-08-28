@@ -24,6 +24,7 @@ size_t wcrtomb ( char *buf, wchar_t wc, mbstate_t *ps __unused ) {
 	return 1;
 }
 
+extern size_t wcsnlen ( const wchar_t *string, size_t max );
 extern size_t wcslen ( const wchar_t *string );
 
 #endif /* WCHAR_H */
