@@ -81,13 +81,22 @@ EFI_STATUS EFIAPI _efi_start ( EFI_HANDLE image_handle,
 static void efi_init_application ( void ) {
 	EFI_HANDLE device = efi_loaded_image->DeviceHandle;
 	EFI_DEVICE_PATH_PROTOCOL *devpath = efi_loaded_image_path;
+	EFI_DEVICE_PATH_PROTOCOL *bootpath;
 	struct uri *uri;
 
 	/* Set current working URI from device path, if present */
+	bootpath = efi_current_boot_path();
+	DBGC ( device, "EFI has loaded image device path %s\n",
+	       efi_devpath_text ( devpath ) );
+	DBGC ( device, "EFI has boot option device path %s\n",
+	       efi_devpath_text ( bootpath ) );
 	uri = efi_path_uri ( devpath );
+	if ( bootpath && ( ! uri ) )
+		uri = efi_path_uri ( bootpath );
 	if ( uri )
 		churi ( uri );
 	uri_put ( uri );
+	free ( bootpath );
 
 	/* Identify autoboot device, if any */
 	efi_set_autoboot_ll_addr ( device, devpath );
