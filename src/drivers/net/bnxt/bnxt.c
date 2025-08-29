@@ -25,6 +25,7 @@ static void bnxt_adv_cq_index ( struct bnxt *bp, u16 cnt );
 static int bnxt_rx_complete ( struct net_device *dev, struct rx_pkt_cmpl *rx );
 void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt );
 
+
 static struct pci_device_id bnxt_nics[] = {
 	PCI_ROM( 0x14e4, 0x1604, "14e4-1604", "Broadcom BCM957454", 0 ),
 	PCI_ROM( 0x14e4, 0x1605, "14e4-1605", "Broadcom BCM957454 RDMA", 0 ),
@@ -512,12 +513,20 @@ static int bnxt_rx_complete ( struct net_device *dev,
 		return NO_MORE_CQ_BD_TO_SERVICE;
 }
 
-void bnxt_mm_init ( struct bnxt *bp, const char *func )
+void bnxt_mm_init_hwrm ( struct bnxt *bp, const char *func )
 {
 	DBGP ( "%s\n", __func__ );
 	memset ( bp->hwrm_addr_req,  0, REQ_BUFFER_SIZE );
 	memset ( bp->hwrm_addr_resp, 0, RESP_BUFFER_SIZE );
 	memset ( bp->hwrm_addr_dma,  0, DMA_BUFFER_SIZE );
+	bp->hwrm_max_req_len  	= HWRM_MAX_REQ_LEN;
+	bp->hwrm_cmd_timeout 	= HWRM_CMD_DEFAULT_TIMEOUT;
+	dbg_mem ( bp, func );
+}
+
+void bnxt_mm_init_rings ( struct bnxt *bp, const char *func )
+{
+	DBGP ( "%s\n", __func__ );
 	memset ( bp->tx.bd_virt,  0, TX_RING_BUFFER_SIZE );
 	memset ( bp->rx.bd_virt,  0, RX_RING_BUFFER_SIZE );
 	memset ( bp->cq.bd_virt,  0, CQ_RING_BUFFER_SIZE );
@@ -526,7 +535,6 @@ void bnxt_mm_init ( struct bnxt *bp, const char *func )
 	bp->link_status = STATUS_LINK_DOWN;
 	bp->wait_link_timeout = LINK_DEFAULT_TIMEOUT;
 	bp->mtu = MAX_ETHERNET_PACKET_BUFFER_SIZE;
-	bp->hwrm_max_req_len  = HWRM_MAX_REQ_LEN;
 	bp->nq.ring_cnt 	  = MAX_NQ_DESC_CNT;
 	bp->cq.ring_cnt 	  = MAX_CQ_DESC_CNT;
 	bp->tx.ring_cnt 	  = MAX_TX_DESC_CNT;
@@ -556,10 +564,7 @@ void bnxt_mm_nic ( struct bnxt *bp )
 	bp->rx.iob_cnt		= 0;
 	bp->rx.epoch            = 0;
 
-	bp->link_status		= STATUS_LINK_DOWN;
-	bp->wait_link_timeout	= LINK_DEFAULT_TIMEOUT;
-	bp->mtu			= MAX_ETHERNET_PACKET_BUFFER_SIZE;
-	bp->hwrm_max_req_len	= HWRM_MAX_REQ_LEN;
+	bp->mtu 		= MAX_ETHERNET_PACKET_BUFFER_SIZE;
 	bp->nq.ring_cnt		= MAX_NQ_DESC_CNT;
 	bp->cq.ring_cnt		= MAX_CQ_DESC_CNT;
 	bp->tx.ring_cnt		= MAX_TX_DESC_CNT;
@@ -567,7 +572,7 @@ void bnxt_mm_nic ( struct bnxt *bp )
 	bp->rx.buf_cnt		= NUM_RX_BUFFERS;
 }
 
-void bnxt_free_mem ( struct bnxt *bp )
+void bnxt_free_rings_mem ( struct bnxt *bp )
 {
 	DBGP ( "%s\n", __func__ );
 	if ( bp->nq.bd_virt ) {
@@ -590,6 +595,12 @@ void bnxt_free_mem ( struct bnxt *bp )
 		bp->tx.bd_virt = NULL;
 	}
 
+	DBGP ( "- %s (  ): - Done\n", __func__ );
+}
+
+void bnxt_free_hwrm_mem ( struct bnxt *bp )
+{
+	DBGP ( "%s\n", __func__ );
 	if ( bp->hwrm_addr_dma ) {
 		dma_free ( &bp->dma_mapped, bp->hwrm_addr_dma, DMA_BUFFER_SIZE );
 		bp->hwrm_addr_dma = NULL;
@@ -607,7 +618,7 @@ void bnxt_free_mem ( struct bnxt *bp )
 	DBGP ( "- %s (  ): - Done\n", __func__ );
 }
 
-int bnxt_alloc_mem ( struct bnxt *bp )
+int bnxt_alloc_hwrm_mem ( struct bnxt *bp )
 {
 	DBGP ( "%s\n", __func__ );
 	bp->hwrm_addr_req  = dma_alloc ( bp->dma, &bp->req_mapping,
@@ -616,6 +627,22 @@ int bnxt_alloc_mem ( struct bnxt *bp )
 					 RESP_BUFFER_SIZE, RESP_BUFFER_SIZE );
 	bp->hwrm_addr_dma  = dma_alloc ( bp->dma, &bp->dma_mapped,
 					 DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
+
+	if ( bp->hwrm_addr_req &&
+		bp->hwrm_addr_resp &&
+		bp->hwrm_addr_dma ) {
+		bnxt_mm_init_hwrm ( bp, __func__ );
+		return STATUS_SUCCESS;
+	}
+
+	DBGP ( "- %s (  ): Failed\n", __func__ );
+	bnxt_free_hwrm_mem ( bp );
+	return -ENOMEM;
+}
+
+int bnxt_alloc_rings_mem ( struct bnxt *bp )
+{
+	DBGP ( "%s\n", __func__ );
 	bp->tx.bd_virt = dma_alloc ( bp->dma, &bp->tx_mapping,
 				     TX_RING_BUFFER_SIZE, DMA_ALIGN_4K );
 	bp->rx.bd_virt = dma_alloc ( bp->dma, &bp->rx_mapping,
@@ -624,19 +651,16 @@ int bnxt_alloc_mem ( struct bnxt *bp )
 				     CQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
 	bp->nq.bd_virt = dma_alloc ( bp->dma, &bp->nq_mapping,
 				     NQ_RING_BUFFER_SIZE, BNXT_DMA_ALIGNMENT );
-	if ( bp->hwrm_addr_req &&
-		bp->hwrm_addr_resp &&
-		bp->hwrm_addr_dma &&
-		bp->tx.bd_virt &&
+	if ( bp->tx.bd_virt &&
 		bp->rx.bd_virt &&
 		bp->nq.bd_virt &&
 		bp->cq.bd_virt ) {
-		bnxt_mm_init ( bp, __func__ );
+		bnxt_mm_init_rings ( bp, __func__ );
 		return STATUS_SUCCESS;
 	}
 
 	DBGP ( "- %s (  ): Failed\n", __func__ );
-	bnxt_free_mem ( bp );
+	bnxt_free_rings_mem ( bp );
 	return -ENOMEM;
 }
 
@@ -897,9 +921,14 @@ static int bnxt_hwrm_func_qcaps_req ( struct bnxt *bp )
 	bp->fid = resp->fid;
 	bp->port_idx = ( u8 )resp->port_id;
 
+	if ( resp->flags & FUNC_QCAPS_OUTPUT_FLAGS_ERROR_RECOVERY_CAPABLE ) {
+		bp->err_rcvry_supported = 1;
+	}
+
 	/* Get MAC address for this PF */
 	memcpy ( &bp->mac_addr[0], &resp->mac_address[0], ETH_ALEN );
 	dbg_func_qcaps ( bp );
+
 	return STATUS_SUCCESS;
 }
 
@@ -1006,6 +1035,69 @@ static int bnxt_hwrm_func_cfg_req ( struct bnxt *bp )
 	return wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 }
 
+static int bnxt_hwrm_error_recovery_req ( struct bnxt *bp )
+{
+	struct hwrm_error_recovery_qcfg_input *req;
+	struct hwrm_error_recovery_qcfg_output *resp;
+	int rc = 0;
+	u8 i = 0;
+	u16 cmd_len = ( u16 ) sizeof ( struct hwrm_error_recovery_qcfg_input );
+
+	DBGP ( "%s\n", __func__ );
+	/* Set default error recovery heartbeat polling value (in 100ms)*/
+	bp->er.drv_poll_freq = 100;
+	if ( ! ( bp->err_rcvry_supported ) ) {
+		return STATUS_SUCCESS;
+	}
+
+	req = ( struct hwrm_error_recovery_qcfg_input * ) REQ_DMA_ADDR ( bp );
+	resp = ( struct hwrm_error_recovery_qcfg_output * ) RESP_DMA_ADDR ( bp );
+
+	hwrm_init ( bp, ( void * ) req, ( u16 ) HWRM_ER_QCFG, cmd_len );
+
+	rc = wait_resp ( bp, HWRM_CMD_WAIT ( 6 ), cmd_len, __func__ );
+	if ( rc ) {
+		DBGP ( "- %s (  ): Failed\n", __func__ );
+		return STATUS_FAILURE;
+	}
+
+	bp->er.flags = resp->flags;
+	bp->er.drv_poll_freq        = resp->driver_polling_freq;
+	bp->er.master_wait_period   = resp->master_wait_period;
+	bp->er.normal_wait_period   = resp->normal_wait_period;
+	bp->er.master_wait_post_rst = resp->master_wait_post_reset;
+	bp->er.max_bailout_post_rst = resp->max_bailout_time;
+
+	bp->er.fw_status_reg        = resp->fw_health_status_reg;
+	bp->er.fw_hb_reg            = resp->fw_heartbeat_reg;
+	bp->er.fw_rst_cnt_reg       = resp->fw_reset_cnt_reg;
+	bp->er.recvry_cnt_reg       = resp->err_recovery_cnt_reg;
+	bp->er.rst_inprg_reg        = resp->reset_inprogress_reg;
+
+	bp->er.rst_inprg_reg_mask   = resp->reset_inprogress_reg_mask;
+	bp->er.reg_array_cnt        = resp->reg_array_cnt;
+
+	DBGP ( "flags               = 0x%x\n", resp->flags );
+	DBGP ( "driver_polling_freq = 0x%x\n", resp->driver_polling_freq );
+	DBGP ( "master_wait_period  = 0x%x\n", resp->master_wait_period );
+	DBGP ( "normal_wait_period  = 0x%x\n", resp->normal_wait_period );
+	DBGP ( "wait_post_reset     = 0x%x\n", resp->master_wait_post_reset );
+	DBGP ( "bailout_post_reset  = 0x%x\n", resp->max_bailout_time );
+	DBGP ( "reg_array_cnt       = %x\n", resp->reg_array_cnt );
+
+	for ( i = 0; i < resp->reg_array_cnt; i++ ) {
+		bp->er.rst_reg[i]         = resp->reset_reg[i];
+		bp->er.rst_reg_val[i]     = resp->reset_reg_val[i];
+		bp->er.delay_after_rst[i] = resp->delay_after_reset[i];
+
+		DBGP ( "rst_reg     = %x    ", bp->er.rst_reg[i] );
+		DBGP ( "rst_reg_val = %x    ", bp->er.rst_reg_val[i] );
+		DBGP ( "rst_after_reset = %x\n", bp->er.delay_after_rst[i] );
+	}
+
+	return STATUS_SUCCESS;
+}
+
 static int bnxt_hwrm_func_drv_rgtr ( struct bnxt *bp )
 {
 	u16 cmd_len = ( u16 )sizeof ( struct hwrm_func_drv_rgtr_input );
@@ -1020,7 +1112,15 @@ static int bnxt_hwrm_func_drv_rgtr ( struct bnxt *bp )
 	req->enables = FUNC_DRV_RGTR_REQ_ENABLES_OS_TYPE |
 			FUNC_DRV_RGTR_REQ_ENABLES_ASYNC_EVENT_FWD |
 			FUNC_DRV_RGTR_REQ_ENABLES_VER;
-	req->async_event_fwd[0] |= 0x01;
+	req->flags = FUNC_DRV_RGTR_REQ_FLAGS_16BIT_VER_MODE;
+
+	if ( bp->err_rcvry_supported ) {
+		req->flags |= FUNC_DRV_RGTR_REQ_FLAGS_ERROR_RECOVERY_SUPPORT;
+		req->flags |= FUNC_DRV_RGTR_REQ_FLAGS_MASTER_SUPPORT;
+		req->async_event_fwd[0] |= 0x301;
+	} else {
+		req->async_event_fwd[0] |= 0x01;
+	}
 	req->os_type = FUNC_DRV_RGTR_REQ_OS_TYPE_OTHER;
 	req->ver_maj = IPXE_VERSION_MAJOR;
 	req->ver_min = IPXE_VERSION_MINOR;
@@ -1612,7 +1712,9 @@ static int bnxt_get_phy_link ( struct bnxt *bp )
 		mdelay ( LINK_POLL_WAIT_TIME );
 	}
 	dbg_link_state ( bp, ( u32 ) ( ( i + 1 ) * 100 ) );
-	bnxt_set_link ( bp );
+	if ( !bp->er.er_rst_on ) {
+		bnxt_set_link ( bp );
+	}
 	return STATUS_SUCCESS;
 }
 
@@ -1975,7 +2077,26 @@ static int bnxt_reset_rx_mask ( struct bnxt *bp )
 	return bnxt_hwrm_set_rx_mask ( bp, 0 );
 }
 
+static int bnxt_get_link_state ( struct bnxt *bp )
+{
+	int rc  = 0;
+
+	DBGP ( "%s \n", __func__ );
+	rc = bnxt_hwrm_port_phy_qcfg ( bp, PHY_STATUS );
+
+	return rc;
+}
+
 typedef int ( *hwrm_func_t ) ( struct bnxt *bp );
+
+hwrm_func_t bring_up_init[] = {
+	bnxt_hwrm_ver_get,		/* HWRM_VER_GET			*/
+	bnxt_hwrm_func_qcaps_req,	/* HWRM_FUNC_QCAPS		*/
+	bnxt_hwrm_func_qcfg_req,	/* HWRM_FUNC_QCFG		*/
+	bnxt_get_device_address,	/* HW MAC address		*/
+	bnxt_get_link_state,
+	NULL
+};
 
 hwrm_func_t bring_down_chip[] = {
 	bnxt_hwrm_func_drv_unrgtr,	/* HWRM_FUNC_DRV_UNRGTR		*/
@@ -1994,13 +2115,15 @@ hwrm_func_t bring_down_nic[] = {
 	bnxt_hwrm_stat_ctx_free,	/* HWRM_STAT_CTX_FREE		*/
 	bnxt_hwrm_ring_free_cq,		/* HWRM_RING_FREE - CQ Ring	*/
 	bnxt_hwrm_ring_free_nq,		/* HWRM_RING_FREE - NQ Ring	*/
+	bnxt_hwrm_func_drv_unrgtr,	/* HWRM_FUNC_DRV_UNRGTR		*/
 	NULL,
 };
 hwrm_func_t bring_up_chip[] = {
 	bnxt_hwrm_ver_get,		/* HWRM_VER_GET			*/
 	bnxt_hwrm_func_reset_req,	/* HWRM_FUNC_RESET		*/
-	bnxt_hwrm_func_drv_rgtr,	/* HWRM_FUNC_DRV_RGTR		*/
 	bnxt_hwrm_func_qcaps_req,	/* HWRM_FUNC_QCAPS		*/
+	bnxt_hwrm_func_drv_rgtr,	/* HWRM_FUNC_DRV_RGTR		*/
+	bnxt_hwrm_error_recovery_req,	/* HWRM_ERROR_RECOVERY_REQ	*/
 	bnxt_hwrm_backing_store_cfg,	/* HWRM_FUNC_BACKING_STORE_CFG  */
 	bnxt_hwrm_backing_store_qcfg,	/* HWRM_FUNC_BACKING_STORE_QCFG	*/
 	bnxt_hwrm_func_resource_qcaps,	/* HWRM_FUNC_RESOURCE_QCAPS	*/
@@ -2052,14 +2175,40 @@ int bnxt_hwrm_run ( hwrm_func_t cmds[], struct bnxt *bp )
 #define bnxt_up_chip( bp )	bnxt_hwrm_run ( bring_up_chip, bp )
 #define bnxt_down_nic( bp )	bnxt_hwrm_run ( bring_down_nic, bp )
 #define bnxt_up_nic( bp )	bnxt_hwrm_run ( bring_up_nic, bp )
+#define bnxt_up_init( bp )	bnxt_hwrm_run ( bring_up_init, bp )
 
 static int bnxt_open ( struct net_device *dev )
 {
 	struct bnxt *bp = dev->priv;
 
 	DBGP ( "%s\n", __func__ );
+
+	/* Allocate and Initialise device specific parameters */
+	if ( bnxt_alloc_rings_mem ( bp ) != 0 ) {
+		DBGP ( "- %s (  ): bnxt_alloc_rings_mem Failed\n", __func__ );
+		return -ENOMEM;
+	}
+
 	bnxt_mm_nic ( bp );
-	return (bnxt_up_nic ( bp ));
+
+	if ( bnxt_up_chip ( bp ) != 0 ) {
+		DBGP ( "- %s (  ): bnxt_up_chip Failed\n", __func__ );
+		goto err_bnxt_open;
+	}
+
+	if ( bnxt_up_nic ( bp ) != 0 ) {
+		DBGP ( "- %s (  ): bnxt_up_nic\n", __func__);
+		goto err_bnxt_open;
+	}
+
+	return 0;
+
+err_bnxt_open:
+	bnxt_down_nic ( bp );
+
+	bnxt_free_rings_mem ( bp );
+
+	return -1;
 }
 
 static void bnxt_tx_adjust_pkt ( struct bnxt *bp, struct io_buffer *iob )
@@ -2081,6 +2230,11 @@ static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
 	struct bnxt *bp = dev->priv;
 	u16 len, entry;
 	physaddr_t mapping;
+
+	if ( bp->er.er_rst_on ) {
+		/* Error recovery has been initiated */
+		return -EBUSY;
+	}
 
 	if ( bnxt_tx_avail ( bp ) < 1 ) {
 		DBGP ( "- %s (  ): Failed no bd's available\n", __func__ );
@@ -2123,17 +2277,264 @@ static void bnxt_adv_nq_index ( struct bnxt *bp, u16 cnt )
 
 void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt )
 {
-	switch ( evt->event_id ) {
-	case ASYNC_EVENT_CMPL_EVENT_ID_LINK_STATUS_CHANGE:
-		if ( evt->event_data1 & 0x01 )
-			bp->link_status = STATUS_LINK_ACTIVE;
-		else
-			bp->link_status = STATUS_LINK_DOWN;
-		bnxt_set_link ( bp );
-		dbg_link_status ( bp );
-		break;
-	default:
-		break;
+	if ( evt->event_data1 & 0x01 )
+		bp->link_status = STATUS_LINK_ACTIVE;
+	else
+		bp->link_status = STATUS_LINK_DOWN;
+
+	bnxt_set_link ( bp );
+	dbg_link_status ( bp );
+}
+
+#define BNXT_FW_HEALTH_WIN_OFF	0x3000
+#define BNXT_REG_WINDOW_BASE	0x400
+#define BNXT_GRC_BASE_MASK	0xfff
+#define BNXT_GRC_OFFSET_MASK	0xffc
+
+u32 bnxt_er_reg_write ( struct bnxt *bp, u32 reg_addr, u32 reg_val)
+{
+	u32 reg_base = 0;
+
+	reg_base = reg_addr & ~BNXT_GRC_BASE_MASK;
+
+	writel ( reg_base, bp->bar0 + BNXT_REG_WINDOW_BASE + 8 );
+
+	writel ( reg_val, bp->bar0 + ( BNXT_FW_HEALTH_WIN_OFF +
+				( reg_addr & BNXT_GRC_OFFSET_MASK ) ) );
+
+	DBGP ("bnxt_er_reg_write: reg_addr = %x, reg_val = %x\n", reg_addr, reg_val);
+	return reg_val;
+}
+
+u32 bnxt_er_reg_read ( struct bnxt *bp, u32 reg_addr)
+{
+	u32 reg_val = 0;
+	u32 reg_base = 0;
+
+	reg_base = reg_addr & ~BNXT_GRC_BASE_MASK;
+
+	writel ( reg_base, bp->bar0 + BNXT_REG_WINDOW_BASE + 8 );
+
+	reg_val = readl ( bp->bar0 + ( BNXT_FW_HEALTH_WIN_OFF +
+				( reg_addr & BNXT_GRC_OFFSET_MASK ) ) );
+
+	DBGP ("bnxt_er_reg_read: reg_addr = %x, reg_val = %x\n", reg_addr, reg_val);
+	return reg_val;
+}
+
+u32 bnxt_er_get_reg_val ( struct bnxt *bp, u32 reg_addr, u32 reg_type, u32 mask )
+{
+	u32 reg_val = 0;
+
+	switch ( reg_type ) {
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_PCIE_CFG:
+			pci_read_config_dword ( bp->pdev, reg_addr & mask, &reg_val );
+			break;
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_GRC:
+			reg_val = bnxt_er_reg_read ( bp, reg_addr );
+			break;
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_BAR0:
+			reg_val = readl ( bp->bar0 + ( reg_addr & mask ) );
+			break;
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_BAR1:
+			reg_val = readl ( bp->bar1 + ( reg_addr & mask ) );
+			break;
+		default:
+			break;
+	}
+	DBGP ( "read_reg_val bp %p addr %x type %x : reg_val = %x\n", bp, reg_addr, reg_type, reg_val );
+	return reg_val;
+}
+
+void bnxt_rst_reg_val ( struct bnxt *bp, u32 reg_addr, u32 reg_val )
+{
+	u32 mask = ER_QCFG_RESET_REG_ADDR_MASK;
+	u32 reg_type = reg_addr & ER_QCFG_RESET_REG_ADDR_SPACE_MASK;
+
+	switch ( reg_type ) {
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_PCIE_CFG:
+			pci_write_config_dword ( bp->pdev, reg_addr & mask, reg_val );
+			break;
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_GRC:
+			bnxt_er_reg_write ( bp, reg_addr, reg_val );
+			break;
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_BAR0:
+			writel ( reg_val, bp->bar0 + ( reg_addr & mask ) );
+			break;
+		case ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_BAR1:
+			writel ( reg_val, bp->bar1 + ( reg_addr & mask ) );
+			break;
+		default:
+			break;
+	}
+}
+
+void bnxt_rst_er_registers ( struct bnxt *bp )
+{
+	u32 delay_time = 0;
+	u8 i;
+
+	for ( i = 0; i < bp->er.reg_array_cnt; i++ ) {
+		bnxt_rst_reg_val ( bp, bp->er.rst_reg[i], bp->er.rst_reg_val[i] );
+
+		delay_time = bp->er.delay_after_rst[i];
+		if ( delay_time ) {
+			udelay ( delay_time * 100000 );
+		}
+	}
+
+}
+
+void bnxt_er_task ( struct bnxt* bp, u8 hb_task )
+{
+	u32 present_hb_cnt;
+	unsigned short pci_command, new_command;
+	u8 i;
+
+	DBGP ( "%s(hb_task: %d)\n", __func__, hb_task );
+	if ( bp->er.er_rst_on ) {
+		if ( timer_running ( &bp->wait_timer) ) {
+			/* Reset already in progress */
+			return;
+		}
+	}
+
+	if ( hb_task ) {
+		present_hb_cnt = bnxt_er_get_reg_val ( bp,
+			bp->er.fw_hb_reg,
+			bp->er.fw_hb_reg & ER_QCFG_FW_HB_REG_ADDR_SPACE_MASK,
+			ER_QCFG_FW_HB_REG_ADDR_MASK ) ;
+
+		if ( present_hb_cnt != bp->er.last_fw_hb ) {
+			bp->er.last_fw_hb = present_hb_cnt;
+			return;
+		}
+	}
+
+	/* Heartbeat not incrementing, trigger error recovery */
+	DBGP ( "%s(): Trigger Error Recovery\n", __func__ );
+	bp->er.er_rst_on = 1;
+	/* Set a recovery phase wait timer */
+	start_timer_fixed ( &bp->wait_timer, BNXT_ER_WAIT_TIMER_INTERVAL ( bp ) );
+
+	/* Disable bus master */
+	pci_read_config_word ( bp->pdev, PCI_COMMAND, &pci_command );
+	new_command = pci_command & ~PCI_COMMAND_MASTER;
+	pci_write_config_word ( bp->pdev, PCI_COMMAND, new_command );
+
+	/* Free up resources */
+	bnxt_free_rx_iob ( bp );
+
+	/* wait for firmware to be operational */
+	udelay ( bp->er.rst_min_dsecs * 100000 );
+
+	/* Reconfigure the PCI attributes */
+	pci_write_config_word ( bp->pdev, PCI_COMMAND, pci_command );
+
+	if ( hb_task ) {
+		if ( bp->er.master_pf ) {
+			/* wait for master func wait period */
+			udelay ( bp->er.master_wait_period * 100000 );
+
+			/* Reset register values */
+			bnxt_rst_er_registers ( bp );
+
+			/* wait for master wait post reset  */
+			udelay ( bp->er.master_wait_post_rst * 100000 );
+		} else {
+			/* wait for normal func wait period */
+			udelay ( bp->er.normal_wait_period * 100000 );
+		}
+	}
+
+	for ( i = 0; i < bp->er.max_bailout_post_rst; i++ ) {
+		bp->er.fw_health_status = bnxt_er_get_reg_val ( bp,
+				bp->er.fw_status_reg,
+				bp->er.fw_status_reg & ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_MASK,
+				ER_QCFG_FW_HEALTH_REG_ADDR_MASK );
+
+		if ( bp->er.fw_health_status == FW_STATUS_REG_CODE_READY )
+			break;
+
+		/* wait for 1 second */
+		udelay ( 1000000 );
+	}
+
+	if ( bp->er.fw_health_status == FW_STATUS_REG_CODE_READY ) {
+		/* Initialize resources */
+		bnxt_mm_nic ( bp );
+
+		/* Get device specific information */
+		bnxt_up_chip ( bp );
+
+		/* Allocate queues */
+		bnxt_up_nic ( bp );
+	}
+
+	/* Clear Reset in progress flag */
+	bp->er.er_rst_on = 0;
+	stop_timer ( &bp->wait_timer );
+}
+
+void bnxt_process_er_event ( struct bnxt *bp,
+		struct hwrm_async_event_cmpl *evt )
+{
+	if ( evt->event_data1 &
+			ASYNC_EVENT_CMPL_ER_EVENT_DATA1_RECOVERY_ENABLED ) {
+		bp->er.driver_initiated_recovery = 1;
+		start_timer_fixed ( &bp->task_timer, BNXT_ER_TIMER_INTERVAL ( bp ) );
+
+	} else {
+		bp->er.driver_initiated_recovery = 0;
+		stop_timer ( &bp->task_timer );
+	}
+
+	if ( evt->event_data1 &
+			ASYNC_EVENT_CMPL_ER_EVENT_DATA1_MASTER_FUNC ) {
+		bp->er.master_pf = 1;
+	} else {
+		bp->er.master_pf = 0;
+	}
+
+	bp->er.fw_health_status = bnxt_er_get_reg_val ( bp,
+		bp->er.fw_status_reg,
+		bp->er.fw_status_reg & ER_QCFG_FW_HEALTH_REG_ADDR_SPACE_MASK,
+		ER_QCFG_FW_HEALTH_REG_ADDR_MASK );
+	/* Intialize the last fw heart beat count */
+	bp->er.last_fw_hb = 0;
+	bp->er.last_fw_rst_cnt = bnxt_er_get_reg_val ( bp,
+		bp->er.fw_rst_cnt_reg,
+		bp->er.fw_rst_cnt_reg & ER_QCFG_FW_RESET_CNT_REG_ADDR_SPACE_MASK,
+		ER_QCFG_FW_RESET_CNT_REG_ADDR_MASK );
+	bp->er.rst_in_progress = bnxt_er_get_reg_val ( bp,
+		bp->er.rst_inprg_reg,
+		bp->er.rst_inprg_reg & ER_QCFG_RESET_INPRG_REG_ADDR_SPACE_MASK,
+		ER_QCFG_RESET_INPRG_REG_ADDR_MASK );
+	bp->er.err_recovery_cnt = bnxt_er_get_reg_val ( bp,
+		bp->er.recvry_cnt_reg,
+		bp->er.recvry_cnt_reg & ER_QCFG_RCVRY_CNT_REG_ADDR_SPACE_MASK,
+		ER_QCFG_RCVRY_CNT_REG_ADDR_MASK );
+}
+
+void bnxt_process_reset_notify_event ( struct bnxt *bp,
+		struct hwrm_async_event_cmpl *evt )
+{
+	DBGP ( "Reset Notify Async event" );
+	if ( ( ( evt->event_data1 ) &
+			ASYNC_EVENT_CMPL_EVENT_DATA1_REASON_CODE_MASK ) ==
+			ASYNC_EVENT_CMPL_EVENT_DATA1_REASON_CODE_FATAL) {
+		DBGP ( " error recovery initiated\n" );
+		bp->er.rst_min_dsecs = evt->timestamp_lo;
+		bp->er.rst_max_dsecs = evt->timestamp_hi;
+
+		if ( bp->er.rst_min_dsecs == 0 )
+			bp->er.rst_min_dsecs = ER_DFLT_FW_RST_MIN_DSECS;
+
+		if ( bp->er.rst_max_dsecs == 0 )
+			bp->er.rst_max_dsecs =  ER_DFLT_FW_RST_MAX_DSECS;
+
+		// Trigger Error recovery
+		bp->er.er_initiate = 1;
 	}
 }
 
@@ -2145,6 +2546,7 @@ static void bnxt_service_cq ( struct net_device *dev )
 	u16 old_cid = bp->cq.cons_id;
 	int done = SERVICE_NEXT_CQ_BD;
 	u32 cq_type;
+	struct hwrm_async_event_cmpl *evt;
 
 	while ( done == SERVICE_NEXT_CQ_BD ) {
 		cmp = ( struct cmpl_base * )BD_NOW ( CQ_DMA_ADDR ( bp ),
@@ -2172,8 +2574,23 @@ static void bnxt_service_cq ( struct net_device *dev )
 				( struct rx_pkt_cmpl * )cmp );
 			break;
 		case CMPL_BASE_TYPE_HWRM_ASYNC_EVENT:
-			bnxt_link_evt ( bp,
-				( struct hwrm_async_event_cmpl * )cmp );
+			evt = (struct hwrm_async_event_cmpl * )cmp;
+			switch ( evt->event_id ) {
+			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_STATUS_CHANGE:
+				bnxt_link_evt ( bp,
+					( struct hwrm_async_event_cmpl * )cmp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_ERROR_RECOVERY:
+				bnxt_process_er_event ( bp,
+					( struct hwrm_async_event_cmpl * )cmp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_RESET_NOTIFY:
+				bnxt_process_reset_notify_event ( bp,
+					( struct hwrm_async_event_cmpl * )cmp );
+				break;
+			default:
+				break;
+			}
 			bnxt_adv_cq_index ( bp, 1 );
 			break;
 		default:
@@ -2193,6 +2610,7 @@ static void bnxt_service_nq ( struct net_device *dev )
 	u16 old_cid = bp->nq.cons_id;
 	int done = SERVICE_NEXT_NQ_BD;
 	u32 nq_type;
+	struct hwrm_async_event_cmpl *evt;
 
 	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return;
@@ -2210,9 +2628,25 @@ static void bnxt_service_nq ( struct net_device *dev )
 
 		switch ( nq_type ) {
 		case CMPL_BASE_TYPE_HWRM_ASYNC_EVENT:
-			bnxt_link_evt ( bp,
-				( struct hwrm_async_event_cmpl * )nqp );
-				/* Fall through */
+			evt = (struct hwrm_async_event_cmpl * )nqp;
+			switch ( evt->event_id ) {
+			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_STATUS_CHANGE:
+				bnxt_link_evt ( bp,
+					( struct hwrm_async_event_cmpl * )nqp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_ERROR_RECOVERY:
+				bnxt_process_er_event ( bp,
+					( struct hwrm_async_event_cmpl * )nqp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_RESET_NOTIFY:
+				bnxt_process_reset_notify_event ( bp,
+					( struct hwrm_async_event_cmpl * )nqp );
+				break;
+			default:
+				break;
+			}
+			bnxt_adv_nq_index ( bp, 1 );
+			break;
 		case NQ_CN_TYPE_CQ_NOTIFICATION:
 			bnxt_adv_nq_index ( bp, 1 );
 			break;
@@ -2226,11 +2660,40 @@ static void bnxt_service_nq ( struct net_device *dev )
 		bnxt_db_nq ( bp );
 }
 
+static void bnxt_er_task_timer ( struct retry_timer *timer, int over __unused )
+{
+	struct bnxt *bp = container_of (timer, struct bnxt, task_timer );
+
+	/* Restart timer */
+	start_timer_fixed ( timer, BNXT_ER_TIMER_INTERVAL ( bp ) );
+	if ( bp->er.driver_initiated_recovery ) {
+		bnxt_er_task ( bp, 1 );
+	}
+}
+
+static void bnxt_er_wait_timer ( struct retry_timer *timer, int over __unused )
+{
+	struct bnxt *bp = container_of (timer, struct bnxt, wait_timer );
+	/* The sole function of this timer is to wait for the specified
+	 * amount of time to complete error recovery phase
+	 */
+	stop_timer ( &bp->wait_timer );
+	return;
+}
+
 static void bnxt_poll ( struct net_device *dev )
 {
+	struct bnxt *bp = dev->priv;
+
 	mb (  );
 	bnxt_service_nq ( dev );
 	bnxt_service_cq ( dev );
+
+	if ( bp->er.er_initiate ) {
+		bnxt_er_task ( bp, 0 );
+		bp->er.er_initiate = 0;
+	}
+
 }
 
 static void bnxt_close ( struct net_device *dev )
@@ -2238,15 +2701,12 @@ static void bnxt_close ( struct net_device *dev )
 	struct bnxt *bp = dev->priv;
 
 	DBGP ( "%s\n", __func__ );
+	stop_timer ( &bp->task_timer );
+	stop_timer ( &bp->wait_timer );
+
 	bnxt_down_nic (bp);
 
-	/* iounmap PCI BAR ( s ) */
-	bnxt_down_pci(bp);
-
-	/* Get Bar Address */
-	bp->bar0 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_0 );
-	bp->bar1 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_2 );
-	bp->bar2 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_4 );
+	bnxt_free_rings_mem ( bp );
 
 }
 
@@ -2287,6 +2747,9 @@ static int bnxt_init_one ( struct pci_device *pci )
 	bp->dev  = netdev;
 	netdev->dev = &pci->dev;
 
+	timer_init ( &bp->task_timer, bnxt_er_task_timer, &netdev->refcnt );
+	timer_init ( &bp->wait_timer, bnxt_er_wait_timer, &netdev->refcnt );
+
 	/* Configure DMA */
 	bp->dma = &pci->dma;
 	netdev->dma = bp->dma;
@@ -2297,16 +2760,12 @@ static int bnxt_init_one ( struct pci_device *pci )
 	/* Get PCI Information */
 	bnxt_get_pci_info ( bp );
 
-	/* Allocate and Initialise device specific parameters */
-	if ( ( err = bnxt_alloc_mem ( bp ) ) != 0 ) {
-		DBGP ( "- %s (  ): bnxt_alloc_mem Failed\n", __func__ );
-		goto err_down_pci;
-	}
+	/* Allocate HWRM memory */
+	bnxt_alloc_hwrm_mem ( bp );
 
-	/* Get device specific information */
-	if ( bnxt_up_chip ( bp ) != 0 ) {
-		DBGP ( "- %s (  ): bnxt_up_chip Failed\n", __func__ );
-		err = -ENODEV;
+	bp->link_status 	= STATUS_LINK_DOWN;
+	bp->wait_link_timeout 	= LINK_DEFAULT_TIMEOUT;
+	if ( bnxt_up_init ( bp ) != 0 ) {
 		goto err_down_chip;
 	}
 
@@ -2316,15 +2775,14 @@ static int bnxt_init_one ( struct pci_device *pci )
 		goto err_down_chip;
 	}
 
+	/* Set Initial Link State */
+	bnxt_set_link ( bp );
+
 	return 0;
 
 	unregister_netdev ( netdev );
 
 err_down_chip:
-	bnxt_down_chip (bp);
-	bnxt_free_mem ( bp );
-
-err_down_pci:
 	bnxt_down_pci ( bp );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
@@ -2343,11 +2801,8 @@ static void bnxt_remove_one ( struct pci_device *pci )
 	/* Unregister network device */
 	unregister_netdev ( netdev );
 
-	/* Bring down Chip */
-	bnxt_down_chip(bp);
-
-	/* Free Allocated resource */
-	bnxt_free_mem ( bp );
+	/* Free HWRM buffers */
+	bnxt_free_hwrm_mem ( bp );
 
 	/* iounmap PCI BAR ( s ) */
 	bnxt_down_pci ( bp );
@@ -2357,6 +2812,7 @@ static void bnxt_remove_one ( struct pci_device *pci )
 
 	/* Drop refernce to network device */
 	netdev_put ( netdev );
+	DBGP ( "%s - Done\n", __func__ );
 }
 
 /* Broadcom NXE PCI driver */
