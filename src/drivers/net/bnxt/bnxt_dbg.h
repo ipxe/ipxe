@@ -659,5 +659,6 @@ void dbg_link_state(struct bnxt *bp, u32 tmo)
 #else
 #define dump_evt(cq, ty, id, ring)
 #define dbg_link_status(bp)
+#define dbg_link_info(bp)
 #define dbg_link_state(bp, tmo)
 #endif
