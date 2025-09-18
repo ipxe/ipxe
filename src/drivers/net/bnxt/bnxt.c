@@ -1114,13 +1114,18 @@ static int bnxt_hwrm_func_drv_rgtr ( struct bnxt *bp )
 			FUNC_DRV_RGTR_REQ_ENABLES_VER;
 	req->flags = FUNC_DRV_RGTR_REQ_FLAGS_16BIT_VER_MODE;
 
+	req->async_event_fwd[0] |= 1 << ASYNC_EVENT_CMPL_EVENT_ID_LINK_STATUS_CHANGE;
+	req->async_event_fwd[0] |= 1 << ASYNC_EVENT_CMPL_EVENT_ID_LINK_SPEED_CHANGE;
+	req->async_event_fwd[0] |= 1 << ASYNC_EVENT_CMPL_EVENT_ID_LINK_SPEED_CFG_CHANGE;
+	req->async_event_fwd[0] |= 1 << ASYNC_EVENT_CMPL_EVENT_ID_PORT_PHY_CFG_CHANGE;
+
 	if ( bp->err_rcvry_supported ) {
 		req->flags |= FUNC_DRV_RGTR_REQ_FLAGS_ERROR_RECOVERY_SUPPORT;
 		req->flags |= FUNC_DRV_RGTR_REQ_FLAGS_MASTER_SUPPORT;
-		req->async_event_fwd[0] |= 0x301;
-	} else {
-		req->async_event_fwd[0] |= 0x01;
+		req->async_event_fwd[0] |= 1 << ASYNC_EVENT_CMPL_EVENT_ID_RESET_NOTIFY;
+		req->async_event_fwd[0] |= 1 << ASYNC_EVENT_CMPL_EVENT_ID_ERROR_RECOVERY;
 	}
+
 	req->os_type = FUNC_DRV_RGTR_REQ_OS_TYPE_OTHER;
 	req->ver_maj = IPXE_VERSION_MAJOR;
 	req->ver_min = IPXE_VERSION_MINOR;
@@ -2538,6 +2543,51 @@ void bnxt_process_reset_notify_event ( struct bnxt *bp,
 	}
 }
 
+void bnxt_link_speed_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt )
+{
+	if ( evt->event_data1 & ASYNC_EVENT_CMPL_LINK_SPEED_CHANGE_FORCE ) {
+		DBGP ("bnxt_link_speed_evt: event data = %lx\n",
+              ( evt->event_data1 & ASYNC_EVENT_CMPL_LINK_SPEED_CHANGE_MASK ));
+	}
+
+	if ( bnxt_hwrm_port_phy_qcfg ( bp, QCFG_PHY_ALL ) != STATUS_SUCCESS ) {
+		return;
+	}
+
+	bnxt_set_link ( bp );
+	dbg_link_info ( bp );
+	dbg_link_status ( bp );
+}
+
+void bnxt_link_speed_chg_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt )
+{
+	if ( ( evt->event_data1 & ASYNC_EVENT_CMPL_LINK_SPEED_CFG_CHANGE_SUPPORTED_LINK_SPEEDS_CHANGE ) ||
+		( evt->event_data1 & ASYNC_EVENT_CMPL_LINK_SPEED_CFG_CHANGE_ILLEGAL_LINK_SPEED_CFG ) ) {
+		if ( bnxt_hwrm_port_phy_qcfg ( bp, QCFG_PHY_ALL ) != STATUS_SUCCESS ) {
+			return;
+		}
+	}
+
+	bnxt_set_link ( bp );
+	dbg_link_info ( bp );
+	dbg_link_status ( bp );
+}
+
+void bnxt_port_phy_chg_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt )
+{
+	if ( ( evt->event_data1 & ASYNC_EVENT_CMPL_PORT_PHY_CFG_CHANGE_FEC_CFG_CHANGE ) ||
+		( evt->event_data1 & ASYNC_EVENT_CMPL_PORT_PHY_CFG_CHANGE_EEE_CFG_CHANGE ) ||
+		( evt->event_data1 & ASYNC_EVENT_CMPL_PORT_PHY_CFG_CHANGE_PAUSE_CFG_CHANGE)) {
+		if ( bnxt_hwrm_port_phy_qcfg ( bp, QCFG_PHY_ALL ) != STATUS_SUCCESS ) {
+			return;
+		}
+	}
+
+	bnxt_set_link ( bp );
+	dbg_link_info ( bp );
+	dbg_link_status ( bp );
+}
+
 static void bnxt_service_cq ( struct net_device *dev )
 {
 	struct bnxt *bp = dev->priv;
@@ -2574,10 +2624,22 @@ static void bnxt_service_cq ( struct net_device *dev )
 				( struct rx_pkt_cmpl * )cmp );
 			break;
 		case CMPL_BASE_TYPE_HWRM_ASYNC_EVENT:
-			evt = (struct hwrm_async_event_cmpl * )cmp;
+			evt = ( struct hwrm_async_event_cmpl * )cmp;
 			switch ( evt->event_id ) {
 			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_STATUS_CHANGE:
 				bnxt_link_evt ( bp,
+					( struct hwrm_async_event_cmpl * )cmp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_SPEED_CHANGE:
+				bnxt_link_speed_evt ( bp,
+					( struct hwrm_async_event_cmpl * )cmp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_SPEED_CFG_CHANGE:
+				bnxt_link_speed_chg_evt ( bp,
+					( struct hwrm_async_event_cmpl * )cmp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_PORT_PHY_CFG_CHANGE:
+				bnxt_port_phy_chg_evt ( bp,
 					( struct hwrm_async_event_cmpl * )cmp );
 				break;
 			case ASYNC_EVENT_CMPL_EVENT_ID_ERROR_RECOVERY:
@@ -2628,10 +2690,22 @@ static void bnxt_service_nq ( struct net_device *dev )
 
 		switch ( nq_type ) {
 		case CMPL_BASE_TYPE_HWRM_ASYNC_EVENT:
-			evt = (struct hwrm_async_event_cmpl * )nqp;
+			evt = ( struct hwrm_async_event_cmpl * )nqp;
 			switch ( evt->event_id ) {
 			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_STATUS_CHANGE:
 				bnxt_link_evt ( bp,
+					( struct hwrm_async_event_cmpl * )nqp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_SPEED_CHANGE:
+				bnxt_link_speed_evt ( bp,
+					( struct hwrm_async_event_cmpl * )nqp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_LINK_SPEED_CFG_CHANGE:
+				bnxt_link_speed_chg_evt ( bp,
+					( struct hwrm_async_event_cmpl * )nqp );
+				break;
+			case ASYNC_EVENT_CMPL_EVENT_ID_PORT_PHY_CFG_CHANGE:
+				bnxt_port_phy_chg_evt ( bp,
 					( struct hwrm_async_event_cmpl * )nqp );
 				break;
 			case ASYNC_EVENT_CMPL_EVENT_ID_ERROR_RECOVERY:
