@@ -420,6 +420,12 @@ static int gve_describe ( struct gve_nic *gve ) {
 	struct net_device *netdev = gve->netdev;
 	struct gve_device_descriptor *desc = &gve->scratch.buf->desc;
 	union gve_admin_command *cmd;
+	struct gve_option *opt;
+	unsigned int count;
+	unsigned int id;
+	size_t offset;
+	size_t max;
+	size_t len;
 	int rc;
 
 	/* Construct request */
@@ -450,6 +456,38 @@ static int gve_describe ( struct gve_nic *gve ) {
 	DBGC ( gve, "GVE %p MAC %s (\"%s\") MTU %zd\n",
 	       gve, eth_ntoa ( netdev->hw_addr ),
 	       inet_ntoa ( desc->mac.in ), netdev->mtu );
+
+	/* Parse options */
+	count = be16_to_cpu ( desc->opt_count );
+	max = be16_to_cpu ( desc->len );
+	gve->options = 0;
+	for ( offset = offsetof ( typeof ( *desc ), opts ) ; count ;
+	      count--, offset += len ) {
+
+		/* Check space for option header */
+		if ( ( offset + sizeof ( *opt ) ) > max ) {
+			DBGC ( gve, "GVE %p underlength option at +%#02zx:\n",
+			       gve, offset );
+			DBGC_HDA ( gve, 0, desc, sizeof ( *desc ) );
+			return -EINVAL;
+		}
+		opt = ( ( ( void * ) desc ) + offset );
+
+		/* Check space for option body */
+		len = ( sizeof ( *opt ) + be16_to_cpu ( opt->len ) );
+		if ( ( offset + len ) > max ) {
+			DBGC ( gve, "GVE %p malformed option at +%#02zx:\n",
+			       gve, offset );
+			DBGC_HDA ( gve, 0, desc, sizeof ( *desc ) );
+			return -EINVAL;
+		}
+
+		/* Record option as supported */
+		id = be16_to_cpu ( opt->id );
+		if ( id < ( 8 * sizeof ( gve->options ) ) )
+			gve->options |= ( 1 << id );
+	}
+	DBGC ( gve, "GVE %p supports options %#08x\n", gve, gve->options );
 
 	return 0;
 }

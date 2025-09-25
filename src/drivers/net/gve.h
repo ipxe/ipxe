@@ -155,9 +155,47 @@ struct gve_device_descriptor {
 	uint8_t reserved_c[4];
 	/** MAC address */
 	struct google_mac mac;
+	/** Number of device options */
+	uint16_t opt_count;
+	/** Total length (including this header) */
+	uint16_t len;
 	/** Reserved */
-	uint8_t reserved_d[10];
+	uint8_t reserved_d[6];
+	/** Space for options
+	 *
+	 * There is no specified upper limit, and no negotiation
+	 * mechanism for the amount of space required.  We allow space
+	 * for seems like a reasonable number of options.
+	 */
+	uint8_t opts[216];
 } __attribute__ (( packed ));
+
+/** Device option header */
+struct gve_option {
+	/** Option ID */
+	uint16_t id;
+	/** Length (excluding this header) */
+	uint16_t len;
+	/** Required feature mask
+	 *
+	 * The purpose of this field is remarkably unclear.  The Linux
+	 * kernel driver does define enum gve_dev_opt_req_feat_mask,
+	 * but every member of this enum has a zero value.
+	 */
+	uint32_t required;
+} __attribute__ (( packed ));
+
+/** In-order descriptor queues with raw DMA addressing */
+#define GVE_OPT_GQI_RDA 0x02
+
+/** In-order descriptor queues with queue page list addressing */
+#define GVE_OPT_GQI_QPL 0x03
+
+/** Out-of-order descriptor queues with raw DMA addressing */
+#define GVE_OPT_DQO_RDA 0x04
+
+/** Out-of-order descriptor queues with queue page list addressing */
+#define GVE_OPT_DQO_QPL 0x07
 
 /** Configure device resources command */
 #define GVE_ADMIN_CONFIGURE 0x0002
@@ -663,6 +701,8 @@ struct gve_nic {
 	struct gve_events events;
 	/** Scratch buffer */
 	struct gve_scratch scratch;
+	/** Supported options */
+	uint32_t options;
 
 	/** Transmit queue */
 	struct gve_queue tx;
