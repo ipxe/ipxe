@@ -585,6 +585,10 @@ static int gve_register ( struct gve_nic *gve, struct gve_qpl *qpl ) {
 	unsigned int i;
 	int rc;
 
+	/* Do nothing if using raw DMA addressing */
+	if ( ! ( gve->mode & GVE_MODE_QPL ) )
+		return 0;
+
 	/* Build page address list */
 	for ( i = 0 ; i < qpl->count ; i++ ) {
 		addr = ( qpl->data + ( i * GVE_PAGE_SIZE ) );
@@ -616,6 +620,10 @@ static int gve_register ( struct gve_nic *gve, struct gve_qpl *qpl ) {
 static int gve_unregister ( struct gve_nic *gve, struct gve_qpl *qpl ) {
 	int rc;
 
+	/* Do nothing if using raw DMA addressing */
+	if ( ! ( gve->mode & GVE_MODE_QPL ) )
+		return 0;
+
 	/* Issue command */
 	if ( ( rc = gve_admin_simple ( gve, GVE_ADMIN_UNREGISTER,
 				       qpl->id ) ) != 0 ) {
@@ -629,9 +637,10 @@ static int gve_unregister ( struct gve_nic *gve, struct gve_qpl *qpl ) {
  * Construct command to create transmit queue
  *
  * @v queue		Transmit queue
+ * @v qpl		Queue page list ID
  * @v cmd		Admin queue command
  */
-static void gve_create_tx_param ( struct gve_queue *queue,
+static void gve_create_tx_param ( struct gve_queue *queue, uint32_t qpl,
 				  union gve_admin_command *cmd ) {
 	struct gve_admin_create_tx *create = &cmd->create_tx;
 	const struct gve_queue_type *type = queue->type;
@@ -640,7 +649,7 @@ static void gve_create_tx_param ( struct gve_queue *queue,
 	create->res = cpu_to_be64 ( dma ( &queue->res_map, queue->res ) );
 	create->desc =
 		cpu_to_be64 ( dma ( &queue->desc_map, queue->desc.raw ) );
-	create->qpl_id = cpu_to_be32 ( type->qpl );
+	create->qpl_id = cpu_to_be32 ( qpl );
 	create->notify_id = cpu_to_be32 ( type->irq );
 	create->desc_count = cpu_to_be16 ( queue->count );
 	if ( queue->cmplt.raw ) {
@@ -654,9 +663,10 @@ static void gve_create_tx_param ( struct gve_queue *queue,
  * Construct command to create receive queue
  *
  * @v queue		Receive queue
+ * @v qpl		Queue page list ID
  * @v cmd		Admin queue command
  */
-static void gve_create_rx_param ( struct gve_queue *queue,
+static void gve_create_rx_param ( struct gve_queue *queue, uint32_t qpl,
 				  union gve_admin_command *cmd ) {
 	struct gve_admin_create_rx *create = &cmd->create_rx;
 	const struct gve_queue_type *type = queue->type;
@@ -668,7 +678,7 @@ static void gve_create_rx_param ( struct gve_queue *queue,
 		cpu_to_be64 ( dma ( &queue->desc_map, queue->desc.raw ) );
 	create->cmplt =
 		cpu_to_be64 ( dma ( &queue->cmplt_map, queue->cmplt.raw ) );
-	create->qpl_id = cpu_to_be32 ( type->qpl );
+	create->qpl_id = cpu_to_be32 ( qpl );
 	create->desc_count = cpu_to_be16 ( queue->count );
 	create->bufsz = cpu_to_be16 ( GVE_BUF_SIZE );
 	create->cmplt_count = cpu_to_be16 ( queue->count );
@@ -686,6 +696,7 @@ static int gve_create_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 	union gve_admin_command *cmd;
 	unsigned int db_off;
 	unsigned int evt_idx;
+	uint32_t qpl;
 	int rc;
 
 	/* Reset queue */
@@ -695,7 +706,8 @@ static int gve_create_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 	/* Construct request */
 	cmd = gve_admin_command ( gve );
 	cmd->hdr.opcode = type->create;
-	type->param ( queue, cmd );
+	qpl = ( ( gve->mode & GVE_MODE_QPL ) ? type->qpl : GVE_RAW_QPL );
+	type->param ( queue, qpl, cmd );
 
 	/* Issue command */
 	if ( ( rc = gve_admin ( gve ) ) != 0 )
@@ -826,6 +838,8 @@ static int gve_alloc_qpl ( struct gve_nic *gve, struct gve_qpl *qpl,
 	qpl->data = dma_umalloc ( gve->dma, &qpl->map, len, GVE_ALIGN );
 	if ( ! qpl->data )
 		return -ENOMEM;
+	qpl->base = ( ( gve->mode & GVE_MODE_QPL ) ?
+		      0 : dma ( &qpl->map, qpl->data ) );
 
 	DBGC ( gve, "GVE %p QPL %#08x at [%08lx,%08lx)\n",
 	       gve, qpl->id, virt_to_phys ( qpl->data ),

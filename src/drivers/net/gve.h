@@ -533,6 +533,9 @@ struct gve_qpl {
 	physaddr_t base;
 };
 
+/** Raw DMA addressing queue page list ID */
+#define GVE_RAW_QPL 0xffffffff
+
 /**
  * Maximum number of transmit buffers
  *
@@ -676,9 +679,10 @@ struct gve_queue_type {
 	 * Populate command parameters to create queue
 	 *
 	 * @v queue		Descriptor queue
+	 * @v qpl		Queue page list ID
 	 * @v cmd		Admin queue command
 	 */
-	void ( * param ) ( struct gve_queue *queue,
+	void ( * param ) ( struct gve_queue *queue, uint32_t qpl,
 			   union gve_admin_command *cmd );
 	/** Queue page list ID */
 	uint32_t qpl;
