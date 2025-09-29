@@ -848,20 +848,34 @@ static void gve_free_qpl ( struct gve_nic *nic __unused,
 }
 
 /**
- * Get buffer address (within queue page list address space)
+ * Get buffer offset (within queue page list allocation)
  *
  * @v queue		Descriptor queue
  * @v index		Buffer index
  * @ret addr		Buffer address within queue page list address space
  */
 static inline __attribute__ (( always_inline)) size_t
-gve_address ( struct gve_queue *queue, unsigned int index ) {
+gve_offset ( struct gve_queue *queue, unsigned int index ) {
 
 	/* We allocate sufficient pages for the maximum fill level of
 	 * buffers, and reuse the pages in strict rotation as we
 	 * progress through the queue.
 	 */
 	return ( ( index & ( queue->fill - 1 ) ) * GVE_BUF_SIZE );
+}
+
+/**
+ * Get buffer address (within queue page list address space)
+ *
+ * @v queue		Descriptor queue
+ * @v index		Buffer index
+ * @ret addr		Buffer address within queue page list address space
+ */
+static inline __attribute__ (( always_inline)) physaddr_t
+gve_address ( struct gve_queue *queue, unsigned int index ) {
+
+	/* Pages are allocated as a single contiguous block */
+	return ( queue->qpl.base + gve_offset ( queue, index ) );
 }
 
 /**
@@ -874,8 +888,8 @@ gve_address ( struct gve_queue *queue, unsigned int index ) {
 static inline __attribute__ (( always_inline )) void *
 gve_buffer ( struct gve_queue *queue, unsigned int index ) {
 
-	/* Pages are currently allocated as a single contiguous block */
-	return ( queue->qpl.data + gve_address ( queue, index ) );
+	/* Pages are allocated as a single contiguous block */
+	return ( queue->qpl.data + gve_offset ( queue, index ) );
 }
 
 /**
@@ -1326,7 +1340,7 @@ static int gve_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 		DBGC2 ( gve, "GVE %p TX %#04x %#02x:%#02x len %#04x/%#04x at "
 			"%#08zx\n", gve, index, desc->type, desc->count,
 			be16_to_cpu ( desc->len ), be16_to_cpu ( desc->total ),
-			gve_address ( tx, index ) );
+			gve_offset ( tx, index ) );
 	}
 	assert ( ( tx->prod - tx->cons ) <= tx->fill );
 
@@ -1401,7 +1415,7 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 		len = be16_to_cpu ( cmplt->len );
 		DBGC2 ( gve, "GVE %p RX %#04x %#02x:%#02x len %#04zx at "
 			"%#08zx\n", gve, index, cmplt->seq, cmplt->flags,
-			len, gve_address ( rx, index ) );
+			len, gve_offset ( rx, index ) );
 
 		/* Accumulate a complete packet */
 		if ( cmplt->flags & GVE_RXF_ERROR ) {

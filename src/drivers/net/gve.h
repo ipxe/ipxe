@@ -524,6 +524,13 @@ struct gve_qpl {
 	unsigned int count;
 	/** Queue page list ID */
 	unsigned int id;
+	/** Queue page list base device address
+	 *
+	 * This will be zero if queue page list addressing is in use,
+	 * or the DMA address of the first page if raw DMA addressing
+	 * is in use.
+	 */
+	physaddr_t base;
 };
 
 /**
