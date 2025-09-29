@@ -555,8 +555,8 @@ struct gve_buffer {
 	uint64_t addr;
 } __attribute__ (( packed ));
 
-/** A transmit descriptor */
-struct gve_tx_descriptor {
+/** An in-order transmit descriptor */
+struct gve_gqi_tx_descriptor {
 	/** Type */
 	uint8_t type;
 	/** Reserved */
@@ -572,10 +572,10 @@ struct gve_tx_descriptor {
 } __attribute__ (( packed ));
 
 /** Start of packet transmit descriptor type */
-#define GVE_TX_TYPE_START 0x00
+#define GVE_GQI_TX_TYPE_START 0x00
 
 /** Continuation of packet transmit descriptor type */
-#define GVE_TX_TYPE_CONT 0x20
+#define GVE_GQI_TX_TYPE_CONT 0x20
 
 /**
  * Maximum number of receive buffers
@@ -592,23 +592,23 @@ struct gve_tx_descriptor {
 /** Receive queue interrupt channel */
 #define GVE_RX_IRQ 1
 
-/** A receive descriptor */
-struct gve_rx_descriptor {
+/** An in-order receive descriptor */
+struct gve_gqi_rx_descriptor {
 	/** Buffer descriptor */
 	struct gve_buffer buf;
 } __attribute__ (( packed ));
 
 /** Receive error */
-#define GVE_RXF_ERROR 0x08
+#define GVE_GQI_RXF_ERROR 0x08
 
 /** Receive packet continues into next descriptor */
-#define GVE_RXF_MORE 0x20
+#define GVE_GQI_RXF_MORE 0x20
 
 /** Receive sequence number mask */
-#define GVE_RX_SEQ_MASK 0x07
+#define GVE_GQI_RX_SEQ_MASK 0x07
 
-/** A receive completion descriptor */
-struct gve_rx_completion {
+/** An in-order receive completion descriptor */
+struct gve_gqi_rx_completion {
 	/** Reserved */
 	uint8_t reserved[60];
 	/** Length */
@@ -627,16 +627,25 @@ struct gve_queue {
 	/** Descriptor ring */
 	union {
 		/** Transmit descriptors */
-		struct gve_tx_descriptor *tx;
+		union {
+			/** In-order transmit descriptors */
+			struct gve_gqi_tx_descriptor *gqi;
+		} tx;
 		/** Receive descriptors */
-		struct gve_rx_descriptor *rx;
+		union {
+			/** In-order receive descriptors */
+			struct gve_gqi_rx_descriptor *gqi;
+		} rx;
 		/** Raw data */
 		void *raw;
 	} desc;
 	/** Completion ring */
 	union {
 		/** Receive completions */
-		struct gve_rx_completion *rx;
+		union {
+			/** In-order receive completions */
+			struct gve_gqi_rx_completion *gqi;
+		} rx;
 		/** Raw data */
 		void *raw;
 	} cmplt;
