@@ -622,6 +622,14 @@ struct gve_gqi_rx_completion {
 /** Padding at the start of all received packets */
 #define GVE_RX_PAD 2
 
+/** Queue strides */
+struct gve_queue_stride {
+	/** Descriptor ring stride */
+	uint8_t desc;
+	/** Completion ring stride */
+	uint8_t cmplt;
+};
+
 /** A descriptor queue */
 struct gve_queue {
 	/** Descriptor ring */
@@ -654,6 +662,8 @@ struct gve_queue {
 
 	/** Queue type */
 	const struct gve_queue_type *type;
+	/** Queue strides */
+	struct gve_queue_stride stride;
 	/** Number of descriptors (must be a power of two) */
 	unsigned int count;
 	/** Maximum fill level (must be a power of two) */
@@ -701,10 +711,11 @@ struct gve_queue_type {
 	uint8_t irq;
 	/** Maximum fill level */
 	uint8_t fill;
-	/** Descriptor size */
-	uint8_t desc_len;
-	/** Completion size */
-	uint8_t cmplt_len;
+	/** Queue strides */
+	struct {
+		/** In-order queue strides */
+		struct gve_queue_stride gqi;
+	} stride;
 	/** Command to create queue */
 	uint8_t create;
 	/** Command to destroy queue */

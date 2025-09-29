@@ -746,6 +746,7 @@ static void gve_create_rx_param ( struct gve_queue *queue, uint32_t qpl,
  */
 static int gve_create_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 	const struct gve_queue_type *type = queue->type;
+	const struct gve_queue_stride *stride = &queue->stride;
 	union gve_admin_command *cmd;
 	struct gve_buffer *buf;
 	unsigned int db_off;
@@ -758,17 +759,17 @@ static int gve_create_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 	/* Reset queue */
 	queue->prod = 0;
 	queue->cons = 0;
-	memset ( queue->desc.raw, 0, ( queue->count * type->desc_len ) );
-	memset ( queue->cmplt.raw, 0, ( queue->count * type->cmplt_len ) );
+	memset ( queue->desc.raw, 0, ( queue->count * stride->desc ) );
+	memset ( queue->cmplt.raw, 0, ( queue->count * stride->cmplt ) );
 	for ( i = 0 ; i < queue->fill ; i++ )
 		queue->tag[i] = i;
 
 	/* Pre-populate descriptor offsets */
-	buf = ( queue->desc.raw + type->desc_len - sizeof ( *buf ) );
+	buf = ( queue->desc.raw + stride->desc - sizeof ( *buf ) );
 	for ( i = 0 ; i < queue->count ; i++ ) {
 		tag = ( i & ( queue->fill - 1 ) );
 		buf->addr = cpu_to_be64 ( gve_address ( queue, tag ) );
-		buf = ( ( ( void * ) buf ) + type->desc_len );
+		buf = ( ( ( void * ) buf ) + stride->desc );
 	}
 
 	/* Construct request */
@@ -963,10 +964,11 @@ gve_next ( unsigned int seq ) {
  */
 static int gve_alloc_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 	const struct gve_queue_type *type = queue->type;
+	struct gve_queue_stride *stride = &queue->stride;
 	struct dma_device *dma = gve->dma;
-	size_t desc_len = ( queue->count * type->desc_len );
-	size_t cmplt_len = ( queue->count * type->cmplt_len );
-	size_t res_len = sizeof ( *queue->res );
+	size_t desc_len;
+	size_t cmplt_len;
+	size_t res_len;
 	int rc;
 
 	/* Sanity checks */
@@ -977,6 +979,12 @@ static int gve_alloc_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 		rc = -EINVAL;
 		goto err_sanity;
 	}
+
+	/* Set queue strides and calculate total lengths */
+	*stride = type->stride.gqi;
+	desc_len = ( queue->count * stride->desc );
+	cmplt_len = ( queue->count * stride->cmplt );
+	res_len = sizeof ( *queue->res );
 
 	/* Calculate maximum fill level */
 	assert ( ( type->fill & ( type->fill - 1 ) ) == 0 );
@@ -1045,9 +1053,9 @@ static int gve_alloc_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
  * @v queue		Descriptor queue
  */
 static void gve_free_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
-	const struct gve_queue_type *type = queue->type;
-	size_t desc_len = ( queue->count * type->desc_len );
-	size_t cmplt_len = ( queue->count * type->cmplt_len );
+	const struct gve_queue_stride *stride = &queue->stride;
+	size_t desc_len = ( queue->count * stride->desc );
+	size_t cmplt_len = ( queue->count * stride->cmplt );
 	size_t res_len = sizeof ( *queue->res );
 
 	/* Free queue resources */
@@ -1570,7 +1578,11 @@ static const struct gve_queue_type gve_tx_type = {
 	.qpl = GVE_TX_QPL,
 	.irq = GVE_TX_IRQ,
 	.fill = GVE_TX_FILL,
-	.desc_len = sizeof ( struct gve_gqi_tx_descriptor ),
+	.stride = {
+		.gqi = {
+			.desc = sizeof ( struct gve_gqi_tx_descriptor ),
+		},
+	},
 	.create = GVE_ADMIN_CREATE_TX,
 	.destroy = GVE_ADMIN_DESTROY_TX,
 };
@@ -1582,8 +1594,12 @@ static const struct gve_queue_type gve_rx_type = {
 	.qpl = GVE_RX_QPL,
 	.irq = GVE_RX_IRQ,
 	.fill = GVE_RX_FILL,
-	.desc_len = sizeof ( struct gve_gqi_rx_descriptor ),
-	.cmplt_len = sizeof ( struct gve_gqi_rx_completion ),
+	.stride = {
+		.gqi = {
+			.desc = sizeof ( struct gve_gqi_rx_descriptor ),
+			.cmplt = sizeof ( struct gve_gqi_rx_completion ),
+		},
+	},
 	.create = GVE_ADMIN_CREATE_RX,
 	.destroy = GVE_ADMIN_DESTROY_RX,
 };
