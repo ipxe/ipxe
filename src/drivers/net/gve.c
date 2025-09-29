@@ -1283,19 +1283,19 @@ static int gve_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 		/* Populate descriptor */
 		index = ( tx->prod++ & ( tx->count - 1 ) );
 		desc = &tx->desc.tx[index];
-		memset ( &desc->pkt, 0, sizeof ( desc->pkt ) );
 		if ( offset ) {
-			desc->pkt.type = GVE_TX_TYPE_CONT;
+			desc->type = GVE_TX_TYPE_CONT;
+			desc->count = 0;
+			desc->total = 0;
 		} else {
-			desc->pkt.type = GVE_TX_TYPE_START;
-			desc->pkt.count = count;
-			desc->pkt.total = cpu_to_be16 ( len );
+			desc->type = GVE_TX_TYPE_START;
+			desc->count = count;
+			desc->total = cpu_to_be16 ( len );
 		}
-		desc->pkt.len = cpu_to_be16 ( frag_len );
+		desc->len = cpu_to_be16 ( frag_len );
 		DBGC2 ( gve, "GVE %p TX %#04x %#02x:%#02x len %#04x/%#04x at "
-			"%#08zx\n", gve, index, desc->pkt.type,
-			desc->pkt.count, be16_to_cpu ( desc->pkt.len ),
-			be16_to_cpu ( desc->pkt.total ),
+			"%#08zx\n", gve, index, desc->type, desc->count,
+			be16_to_cpu ( desc->len ), be16_to_cpu ( desc->total ),
 			gve_address ( tx, index ) );
 	}
 	assert ( ( tx->prod - tx->cons ) <= tx->fill );
@@ -1363,22 +1363,22 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 		cmplt = &rx->cmplt.rx[index];
 
 		/* Check sequence number */
-		if ( ( cmplt->pkt.seq & GVE_RX_SEQ_MASK ) != seq )
+		if ( ( cmplt->seq & GVE_RX_SEQ_MASK ) != seq )
 			break;
 		seq = gve_next ( seq );
 
 		/* Parse completion */
-		len = be16_to_cpu ( cmplt->pkt.len );
+		len = be16_to_cpu ( cmplt->len );
 		DBGC2 ( gve, "GVE %p RX %#04x %#02x:%#02x len %#04zx at "
-			"%#08zx\n", gve, index, cmplt->pkt.seq,
-			cmplt->pkt.flags, len, gve_address ( rx, index ) );
+			"%#08zx\n", gve, index, cmplt->seq, cmplt->flags,
+			len, gve_address ( rx, index ) );
 
 		/* Accumulate a complete packet */
-		if ( cmplt->pkt.flags & GVE_RXF_ERROR ) {
+		if ( cmplt->flags & GVE_RXF_ERROR ) {
 			total = 0;
 		} else {
 			total += len;
-			if ( cmplt->pkt.flags & GVE_RXF_MORE )
+			if ( cmplt->flags & GVE_RXF_MORE )
 				continue;
 		}
 		gve->seq = seq;
@@ -1393,7 +1393,7 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 
 			/* Copy data */
 			if ( iobuf ) {
-				len = be16_to_cpu ( cmplt->pkt.len );
+				len = be16_to_cpu ( cmplt->len );
 				memcpy ( iob_put ( iobuf, len ),
 					 gve_buffer ( rx, rx->cons ), len );
 			}
@@ -1406,7 +1406,7 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 			iob_pull ( iobuf, GVE_RX_PAD );
 			netdev_rx ( netdev, iobuf );
 		} else {
-			rc = ( ( cmplt->pkt.flags & GVE_RXF_ERROR ) ?
+			rc = ( ( cmplt->flags & GVE_RXF_ERROR ) ?
 			       -EIO : -ENOMEM );
 			netdev_rx_err ( netdev, NULL, rc );
 		}

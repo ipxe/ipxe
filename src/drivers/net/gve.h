@@ -524,8 +524,8 @@ struct gve_buffer {
 	uint64_t addr;
 } __attribute__ (( packed ));
 
-/** A transmit packet descriptor */
-struct gve_tx_packet {
+/** A transmit descriptor */
+struct gve_tx_descriptor {
 	/** Type */
 	uint8_t type;
 	/** Reserved */
@@ -536,12 +536,6 @@ struct gve_tx_packet {
 	uint16_t total;
 	/** Length of this descriptor */
 	uint16_t len;
-} __attribute__ (( packed ));
-
-/** A transmit descriptor */
-struct gve_tx_descriptor {
-	/** Packet descriptor */
-	struct gve_tx_packet pkt;
 	/** Buffer descriptor */
 	struct gve_buffer buf;
 } __attribute__ (( packed ));
@@ -573,16 +567,6 @@ struct gve_rx_descriptor {
 	struct gve_buffer buf;
 } __attribute__ (( packed ));
 
-/** A receive packet descriptor */
-struct gve_rx_packet {
-	/** Length */
-	uint16_t len;
-	/** Flags */
-	uint8_t flags;
-	/** Sequence number */
-	uint8_t seq;
-} __attribute__ (( packed ));
-
 /** Receive error */
 #define GVE_RXF_ERROR 0x08
 
@@ -596,8 +580,12 @@ struct gve_rx_packet {
 struct gve_rx_completion {
 	/** Reserved */
 	uint8_t reserved[60];
-	/** Packet descriptor */
-	struct gve_rx_packet pkt;
+	/** Length */
+	uint16_t len;
+	/** Flags */
+	uint8_t flags;
+	/** Sequence number */
+	uint8_t seq;
 } __attribute__ (( packed ));
 
 /** Padding at the start of all received packets */
