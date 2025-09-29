@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
@@ -181,6 +182,21 @@ static int gve_reset ( struct gve_nic *gve ) {
  *
  ******************************************************************************
  */
+
+/**
+ * Get operating mode name (for debugging)
+ *
+ * @v mode		Operating mode
+ * @ret name		Mode name
+ */
+static inline const char * gve_mode_name ( unsigned int mode ) {
+	static char buf[ 8 /* "XXX-XXX" + NUL */ ];
+
+	snprintf ( buf, sizeof ( buf ), "%s-%s",
+		   ( ( mode & GVE_MODE_DQO ) ? "DQO" : "GQI" ),
+		   ( ( mode & GVE_MODE_QPL ) ? "QPL" : "RDA" ) );
+	return buf;
+}
 
 /**
  * Allocate admin queue
@@ -489,6 +505,11 @@ static int gve_describe ( struct gve_nic *gve ) {
 	}
 	DBGC ( gve, "GVE %p supports options %#08x\n", gve, gve->options );
 
+	/* Select preferred operating mode */
+	gve->mode = GVE_MODE_QPL;
+	DBGC ( gve, "GVE %p using %s mode\n",
+	       gve, gve_mode_name ( gve->mode ) );
+
 	return 0;
 }
 
@@ -516,6 +537,7 @@ static int gve_configure ( struct gve_nic *gve ) {
 	cmd->conf.num_events = cpu_to_be32 ( events->count );
 	cmd->conf.num_irqs = cpu_to_be32 ( GVE_IRQ_COUNT );
 	cmd->conf.irq_stride = cpu_to_be32 ( sizeof ( irqs->irq[0] ) );
+	cmd->conf.format = GVE_FORMAT ( gve->mode );
 
 	/* Issue command */
 	if ( ( rc = gve_admin ( gve ) ) != 0 )

@@ -214,7 +214,16 @@ struct gve_admin_configure {
 	uint32_t num_irqs;
 	/** IRQ doorbell stride */
 	uint32_t irq_stride;
+	/** MSI-X base index */
+	uint32_t msix_base;
+	/** Descriptor queue format */
+	uint8_t format;
+	/** Reserved */
+	uint8_t reserved[7];
 } __attribute__ (( packed ));
+
+/** Descriptor queue format */
+#define GVE_FORMAT( mode ) ( (mode) + 1 )
 
 /** Register page list command */
 #define GVE_ADMIN_REGISTER 0x0003
@@ -691,6 +700,8 @@ struct gve_nic {
 	struct gve_scratch scratch;
 	/** Supported options */
 	uint32_t options;
+	/** Operating mode */
+	unsigned int mode;
 
 	/** Transmit queue */
 	struct gve_queue tx;
@@ -710,6 +721,15 @@ struct gve_nic {
 	/** Reset recovery recorded activity counter */
 	uint32_t activity;
 };
+
+/** Operating mode
+ *
+ * These values are chosen to allow for easy transformation to a queue
+ * format identifier as used for the "Configure device resources"
+ * command.
+ */
+#define GVE_MODE_QPL 0x01		/**< Use registered queue pages */
+#define GVE_MODE_DQO 0x02		/**< Use out-of-order queues */
 
 /** Maximum time to wait for admin queue commands */
 #define GVE_ADMIN_MAX_WAIT_MS 500
