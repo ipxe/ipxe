@@ -278,6 +278,14 @@ struct gve_admin_create_tx {
 	uint32_t qpl_id;
 	/** Notification channel ID */
 	uint32_t notify_id;
+	/** Completion ring address */
+	uint64_t cmplt;
+	/** Number of descriptor ring entries */
+	uint16_t desc_count;
+	/** Number of completion ring entries */
+	uint16_t cmplt_count;
+	/** Reserved */
+	uint8_t reserved_b[4];
 } __attribute__ (( packed ));
 
 /** Create receive queue command */
@@ -303,10 +311,14 @@ struct gve_admin_create_rx {
 	uint64_t desc;
 	/** Queue page list ID */
 	uint32_t qpl_id;
-	/** Reserved */
-	uint8_t reserved_b[2];
+	/** Number of descriptor ring entries */
+	uint16_t desc_count;
 	/** Packet buffer size */
 	uint16_t bufsz;
+	/** Number of completion ring entries */
+	uint16_t cmplt_count;
+	/** Reserved */
+	uint8_t reserved[6];
 } __attribute__ (( packed ));
 
 /** Destroy transmit queue command */

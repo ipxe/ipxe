@@ -639,9 +639,15 @@ static void gve_create_tx_param ( struct gve_queue *queue,
 	/* Construct request parameters */
 	create->res = cpu_to_be64 ( dma ( &queue->res_map, queue->res ) );
 	create->desc =
-		cpu_to_be64 ( dma ( &queue->desc_map, queue->desc.tx ) );
+		cpu_to_be64 ( dma ( &queue->desc_map, queue->desc.raw ) );
 	create->qpl_id = cpu_to_be32 ( type->qpl );
 	create->notify_id = cpu_to_be32 ( type->irq );
+	create->desc_count = cpu_to_be16 ( queue->count );
+	if ( queue->cmplt.raw ) {
+		create->cmplt = cpu_to_be64 ( dma ( &queue->cmplt_map,
+						    queue->cmplt.raw ) );
+		create->cmplt_count = cpu_to_be16 ( queue->count );
+	}
 }
 
 /**
@@ -659,11 +665,13 @@ static void gve_create_rx_param ( struct gve_queue *queue,
 	create->notify_id = cpu_to_be32 ( type->irq );
 	create->res = cpu_to_be64 ( dma ( &queue->res_map, queue->res ) );
 	create->desc =
-		cpu_to_be64 ( dma ( &queue->desc_map, queue->desc.rx ) );
+		cpu_to_be64 ( dma ( &queue->desc_map, queue->desc.raw ) );
 	create->cmplt =
-		cpu_to_be64 ( dma ( &queue->cmplt_map, queue->cmplt.rx ) );
+		cpu_to_be64 ( dma ( &queue->cmplt_map, queue->cmplt.raw ) );
 	create->qpl_id = cpu_to_be32 ( type->qpl );
+	create->desc_count = cpu_to_be16 ( queue->count );
 	create->bufsz = cpu_to_be16 ( GVE_BUF_SIZE );
+	create->cmplt_count = cpu_to_be16 ( queue->count );
 }
 
 /**
