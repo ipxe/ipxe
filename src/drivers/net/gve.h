@@ -666,6 +666,8 @@ struct gve_queue {
 	uint32_t prod;
 	/** Consumer counter */
 	uint32_t cons;
+	/** Tag ring */
+	uint8_t *tag;
 
 	/** Queue page list */
 	struct gve_qpl qpl;
@@ -730,8 +732,12 @@ struct gve_nic {
 	struct gve_queue tx;
 	/** Receive queue */
 	struct gve_queue rx;
-	/** Transmit I/O buffers */
+	/** Transmit I/O buffers (indexed by tag) */
 	struct io_buffer *tx_iobuf[GVE_TX_FILL];
+	/** Transmit tag ring */
+	uint8_t tx_tag[GVE_TX_FILL];
+	/** Receive tag ring */
+	uint8_t rx_tag[GVE_RX_FILL];
 	/** Receive sequence number */
 	unsigned int seq;
 
