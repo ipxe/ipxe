@@ -1493,6 +1493,7 @@ static void gve_poll_tx ( struct net_device *netdev ) {
 			bit = ( dqo->flags & GVE_DQO_TXF_GEN );
 			if ( ( !! bit ) == ( !! gen ) )
 				break;
+			rmb();
 			tx->done++;
 
 			/* Ignore non-packet completions */
@@ -1583,6 +1584,7 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 			bit = ( dqo->len & cpu_to_le16 ( GVE_DQO_RXL_GEN ) );
 			if ( ( !! bit ) == ( !! gen ) )
 				break;
+			rmb();
 
 			/* Parse completion */
 			len = ( le16_to_cpu ( dqo->len ) &
@@ -1610,6 +1612,7 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 			/* Check sequence number */
 			if ( ( gqi->seq & GVE_GQI_RX_SEQ_MASK ) != seq )
 				break;
+			rmb();
 			seq = gve_next ( seq );
 
 			/* Parse completion */
