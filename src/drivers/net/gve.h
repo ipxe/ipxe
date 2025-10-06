@@ -539,9 +539,14 @@ struct gve_qpl {
 /**
  * Maximum number of transmit buffers
  *
- * This is a policy decision.
+ * This is a policy decision.  Experiments suggest that out-of-order
+ * transmit queues will write completions only in batches of 128
+ * bytes, comprising 8 descriptor completions and 8 packet
+ * completions.  The transmit fill level must therefore be greater
+ * than 8, so that completions will be written out before the transmit
+ * ring runs out of space.
  */
-#define GVE_TX_FILL 8
+#define GVE_TX_FILL 16
 
 /** Transmit queue page list ID */
 #define GVE_TX_QPL 0x18ae5458
@@ -576,6 +581,65 @@ struct gve_gqi_tx_descriptor {
 
 /** Continuation of packet transmit descriptor type */
 #define GVE_GQI_TX_TYPE_CONT 0x20
+
+/** An out-of-order transmit tag
+ *
+ * From the hardware perspective, this is an opaque 15-bit (sic) value
+ * that is simply copied from the descriptor to the corresponding
+ * completion.
+ */
+struct gve_dqo_tx_tag {
+	/** Buffer index within queue page list */
+	uint8_t id;
+	/** Number of descriptors covered by this completion
+	 *
+	 * Note that this is a 7-bit quantity: the high bit may be
+	 * (ab)used by the hardware to indicate that a completion is a
+	 * terminologically undefined "miss" completion.
+	 */
+	int8_t count;
+} __attribute__ (( packed ));
+
+/** An out-of-order transmit descriptor */
+struct gve_dqo_tx_descriptor {
+	/** Buffer descriptor */
+	struct gve_buffer buf;
+	/** Descriptor type and flags */
+	uint8_t type;
+	/** Reserved */
+	uint8_t reserved_a[3];
+	/** Tag */
+	struct gve_dqo_tx_tag tag;
+	/** Length of this descriptor */
+	uint16_t len;
+} __attribute__ (( packed ));
+
+/** Normal packet transmit descriptor type */
+#define GVE_DQO_TX_TYPE_PACKET 0x0c
+
+/** Last transmit descriptor in a packet */
+#define GVE_DQO_TX_TYPE_LAST 0x20
+
+/** Report transmit completion */
+#define GVE_DQO_TX_TYPE_REPORT 0x80
+
+/** An out-of-order transmit completion */
+struct gve_dqo_tx_completion {
+	/** Reserved */
+	uint8_t reserved_a[1];
+	/** Completion flags */
+	uint8_t flags;
+	/** Tag */
+	struct gve_dqo_tx_tag tag;
+	/** Reserved */
+	uint8_t reserved_b[4];
+} __attribute__ (( packed ));
+
+/** Transmit completion packet flag */
+#define GVE_DQO_TXF_PKT 0x10
+
+/** Transmit completion generation flag */
+#define GVE_DQO_TXF_GEN 0x80
 
 /**
  * Maximum number of receive buffers
@@ -620,7 +684,50 @@ struct gve_gqi_rx_completion {
 } __attribute__ (( packed ));
 
 /** Padding at the start of all received packets */
-#define GVE_RX_PAD 2
+#define GVE_GQI_RX_PAD 2
+
+/** An out-of-order receive descriptor */
+struct gve_dqo_rx_descriptor {
+	/** Tag */
+	uint8_t tag;
+	/** Reserved */
+	uint8_t reserved_a[7];
+	/** Buffer descriptor */
+	struct gve_buffer buf;
+	/** Reserved */
+	uint8_t reserved_b[16];
+} __attribute__ (( packed ));
+
+/** An out-of-order receive completion */
+struct gve_dqo_rx_completion {
+	/** Reserved */
+	uint8_t reserved_a[1];
+	/** Status */
+	uint8_t status;
+	/** Reserved */
+	uint8_t reserved_b[2];
+	/** Length and generation bit */
+	uint16_t len;
+	/** Reserved */
+	uint8_t reserved_c[2];
+	/** Flags */
+	uint8_t flags;
+	/** Reserved */
+	uint8_t reserved_d[3];
+	/** Tag */
+	uint8_t tag;
+	/** Reserved */
+	uint8_t reserved_e[19];
+} __attribute__ (( packed ));
+
+/** Receive error */
+#define GVE_DQO_RXS_ERROR 0x04
+
+/** Receive completion generation flag */
+#define GVE_DQO_RXL_GEN 0x4000
+
+/** Last receive descriptor in a packet */
+#define GVE_DQO_RXF_LAST 0x02
 
 /** Queue strides */
 struct gve_queue_stride {
@@ -638,21 +745,32 @@ struct gve_queue {
 		union {
 			/** In-order transmit descriptors */
 			struct gve_gqi_tx_descriptor *gqi;
+			/** Out-of-order transmit descriptors */
+			struct gve_dqo_tx_descriptor *dqo;
 		} tx;
 		/** Receive descriptors */
 		union {
 			/** In-order receive descriptors */
 			struct gve_gqi_rx_descriptor *gqi;
+			/** Out-of-order receive descriptors */
+			struct gve_dqo_rx_descriptor *dqo;
 		} rx;
 		/** Raw data */
 		void *raw;
 	} desc;
 	/** Completion ring */
 	union {
+		/** Transmit completions */
+		union {
+			/** Out-of-order transmit completions */
+			struct gve_dqo_tx_completion *dqo;
+		} tx;
 		/** Receive completions */
 		union {
 			/** In-order receive completions */
 			struct gve_gqi_rx_completion *gqi;
+			/** Out-of-order receive completions */
+			struct gve_dqo_rx_completion *dqo;
 		} rx;
 		/** Raw data */
 		void *raw;
@@ -685,6 +803,8 @@ struct gve_queue {
 	uint32_t prod;
 	/** Consumer counter */
 	uint32_t cons;
+	/** Completion counter */
+	uint32_t done;
 	/** Tag ring */
 	uint8_t *tag;
 
@@ -715,6 +835,8 @@ struct gve_queue_type {
 	struct {
 		/** In-order queue strides */
 		struct gve_queue_stride gqi;
+		/** Out-of-order queue strides */
+		struct gve_queue_stride dqo;
 	} stride;
 	/** Command to create queue */
 	uint8_t create;
@@ -754,6 +876,8 @@ struct gve_nic {
 	struct gve_queue rx;
 	/** Transmit I/O buffers (indexed by tag) */
 	struct io_buffer *tx_iobuf[GVE_TX_FILL];
+	/** Transmit tag chain */
+	uint8_t tx_chain[GVE_TX_FILL];
 	/** Transmit tag ring */
 	uint8_t tx_tag[GVE_TX_FILL];
 	/** Receive tag ring */

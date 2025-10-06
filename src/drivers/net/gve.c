@@ -759,17 +759,20 @@ static int gve_create_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 	/* Reset queue */
 	queue->prod = 0;
 	queue->cons = 0;
+	queue->done = 0;
 	memset ( queue->desc.raw, 0, ( queue->count * stride->desc ) );
 	memset ( queue->cmplt.raw, 0, ( queue->count * stride->cmplt ) );
 	for ( i = 0 ; i < queue->fill ; i++ )
 		queue->tag[i] = i;
 
-	/* Pre-populate descriptor offsets */
-	buf = ( queue->desc.raw + stride->desc - sizeof ( *buf ) );
-	for ( i = 0 ; i < queue->count ; i++ ) {
-		tag = ( i & ( queue->fill - 1 ) );
-		buf->addr = cpu_to_be64 ( gve_address ( queue, tag ) );
-		buf = ( ( ( void * ) buf ) + stride->desc );
+	/* Pre-populate descriptor offsets for in-order queues */
+	if ( ! ( gve->mode & GVE_MODE_DQO ) ) {
+		buf = ( queue->desc.raw + stride->desc - sizeof ( *buf ) );
+		for ( i = 0 ; i < queue->count ; i++ ) {
+			tag = ( i & ( queue->fill - 1 ) );
+			buf->addr = cpu_to_be64 ( gve_address ( queue, tag ) );
+			buf = ( ( ( void * ) buf ) + stride->desc );
+		}
 	}
 
 	/* Construct request */
@@ -981,7 +984,8 @@ static int gve_alloc_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 	}
 
 	/* Set queue strides and calculate total lengths */
-	*stride = type->stride.gqi;
+	*stride = ( ( gve->mode & GVE_MODE_DQO ) ?
+		    type->stride.dqo : type->stride.gqi );
 	desc_len = ( queue->count * stride->desc );
 	cmplt_len = ( queue->count * stride->cmplt );
 	res_len = sizeof ( *queue->res );
@@ -1340,11 +1344,15 @@ static int gve_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct gve_nic *gve = netdev->priv;
 	struct gve_queue *tx = &gve->tx;
 	struct gve_gqi_tx_descriptor *gqi;
+	struct gve_dqo_tx_descriptor *dqo;
 	unsigned int count;
 	unsigned int index;
 	unsigned int tag;
+	unsigned int chain;
+	uint32_t doorbell;
 	size_t frag_len;
 	size_t offset;
+	size_t next;
 	size_t len;
 
 	/* Do nothing if queues are not yet set up */
@@ -1360,8 +1368,7 @@ static int gve_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	}
 
 	/* Copy packet to queue pages and populate descriptors */
-	offset = 0;
-	while ( 1 ) {
+	for ( offset = 0, chain = 0 ; ; offset = next, chain = tag ) {
 
 		/* Identify next available buffer */
 		index = ( tx->prod++ & ( tx->count - 1 ) );
@@ -1376,38 +1383,66 @@ static int gve_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 			frag_len = GVE_BUF_SIZE;
 		memcpy ( gve_buffer ( tx, tag ),
 			 ( iobuf->data + offset ), frag_len );
+		next = ( offset + frag_len );
 
 		/* Populate descriptor */
-		gqi = &tx->desc.tx.gqi[index];
-		if ( offset ) {
-			gqi->type = GVE_GQI_TX_TYPE_CONT;
-			gqi->count = 0;
-			gqi->total = 0;
-		} else {
-			gqi->type = GVE_GQI_TX_TYPE_START;
-			gqi->count = count;
-			gqi->total = cpu_to_be16 ( len );
-		}
-		gqi->len = cpu_to_be16 ( frag_len );
-		DBGC2 ( gve, "GVE %p TX %#04x %#02x:%#02x len %#04x/%#04x at "
-			"%#08zx\n", gve, index, gqi->type, gqi->count,
-			be16_to_cpu ( gqi->len ), be16_to_cpu ( gqi->total ),
-			gve_offset ( tx, tag ) );
+		if ( gve->mode & GVE_MODE_DQO ) {
 
-		/* Move to next descriptor */
-		offset += frag_len;
-		if ( offset < len )
-			continue;
+			/* Out-of-order descriptor */
+			dqo = &tx->desc.tx.dqo[index];
+			dqo->buf.addr =
+				cpu_to_le64 ( gve_address ( tx, tag ) );
+			if ( next == len ) {
+				dqo->type = ( GVE_DQO_TX_TYPE_PACKET |
+					      GVE_DQO_TX_TYPE_LAST |
+					      GVE_DQO_TX_TYPE_REPORT );
+				dqo->tag.id = tag;
+				dqo->tag.count = count;
+			} else {
+				dqo->type = GVE_DQO_TX_TYPE_PACKET;
+				dqo->tag.id = 0;
+				dqo->tag.count = 0;
+			}
+			dqo->len = cpu_to_le16 ( frag_len );
+			gve->tx_chain[tag] = chain;
+
+		} else {
+
+			/* In-order descriptor */
+			gqi = &tx->desc.tx.gqi[index];
+			if ( offset ) {
+				gqi->type = GVE_GQI_TX_TYPE_CONT;
+				gqi->count = 0;
+				gqi->total = 0;
+			} else {
+				gqi->type = GVE_GQI_TX_TYPE_START;
+				gqi->count = count;
+				gqi->total = cpu_to_be16 ( len );
+			}
+			gqi->len = cpu_to_be16 ( frag_len );
+
+		}
+		DBGC2 ( gve, "GVE %p TXD %#04x %#02x:%#02x len %#04zx/%#04zx "
+			"at %#08lx\n", gve, index, tag, count, frag_len, len,
+			gve_address ( tx, tag ) );
 
 		/* Record I/O buffer against final descriptor */
-		gve->tx_iobuf[tag] = iobuf;
-		break;
+		if ( next == len ) {
+			gve->tx_iobuf[tag] = iobuf;
+			break;
+		}
 	}
 	assert ( ( tx->prod - tx->cons ) <= tx->fill );
 
 	/* Ring doorbell */
+	doorbell = tx->prod;
+	if ( gve->mode & GVE_MODE_DQO ) {
+		doorbell &= ( tx->count - 1 );
+	} else {
+		doorbell = bswap_32 ( doorbell );
+	}
 	wmb();
-	writel ( bswap_32 ( tx->prod ), tx->db );
+	writel ( doorbell, tx->db );
 
 	return 0;
 }
@@ -1420,22 +1455,76 @@ static int gve_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 static void gve_poll_tx ( struct net_device *netdev ) {
 	struct gve_nic *gve = netdev->priv;
 	struct gve_queue *tx = &gve->tx;
+	struct gve_dqo_tx_completion *dqo;
 	struct io_buffer *iobuf;
+	unsigned int index;
+	unsigned int gen;
+	unsigned int bit;
 	unsigned int tag;
 	uint32_t count;
 
-	/* Read event counter */
-	count = be32_to_cpu ( tx->event->count );
-
 	/* Process transmit completions */
-	while ( count != tx->cons ) {
-		DBGC2 ( gve, "GVE %p TX %#04x complete\n", gve, tx->cons );
-		tag = ( tx->cons % GVE_TX_FILL );
-		iobuf = gve->tx_iobuf[tag];
-		gve->tx_iobuf[tag] = NULL;
-		tx->cons++;
-		if ( iobuf )
-			netdev_tx_complete ( netdev, iobuf );
+	if ( gve->mode & GVE_MODE_DQO ) {
+
+		/* Out-of-order completions */
+		while ( 1 ) {
+
+			/* Read next possible completion */
+			gen = ( tx->done & tx->count );
+			index = ( tx->done & ( tx->count - 1 ) );
+			dqo = &tx->cmplt.tx.dqo[index];
+
+			/* Check generation bit */
+			bit = ( dqo->flags & GVE_DQO_TXF_GEN );
+			if ( ( !! bit ) == ( !! gen ) )
+				break;
+			tx->done++;
+
+			/* Ignore non-packet completions */
+			if ( ( ! ( dqo->flags & GVE_DQO_TXF_PKT ) ) ||
+			     ( dqo->tag.count < 0 ) ) {
+				DBGC2 ( gve, "GVE %p TXC %#04x flags %#02x "
+					"ignored\n", gve, index, dqo->flags );
+				continue;
+			}
+
+			/* Parse completion */
+			tag = dqo->tag.id;
+			count = dqo->tag.count;
+			iobuf = gve->tx_iobuf[tag];
+			gve->tx_iobuf[tag] = NULL;
+			assert ( iobuf != NULL );
+
+			/* Return completed descriptors to ring */
+			while ( count-- ) {
+				DBGC2 ( gve, "GVE %p TXC %#04x %#02x:%#02x "
+					"complete\n", gve, index, tag,
+					dqo->tag.count );
+				tx->tag[ tx->cons++ % GVE_TX_FILL ] = tag;
+				tag = gve->tx_chain[tag];
+			}
+
+			/* Hand off to network stack */
+			if ( iobuf )
+				netdev_tx_complete ( netdev, iobuf );
+		}
+
+	} else {
+
+		/* Read event counter */
+		count = be32_to_cpu ( tx->event->count );
+
+		/* Process transmit completions */
+		while ( count != tx->cons ) {
+			DBGC2 ( gve, "GVE %p TXC %#04x complete\n",
+				gve, tx->cons );
+			tag = ( tx->cons % GVE_TX_FILL );
+			iobuf = gve->tx_iobuf[tag];
+			gve->tx_iobuf[tag] = NULL;
+			tx->cons++;
+			if ( iobuf )
+				netdev_tx_complete ( netdev, iobuf );
+		}
 	}
 }
 
@@ -1448,59 +1537,107 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 	struct gve_nic *gve = netdev->priv;
 	struct gve_queue *rx = &gve->rx;
 	struct gve_gqi_rx_completion *gqi;
+	struct gve_dqo_rx_completion *dqo;
 	struct io_buffer *iobuf;
 	unsigned int index;
+	unsigned int gen;
+	unsigned int bit;
 	unsigned int seq;
 	unsigned int tag;
-	uint32_t cons;
+	uint32_t done;
 	size_t total;
 	size_t len;
 	int rc;
 
 	/* Process receive completions */
-	cons = rx->cons;
+	done = rx->done;
 	seq = gve->seq;
 	total = 0;
 	while ( 1 ) {
 
 		/* Read next possible completion */
-		index = ( cons++ & ( rx->count - 1 ) );
-		gqi = &rx->cmplt.rx.gqi[index];
+		rc = 0;
+		gen = ( done & rx->count );
+		index = ( done++ & ( rx->count - 1 ) );
+		if ( gve->mode & GVE_MODE_DQO ) {
 
-		/* Check sequence number */
-		if ( ( gqi->seq & GVE_GQI_RX_SEQ_MASK ) != seq )
-			break;
-		seq = gve_next ( seq );
+			/* Out-of-order completion */
+			dqo = &rx->cmplt.rx.dqo[index];
 
-		/* Parse completion */
-		len = be16_to_cpu ( gqi->len );
-		tag = ( index % GVE_RX_FILL );
-		DBGC2 ( gve, "GVE %p RX %#04x %#02x:%#02x len %#04zx at "
-			"%#08zx\n", gve, index, gqi->seq, gqi->flags,
-			len, gve_offset ( rx, tag ) );
+			/* Check generation bit */
+			bit = ( dqo->len & cpu_to_le16 ( GVE_DQO_RXL_GEN ) );
+			if ( ( !! bit ) == ( !! gen ) )
+				break;
 
-		/* Accumulate a complete packet */
-		if ( gqi->flags & GVE_GQI_RXF_ERROR ) {
-			total = 0;
+			/* Parse completion */
+			len = ( le16_to_cpu ( dqo->len ) &
+				( GVE_BUF_SIZE - 1 ) );
+			tag = dqo->tag;
+			DBGC2 ( gve, "GVE %p RXC %#04x %#02x:%#02x len %#04zx "
+				"at %#08zx\n", gve, index, tag, dqo->flags,
+				len, gve_offset ( rx, tag ) );
+
+			/* Accumulate a complete packet */
+			if ( dqo->status & GVE_DQO_RXS_ERROR ) {
+				rc = -EIO;
+				total = 0;
+			} else {
+				total += len;
+				if ( ! ( dqo->flags & GVE_DQO_RXF_LAST ) )
+					continue;
+			}
+
 		} else {
-			total += len;
-			if ( gqi->flags & GVE_GQI_RXF_MORE )
-				continue;
+
+			/* In-order completion */
+			gqi = &rx->cmplt.rx.gqi[index];
+
+			/* Check sequence number */
+			if ( ( gqi->seq & GVE_GQI_RX_SEQ_MASK ) != seq )
+				break;
+			seq = gve_next ( seq );
+
+			/* Parse completion */
+			len = be16_to_cpu ( gqi->len );
+			tag = ( index % GVE_RX_FILL );
+			DBGC2 ( gve, "GVE %p RXC %#04x %#02x:%#02x len %#04zx "
+				"at %#08zx\n", gve, index, gqi->seq,
+				gqi->flags, len, gve_offset ( rx, tag ) );
+
+			/* Accumulate a complete packet */
+			if ( gqi->flags & GVE_GQI_RXF_ERROR ) {
+				rc = -EIO;
+				total = 0;
+			} else {
+				total += len;
+				if ( gqi->flags & GVE_GQI_RXF_MORE )
+					continue;
+			}
+			gve->seq = seq;
 		}
-		gve->seq = seq;
 
 		/* Allocate and populate I/O buffer */
 		iobuf = ( total ? alloc_iob ( total ) : NULL );
-		for ( ; rx->cons != cons ; rx->cons++ ) {
+		for ( ; rx->done != done ; rx->done++ ) {
 
-			/* Re-read completion */
-			index = ( rx->cons & ( rx->count - 1 ) );
-			gqi = &rx->cmplt.rx.gqi[index];
-			tag = ( index % GVE_RX_FILL );
+			/* Re-read completion and return tag to ring */
+			index = ( rx->done & ( rx->count - 1 ) );
+			if ( gve->mode & GVE_MODE_DQO ) {
+				dqo = &rx->cmplt.rx.dqo[index];
+				tag = dqo->tag;
+				len = ( le16_to_cpu ( dqo->len ) &
+					( GVE_BUF_SIZE - 1 ) );
+				rx->tag[ rx->cons++ % GVE_RX_FILL ] = tag;
+			} else {
+				gqi = &rx->cmplt.rx.gqi[index];
+				tag = ( index % GVE_RX_FILL );
+				len = be16_to_cpu ( gqi->len );
+				assert ( rx->cons == rx->done );
+				rx->cons++;
+			}
 
 			/* Copy data */
 			if ( iobuf ) {
-				len = be16_to_cpu ( gqi->len );
 				memcpy ( iob_put ( iobuf, len ),
 					 gve_buffer ( rx, tag ), len );
 			}
@@ -1510,18 +1647,12 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 
 		/* Hand off packet to network stack */
 		if ( iobuf ) {
-			iob_pull ( iobuf, GVE_RX_PAD );
+			if ( ! ( gve->mode & GVE_MODE_DQO ) )
+				iob_pull ( iobuf, GVE_GQI_RX_PAD );
 			netdev_rx ( netdev, iobuf );
 		} else {
-			rc = ( ( gqi->flags & GVE_GQI_RXF_ERROR ) ?
-			       -EIO : -ENOMEM );
-			netdev_rx_err ( netdev, NULL, rc );
+			netdev_rx_err ( netdev, NULL, ( rc ? rc : -ENOMEM ) );
 		}
-
-		/* Sanity check */
-		assert ( rx->cons == cons );
-		assert ( gve->seq == seq );
-		assert ( total == 0 );
 	}
 }
 
@@ -1533,20 +1664,60 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 static void gve_refill_rx ( struct net_device *netdev ) {
 	struct gve_nic *gve = netdev->priv;
 	struct gve_queue *rx = &gve->rx;
-	unsigned int prod;
+	struct gve_dqo_rx_descriptor *dqo;
+	unsigned int refill;
+	unsigned int index;
+	unsigned int tag;
+	uint32_t doorbell;
 
-	/* The receive descriptors are prepopulated at the time of
-	 * creating the receive queue (pointing to the preallocated
-	 * queue pages).  Refilling is therefore just a case of
-	 * ringing the doorbell if the device is not yet aware of any
-	 * available descriptors.
-	 */
-	prod = ( rx->cons + rx->fill );
-	if ( prod != rx->prod ) {
-		rx->prod = prod;
-		writel ( bswap_32 ( prod ), rx->db );
-		DBGC2 ( gve, "GVE %p RX %#04x ready\n", gve, rx->prod );
+	/* Calculate refill quantity */
+	doorbell = ( rx->cons + rx->fill );
+	refill = ( doorbell - rx->prod );
+	if ( ! refill )
+		return;
+
+	/* Refill ring */
+	if ( gve->mode & GVE_MODE_DQO ) {
+
+		/* Out-of-order descriptors */
+		while ( refill-- ) {
+
+			/* Identify next available buffer */
+			index = ( rx->prod++ & ( rx->count - 1 ) );
+			tag = rx->tag[ index % GVE_RX_FILL ];
+
+			/* Populate descriptor */
+			dqo = &rx->desc.rx.dqo[index];
+			dqo->tag = tag;
+			dqo->buf.addr =
+				cpu_to_le64 ( gve_address ( rx, tag ) );
+			DBGC2 ( gve, "GVE %p RXD %#04x:%#02x at %#08llx\n",
+				gve, index, dqo->tag,
+				( ( unsigned long long )
+				  le64_to_cpu ( dqo->buf.addr ) ) );
+		}
+		wmb();
+		assert ( rx->prod == doorbell );
+
+	} else {
+
+		/* The in-order receive descriptors are prepopulated
+		 * at the time of creating the receive queue (pointing
+		 * to the preallocated queue pages).  Refilling is
+		 * therefore just a case of ringing the doorbell if
+		 * the device is not yet aware of any available
+		 * descriptors.
+		 */
+		rx->prod += refill;
+		assert ( rx->prod == doorbell );
+		DBGC2 ( gve, "GVE %p RXD %#04x ready\n", gve, rx->prod );
+
+		/* Doorbell is big-endian */
+		doorbell = bswap_32 ( doorbell );
 	}
+
+	/* Ring doorbell */
+	writel ( doorbell, rx->db );
 }
 
 /**
@@ -1596,6 +1767,10 @@ static const struct gve_queue_type gve_tx_type = {
 		.gqi = {
 			.desc = sizeof ( struct gve_gqi_tx_descriptor ),
 		},
+		.dqo = {
+			.desc = sizeof ( struct gve_dqo_tx_descriptor ),
+			.cmplt = sizeof ( struct gve_dqo_tx_completion ),
+		},
 	},
 	.create = GVE_ADMIN_CREATE_TX,
 	.destroy = GVE_ADMIN_DESTROY_TX,
@@ -1612,6 +1787,10 @@ static const struct gve_queue_type gve_rx_type = {
 		.gqi = {
 			.desc = sizeof ( struct gve_gqi_rx_descriptor ),
 			.cmplt = sizeof ( struct gve_gqi_rx_completion ),
+		},
+		.dqo = {
+			.desc = sizeof ( struct gve_dqo_rx_descriptor ),
+			.cmplt = sizeof ( struct gve_dqo_rx_completion ),
 		},
 	},
 	.create = GVE_ADMIN_CREATE_RX,
