@@ -1073,18 +1073,14 @@ static void gve_free_queue ( struct gve_nic *gve, struct gve_queue *queue ) {
 }
 
 /**
- * Start up device
+ * Cancel any pending transmissions
  *
  * @v gve		GVE device
- * @ret rc		Return status code
  */
-static int gve_start ( struct gve_nic *gve ) {
+static void gve_cancel_tx ( struct gve_nic *gve ) {
 	struct net_device *netdev = gve->netdev;
-	struct gve_queue *tx = &gve->tx;
-	struct gve_queue *rx = &gve->rx;
 	struct io_buffer *iobuf;
 	unsigned int i;
-	int rc;
 
 	/* Cancel any pending transmissions */
 	for ( i = 0 ; i < ( sizeof ( gve->tx_iobuf ) /
@@ -1094,6 +1090,21 @@ static int gve_start ( struct gve_nic *gve ) {
 		if ( iobuf )
 			netdev_tx_complete_err ( netdev, iobuf, -ECANCELED );
 	}
+}
+
+/**
+ * Start up device
+ *
+ * @v gve		GVE device
+ * @ret rc		Return status code
+ */
+static int gve_start ( struct gve_nic *gve ) {
+	struct gve_queue *tx = &gve->tx;
+	struct gve_queue *rx = &gve->rx;
+	int rc;
+
+	/* Cancel any pending transmissions */
+	gve_cancel_tx ( gve );
 
 	/* Reset receive sequence */
 	gve->seq = gve_next ( 0 );
@@ -1306,6 +1317,9 @@ static void gve_close ( struct net_device *netdev ) {
 	/* Stop and reset device */
 	gve_stop ( gve );
 	gve_reset ( gve );
+
+	/* Cancel any pending transmissions */
+	gve_cancel_tx ( gve );
 
 	/* Free queues */
 	gve_free_queue ( gve, rx );
