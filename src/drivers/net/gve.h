@@ -543,14 +543,9 @@ struct gve_qpl {
 /**
  * Maximum number of transmit buffers
  *
- * This is a policy decision.  Experiments suggest that out-of-order
- * transmit queues will write completions only in batches of 128
- * bytes, comprising 8 descriptor completions and 8 packet
- * completions.  The transmit fill level must therefore be greater
- * than 8, so that completions will be written out before the transmit
- * ring runs out of space.
+ * This is a policy decision.
  */
-#define GVE_TX_FILL 16
+#define GVE_TX_FILL 8
 
 /** Transmit queue page list ID */
 #define GVE_TX_QPL 0x18ae5458
@@ -623,9 +618,6 @@ struct gve_dqo_tx_descriptor {
 
 /** Last transmit descriptor in a packet */
 #define GVE_DQO_TX_TYPE_LAST 0x20
-
-/** Report transmit completion */
-#define GVE_DQO_TX_TYPE_REPORT 0x80
 
 /** An out-of-order transmit completion */
 struct gve_dqo_tx_completion {

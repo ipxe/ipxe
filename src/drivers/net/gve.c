@@ -1422,8 +1422,7 @@ static int gve_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 				cpu_to_le64 ( gve_address ( tx, tag ) );
 			if ( next == len ) {
 				dqo->type = ( GVE_DQO_TX_TYPE_PACKET |
-					      GVE_DQO_TX_TYPE_LAST |
-					      GVE_DQO_TX_TYPE_REPORT );
+					      GVE_DQO_TX_TYPE_LAST );
 				dqo->tag.id = tag;
 				dqo->tag.count = count;
 			} else {
