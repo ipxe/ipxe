@@ -16,6 +16,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/dma.h>
 #include <ipxe/pci.h>
+#include <ipxe/pcimsix.h>
 #include <ipxe/in.h>
 #include <ipxe/process.h>
 #include <ipxe/retry.h>
@@ -443,8 +444,11 @@ struct gve_irqs {
 	volatile uint32_t *db[GVE_IRQ_COUNT];
 };
 
-/** Disable interrupts */
-#define GVE_IRQ_DISABLE 0x40000000UL
+/** Disable in-order queue interrupt */
+#define GVE_GQI_IRQ_DISABLE 0x40000000UL
+
+/** Rearm out-of-order queue interrupt */
+#define GVE_DQO_IRQ_REARM 0x00000019UL
 
 /**
  * Queue resources
@@ -856,6 +860,8 @@ struct gve_nic {
 	struct net_device *netdev;
 	/** DMA device */
 	struct dma_device *dma;
+	/** Dummy MSI-X interrupt */
+	struct pci_msix msix;
 
 	/** Admin queue */
 	struct gve_admin admin;
