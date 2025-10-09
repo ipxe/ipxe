@@ -33,6 +33,38 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * PCI MSI-X interrupts
  *
+ * Interrupts as such are not used in iPXE, which operates in polling
+ * mode.  However, some network cards (such as the Intel 40GbE and
+ * 100GbE NICs) will defer writing out completions until the point of
+ * asserting an MSI-X interrupt.
+ *
+ * From the point of view of the PCI device, asserting an MSI-X
+ * interrupt is just a 32-bit DMA write of an opaque value to an
+ * opaque target address.  The PCI device has no know to know whether
+ * or not the target address corresponds to a real APIC.
+ *
+ * We can therefore trick the PCI device into believing that it is
+ * asserting an MSI-X interrupt, by configuring it to write an opaque
+ * 32-bit value to a dummy target address in host memory.  This is
+ * sufficient to trigger the associated write of the completions to
+ * host memory.
+ *
+ * When running in a virtual machine, the hypervisor will intercept
+ * our attempt to configure MSI-X on the PCI device.  The physical
+ * hardware will be configured to raise an interrupt under the
+ * hypervisor's control, which will then be reflected back into the
+ * virtual machine.  The opaque value that we write will be assumed to
+ * indicate an interrupt vector number (as would normally be the case
+ * when configuring MSI-X), and the opaque address will generally be
+ * ignored.  The reflected interrupt will be ignored (since it is not
+ * enabled within the virtual machine), but the device still asserts
+ * an MSI-X interrupt and so still triggers the associated write of
+ * the completions to host memory.
+ *
+ * Note that since the opaque target address will generally be ignored
+ * by the hypervisor, we cannot examine the value present at the dummy
+ * target address to find out whether or not an interrupt has been
+ * raised.
  */
 
 /**
@@ -103,6 +135,8 @@ static void * pci_msix_ioremap ( struct pci_device *pci, struct pci_msix *msix,
  */
 int pci_msix_enable ( struct pci_device *pci, struct pci_msix *msix ) {
 	uint16_t ctrl;
+	physaddr_t msg;
+	unsigned int i;
 	int rc;
 
 	/* Locate capability */
@@ -134,6 +168,19 @@ int pci_msix_enable ( struct pci_device *pci, struct pci_msix *msix ) {
 		goto err_pba;
 	}
 
+	/* Allocate dummy target */
+	msix->msg = dma_alloc ( &pci->dma, &msix->map, sizeof ( *msix->msg ),
+				sizeof ( *msix->msg ) );
+	if ( ! msix->msg ) {
+		rc = -ENOMEM;
+		goto err_msg;
+	}
+
+	/* Map all interrupts to dummy target by default */
+	msg = dma ( &msix->map, msix->msg );
+	for ( i = 0 ; i < msix->count ; i++ )
+		pci_msix_map ( msix, i, msg, 0 );
+
 	/* Enable MSI-X */
 	ctrl &= ~PCI_MSIX_CTRL_MASK;
 	ctrl |= PCI_MSIX_CTRL_ENABLE;
@@ -141,6 +188,8 @@ int pci_msix_enable ( struct pci_device *pci, struct pci_msix *msix ) {
 
 	return 0;
 
+	dma_free ( &msix->map, msix->msg, sizeof ( *msix->msg ) );
+ err_msg:
 	iounmap ( msix->pba );
  err_pba:
 	iounmap ( msix->table );
@@ -162,6 +211,9 @@ void pci_msix_disable ( struct pci_device *pci, struct pci_msix *msix ) {
 	pci_read_config_word ( pci, ( msix->cap + PCI_MSIX_CTRL ), &ctrl );
 	ctrl &= ~PCI_MSIX_CTRL_ENABLE;
 	pci_write_config_word ( pci, ( msix->cap + PCI_MSIX_CTRL ), ctrl );
+
+	/* Free dummy target */
+	dma_free ( &msix->map, msix->msg, sizeof ( *msix->msg ) );
 
 	/* Unmap pending bit array */
 	iounmap ( msix->pba );
