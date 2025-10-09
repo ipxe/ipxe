@@ -63,35 +63,20 @@ int intelxl_msix_enable ( struct intelxl_nic *intelxl,
 			  struct pci_device *pci, unsigned int vector ) {
 	int rc;
 
-	/* Map dummy target location */
-	if ( ( rc = dma_map ( intelxl->dma, &intelxl->msix.map,
-			      &intelxl->msix.msg, sizeof ( intelxl->msix.msg ),
-			      DMA_RX ) ) != 0 ) {
-		DBGC ( intelxl, "INTELXL %p could not map MSI-X target: %s\n",
-		       intelxl, strerror ( rc ) );
-		goto err_map;
-	}
-
 	/* Enable MSI-X capability */
-	if ( ( rc = pci_msix_enable ( pci, &intelxl->msix.cap ) ) != 0 ) {
+	if ( ( rc = pci_msix_enable ( pci, &intelxl->msix ) ) != 0 ) {
 		DBGC ( intelxl, "INTELXL %p could not enable MSI-X: %s\n",
 		       intelxl, strerror ( rc ) );
 		goto err_enable;
 	}
 
-	/* Configure interrupt to write to dummy location */
-	pci_msix_map ( &intelxl->msix.cap, vector,
-		       dma ( &intelxl->msix.map, &intelxl->msix.msg ), 0 );
-
 	/* Enable dummy interrupt */
-	pci_msix_unmask ( &intelxl->msix.cap, vector );
+	pci_msix_unmask ( &intelxl->msix, vector );
 
 	return 0;
 
-	pci_msix_disable ( pci, &intelxl->msix.cap );
+	pci_msix_disable ( pci, &intelxl->msix );
  err_enable:
-	dma_unmap ( &intelxl->msix.map, sizeof ( intelxl->msix.msg ) );
- err_map:
 	return rc;
 }
 
@@ -106,13 +91,10 @@ void intelxl_msix_disable ( struct intelxl_nic *intelxl,
 			    struct pci_device *pci, unsigned int vector ) {
 
 	/* Disable dummy interrupts */
-	pci_msix_mask ( &intelxl->msix.cap, vector );
+	pci_msix_mask ( &intelxl->msix, vector );
 
 	/* Disable MSI-X capability */
-	pci_msix_disable ( pci, &intelxl->msix.cap );
-
-	/* Unmap dummy target location */
-	dma_unmap ( &intelxl->msix.map, sizeof ( intelxl->msix.msg ) );
+	pci_msix_disable ( pci, &intelxl->msix );
 }
 
 /******************************************************************************

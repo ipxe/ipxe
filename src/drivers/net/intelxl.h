@@ -891,16 +891,6 @@ intelxl_init_ring ( struct intelxl_ring *ring, unsigned int count, size_t len,
 #define INTELXL_PFGEN_PORTNUM_PORT_NUM(x) \
 	( ( (x) >> 0 ) & 0x3 )				/**< Port number */
 
-/** MSI-X interrupt */
-struct intelxl_msix {
-	/** PCI capability */
-	struct pci_msix cap;
-	/** MSI-X dummy interrupt target */
-	uint32_t msg;
-	/** DMA mapping for dummy interrupt target */
-	struct dma_mapping map;
-};
-
 /** MSI-X interrupt vector */
 #define INTELXL_MSIX_VECTOR 0
 
@@ -934,7 +924,7 @@ struct intelxl_nic {
 	/** PCI Express capability offset */
 	unsigned int exp;
 	/** MSI-X interrupt */
-	struct intelxl_msix msix;
+	struct pci_msix msix;
 
 	/** Admin command queue */
 	struct intelxl_admin command;
