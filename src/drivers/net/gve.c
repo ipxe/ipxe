@@ -1508,9 +1508,6 @@ static void gve_poll_tx ( struct net_device *netdev ) {
 			rmb();
 			tx->done++;
 
-			/* Re-arm interrupt */
-			writel ( GVE_DQO_IRQ_REARM, gve->irqs.db[GVE_TX_IRQ] );
-
 			/* Ignore non-packet completions */
 			if ( ( ! ( dqo->flags & GVE_DQO_TXF_PKT ) ) ||
 			     ( dqo->tag.count < 0 ) ) {
@@ -1600,9 +1597,6 @@ static void gve_poll_rx ( struct net_device *netdev ) {
 			if ( ( !! bit ) == ( !! gen ) )
 				break;
 			rmb();
-
-			/* Re-arm interrupt */
-			writel ( GVE_DQO_IRQ_REARM, gve->irqs.db[GVE_RX_IRQ] );
 
 			/* Parse completion */
 			len = ( le16_to_cpu ( dqo->len ) &
@@ -1762,6 +1756,7 @@ static void gve_refill_rx ( struct net_device *netdev ) {
  * @v netdev		Network device
  */
 static void gve_poll ( struct net_device *netdev ) {
+	struct gve_nic *gve = netdev->priv;
 
 	/* Do nothing if queues are not yet set up */
 	if ( ! netdev_link_ok ( netdev ) )
@@ -1775,6 +1770,12 @@ static void gve_poll ( struct net_device *netdev ) {
 
 	/* Refill receive queue */
 	gve_refill_rx ( netdev );
+
+	/* Rearm queue interrupts if applicable */
+	if ( gve->mode & GVE_MODE_DQO ) {
+		writel ( GVE_DQO_IRQ_REARM, gve->irqs.db[GVE_TX_IRQ] );
+		writel ( GVE_DQO_IRQ_REARM, gve->irqs.db[GVE_RX_IRQ] );
+	}
 }
 
 /** GVE network device operations */
