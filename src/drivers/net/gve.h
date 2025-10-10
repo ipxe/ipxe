@@ -530,9 +530,10 @@ struct gve_qpl {
 	unsigned int id;
 	/** Queue page list base device address
 	 *
-	 * This will be zero if queue page list addressing is in use,
-	 * or the DMA address of the first page if raw DMA addressing
-	 * is in use.
+	 * This will be zero in the GQI-QPL operating mode, or the DMA
+	 * address of the first page in any other operating mode.
+	 * (Despite its name, DQO-QPL still requires the use of raw
+	 * DMA addresses in transmit and receive descriptors.)
 	 */
 	physaddr_t base;
 };

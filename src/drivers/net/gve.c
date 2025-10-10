@@ -938,7 +938,7 @@ static int gve_alloc_qpl ( struct gve_nic *gve, struct gve_qpl *qpl,
 	qpl->data = dma_umalloc ( gve->dma, &qpl->map, len, GVE_ALIGN );
 	if ( ! qpl->data )
 		return -ENOMEM;
-	qpl->base = ( ( gve->mode & GVE_MODE_QPL ) ?
+	qpl->base = ( ( gve->mode == GVE_MODE_QPL ) ?
 		      0 : dma ( &qpl->map, qpl->data ) );
 
 	DBGC ( gve, "GVE %p QPL %#08x at [%08lx,%08lx)\n",
