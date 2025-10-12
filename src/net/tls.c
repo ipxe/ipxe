@@ -1399,10 +1399,6 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 		return rc;
 	}
 
-	/* Generate master secret */
-	tls_generate_master_secret ( tls, &pre_master_secret,
-				     sizeof ( pre_master_secret ) );
-
 	/* Encrypt pre-master secret using server's public key */
 	memset ( &key_xchg, 0, sizeof ( key_xchg ) );
 	len = pubkey_encrypt ( pubkey, &tls->server.key, &pre_master_secret,
@@ -1423,8 +1419,18 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 		htons ( sizeof ( key_xchg.encrypted_pre_master_secret ) -
 			unused );
 
-	return tls_send_handshake ( tls, &key_xchg,
-				    ( sizeof ( key_xchg ) - unused ) );
+	/* Transmit Client Key Exchange record */
+	if ( ( rc = tls_send_handshake ( tls, &key_xchg,
+					 ( sizeof ( key_xchg ) -
+					   unused ) ) ) != 0 ) {
+		return rc;
+	}
+
+	/* Generate master secret */
+	tls_generate_master_secret ( tls, &pre_master_secret,
+				     sizeof ( pre_master_secret ) );
+
+	return 0;
 }
 
 /** Public key exchange algorithm */
@@ -1622,14 +1628,14 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 			len--;
 		}
 
-		/* Generate master secret */
-		tls_generate_master_secret ( tls, pre_master_secret, len );
-
 		/* Transmit Client Key Exchange record */
 		if ( ( rc = tls_send_handshake ( tls, key_xchg,
 						 sizeof ( *key_xchg ) ) ) !=0){
 			goto err_send_handshake;
 		}
+
+		/* Generate master secret */
+		tls_generate_master_secret ( tls, pre_master_secret, len );
 
 	err_send_handshake:
 	err_dhe_key:
@@ -1749,10 +1755,6 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			return rc;
 		}
 
-		/* Generate master secret */
-		tls_generate_master_secret ( tls, pre_master_secret,
-					     curve->pre_master_secret_len );
-
 		/* Generate Client Key Exchange record */
 		key_xchg.type_length =
 			( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
@@ -1767,6 +1769,10 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 						 sizeof ( key_xchg ) ) ) !=0){
 			return rc;
 		}
+
+		/* Generate master secret */
+		tls_generate_master_secret ( tls, pre_master_secret,
+					     curve->pre_master_secret_len );
 	}
 
 	return 0;
