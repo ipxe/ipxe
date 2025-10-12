@@ -2082,7 +2082,7 @@ static int tls_new_hello_request ( struct tls_connection *tls,
 	}
 
 	/* Fail unless server supports secure renegotiation */
-	if ( ! tls->secure_renegotiation ) {
+	if ( ! ( tls->secure_renegotiation && tls->extended_master_secret ) ) {
 		DBGC ( tls, "TLS %p refusing to renegotiate insecurely\n",
 		       tls );
 		return -EPERM_RENEG_INSECURE;
