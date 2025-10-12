@@ -134,6 +134,9 @@ struct tls_header {
 /* TLS signature algorithms extension */
 #define TLS_SIGNATURE_ALGORITHMS 13
 
+/* TLS extended master secret extension */
+#define TLS_EXTENDED_MASTER_SECRET 23
+
 /* TLS session ticket extension */
 #define TLS_SESSION_TICKET 35
 
@@ -452,6 +455,8 @@ struct tls_connection {
 	uint8_t *handshake_ctx;
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
+	/** Extended master secret flag */
+	int extended_master_secret;
 	/** Verification data */
 	struct tls_verify_data verify;
 

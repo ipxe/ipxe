@@ -200,6 +200,7 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len );
 static void tls_clear_cipher ( struct tls_connection *tls,
 			       struct tls_cipherspec *cipherspec );
+static void tls_verify_handshake ( struct tls_connection *tls, void *out );
 
 /******************************************************************************
  *
@@ -637,21 +638,43 @@ static void tls_prf ( struct tls_connection *tls, const void *secret,
 static void tls_generate_master_secret ( struct tls_connection *tls,
 					 const void *pre_master_secret,
 					 size_t pre_master_secret_len ) {
+	struct digest_algorithm *digest = tls->handshake_digest;
+	uint8_t digest_out[ digest->digestsize ];
 
-	DBGC ( tls, "TLS %p pre-master-secret:\n", tls );
+	/* Generate handshake digest */
+	tls_verify_handshake ( tls, digest_out );
+
+	/* Show inputs */
+	DBGC ( tls, "TLS %p pre-master secret:\n", tls );
 	DBGC_HD ( tls, pre_master_secret, pre_master_secret_len );
 	DBGC ( tls, "TLS %p client random bytes:\n", tls );
 	DBGC_HD ( tls, &tls->client.random, sizeof ( tls->client.random ) );
 	DBGC ( tls, "TLS %p server random bytes:\n", tls );
 	DBGC_HD ( tls, &tls->server.random, sizeof ( tls->server.random ) );
+	DBGC ( tls, "TLS %p session hash:\n", tls );
+	DBGC_HD ( tls, digest_out, sizeof ( digest_out ) );
 
-	tls_prf_label ( tls, pre_master_secret, pre_master_secret_len,
-			&tls->master_secret, sizeof ( tls->master_secret ),
-			"master secret",
-			&tls->client.random, sizeof ( tls->client.random ),
-			&tls->server.random, sizeof ( tls->server.random ) );
+	/* Generate master secret */
+	if ( tls->extended_master_secret ) {
+		tls_prf_label ( tls, pre_master_secret, pre_master_secret_len,
+				&tls->master_secret,
+				sizeof ( tls->master_secret ),
+				"extended master secret",
+				digest_out, sizeof ( digest_out ) );
+	} else {
+		tls_prf_label ( tls, pre_master_secret, pre_master_secret_len,
+				&tls->master_secret,
+				sizeof ( tls->master_secret ),
+				"master secret",
+				&tls->client.random,
+				sizeof ( tls->client.random ),
+				&tls->server.random,
+				sizeof ( tls->server.random ) );
+	}
 
-	DBGC ( tls, "TLS %p generated master secret:\n", tls );
+	/* Show output */
+	DBGC ( tls, "TLS %p generated %smaster secret:\n", tls,
+	       ( tls->extended_master_secret ? "extended ": "" ) );
 	DBGC_HD ( tls, &tls->master_secret, sizeof ( tls->master_secret ) );
 }
 
@@ -1196,11 +1219,16 @@ static int tls_client_hello ( struct tls_connection *tls,
 		} __attribute__ (( packed )) data;
 	} __attribute__ (( packed )) *named_curve_ext;
 	struct {
+		uint16_t type;
+		uint16_t len;
+	} __attribute__ (( packed )) *extended_master_secret_ext;
+	struct {
 		typeof ( *server_name_ext ) server_name;
 		typeof ( *max_fragment_length_ext ) max_fragment_length;
 		typeof ( *signature_algorithms_ext ) signature_algorithms;
 		typeof ( *renegotiation_info_ext ) renegotiation_info;
 		typeof ( *session_ticket_ext ) session_ticket;
+		typeof ( *extended_master_secret_ext ) extended_master_secret;
 		typeof ( *named_curve_ext )
 			named_curve[TLS_NUM_NAMED_CURVES ? 1 : 0];
 	} __attribute__ (( packed )) *extensions;
@@ -1285,6 +1313,12 @@ static int tls_client_hello ( struct tls_connection *tls,
 		= htons ( sizeof ( session_ticket_ext->data ) );
 	memcpy ( session_ticket_ext->data.data, session->ticket,
 		 sizeof ( session_ticket_ext->data.data ) );
+
+	/* Construct extended master secret extension */
+	extended_master_secret_ext = &extensions->extended_master_secret;
+	extended_master_secret_ext->type
+		= htons ( TLS_EXTENDED_MASTER_SECRET );
+	extended_master_secret_ext->len = 0;
 
 	/* Construct named curves extension, if applicable */
 	if ( sizeof ( extensions->named_curve ) ) {
@@ -2091,6 +2125,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		uint8_t len;
 		uint8_t data[0];
 	} __attribute__ (( packed )) *reneg = NULL;
+	const struct {
+		uint8_t data[0];
+	} __attribute__ (( packed )) *ems = NULL;
 	uint16_t version;
 	size_t exts_len;
 	size_t ext_len;
@@ -2155,6 +2192,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 					return -EINVAL_HELLO;
 				}
 				break;
+			case htons ( TLS_EXTENDED_MASTER_SECRET ) :
+				ems = ( ( void * ) ext->data );
+				break;
 			}
 		}
 	}
@@ -2187,6 +2227,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	/* Copy out server random bytes */
 	memcpy ( &tls->server.random, &hello_a->random,
 		 sizeof ( tls->server.random ) );
+
+	/* Handle extended master secret */
+	tls->extended_master_secret = ( !! ems );
 
 	/* Check session ID */
 	if ( hello_a->session_id_len &&
