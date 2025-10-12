@@ -183,6 +183,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define EINFO_EPERM_KEY_EXCHANGE					\
 	__einfo_uniqify ( EINFO_EPERM, 0x06,				\
 			  "ServerKeyExchange verification failed" )
+#define EPERM_EMS __einfo_error ( EINFO_EPERM_EMS )
+#define EINFO_EPERM_EMS							\
+	__einfo_uniqify ( EINFO_EPERM, 0x07,				\
+			  "Extended master secret extension mismatch" )
 #define EPROTO_VERSION __einfo_error ( EINFO_EPROTO_VERSION )
 #define EINFO_EPROTO_VERSION						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x01,				\
@@ -2243,6 +2247,14 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
 			return rc;
 
+		/* Ensure master secret generation method matches */
+		if ( tls->extended_master_secret !=
+		     tls->session->extended_master_secret ) {
+			DBGC ( tls, "TLS %p mismatched extended master secret "
+			       "extension\n", tls );
+			return -EPERM_EMS;
+		}
+
 	} else {
 
 		/* Record new session ID, if present */
@@ -2635,6 +2647,7 @@ static int tls_new_finished ( struct tls_connection *tls,
 	if ( tls->session_id_len || tls->new_session_ticket_len ) {
 		memcpy ( session->master_secret, tls->master_secret,
 			 sizeof ( session->master_secret ) );
+		session->extended_master_secret = tls->extended_master_secret;
 	}
 	if ( tls->session_id_len ) {
 		session->id_len = tls->session_id_len;

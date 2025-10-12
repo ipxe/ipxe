@@ -353,6 +353,8 @@ struct tls_session {
 	size_t ticket_len;
 	/** Master secret */
 	uint8_t master_secret[48];
+	/** Extended master secret flag */
+	int extended_master_secret;
 
 	/** List of connections */
 	struct list_head conn;
