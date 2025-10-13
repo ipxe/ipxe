@@ -1193,6 +1193,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1f41, "i354", "I354", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),
+	PCI_ROM ( 0x8086, 0x550a, "i219lm-20", "I219-LM (20)", INTEL_I219 ),
 };
 
 /** Intel PCI driver */
