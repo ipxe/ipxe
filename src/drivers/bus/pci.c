@@ -105,6 +105,82 @@ unsigned long pci_bar_start ( struct pci_device *pci, unsigned int reg ) {
 }
 
 /**
+ * Set the start of a PCI BAR
+ *
+ * @v pci		PCI device
+ * @v reg		PCI register number
+ * @v start		BAR start address
+ */
+void pci_bar_set ( struct pci_device *pci, unsigned int reg,
+		   unsigned long start ) {
+	unsigned int type;
+	uint32_t low;
+	uint32_t high;
+
+	/* Check for a 64-bit BAR */
+	pci_read_config_dword ( pci, reg, &low );
+	type = ( low & ( PCI_BASE_ADDRESS_SPACE_IO |
+			 PCI_BASE_ADDRESS_MEM_TYPE_MASK ) );
+
+	/* Write low 32 bits */
+	low = start;
+	pci_write_config_dword ( pci, reg, low );
+
+	/* Write high 32 bits, if applicable */
+	if ( type == PCI_BASE_ADDRESS_MEM_TYPE_64 ) {
+		if ( sizeof ( unsigned long ) > sizeof ( uint32_t ) ) {
+			high = ( ( ( uint64_t ) start ) >> 32 );
+		} else {
+			high = 0;
+		}
+		pci_write_config_dword ( pci, reg + 4, high );
+	}
+}
+
+/**
+ * Get the size of a PCI BAR
+ *
+ * @v pci		PCI device
+ * @v reg		PCI register number
+ * @ret size		BAR size
+ *
+ * Most drivers should not need to call this function.  It is not
+ * necessary to map the whole PCI BAR, only the portion that will be
+ * used for register access.  Since register offsets are almost always
+ * fixed by hardware design, the length of the mapped portion will
+ * almost always be a compile-time constant.
+ */
+unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
+	unsigned long start;
+	unsigned long size;
+	uint16_t cmd;
+
+	/* Save the original command register and disable decoding */
+	pci_read_config_word ( pci, PCI_COMMAND, &cmd );
+	pci_write_config_word ( pci, PCI_COMMAND,
+				( cmd & ~( PCI_COMMAND_MEM |
+					   PCI_COMMAND_IO ) ) );
+
+	/* Save the original start address */
+	start = pci_bar_start ( pci, reg );
+
+	/* Set all possible bits */
+	pci_bar_set ( pci, reg, -1UL );
+
+	/* Determine size by finding lowest set bit */
+	size = pci_bar_start ( pci, reg );
+	size &= ( -size );
+
+	/* Restore the original start address */
+	pci_bar_set ( pci, reg, start );
+
+	/* Restore the original command register */
+	pci_write_config_word ( pci, PCI_COMMAND, cmd );
+
+	return size;
+}
+
+/**
  * Read membase and ioaddr for a PCI device
  *
  * @v pci		PCI device

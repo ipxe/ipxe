@@ -80,42 +80,6 @@ int pci_find_next_capability ( struct pci_device *pci, int pos, int cap ) {
 }
 
 /**
- * Find the size of a PCI BAR
- *
- * @v pci		PCI device
- * @v reg		PCI register number
- * @ret size		BAR size
- *
- * It should not be necessary for any Etherboot code to call this
- * function.
- */
-unsigned long pci_bar_size ( struct pci_device *pci, unsigned int reg ) {
-	uint16_t cmd;
-	uint32_t start, size;
-
-	/* Save the original command register */
-	pci_read_config_word ( pci, PCI_COMMAND, &cmd );
-	/* Save the original bar */
-	pci_read_config_dword ( pci, reg, &start );
-	/* Compute which bits can be set */
-	pci_write_config_dword ( pci, reg, ~0 );
-	pci_read_config_dword ( pci, reg, &size );
-	/* Restore the original size */
-	pci_write_config_dword ( pci, reg, start );
-	/* Find the significant bits */
-	/* Restore the original command register. This reenables decoding. */
-	pci_write_config_word ( pci, PCI_COMMAND, cmd );
-	if ( start & PCI_BASE_ADDRESS_SPACE_IO ) {
-		size &= ~PCI_BASE_ADDRESS_IO_MASK;
-	} else {
-		size &= ~PCI_BASE_ADDRESS_MEM_MASK;
-	}
-	/* Find the lowest bit set */
-	size = size & ~( size - 1 );
-	return size;
-}
-
-/**
  * Perform PCI Express function-level reset (FLR)
  *
  * @v pci		PCI device
