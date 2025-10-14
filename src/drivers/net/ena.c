@@ -1102,7 +1102,7 @@ static int ena_membase ( struct ena_nic *ena, struct pci_device *pci ) {
 	}
 
 	/* Place device at start of memory window */
-	pci_write_config_dword ( pci, PCI_BASE_ADDRESS_0, bridge->membase );
+	pci_bar_set ( pci, PCI_BASE_ADDRESS_0, bridge->membase );
 	pci->membase = bridge->membase;
 	DBGC ( ena, "ENA %p at " PCI_FMT " claiming bridge " PCI_FMT " mem "
 	       "%08x\n", ena, PCI_ARGS ( pci ), PCI_ARGS ( bridge->pci ),
