@@ -34,6 +34,10 @@ struct pci_bridge {
 	uint32_t membase;
 	/** Memory limit */
 	uint32_t memlimit;
+	/** Prefetchable memory base */
+	uint64_t prefmembase;
+	/** Prefetchable memory limit */
+	uint64_t prefmemlimit;
 	/** List of bridges */
 	struct list_head list;
 };

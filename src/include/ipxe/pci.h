@@ -151,7 +151,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Memory base and limit */
 #define PCI_MEM_BASE		0x20
 #define PCI_MEM_LIMIT		0x22
-#define PCI_MEM_MASK			0x000f
+#define PCI_MEM_MASK			0x000fUL
+#define PCI_PREFMEM_BASE	0x24
+#define PCI_PREFMEM_LIMIT	0x26
+#define PCI_PREFMEM_BASE_HI	0x28
+#define PCI_PREFMEM_LIMIT_HI	0x2c
 
 /** Construct PCI class
  *

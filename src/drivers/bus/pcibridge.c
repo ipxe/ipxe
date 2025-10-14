@@ -68,6 +68,8 @@ static int pcibridge_probe ( struct pci_device *pci ) {
 	struct pci_bridge *bridge;
 	uint16_t base;
 	uint16_t limit;
+	uint32_t base_hi;
+	uint32_t limit_hi;
 	int rc;
 
 	/* Allocate and initialise structure */
@@ -78,17 +80,33 @@ static int pcibridge_probe ( struct pci_device *pci ) {
 	}
 	bridge->pci = pci;
 
-	/* Read configuration */
+	/* Read bus configuration */
 	pci_read_config_dword ( pci, PCI_PRIMARY, &bridge->buses );
 	cpu_to_le32s ( &buses );
+
+	/* Read memory base and limit */
 	pci_read_config_word ( pci, PCI_MEM_BASE, &base );
 	bridge->membase = ( ( base & ~PCI_MEM_MASK ) << 16 );
 	pci_read_config_word ( pci, PCI_MEM_LIMIT, &limit );
 	bridge->memlimit = ( ( ( ( limit | PCI_MEM_MASK ) + 1 ) << 16 ) - 1 );
-	DBGC ( bridge, "BRIDGE " PCI_FMT " bus %02x to [%02x,%02x) mem "
-	       "[%08x,%08x)\n", PCI_ARGS ( pci ), bridge->primary,
-	       bridge->secondary, bridge->subordinate, bridge->membase,
-	       bridge->memlimit );
+
+	/* Read prefetchable memory base and limit */
+	pci_read_config_word ( pci, PCI_PREFMEM_BASE, &base );
+	pci_read_config_dword ( pci, PCI_PREFMEM_BASE_HI, &base_hi );
+	bridge->prefmembase = ( ( ( base & ~PCI_MEM_MASK ) << 16 ) |
+				( ( ( uint64_t ) base_hi ) << 32 ) );
+	pci_read_config_word ( pci, PCI_PREFMEM_LIMIT, &limit );
+	pci_read_config_dword ( pci, PCI_PREFMEM_LIMIT_HI, &limit_hi );
+	bridge->prefmemlimit = ( ( ( ( ( limit | PCI_MEM_MASK ) + 1 ) << 16 ) |
+				   ( ( ( uint64_t ) limit_hi ) << 32 ) ) - 1 );
+
+	DBGC ( bridge, "BRIDGE " PCI_FMT " bus %02x to [%02x,%02x)\n",
+	       PCI_ARGS ( pci ), bridge->primary, bridge->secondary,
+	       bridge->subordinate );
+	DBGC ( bridge, "BRIDGE " PCI_FMT " mem [%08x,%08x) prefmem "
+	       "[%08llx,%08llx)\n", PCI_ARGS ( pci ), bridge->membase,
+	       bridge->memlimit, ( ( unsigned long long ) bridge->prefmembase ),
+	       ( ( unsigned long long ) bridge->prefmemlimit ) );
 
 	/* Add to list of PCI bridges */
 	list_add ( &bridge->list, &pcibridges );
