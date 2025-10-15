@@ -371,8 +371,11 @@ static int ena_set_aenq_config ( struct ena_nic *ena, uint32_t enabled ) {
 	feature->aenq.enabled = cpu_to_le32 ( enabled );
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not set AENQ configuration: %s\n",
+		       ena, strerror ( rc ) );
 		return rc;
+	}
 
 	return 0;
 }
@@ -468,8 +471,11 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	req->create_sq.address = cpu_to_le64 ( virt_to_bus ( sq->sqe.raw ) );
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not create %s SQ: %s\n",
+		       ena, ena_direction ( sq->direction ), strerror ( rc ) );
 		goto err_admin;
+	}
 
 	/* Parse response */
 	sq->id = le16_to_cpu ( rsp->create_sq.id );
@@ -520,8 +526,12 @@ static int ena_destroy_sq ( struct ena_nic *ena, struct ena_sq *sq ) {
 	req->destroy_sq.direction = sq->direction;
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not destroy %s SQ%d: %s\n",
+		       ena, ena_direction ( sq->direction ), sq->id,
+		       strerror ( rc ) );
 		return rc;
+	}
 
 	/* Free submission queue entries */
 	free_phys ( sq->sqe.raw, sq->len );
@@ -561,8 +571,8 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 
 	/* Issue request */
 	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
-		DBGC ( ena, "ENA %p CQ%d creation failed (broken firmware?)\n",
-		       ena, cq->id );
+		DBGC ( ena, "ENA %p could not create CQ (broken firmware?): "
+		       "%s\n", ena, strerror ( rc ) );
 		goto err_admin;
 	}
 
@@ -609,8 +619,11 @@ static int ena_destroy_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	req->destroy_cq.id = cpu_to_le16 ( cq->id );
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not destroy CQ%d: %s\n",
+		       ena, cq->id, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Free completion queue entries */
 	free_phys ( cq->cqe.raw, cq->len );
@@ -683,8 +696,11 @@ static int ena_get_device_attributes ( struct net_device *netdev ) {
 	req->get_feature.id = ENA_DEVICE_ATTRIBUTES;
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not get device attributes: %s\n",
+		       ena, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Parse response */
 	feature = &rsp->get_feature.feature;
@@ -717,8 +733,11 @@ static int ena_set_host_attributes ( struct ena_nic *ena ) {
 	feature->host.info = cpu_to_le64 ( virt_to_bus ( ena->info ) );
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not set host attributes: %s\n",
+		       ena, strerror ( rc ) );
 		return rc;
+	}
 
 	return 0;
 }
@@ -747,8 +766,11 @@ static int ena_get_stats ( struct ena_nic *ena ) {
 	req->get_stats.device = ENA_DEVICE_MINE;
 
 	/* Issue request */
-	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 )
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not get statistics: %s\n",
+		       ena, strerror ( rc ) );
 		return rc;
+	}
 
 	/* Parse response */
 	stats = &rsp->get_stats;
