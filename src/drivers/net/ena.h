@@ -12,8 +12,14 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <ipxe/if_ether.h>
 
-/** BAR size */
-#define ENA_BAR_SIZE 16384
+/** Register BAR */
+#define ENA_REGS_BAR PCI_BASE_ADDRESS_0
+
+/** Register BAR size */
+#define ENA_REGS_SIZE 16384
+
+/** On-device memory BAR */
+#define ENA_MEM_BAR PCI_BASE_ADDRESS_2
 
 /** Queue alignment */
 #define ENA_ALIGN 4096
@@ -743,6 +749,8 @@ struct ena_qp {
 struct ena_nic {
 	/** Registers */
 	void *regs;
+	/** On-device memory */
+	void *mem;
 	/** Host info */
 	struct ena_host_info *info;
 	/** Admin queue */

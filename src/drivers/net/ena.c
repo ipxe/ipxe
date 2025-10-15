@@ -1095,10 +1095,12 @@ static struct net_device_operations ena_operations = {
  */
 
 /**
- * Assign memory BAR
+ * Assign memory BARs
  *
  * @v ena		ENA device
  * @v pci		PCI device
+ * @v prefmembase	On-device memory base address to fill in
+ * @v prefmemsize	On-device memory size to fill in
  * @ret rc		Return status code
  *
  * Some BIOSes in AWS EC2 are observed to fail to assign a base
@@ -1106,8 +1108,18 @@ static struct net_device_operations ena_operations = {
  * its bridge, and the BIOS does assign a memory window to the bridge.
  * We therefore place the device at the start of the memory window.
  */
-static int ena_membase ( struct ena_nic *ena, struct pci_device *pci ) {
+static int ena_membases ( struct ena_nic *ena, struct pci_device *pci,
+			  unsigned long *prefmembase,
+			  unsigned long *prefmemsize ) {
 	struct pci_bridge *bridge;
+
+	/* Get on-device memory base address and size */
+	*prefmembase = pci_bar_start ( pci, ENA_MEM_BAR );
+	*prefmemsize = pci_bar_size ( pci, ENA_MEM_BAR );
+
+	/* Do nothing if addresses are already assigned */
+	if ( pci->membase && ( *prefmembase || ( ! *prefmemsize ) ) )
+		return 0;
 
 	/* Locate PCI bridge */
 	bridge = pcibridge_find ( pci );
@@ -1115,6 +1127,8 @@ static int ena_membase ( struct ena_nic *ena, struct pci_device *pci ) {
 		DBGC ( ena, "ENA %p found no PCI bridge\n", ena );
 		return -ENOTCONN;
 	}
+	DBGC ( ena, "ENA %p at " PCI_FMT " claiming bridge " PCI_FMT "\n",
+	       ena, PCI_ARGS ( pci ), PCI_ARGS ( bridge->pci ) );
 
 	/* Sanity check */
 	if ( PCI_SLOT ( pci->busdevfn ) || PCI_FUNC ( pci->busdevfn ) ) {
@@ -1123,12 +1137,21 @@ static int ena_membase ( struct ena_nic *ena, struct pci_device *pci ) {
 		return -ENOTSUP;
 	}
 
-	/* Place device at start of memory window */
-	pci_bar_set ( pci, PCI_BASE_ADDRESS_0, bridge->membase );
-	pci->membase = bridge->membase;
-	DBGC ( ena, "ENA %p at " PCI_FMT " claiming bridge " PCI_FMT " mem "
-	       "%08x\n", ena, PCI_ARGS ( pci ), PCI_ARGS ( bridge->pci ),
-	       bridge->membase );
+	/* Place register BAR at start of memory window, if applicable */
+	if ( ! pci->membase ) {
+		pci_bar_set ( pci, ENA_REGS_BAR, bridge->membase );
+		pci->membase = bridge->membase;
+		DBGC ( ena, "ENA %p at " PCI_FMT " claiming mem %08lx\n",
+		       ena, PCI_ARGS ( pci ), pci->membase );
+	}
+
+	/* Place memory BAR at start of prefetchable window, if applicable */
+	if ( *prefmemsize && ( ! *prefmembase ) ) {
+		pci_bar_set ( pci, ENA_MEM_BAR, bridge->prefmembase );
+		*prefmembase = bridge->prefmembase;
+		DBGC ( ena, "ENA %p at " PCI_FMT " claiming prefmem %08lx\n",
+		       ena, PCI_ARGS ( pci ), *prefmembase );
+	}
 
 	return 0;
 }
@@ -1143,6 +1166,8 @@ static int ena_probe ( struct pci_device *pci ) {
 	struct net_device *netdev;
 	struct ena_nic *ena;
 	struct ena_host_info *info;
+	unsigned long prefmembase;
+	unsigned long prefmemsize;
 	int rc;
 
 	/* Allocate and initialise net device */
@@ -1170,14 +1195,27 @@ static int ena_probe ( struct pci_device *pci ) {
 	adjust_pci_device ( pci );
 
 	/* Fix up PCI BAR if left unassigned by BIOS */
-	if ( ( ! pci->membase ) && ( ( rc = ena_membase ( ena, pci ) ) != 0 ) )
-		goto err_membase;
+	if ( ( rc = ena_membases ( ena, pci, &prefmembase,
+				   &prefmemsize ) ) != 0 ) {
+		goto err_membases;
+	}
 
 	/* Map registers */
-	ena->regs = pci_ioremap ( pci, pci->membase, ENA_BAR_SIZE );
+	ena->regs = pci_ioremap ( pci, pci->membase, ENA_REGS_SIZE );
 	if ( ! ena->regs ) {
 		rc = -ENODEV;
-		goto err_ioremap;
+		goto err_regs;
+	}
+
+	/* Map device memory */
+	if ( prefmemsize ) {
+		ena->mem = pci_ioremap ( pci, prefmembase, prefmemsize );
+		if ( ! ena->mem ) {
+			rc = -ENODEV;
+			goto err_mem;
+		}
+		DBGC ( ena, "ENA %p has %ldkB of on-device memory\n",
+		       ena, ( prefmemsize >> 10 ) );
 	}
 
 	/* Allocate and initialise host info */
@@ -1242,9 +1280,12 @@ static int ena_probe ( struct pci_device *pci ) {
  err_reset:
 	free_phys ( ena->info, PAGE_SIZE );
  err_info:
+	if ( ena->mem )
+		iounmap ( ena->mem );
+ err_mem:
 	iounmap ( ena->regs );
- err_ioremap:
- err_membase:
+ err_regs:
+ err_membases:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
  err_alloc:
@@ -1275,8 +1316,12 @@ static void ena_remove ( struct pci_device *pci ) {
 	/* Free host info */
 	free_phys ( ena->info, PAGE_SIZE );
 
-	/* Free network device */
+	/* Unmap registers and on-device memory */
+	if ( ena->mem )
+		iounmap ( ena->mem );
 	iounmap ( ena->regs );
+
+	/* Free network device */
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
