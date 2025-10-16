@@ -40,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ENA_RX_COUNT 128
 
 /** Receive queue maximum fill level */
-#define ENA_RX_FILL 16
+#define ENA_RX_FILL 32
 
 /** Base address low register offset */
 #define ENA_BASE_LO 0x0
