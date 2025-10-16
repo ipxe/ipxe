@@ -450,6 +450,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	union ena_aq_req *req;
 	union ena_acq_rsp *rsp;
 	unsigned int i;
+	size_t llqe;
 	int rc;
 
 	/* Allocate submission queue entries */
@@ -464,8 +465,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	req = ena_admin_req ( ena );
 	req->header.opcode = ENA_CREATE_SQ;
 	req->create_sq.direction = sq->direction;
-	req->create_sq.policy = cpu_to_le16 ( ENA_SQ_HOST_MEMORY |
-					      ENA_SQ_CONTIGUOUS );
+	req->create_sq.policy = cpu_to_le16 ( sq->policy );
 	req->create_sq.cq_id = cpu_to_le16 ( cq->id );
 	req->create_sq.count = cpu_to_le16 ( sq->count );
 	req->create_sq.address = cpu_to_le64 ( virt_to_bus ( sq->sqe.raw ) );
@@ -480,6 +480,14 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	/* Parse response */
 	sq->id = le16_to_cpu ( rsp->create_sq.id );
 	sq->doorbell = le32_to_cpu ( rsp->create_sq.doorbell );
+	llqe = le32_to_cpu ( rsp->create_sq.llqe );
+	if ( sq->policy & ENA_SQ_DEVICE_MEMORY ) {
+		assert ( ena->mem != NULL );
+		assert ( sq->len >= sizeof ( *sq->sqe.llq ) );
+		sq->llqe = ( ena->mem + llqe );
+	} else {
+		sq->llqe = NULL;
+	}
 
 	/* Reset producer counter and phase */
 	sq->prod = 0;
@@ -494,10 +502,16 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	for ( i = 0 ; i < sq->count ; i++ )
 		sq->ids[i] = i;
 
-	DBGC ( ena, "ENA %p %s SQ%d at [%08lx,%08lx) fill %d db +%04x CQ%d\n",
-	       ena, ena_direction ( sq->direction ), sq->id,
-	       virt_to_phys ( sq->sqe.raw ),
-	       ( virt_to_phys ( sq->sqe.raw ) + sq->len ),
+	DBGC ( ena, "ENA %p %s SQ%d at ",
+	       ena, ena_direction ( sq->direction ), sq->id );
+	if ( sq->policy & ENA_SQ_DEVICE_MEMORY ) {
+		DBGC ( ena, "LLQ [+%08zx,+%08zx)", llqe,
+		       ( llqe + ( sq->count * sizeof ( sq->sqe.llq[0] ) ) ) );
+	} else {
+		DBGC ( ena, "[%08lx,%08lx)", virt_to_phys ( sq->sqe.raw ),
+		       ( virt_to_phys ( sq->sqe.raw ) + sq->len ) );
+	}
+	DBGC ( ena, " fill %d db +%04x CQ%d\n",
 	       sq->fill, sq->doorbell, cq->id );
 	return 0;
 
@@ -745,6 +759,101 @@ static int ena_set_host_attributes ( struct ena_nic *ena ) {
 }
 
 /**
+ * Configure low latency queues
+ *
+ * @v ena		ENA device
+ * @ret rc		Return status code
+ */
+static int ena_llq_config ( struct ena_nic *ena ) {
+	union ena_aq_req *req;
+	union ena_acq_rsp *rsp;
+	union ena_feature *feature;
+	uint16_t header;
+	uint16_t size;
+	uint16_t desc;
+	uint16_t stride;
+	uint16_t mode;
+	int rc;
+
+	/* Construct request */
+	req = ena_admin_req ( ena );
+	req->header.opcode = ENA_GET_FEATURE;
+	req->get_feature.id = ENA_LLQ_CONFIG;
+
+	/* Issue request */
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not get LLQ configuration: %s\n",
+		       ena, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Parse response */
+	feature = &rsp->get_feature.feature;
+	header = le16_to_cpu ( feature->llq.header.supported );
+	size = le16_to_cpu ( feature->llq.size.supported );
+	desc = le16_to_cpu ( feature->llq.desc.supported );
+	stride = le16_to_cpu ( feature->llq.stride.supported );
+	mode = le16_to_cpu ( feature->llq.mode );
+	DBGC ( ena, "ENA %p LLQ supports %02x:%02x:%02x:%02x:%02x with %dx%d "
+	       "entries\n", ena, header, size, desc, stride, mode,
+	       le32_to_cpu ( feature->llq.queues ),
+	       le32_to_cpu ( feature->llq.count ) );
+
+	/* Check for a supported configuration */
+	if ( ! feature->llq.queues ) {
+		DBGC ( ena, "ENA %p LLQ has no queues\n", ena );
+		return -ENOTSUP;
+	}
+	if ( ! ( header & ENA_LLQ_HEADER_INLINE ) ) {
+		DBGC ( ena, "ENA %p LLQ does not support inline headers\n",
+		       ena );
+		return -ENOTSUP;
+	}
+	if ( ! ( size & ENA_LLQ_SIZE_128 ) ) {
+		DBGC ( ena, "ENA %p LLQ does not support 128-byte entries\n",
+		       ena );
+		return -ENOTSUP;
+	}
+	if ( ! ( desc & ENA_LLQ_DESC_2 ) ) {
+		DBGC ( ena, "ENA %p LLQ does not support two-descriptor "
+		       "entries\n", ena );
+		return -ENOTSUP;
+	}
+
+	/* Enable a minimal configuration */
+	header = ENA_LLQ_HEADER_INLINE;
+	size = ENA_LLQ_SIZE_128;
+	desc = ENA_LLQ_DESC_2;
+	stride &= ( -stride ); /* Don't care: use first supported option */
+	DBGC ( ena, "ENA %p LLQ enabling %02x:%02x:%02x:%02x:%02x\n",
+	       ena, header, size, desc, stride, mode );
+
+	/* Construct request */
+	req = ena_admin_req ( ena );
+	req->header.opcode = ENA_SET_FEATURE;
+	req->set_feature.id = ENA_LLQ_CONFIG;
+	feature = &req->set_feature.feature;
+	feature->llq.header.enabled = cpu_to_le16 ( header );
+	feature->llq.size.enabled = cpu_to_le16 ( size );
+	feature->llq.desc.enabled = cpu_to_le16 ( desc );
+	feature->llq.stride.enabled = cpu_to_le16 ( stride );
+	feature->llq.mode = cpu_to_le16 ( mode );
+
+	/* Issue request */
+	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not set LLQ configuration: %s\n",
+		       ena, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Use on-device memory for transmit queue */
+	ena->tx.sq.policy |= ENA_SQ_DEVICE_MEMORY;
+	ena->tx.sq.inlined = sizeof ( ena->tx.sq.sqe.llq->inlined );
+
+	return 0;
+}
+
+/**
  * Get statistics (for debugging)
  *
  * @v ena		ENA device
@@ -954,9 +1063,15 @@ static void ena_close ( struct net_device *netdev ) {
 static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	struct ena_nic *ena = netdev->priv;
 	struct ena_tx_sqe *sqe;
+	struct ena_tx_llqe *llqe;
+	const uint64_t *src;
+	uint64_t *dest;
 	physaddr_t address;
 	unsigned int index;
 	unsigned int id;
+	unsigned int i;
+	uint8_t flags;
+	size_t inlined;
 	size_t len;
 
 	/* Get next submission queue entry */
@@ -968,16 +1083,49 @@ static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	sqe = &ena->tx.sq.sqe.tx[index];
 	id = ena->tx_ids[index];
 
-	/* Construct submission queue entry */
+	/* Construct submission queue entry values */
 	address = virt_to_bus ( iobuf->data );
 	len = iob_len ( iobuf );
+	inlined = ena->tx.sq.inlined;
+	if ( inlined > len )
+		inlined = len;
+	len -= inlined;
+	address += inlined;
+	flags = ( ENA_SQE_FIRST | ENA_SQE_LAST | ENA_SQE_CPL |
+		  ena->tx.sq.phase );
+
+	/* Prepare low-latency queue bounce buffer, if applicable */
+	llqe = ena->tx.sq.sqe.llq;
+	if ( ena->tx.sq.llqe ) {
+
+		/* Construct zero-information metadata queue entry */
+		llqe->meta.meta = ENA_TX_SQE_META;
+		llqe->meta.flags = ( flags & ~( ENA_SQE_LAST | ENA_SQE_CPL ) );
+
+		/* Copy inlined data */
+		memcpy ( llqe->inlined, iobuf->data, inlined );
+
+		/* Place submission queue entry within bounce buffer */
+		sqe = &llqe->sqe;
+		flags &= ~ENA_SQE_FIRST;
+	}
+
+	/* Construct submission queue entry */
 	sqe->len = cpu_to_le16 ( len );
 	sqe->id = cpu_to_le16 ( id );
 	sqe->address = cpu_to_le64 ( address );
+	sqe->inlined = inlined;
 	wmb();
-	sqe->flags = ( ENA_SQE_FIRST | ENA_SQE_LAST | ENA_SQE_CPL |
-		       ena->tx.sq.phase );
+	sqe->flags = flags;
 	wmb();
+
+	/* Copy bounce buffer to on-device memory, if applicable */
+	if ( ena->tx.sq.llqe ) {
+		src = ( ( const void * ) llqe );
+		dest = ( ena->tx.sq.llqe + ( index * sizeof ( *llqe ) ) );
+		for ( i = 0 ; i < ( sizeof ( *llqe ) / sizeof ( *src ) ); i++ )
+			writeq ( *(src++), dest++ );
+	}
 
 	/* Increment producer counter */
 	ena->tx.sq.prod++;
@@ -1281,6 +1429,12 @@ static int ena_probe ( struct pci_device *pci ) {
 	/* Fetch MAC address */
 	if ( ( rc = ena_get_device_attributes ( netdev ) ) != 0 )
 		goto err_get_device_attributes;
+
+	/* Attempt to configure low latency queues, if applicable.
+	 * Ignore any errors and continue without using LLQs.
+	 */
+	if ( ena->mem && ( ena->features & ENA_FEATURE_LLQ ) )
+		ena_llq_config ( ena );
 
 	/* Register network device */
 	if ( ( rc = register_netdev ( netdev ) ) != 0 )
