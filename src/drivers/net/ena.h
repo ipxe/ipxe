@@ -751,6 +751,8 @@ struct ena_nic {
 	void *regs;
 	/** On-device memory */
 	void *mem;
+	/** Device features */
+	uint32_t features;
 	/** Host info */
 	struct ena_host_info *info;
 	/** Admin queue */
