@@ -859,12 +859,32 @@ static void ena_refill_rx ( struct net_device *netdev ) {
  * @v ena		ENA device
  */
 static void ena_empty_rx ( struct ena_nic *ena ) {
+	struct io_buffer *iobuf;
 	unsigned int i;
 
 	for ( i = 0 ; i < ENA_RX_COUNT ; i++ ) {
-		if ( ena->rx_iobuf[i] )
-			free_iob ( ena->rx_iobuf[i] );
+		iobuf = ena->rx_iobuf[i];
 		ena->rx_iobuf[i] = NULL;
+		if ( iobuf )
+			free_iob ( iobuf );
+	}
+}
+
+/**
+ * Cancel uncompleted transmit I/O buffers
+ *
+ * @v netdev		Network device
+ */
+static void ena_cancel_tx ( struct net_device *netdev ) {
+	struct ena_nic *ena = netdev->priv;
+	struct io_buffer *iobuf;
+	unsigned int i;
+
+	for ( i = 0 ; i < ENA_TX_COUNT ; i++ ) {
+		iobuf = ena->tx_iobuf[i];
+		ena->tx_iobuf[i] = NULL;
+		if ( iobuf )
+			netdev_tx_complete_err ( netdev, iobuf, -ECANCELED );
 	}
 }
 
@@ -917,6 +937,9 @@ static void ena_close ( struct net_device *netdev ) {
 
 	/* Destroy transmit queue pair */
 	ena_destroy_qp ( ena, &ena->tx );
+
+	/* Cancel any uncompleted transmit buffers */
+	ena_cancel_tx ( netdev );
 }
 
 /**
