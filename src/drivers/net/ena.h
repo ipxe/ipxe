@@ -34,7 +34,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ENA_AENQ_COUNT 2
 
 /** Number of transmit queue entries */
-#define ENA_TX_COUNT 16
+#define ENA_TX_COUNT 32
 
 /** Number of receive queue entries */
 #define ENA_RX_COUNT 128
