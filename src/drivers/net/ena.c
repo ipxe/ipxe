@@ -1125,6 +1125,7 @@ static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 		dest = ( ena->tx.sq.llqe + ( index * sizeof ( *llqe ) ) );
 		for ( i = 0 ; i < ( sizeof ( *llqe ) / sizeof ( *src ) ); i++ )
 			writeq ( *(src++), dest++ );
+		wmb();
 	}
 
 	/* Increment producer counter */
