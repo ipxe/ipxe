@@ -104,7 +104,9 @@ def import_image(region, name, family, architecture, image, public, overwrite,
     image_id = image['ImageId']
     client.get_waiter('image_available').wait(ImageIds=[image_id])
     if public:
-        client.disable_image_block_public_access()
+        image_block = client.get_image_block_public_access_state()
+        if image_block['ImageBlockPublicAccessState'] != 'unblocked':
+            client.disable_image_block_public_access()
         resource.Image(image_id).modify_attribute(Attribute='launchPermission',
                                                   OperationType='add',
                                                   UserGroups=['all'])
