@@ -1,7 +1,7 @@
 #!ipxe
 
 echo Amazon EC2 - iPXE boot via user-data
-echo CPU: ${cpuvendor} ${cpumodel}
+echo CPU: ${buildarch} ${cpuvendor} ${cpumodel}
 ifstat ||
 
 set attempt:int8 1
