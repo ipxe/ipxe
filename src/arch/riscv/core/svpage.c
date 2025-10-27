@@ -150,7 +150,7 @@ static void * svpage_map ( physaddr_t phys, size_t len, unsigned long attrs ) {
 			   sizeof ( page_table.pte[0] ) ) );
 
 	/* Round up number of pages to a power of two */
-	stride = ( 1 << ( fls ( count ) - 1 ) );
+	stride = ( 1 << fls ( count - 1 ) );
 	assert ( count <= stride );
 
 	/* Allocate pages */
