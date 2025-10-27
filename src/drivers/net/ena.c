@@ -468,7 +468,10 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	req->create_sq.policy = cpu_to_le16 ( sq->policy );
 	req->create_sq.cq_id = cpu_to_le16 ( cq->id );
 	req->create_sq.count = cpu_to_le16 ( sq->count );
-	req->create_sq.address = cpu_to_le64 ( virt_to_bus ( sq->sqe.raw ) );
+	if ( ! ( sq->policy & ENA_SQ_DEVICE_MEMORY ) ) {
+		req->create_sq.address =
+			cpu_to_le64 ( virt_to_bus ( sq->sqe.raw ) );
+	}
 
 	/* Issue request */
 	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
