@@ -307,7 +307,7 @@ static void * ioremap_pages ( unsigned long bus_addr, size_t len ) {
 			   sizeof ( io_pages.page[0] ) ) );
 
 	/* Round up number of pages to a power of two */
-	stride = ( 1 << ( fls ( count ) - 1 ) );
+	stride = ( 1 << fls ( count - 1 ) );
 	assert ( count <= stride );
 
 	/* Allocate pages */
