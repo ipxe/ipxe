@@ -116,6 +116,13 @@ void pci_bar_set ( struct pci_device *pci, unsigned int reg,
 	unsigned int type;
 	uint32_t low;
 	uint32_t high;
+	uint16_t cmd;
+
+	/* Save the original command register and disable decoding */
+	pci_read_config_word ( pci, PCI_COMMAND, &cmd );
+	pci_write_config_word ( pci, PCI_COMMAND,
+				( cmd & ~( PCI_COMMAND_MEM |
+					   PCI_COMMAND_IO ) ) );
 
 	/* Check for a 64-bit BAR */
 	pci_read_config_dword ( pci, reg, &low );
@@ -135,6 +142,9 @@ void pci_bar_set ( struct pci_device *pci, unsigned int reg,
 		}
 		pci_write_config_dword ( pci, reg + 4, high );
 	}
+
+	/* Restore the original command register */
+	pci_write_config_word ( pci, PCI_COMMAND, cmd );
 }
 
 /**
