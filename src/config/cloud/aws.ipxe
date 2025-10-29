@@ -1,6 +1,6 @@
 #!ipxe
 
-echo Amazon EC2 - iPXE boot via user-data
+echo Amazon EC2 ${product} - iPXE boot via user-data
 echo CPU: ${buildarch} ${cpuvendor} ${cpumodel}
 ifstat ||
 
