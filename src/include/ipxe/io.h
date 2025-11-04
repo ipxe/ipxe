@@ -330,6 +330,66 @@ void outl ( uint32_t data, volatile uint32_t *io_addr );
 	IOAPI_WRITE ( outl, uint32_t, data, io_addr, "IO", 8 )
 
 /**
+ * Read byte from I/O-mapped or memory-mapped device
+ *
+ * @v io_addr		I/O address
+ * @ret data		Value read
+ */
+uint8_t ioread8 ( volatile uint8_t *io_addr );
+#define ioread8( io_addr ) \
+	IOAPI_READ ( ioread8, uint8_t, io_addr, "IO/MEM", 2 )
+
+/**
+ * Read 16-bit word from I/O-mapped or memory-mapped device
+ *
+ * @v io_addr		I/O address
+ * @ret data		Value read
+ */
+uint16_t ioread16 ( volatile uint16_t *io_addr );
+#define ioread16( io_addr ) \
+	IOAPI_READ ( ioread16, uint16_t, io_addr, "IO/MEM", 4 )
+
+/**
+ * Read 32-bit dword from I/O-mapped or memory-mapped device
+ *
+ * @v io_addr		I/O address
+ * @ret data		Value read
+ */
+uint32_t ioread32 ( volatile uint32_t *io_addr );
+#define ioread32( io_addr ) \
+	IOAPI_READ ( ioread32, uint32_t, io_addr, "IO/MEM", 8 )
+
+/**
+ * Write byte to I/O-mapped or memory-mapped device
+ *
+ * @v data		Value to write
+ * @v io_addr		I/O address
+ */
+void iowrite8 ( uint8_t data, volatile uint8_t *io_addr );
+#define iowrite8( data, io_addr ) \
+	IOAPI_WRITE ( iowrite8, uint8_t, data, io_addr, "IO/MEM", 2 )
+
+/**
+ * Write 16-bit word to I/O-mapped or memory-mapped device
+ *
+ * @v data		Value to write
+ * @v io_addr		I/O address
+ */
+void iowrite16 ( uint16_t data, volatile uint16_t *io_addr );
+#define iowrite16( data, io_addr ) \
+	IOAPI_WRITE ( iowrite16, uint16_t, data, io_addr, "IO/MEM", 4 )
+
+/**
+ * Write 32-bit dword to I/O-mapped or memory-mapped device
+ *
+ * @v data		Value to write
+ * @v io_addr		I/O address
+ */
+void iowrite32 ( uint32_t data, volatile uint32_t *io_addr );
+#define iowrite32( data, io_addr ) \
+	IOAPI_WRITE ( iowrite32, uint32_t, data, io_addr, "IO/MEM", 8 )
+
+/**
  * Read bytes from I/O-mapped device
  *
  * @v io_addr		I/O address

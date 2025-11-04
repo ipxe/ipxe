@@ -39,6 +39,19 @@ IOAPI_INLINE ( _prefix, outs ## _suffix ) ( volatile _type *io_addr __unused, \
 	/* Do nothing */						      \
 }
 
+#define DUMMY_IOREADX( _prefix, _width, _suffix, _type )		      \
+static inline __always_inline _type					      \
+IOAPI_INLINE ( _prefix, ioread ## _width ) ( volatile _type *io_addr ) {      \
+	return IOAPI_INLINE ( _prefix, read ## _suffix ) ( io_addr );	      \
+}
+
+#define DUMMY_IOWRITEX( _prefix, _width, _suffix, _type )		      \
+static inline __always_inline void					      \
+IOAPI_INLINE ( _prefix, iowrite ## _width ) ( _type data,		      \
+					      volatile _type *io_addr ) {     \
+	IOAPI_INLINE ( _prefix, write ## _suffix ) ( data, io_addr );	      \
+}
+
 #define DUMMY_IODELAY( _prefix )					      \
 static inline __always_inline void					      \
 IOAPI_INLINE ( _prefix, iodelay ) ( void ) {				      \
@@ -52,6 +65,12 @@ IOAPI_INLINE ( _prefix, iodelay ) ( void ) {				      \
 	DUMMY_OUTX ( _prefix, b, uint8_t );				      \
 	DUMMY_OUTX ( _prefix, w, uint16_t );				      \
 	DUMMY_OUTX ( _prefix, l, uint32_t );				      \
+	DUMMY_IOREADX ( _prefix, 8, b, uint8_t );			      \
+	DUMMY_IOREADX ( _prefix, 16, w, uint16_t );			      \
+	DUMMY_IOREADX ( _prefix, 32, l, uint32_t );			      \
+	DUMMY_IOWRITEX ( _prefix, 8, b, uint8_t );			      \
+	DUMMY_IOWRITEX ( _prefix, 16, w, uint16_t );			      \
+	DUMMY_IOWRITEX ( _prefix, 32, l, uint32_t );			      \
 	DUMMY_IODELAY ( _prefix );
 
 #define PROVIDE_DUMMY_PIO( _prefix )					      \
@@ -61,6 +80,12 @@ IOAPI_INLINE ( _prefix, iodelay ) ( void ) {				      \
 	PROVIDE_IOAPI_INLINE ( _prefix, outb );				      \
 	PROVIDE_IOAPI_INLINE ( _prefix, outw );				      \
 	PROVIDE_IOAPI_INLINE ( _prefix, outl );				      \
+	PROVIDE_IOAPI_INLINE ( _prefix, ioread8 );			      \
+	PROVIDE_IOAPI_INLINE ( _prefix, ioread16 );			      \
+	PROVIDE_IOAPI_INLINE ( _prefix, ioread32 );			      \
+	PROVIDE_IOAPI_INLINE ( _prefix, iowrite8 );			      \
+	PROVIDE_IOAPI_INLINE ( _prefix, iowrite16 );			      \
+	PROVIDE_IOAPI_INLINE ( _prefix, iowrite32 );			      \
 	PROVIDE_IOAPI_INLINE ( _prefix, iodelay );
 
 #endif /* _IPXE_DUMMY_PIO_H */
