@@ -22,6 +22,9 @@ struct uart {
 	/** List of registered UARTs */
 	struct list_head list;
 
+	/** Baud rate (if specified) */
+	unsigned int baud;
+
 	/** UART operations */
 	struct uart_operations *op;
 	/** Driver-private data */
@@ -56,10 +59,9 @@ struct uart_operations {
 	 * Initialise UART
 	 *
 	 * @v uart		UART
-	 * @v baud		Baud rate, or zero to leave unchanged
 	 * @ret rc		Return status code
 	 */
-	int ( * init ) ( struct uart *uart, unsigned int baud );
+	int ( * init ) ( struct uart *uart );
 	/**
 	 * Flush transmitted data
 	 *
@@ -109,13 +111,12 @@ uart_receive ( struct uart *uart ) {
  * Initialise UART
  *
  * @v uart		UART
- * @v baud		Baud rate, or zero to leave unchanged
  * @ret rc		Return status code
  */
 static inline __attribute__ (( always_inline )) int
-uart_init ( struct uart *uart, unsigned int baud ) {
+uart_init ( struct uart *uart ) {
 
-	return uart->op->init ( uart, baud );
+	return uart->op->init ( uart );
 }
 
 /**

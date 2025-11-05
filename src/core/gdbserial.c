@@ -95,7 +95,9 @@ struct gdb_transport * gdbserial_configure ( const char *name,
 		return NULL;
 	uart_get ( gdbserial_uart );
 
-	if ( ( rc = uart_init ( gdbserial_uart, baud ) ) != 0 )
+	gdbserial_uart->baud = baud;
+
+	if ( ( rc = uart_init ( gdbserial_uart ) ) != 0 )
 		return NULL;
 
 	return &serial_gdb_transport;

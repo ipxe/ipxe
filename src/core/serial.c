@@ -74,8 +74,14 @@ struct uart *serial_console = NULL;
  * @ret uart		Serial console UART, or NULL
  */
 static struct uart * serial_comconsole ( void ) {
+	struct uart *uart = COMCONSOLE;
+	unsigned int baud = COMSPEED;
 
-	return COMCONSOLE;
+	/* Set default baud rate, if applicable */
+	if ( uart && baud )
+		uart->baud = baud;
+
+	return uart;
 }
 
 /**
@@ -154,9 +160,9 @@ static void serial_init ( void ) {
 		return;
 
 	/* Initialise UART */
-	if ( ( rc = uart_init ( uart, COMSPEED ) ) != 0 ) {
-		DBGC ( uart, "SERIAL could not initialise %s baud %d: %s\n",
-		       uart->name, COMSPEED, strerror ( rc ) );
+	if ( ( rc = uart_init ( uart ) ) != 0 ) {
+		DBGC ( uart, "SERIAL could not initialise %s: %s\n",
+		       uart->name, strerror ( rc ) );
 		return;
 	}
 

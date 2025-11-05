@@ -49,8 +49,7 @@ static uint8_t null_uart_receive ( struct uart *uart __unused ) {
 	return 0;
 }
 
-static int null_uart_init ( struct uart *uart __unused,
-			    unsigned int baud __unused ) {
+static int null_uart_init ( struct uart *uart __unused ) {
 	return 0;
 }
 

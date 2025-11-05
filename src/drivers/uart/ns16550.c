@@ -115,10 +115,9 @@ static void ns16550_flush ( struct uart *uart ) {
  * Initialise UART
  *
  * @v uart		UART
- * @v baud		Baud rate, or zero to leave unchanged
  * @ret rc		Return status code
  */
-static int ns16550_init ( struct uart *uart, unsigned int baud ) {
+static int ns16550_init ( struct uart *uart ) {
 	struct ns16550_uart *ns16550 = uart->priv;
 	uint8_t dlm;
 	uint8_t dll;
@@ -137,8 +136,8 @@ static int ns16550_init ( struct uart *uart, unsigned int baud ) {
 	/* Configure divisor and line control register, if applicable */
 	ns16550_write ( ns16550, NS16550_LCR,
 			( NS16550_LCR_8N1 | NS16550_LCR_DLAB ) );
-	if ( baud ) {
-		ns16550->divisor = ( ( ns16550->clock / baud ) /
+	if ( uart->baud ) {
+		ns16550->divisor = ( ( ns16550->clock / uart->baud ) /
 				     NS16550_CLK_BIT );
 		dlm = ( ( ns16550->divisor >> 8 ) & 0xff );
 		dll = ( ( ns16550->divisor >> 0 ) & 0xff );
