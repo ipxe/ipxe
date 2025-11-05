@@ -346,6 +346,10 @@ enum page_flags {
 /** The I/O space page table */
 extern struct page_table io_pages;
 
+/** Maximum number of I/O pages */
+#define IO_PAGE_COUNT \
+	( sizeof ( io_pages.page ) / sizeof ( io_pages.page[0] ) )
+
 /** I/O page size
  *
  * We choose to use 2MB pages for I/O space, to minimise the number of

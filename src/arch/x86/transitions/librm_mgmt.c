@@ -303,17 +303,14 @@ static void * ioremap_pages ( unsigned long bus_addr, size_t len ) {
 	/* Calculate number of pages required */
 	count = ( ( offset + len + IO_PAGE_SIZE - 1 ) / IO_PAGE_SIZE );
 	assert ( count != 0 );
-	assert ( count < ( sizeof ( io_pages.page ) /
-			   sizeof ( io_pages.page[0] ) ) );
+	assert ( count <= IO_PAGE_COUNT );
 
 	/* Round up number of pages to a power of two */
 	stride = ( 1 << fls ( count - 1 ) );
 	assert ( count <= stride );
 
 	/* Allocate pages */
-	for ( first = 0 ; first < ( sizeof ( io_pages.page ) /
-				    sizeof ( io_pages.page[0] ) ) ;
-	      first += stride ) {
+	for ( first = 0 ; first < IO_PAGE_COUNT ; first += stride ) {
 
 		/* Calculate I/O address */
 		io_addr = ( IO_BASE + ( first * IO_PAGE_SIZE ) + offset );
@@ -365,6 +362,10 @@ static void iounmap_pages ( volatile const void *io_addr ) {
 
 	/* Calculate first page table entry */
 	first = ( ( io_addr - IO_BASE ) / IO_PAGE_SIZE );
+
+	/* Ignore unmappings outside of the I/O range */
+	if ( first >= IO_PAGE_COUNT )
+		return;
 
 	/* Clear page table entries */
 	for ( i = first ; ; i++ ) {

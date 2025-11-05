@@ -83,6 +83,10 @@ enum pte_flags {
 /** The page table */
 extern struct page_table page_table;
 
+/** Maximum number of I/O pages */
+#define MAP_PAGE_COUNT \
+	( sizeof ( page_table.pte ) / sizeof ( page_table.pte[0] ) )
+
 /** I/O page size
  *
  * We choose to use 1GB "gigapages", since these are supported by all
@@ -146,17 +150,14 @@ static void * svpage_map ( physaddr_t phys, size_t len, unsigned long attrs ) {
 	/* Calculate number of pages required */
 	count = ( ( offset + len + MAP_PAGE_SIZE - 1 ) / MAP_PAGE_SIZE );
 	assert ( count != 0 );
-	assert ( count < ( sizeof ( page_table.pte ) /
-			   sizeof ( page_table.pte[0] ) ) );
+	assert ( count <= MAP_PAGE_COUNT );
 
 	/* Round up number of pages to a power of two */
 	stride = ( 1 << fls ( count - 1 ) );
 	assert ( count <= stride );
 
 	/* Allocate pages */
-	for ( first = 0 ; first < ( sizeof ( page_table.pte ) /
-				    sizeof ( page_table.pte[0] ) ) ;
-	      first += stride ) {
+	for ( first = 0 ; first < MAP_PAGE_COUNT ; first += stride ) {
 
 		/* Calculate virtual address */
 		virt = ( MAP_BASE + ( first * MAP_PAGE_SIZE ) + offset );
@@ -215,6 +216,10 @@ static void svpage_unmap ( const volatile void *virt ) {
 
 	/* Calculate first page table entry */
 	first = ( ( virt - MAP_BASE ) / MAP_PAGE_SIZE );
+
+	/* Ignore unmappings outside of the I/O range */
+	if ( first >= MAP_PAGE_COUNT )
+		return;
 
 	/* Clear page table entries */
 	for ( i = first ; ; i++ ) {
