@@ -74,6 +74,7 @@ struct spcr_table {
 /* SPCR interface types */
 #define SPCR_TYPE_16550		0x0000		/**< 16550-compatible */
 #define SPCR_TYPE_16450		0x0001		/**< 16450-compatible */
+#define SPCR_TYPE_16550_GAS	0x0012		/**< 16550-compatible */
 
 /** SPCR baud rates */
 enum spcr_baud {

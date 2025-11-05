@@ -143,6 +143,7 @@ static struct uart * spcr_console ( void ) {
 	switch ( spcr->type ) {
 	case SPCR_TYPE_16550:
 	case SPCR_TYPE_16450:
+	case SPCR_TYPE_16550_GAS:
 		if ( ( rc = spcr_16550 ( spcr, uart ) ) != 0 )
 			goto err_type;
 		break;
