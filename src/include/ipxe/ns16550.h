@@ -11,6 +11,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <ipxe/uart.h>
 
+/** Length of register region */
+#define NS16550_LEN 8
+
 /** Transmitter holding register */
 #define NS16550_THR 0x00
 

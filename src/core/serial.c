@@ -73,7 +73,7 @@ struct uart *serial_console = NULL;
  *
  * @ret uart		Serial console UART, or NULL
  */
-static struct uart * serial_comconsole ( void ) {
+struct uart * fixed_serial_console ( void ) {
 	struct uart *uart = COMCONSOLE;
 	unsigned int baud = COMSPEED;
 
@@ -201,4 +201,4 @@ struct startup_fn serial_startup_fn __startup_fn ( STARTUP_EARLY ) = {
 };
 
 PROVIDE_SERIAL_INLINE ( null, default_serial_console );
-PROVIDE_SERIAL ( fixed, default_serial_console, serial_comconsole );
+PROVIDE_SERIAL ( fixed, default_serial_console, fixed_serial_console );

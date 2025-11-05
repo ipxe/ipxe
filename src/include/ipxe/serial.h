@@ -67,4 +67,6 @@ struct uart * default_serial_console ( void );
 
 extern struct uart *serial_console;
 
+extern struct uart * fixed_serial_console ( void );
+
 #endif /* _IPXE_SERIAL_H */

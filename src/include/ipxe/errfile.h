@@ -88,6 +88,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_efi_table	       ( ERRFILE_CORE | 0x00300000 )
 #define ERRFILE_efi_connect	       ( ERRFILE_CORE | 0x00310000 )
 #define ERRFILE_gpio		       ( ERRFILE_CORE | 0x00320000 )
+#define ERRFILE_spcr		       ( ERRFILE_CORE | 0x00330000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
