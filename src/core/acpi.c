@@ -272,6 +272,8 @@ void * acpi_ioremap ( struct acpi_address *address, size_t len ) {
 	switch ( address->type ) {
 	case ACPI_ADDRESS_TYPE_MEM:
 		return ioremap ( base, len );
+	case ACPI_ADDRESS_TYPE_IO:
+		return ( ( void * ) base );
 	default:
 		return NULL;
 	}
