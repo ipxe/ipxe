@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <byteswap.h>
 #include <ipxe/uaccess.h>
+#include <ipxe/iomap.h>
 #include <ipxe/acpi.h>
 #include <ipxe/interface.h>
 
@@ -256,6 +257,24 @@ int acpi_extract ( uint32_t signature, void *data,
 	DBGC ( colour, "ACPI could not find \"%s\"\n",
 	       acpi_name ( signature ) );
 	return -ENOENT;
+}
+
+/**
+ * Map an ACPI generic address
+ *
+ * @v address		Generic address
+ * @v len		Length of region
+ * @ret io_addr		I/O address, or NULL on error
+ */
+void * acpi_ioremap ( struct acpi_address *address, size_t len ) {
+	physaddr_t base = le64_to_cpu ( address->address );
+
+	switch ( address->type ) {
+	case ACPI_ADDRESS_TYPE_MEM:
+		return ioremap ( base, len );
+	default:
+		return NULL;
+	}
 }
 
 /******************************************************************************

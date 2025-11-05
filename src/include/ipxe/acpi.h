@@ -18,6 +18,29 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/api.h>
 #include <config/general.h>
 
+/** An ACPI generic address structure */
+struct acpi_address {
+	/** Address space type */
+	uint8_t type;
+	/** Register bit width */
+	uint8_t width;
+	/** Register bit offset */
+	uint8_t offset;
+	/** Access size */
+	uint8_t access;
+	/** Address */
+	uint64_t address;
+} __attribute__ (( packed ));
+
+/** A memory address space type */
+#define ACPI_ADDRESS_TYPE_MEM 0x00
+
+/** An I/O address space type */
+#define ACPI_ADDRESS_TYPE_IO 0x01
+
+/** A bus number address space type */
+#define ACPI_ADDRESS_TYPE_BUS 0x02
+
 /** An ACPI small resource descriptor header */
 struct acpi_small_resource {
 	/** Tag byte */
@@ -73,12 +96,6 @@ struct acpi_qword_address_space_resource {
 	/** Length */
 	uint64_t len;
 } __attribute__ (( packed ));
-
-/** A memory address space type */
-#define ACPI_ADDRESS_TYPE_MEM 0x00
-
-/** A bus number address space type */
-#define ACPI_ADDRESS_TYPE_BUS 0x02
 
 /** An ACPI resource descriptor */
 union acpi_resource {
@@ -397,6 +414,7 @@ extern int acpi_extract ( uint32_t signature, void *data,
 			  int ( * extract ) ( const struct acpi_header *zsdt,
 					      size_t len, size_t offset,
 					      void *data ) );
+extern void * acpi_ioremap ( struct acpi_address *address, size_t len );
 extern void acpi_add ( struct acpi_descriptor *desc );
 extern void acpi_del ( struct acpi_descriptor *desc );
 extern int acpi_install ( int ( * install ) ( struct acpi_header *acpi ) );
