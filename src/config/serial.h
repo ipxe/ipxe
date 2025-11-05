@@ -26,6 +26,10 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define	COMSPEED	115200		/* Baud rate */
 #endif
 
+/* Uncomment these to ignore the ACPI SPCR table (if present) */
+//#undef SERIAL_SPCR
+//#define SERIAL_FIXED
+
 /* Early UART configuration (for bare metal prefix debugging only) */
 //#define EARLY_UART_MODEL	8250
 //#define EARLY_UART_REG_BASE	0x10000000

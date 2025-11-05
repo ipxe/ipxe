@@ -26,7 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define REBOOT_PCBIOS
 #define ACPI_RSDP
 #define MPAPI_PCBIOS
-#define SERIAL_FIXED
+#define SERIAL_SPCR
 
 #ifdef __x86_64__
 #define IOMAP_PAGES
