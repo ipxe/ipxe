@@ -1,3 +1,6 @@
+#ifndef _IPXE_EFI_IP4CONFIG_H
+#define _IPXE_EFI_IP4CONFIG_H
+
 /** @file
   This file provides a definition of the EFI IPv4 Configuration
   Protocol.
@@ -176,3 +179,5 @@ struct _EFI_IP4_CONFIG_PROTOCOL {
 extern EFI_GUID  gEfiIp4ConfigProtocolGuid;
 
 #endif
+
+#endif /* _IPXE_EFI_IP4CONFIG_H */
