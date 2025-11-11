@@ -54,16 +54,6 @@ struct ecam_mapping {
 	int rc;
 };
 
-/**
- * Check if PCI bus probing is allowed
- *
- * @ret ok		Bus probing is allowed
- */
-static inline __always_inline int
-PCIAPI_INLINE ( ecam, pci_can_probe ) ( void ) {
-	return 1;
-}
-
 extern struct pci_api ecam_api;
 
 #endif /* _IPXE_ECAM_H */
