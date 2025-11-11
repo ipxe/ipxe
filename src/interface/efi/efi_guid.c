@@ -74,6 +74,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SimpleTextIn.h>
 #include <ipxe/efi/Protocol/SimpleTextInEx.h>
 #include <ipxe/efi/Protocol/SimpleTextOut.h>
+#include <ipxe/efi/Protocol/StorageSecurityCommand.h>
 #include <ipxe/efi/Protocol/Supplicant.h>
 #include <ipxe/efi/Protocol/TcgService.h>
 #include <ipxe/efi/Protocol/Tcg2Protocol.h>
@@ -352,6 +353,10 @@ EFI_GUID efi_simple_text_input_ex_protocol_guid
 /** Simple text output protocol GUID */
 EFI_GUID efi_simple_text_output_protocol_guid
 	= EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID;
+
+/** Storage security protocol GUID */
+EFI_GUID efi_storage_security_command_protocol_guid
+	= EFI_STORAGE_SECURITY_COMMAND_PROTOCOL_GUID;
 
 /** Supplicant protocol GUID */
 EFI_GUID efi_supplicant_protocol_guid
@@ -650,6 +655,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Smbios" },
 	{ &efi_smbios3_table_guid,
 	  "Smbios3" },
+	{ &efi_storage_security_command_protocol_guid,
+	  "StorageSecurityCommand" },
 	{ &efi_supplicant_protocol_guid,
 	  "Supplicant" },
 	{ &efi_tcg_protocol_guid,
