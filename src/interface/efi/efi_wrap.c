@@ -1082,7 +1082,7 @@ efi_install_multiple_protocol_interfaces_wrapper ( EFI_HANDLE *handle, ... ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_GUID *protocol[ MAX_WRAP_MULTI + 1 ];
 	VOID *interface[MAX_WRAP_MULTI];
-	va_list ap;
+	VA_LIST ap;
 	unsigned int i;
 	EFI_STATUS efirc;
 
@@ -1090,20 +1090,20 @@ efi_install_multiple_protocol_interfaces_wrapper ( EFI_HANDLE *handle, ... ) {
 	       efi_handle_name ( *handle ) );
 	memset ( protocol, 0, sizeof ( protocol ) );
 	memset ( interface, 0, sizeof ( interface ) );
-	va_start ( ap, handle );
-	for ( i = 0 ; ( protocol[i] = va_arg ( ap, EFI_GUID * ) ) ; i++ ) {
+	VA_START ( ap, handle );
+	for ( i = 0 ; ( protocol[i] = VA_ARG ( ap, EFI_GUID * ) ) ; i++ ) {
 		if ( i == MAX_WRAP_MULTI ) {
-			va_end ( ap );
+			VA_END ( ap );
 			efirc = EFI_OUT_OF_RESOURCES;
 			DBGC ( colour, "<FATAL: too many arguments> ) = %s "
 			       "-> %p\n", efi_status ( efirc ), retaddr );
 			return efirc;
 		}
-		interface[i] = va_arg ( ap, VOID * );
+		interface[i] = VA_ARG ( ap, VOID * );
 		DBGC ( colour, ", %s, %p",
 		       efi_guid_ntoa ( protocol[i] ), interface[i] );
 	}
-	va_end ( ap );
+	VA_END ( ap );
 	DBGC ( colour, " ) " );
 	efirc = bs->InstallMultipleProtocolInterfaces ( handle,
 		protocol[0], interface[0], protocol[1], interface[1],
@@ -1132,7 +1132,7 @@ efi_uninstall_multiple_protocol_interfaces_wrapper ( EFI_HANDLE handle, ... ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_GUID *protocol[ MAX_WRAP_MULTI  + 1 ];
 	VOID *interface[MAX_WRAP_MULTI];
-	va_list ap;
+	VA_LIST ap;
 	unsigned int i;
 	EFI_STATUS efirc;
 
@@ -1140,20 +1140,20 @@ efi_uninstall_multiple_protocol_interfaces_wrapper ( EFI_HANDLE handle, ... ) {
 	       efi_handle_name ( handle ) );
 	memset ( protocol, 0, sizeof ( protocol ) );
 	memset ( interface, 0, sizeof ( interface ) );
-	va_start ( ap, handle );
-	for ( i = 0 ; ( protocol[i] = va_arg ( ap, EFI_GUID * ) ) ; i++ ) {
+	VA_START ( ap, handle );
+	for ( i = 0 ; ( protocol[i] = VA_ARG ( ap, EFI_GUID * ) ) ; i++ ) {
 		if ( i == MAX_WRAP_MULTI ) {
-			va_end ( ap );
+			VA_END ( ap );
 			efirc = EFI_OUT_OF_RESOURCES;
 			DBGC ( colour, "<FATAL: too many arguments> ) = %s "
 			       "-> %p\n", efi_status ( efirc ), retaddr );
 			return efirc;
 		}
-		interface[i] = va_arg ( ap, VOID * );
+		interface[i] = VA_ARG ( ap, VOID * );
 		DBGC ( colour, ", %s, %p",
 		       efi_guid_ntoa ( protocol[i] ), interface[i] );
 	}
-	va_end ( ap );
+	VA_END ( ap );
 	DBGC ( colour, " ) " );
 	efirc = bs->UninstallMultipleProtocolInterfaces ( handle,
 		protocol[0], interface[0], protocol[1], interface[1],
