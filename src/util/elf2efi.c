@@ -38,6 +38,9 @@
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 
+/* Provide constants spuriously deleted from EDK2 headers */
+#define EFI_IMAGE_MACHINE_ARMTHUMB_MIXED 0x01c2
+
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
 #undef ELF_R_TYPE

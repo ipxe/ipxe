@@ -108,6 +108,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 	{ 0x607f766c, 0x7455, 0x42be,					\
 	  { 0x93, 0x0b, 0xe4, 0xd7, 0x6d, 0xb2, 0x72, 0x0f } }
 
+/* Unicode collation protocol GUID was deleted from EDK2 headers */
+#define EFI_UNICODE_COLLATION_PROTOCOL_GUID				\
+	{ 0x1d85cd7f, 0xf43d, 0x11d2,					\
+	  { 0x9a, 0xc, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d } }
+
 /** Absolute pointer protocol GUID */
 EFI_GUID efi_absolute_pointer_protocol_guid
 	= EFI_ABSOLUTE_POINTER_PROTOCOL_GUID;

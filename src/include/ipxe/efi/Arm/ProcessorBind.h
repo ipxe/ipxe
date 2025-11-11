@@ -19,7 +19,11 @@ FILE_LICENCE ( BSD2_PATENT );
 ///
 /// Define the processor type so other code can make processor based choices
 ///
-#define MDE_CPU_ARM
+/// Upstream EDK2 headers no longer accept MDE_CPU_ARM: define
+/// MDE_CPU_EBC to prevent build errors.  (The definition doesn't
+/// actually affect anything used by iPXE.)
+///
+#define MDE_CPU_EBC
 
 //
 // Make sure we are using the correct packing rules per EFI specification

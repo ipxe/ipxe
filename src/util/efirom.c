@@ -34,6 +34,9 @@
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 #include <ipxe/efi/IndustryStandard/Pci22.h>
 
+/* Provide constants spuriously deleted from EDK2 headers */
+#define EFI_IMAGE_MACHINE_ARMTHUMB_MIXED 0x01c2
+
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 
 /* Round up ROM size */
