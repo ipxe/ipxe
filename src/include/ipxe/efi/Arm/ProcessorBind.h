@@ -1,3 +1,7 @@
+#ifndef _IPXE_EFI_ARM_PROCESSORBIND_H
+#define _IPXE_EFI_ARM_PROCESSORBIND_H
+
+
 /** @file
   Processor or Compiler specific defines and types for ARM.
 
@@ -238,3 +242,5 @@ typedef INT32 INTN;
 #endif
 
 #endif
+
+#endif /* _IPXE_EFI_ARM_PROCESSORBIND_H */
