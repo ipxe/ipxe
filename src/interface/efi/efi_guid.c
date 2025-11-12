@@ -467,6 +467,9 @@ EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;
 /** Global variable GUID */
 EFI_GUID efi_global_variable = EFI_GLOBAL_VARIABLE;
 
+/** Image security database GUID */
+EFI_GUID efi_image_security_database_guid = EFI_IMAGE_SECURITY_DATABASE_GUID;
+
 /** Microsoft vendor GUID */
 EFI_GUID efi_microsoft_vendor_guid = MICROSOFT_VENDOR_GUID;
 
@@ -589,6 +592,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Http" },
 	{ &efi_http_service_binding_protocol_guid,
 	  "HttpSb" },
+	{ &efi_image_security_database_guid,
+	  "ImageSecDb" },
 	{ &efi_ip4_protocol_guid,
 	  "Ip4" },
 	{ &efi_ip4_config_protocol_guid,
