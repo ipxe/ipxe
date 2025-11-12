@@ -95,6 +95,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/Guid/GlobalVariable.h>
 #include <ipxe/efi/Guid/ImageAuthentication.h>
+#include <ipxe/efi/Guid/MicrosoftVendor.h>
 #include <ipxe/efi/Guid/SmBios.h>
 #include <ipxe/efi/Guid/TlsAuthentication.h>
 
@@ -466,6 +467,9 @@ EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;
 /** Global variable GUID */
 EFI_GUID efi_global_variable = EFI_GLOBAL_VARIABLE;
 
+/** Microsoft vendor GUID */
+EFI_GUID efi_microsoft_vendor_guid = MICROSOFT_VENDOR_GUID;
+
 /** TLS CA certificate variable GUID */
 EFI_GUID efi_tls_ca_certificate_guid = EFI_TLS_CA_CERTIFICATE_GUID;
 
@@ -615,6 +619,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "ManagedNetwork" },
 	{ &efi_managed_network_service_binding_protocol_guid,
 	  "ManagedNetworkSb" },
+	{ &efi_microsoft_vendor_guid,
+	  "Microsoft" },
 	{ &efi_mtftp4_protocol_guid,
 	  "Mtftp4" },
 	{ &efi_mtftp4_service_binding_protocol_guid,

@@ -264,6 +264,7 @@ extern EFI_GUID efi_cert_x509_guid;
 extern EFI_GUID efi_file_info_id;
 extern EFI_GUID efi_file_system_info_id;
 extern EFI_GUID efi_global_variable;
+extern EFI_GUID efi_microsoft_vendor_guid;
 extern EFI_GUID efi_tls_ca_certificate_guid;
 
 extern EFI_HANDLE efi_image_handle;

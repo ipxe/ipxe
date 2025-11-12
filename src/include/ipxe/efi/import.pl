@@ -119,7 +119,8 @@ my $edktop = shift;
 
 # Identify edk import directories
 my $edkdirs = [ "MdePkg/Include", "MdeModulePkg/Include",
-		"NetworkPkg/Include", "EmbeddedPkg/Include" ];
+		"NetworkPkg/Include", "EmbeddedPkg/Include",
+		"OvmfPkg/Include" ];
 foreach my $edkdir ( @$edkdirs ) {
   die "Directory \"$edktop\" does not appear to contain the EFI EDK2 "
       ."(missing \"$edkdir\")\n" unless -d catdir ( $edktop, $edkdir );
