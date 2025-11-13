@@ -59,6 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/efi_snp.h>
 #include <ipxe/efi/efi_path.h>
 #include <ipxe/efi/efi_null.h>
+#include <ipxe/efi/efi_wrap.h>
 #include <ipxe/efi/efi_block.h>
 
 /** ACPI table protocol protocol */
@@ -861,11 +862,17 @@ static int efi_block_exec ( unsigned int drive,
 		}
 	}
 
+	/* Wrap calls made by the loaded image (for debugging) */
+	efi_wrap_image ( image );
+
 	/* Start image */
 	efirc = bs->StartImage ( image, NULL, NULL );
 	rc = ( efirc ? -EEFI ( efirc ) : 0 );
 	DBGC ( drive, "EFIBLK %#02x boot image returned: %s\n",
 	       drive, strerror ( rc ) );
+
+	/* Remove wrapper */
+	efi_unwrap();
 
  err_load_security_violation:
 	bs->UnloadImage ( image );
