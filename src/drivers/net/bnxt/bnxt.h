@@ -175,6 +175,7 @@
 #define STAT_CTX_ID ((bp->vf || FLAG_TEST(bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS)) ? bp->stat_ctx_id : 0)
 #define TX_AVAIL(r)                      (r - 1)
 #define TX_IN_USE(a, b, c) ((a - b) & (c - 1))
+#define SHORT_COMMAND_ADDR(bp)		( dma ( &bp->short_cmd_mapped, bp->short_cmd_req ) )
 #define NQ_DMA_ADDR(bp)		( dma ( &bp->nq_mapping, bp->nq.bd_virt ) )
 #define CQ_DMA_ADDR(bp)		( dma ( &bp->cq_mapping, bp->cq.bd_virt ) )
 #define TX_DMA_ADDR(bp)		( dma ( &bp->tx_mapping, bp->tx.bd_virt ) )
@@ -971,10 +972,12 @@ struct bnxt {
 	void                      *hwrm_addr_req;
 	void                      *hwrm_addr_resp;
 	void                      *hwrm_addr_dma;
+	void                      *short_cmd_req;
 	struct dma_device         *dma;
 	struct dma_mapping        req_mapping;
 	struct dma_mapping        resp_mapping;
 	struct dma_mapping        dma_mapped;
+	struct dma_mapping        short_cmd_mapped;
 	struct dma_mapping        tx_mapping;
 	struct dma_mapping        rx_mapping;
 	struct dma_mapping        cq_mapping;
