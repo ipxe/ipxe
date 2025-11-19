@@ -31,6 +31,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <string.h>
 
+/** Block size (for "ldp"/"stp") */
+#define ARM64_STRING_BLKSZ 16
+
 /**
  * Copy memory area
  *
@@ -40,59 +43,70 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret dest		Destination address
  */
 void arm64_memcpy ( void *dest, const void *src, size_t len ) {
-	void *discard_dest;
-	void *discard_end;
-	const void *discard_src;
-	size_t discard_offset;
+	size_t len_pre;
+	size_t len_mid;
+	size_t len_post;
 	unsigned long discard_data;
 	unsigned long discard_low;
 	unsigned long discard_high;
+	unsigned long discard_len;
 
-	/* If length is too short for an "ldp"/"stp" instruction pair,
-	 * then just copy individual bytes.
+	/* Calculate pre-aligned, aligned, and post-aligned lengths.
+	 * (Align on the destination address, on the assumption that
+	 * misaligned stores are likely to be more expensive than
+	 * misaligned loads.)
 	 */
-	if ( len < 16 ) {
-		__asm__ __volatile__ ( "cbz %0, 2f\n\t"
-				       "\n1:\n\t"
-				       "sub %0, %0, #1\n\t"
-				       "ldrb %w1, [%3, %0]\n\t"
-				       "strb %w1, [%2, %0]\n\t"
-				       "cbnz %0, 1b\n\t"
-				       "\n2:\n\t"
-				       : "=&r" ( discard_offset ),
-					 "=&r" ( discard_data )
-				       : "r" ( dest ), "r" ( src ), "0" ( len )
-				       : "memory" );
-		return;
-	}
+	len_pre = ( ( ARM64_STRING_BLKSZ - ( ( intptr_t ) dest ) ) &
+		    ( ARM64_STRING_BLKSZ - 1 ) );
+	if ( len_pre > len )
+		len_pre = len;
+	len -= len_pre;
+	len_mid = ( len & ~( ARM64_STRING_BLKSZ - 1 ) );
+	len -= len_mid;
+	len_post = len;
 
-	/* Use "ldp"/"stp" to copy 16 bytes at a time: one initial
-	 * potentially unaligned access, multiple destination-aligned
-	 * accesses, one final potentially unaligned access.
-	 */
-	__asm__ __volatile__ ( "ldp %3, %4, [%1], #16\n\t"
-			       "stp %3, %4, [%0], #16\n\t"
-			       "and %3, %0, #15\n\t"
-			       "sub %0, %0, %3\n\t"
-			       "sub %1, %1, %3\n\t"
-			       "bic %2, %5, #15\n\t"
-			       "b 2f\n\t"
+	/* Copy pre-aligned section */
+	__asm__ __volatile__ ( "cbz %2, 2f\n\t"
+			       "\n1:\n\t"
+			       "ldrb %w3, [%1], #1\n\t"
+			       "strb %w3, [%0], #1\n\t"
+			       "sub %2, %2, #1\n\t"
+			       "cbnz %2, 1b\n\t"
+			       "\n2:\n\t"
+			       : "+r" ( dest ), "+r" ( src ),
+				 "=&r" ( discard_len ),
+				 "=&r" ( discard_data )
+			       : "2" ( len_pre )
+			       : "memory" );
+
+	/* Copy aligned section */
+	__asm__ __volatile__ ( "cbz %2, 2f\n\t"
 			       "\n1:\n\t"
 			       "ldp %3, %4, [%1], #16\n\t"
 			       "stp %3, %4, [%0], #16\n\t"
+			       "sub %2, %2, #16\n\t"
+			       "cbnz %2, 1b\n\t"
 			       "\n2:\n\t"
-			       "cmp %0, %2\n\t"
-			       "bne 1b\n\t"
-			       "ldp %3, %4, [%6, #-16]\n\t"
-			       "stp %3, %4, [%5, #-16]\n\t"
-			       : "=&r" ( discard_dest ),
-				 "=&r" ( discard_src ),
-				 "=&r" ( discard_end ),
+			       : "+r" ( dest ), "+r" ( src ),
+				 "=&r" ( discard_len ),
 				 "=&r" ( discard_low ),
 				 "=&r" ( discard_high )
-			       : "r" ( dest + len ), "r" ( src + len ),
-				 "0" ( dest ), "1" ( src )
-			       : "memory", "cc" );
+			       : "2" ( len_mid )
+			       : "memory" );
+
+	/* Copy post-aligned section */
+	__asm__ __volatile__ ( "cbz %2, 2f\n\t"
+			       "\n1:\n\t"
+			       "ldrb %w3, [%1], #1\n\t"
+			       "strb %w3, [%0], #1\n\t"
+			       "sub %2, %2, #1\n\t"
+			       "cbnz %2, 1b\n\t"
+			       "\n2:\n\t"
+			       : "+r" ( dest ), "+r" ( src ),
+				 "=&r" ( discard_len ),
+				 "=&r" ( discard_data )
+			       : "2" ( len_post )
+			       : "memory" );
 }
 
 /**
@@ -102,44 +116,56 @@ void arm64_memcpy ( void *dest, const void *src, size_t len ) {
  * @v len		Length
  */
 void arm64_bzero ( void *dest, size_t len ) {
-	size_t discard_offset;
-	void *discard_dest;
-	void *discard_end;
+	size_t len_pre;
+	size_t len_mid;
+	size_t len_post;
+	unsigned long discard_len;
 
-	/* If length is too short for an "stp" instruction, then just
-	 * zero individual bytes.
-	 */
-	if ( len < 16 ) {
-		__asm__ __volatile__ ( "cbz %0, 2f\n\t"
-				       "\n1:\n\t"
-				       "sub %0, %0, #1\n\t"
-				       "strb wzr, [%1, %0]\n\t"
-				       "cbnz %0, 1b\n\t"
-				       "\n2:\n\t"
-				       : "=&r" ( discard_offset )
-				       : "r" ( dest ), "0" ( len )
-				       : "memory" );
-		return;
-	}
+	/* Calculate pre-aligned, aligned, and post-aligned lengths */
+	len_pre = ( ( ARM64_STRING_BLKSZ - ( ( intptr_t ) dest ) ) &
+		    ( ARM64_STRING_BLKSZ - 1 ) );
+	if ( len_pre > len )
+		len_pre = len;
+	len -= len_pre;
+	len_mid = ( len & ~( ARM64_STRING_BLKSZ - 1 ) );
+	len -= len_mid;
+	len_post = len;
 
-	/* Use "stp" to zero 16 bytes at a time: one initial
-	 * potentially unaligned access, multiple aligned accesses,
-	 * one final potentially unaligned access.
-	 */
-	__asm__ __volatile__ ( "stp xzr, xzr, [%0], #16\n\t"
-			       "bic %0, %0, #15\n\t"
-			       "bic %1, %2, #15\n\t"
-			       "b 2f\n\t"
+	/* Zero pre-aligned section */
+	__asm__ __volatile__ ( "cbz %1, 2f\n\t"
+			       "\n1:\n\t"
+			       "strb wzr, [%0], #1\n\t"
+			       "sub %1, %1, #1\n\t"
+			       "cbnz %1, 1b\n\t"
+			       "\n2:\n\t"
+			       : "+r" ( dest ),
+				 "=&r" ( discard_len )
+			       : "1" ( len_pre )
+			       : "memory" );
+
+	/* Zero aligned section */
+	__asm__ __volatile__ ( "cbz %1, 2f\n\t"
 			       "\n1:\n\t"
 			       "stp xzr, xzr, [%0], #16\n\t"
+			       "sub %1, %1, #16\n\t"
+			       "cbnz %1, 1b\n\t"
 			       "\n2:\n\t"
-			       "cmp %0, %1\n\t"
-			       "bne 1b\n\t"
-			       "stp xzr, xzr, [%2, #-16]\n\t"
-			       : "=&r" ( discard_dest ),
-				 "=&r" ( discard_end )
-			       : "r" ( dest + len ), "0" ( dest )
-			       : "memory", "cc" );
+			       : "+r" ( dest ),
+				 "=&r" ( discard_len )
+			       : "1" ( len_mid )
+			       : "memory" );
+
+	/* Zero post-aligned section */
+	__asm__ __volatile__ ( "cbz %1, 2f\n\t"
+			       "\n1:\n\t"
+			       "strb wzr, [%0], #1\n\t"
+			       "sub %1, %1, #1\n\t"
+			       "cbnz %1, 1b\n\t"
+			       "\n2:\n\t"
+			       : "+r" ( dest ),
+				 "=&r" ( discard_len )
+			       : "1" ( len_post )
+			       : "memory" );
 }
 
 /**
