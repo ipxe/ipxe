@@ -615,6 +615,11 @@ void bnxt_free_hwrm_mem ( struct bnxt *bp )
 		dma_free ( &bp->req_mapping, bp->hwrm_addr_req, REQ_BUFFER_SIZE );
 		bp->hwrm_addr_req = NULL;
 	}
+
+	if ( bp->short_cmd_req ) {
+		dma_free ( &bp->short_cmd_mapped, bp->short_cmd_req, sizeof ( struct hwrm_short_input ) );
+		bp->short_cmd_req = NULL;
+	}
 	DBGP ( "- %s (  ): - Done\n", __func__ );
 }
 
@@ -627,10 +632,13 @@ int bnxt_alloc_hwrm_mem ( struct bnxt *bp )
 					 RESP_BUFFER_SIZE, RESP_BUFFER_SIZE );
 	bp->hwrm_addr_dma  = dma_alloc ( bp->dma, &bp->dma_mapped,
 					 DMA_BUFFER_SIZE, DMA_BUFFER_SIZE);
+	bp->short_cmd_req  = dma_alloc ( bp->dma, &bp->short_cmd_mapped,
+					 sizeof (struct hwrm_short_input ), sizeof ( struct hwrm_short_input ) );
 
 	if ( bp->hwrm_addr_req &&
 		bp->hwrm_addr_resp &&
-		bp->hwrm_addr_dma ) {
+		bp->hwrm_addr_dma &&
+		bp->short_cmd_req ) {
 		bnxt_mm_init_hwrm ( bp, __func__ );
 		return STATUS_SUCCESS;
 	}
@@ -685,19 +693,20 @@ static void hwrm_write_req ( struct bnxt *bp, void *req, u32 cnt )
 	writel ( 0x1, ( bp->bar0 + GRC_COM_CHAN_BASE + GRC_COM_CHAN_TRIG ) );
 }
 
-static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len )
+static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len, u16 req_type )
 {
-	struct hwrm_short_input sreq;
+	struct hwrm_short_input *short_req;
+	
+	short_req = ( struct hwrm_short_input * ) SHORT_COMMAND_ADDR ( bp );
 
-	memset ( &sreq, 0, sizeof ( struct hwrm_short_input ) );
-	sreq.req_type  = ( u16 ) ( ( struct input * ) REQ_DMA_ADDR (bp ) )->req_type;
-	sreq.signature = SHORT_REQ_SIGNATURE_SHORT_CMD;
-	sreq.size      = len;
-	sreq.req_addr  = REQ_DMA_ADDR ( bp );
+	short_req->req_type  = req_type;
+	short_req->signature = SHORT_REQ_SIGNATURE_SHORT_CMD;
+	short_req->size      = len;
+	short_req->req_addr  = REQ_DMA_ADDR ( bp );
 	mdelay ( 100 );
-	dbg_short_cmd ( ( u8 * )&sreq, __func__,
+	dbg_short_cmd ( ( u8 * )short_req, __func__,
 			sizeof ( struct hwrm_short_input ) );
-	hwrm_write_req ( bp, &sreq, sizeof ( struct hwrm_short_input ) / 4 );
+	hwrm_write_req ( bp, short_req, sizeof ( struct hwrm_short_input ) / 4 );
 }
 
 static int wait_resp ( struct bnxt *bp, u32 tmo, u16 len, const char *func )
@@ -710,8 +719,9 @@ static int wait_resp ( struct bnxt *bp, u32 tmo, u16 len, const char *func )
 	u16 resp_len = 0;
 	u16 ret = STATUS_TIMEOUT;
 
-	if ( len > bp->hwrm_max_req_len )
-		short_hwrm_cmd_req ( bp, len );
+	if ( ( len > bp->hwrm_max_req_len ) ||
+             ( FLAG_TEST ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_REQ ) ) )
+		short_hwrm_cmd_req ( bp, len, req->req_type );
 	else
 		hwrm_write_req ( bp, req, ( u32 ) ( len / 4 ) );
 
@@ -765,7 +775,7 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 	bp->chip_num = resp->chip_num;
 	if ( ( resp->dev_caps_cfg & SHORT_CMD_SUPPORTED ) &&
 		 ( resp->dev_caps_cfg & SHORT_CMD_REQUIRED ) )
-		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_SUPP );
+		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_REQ );
 	bp->hwrm_max_ext_req_len = resp->max_ext_req_len;
 	if ( ( bp->chip_num == CHIP_NUM_57508 ) ||
 	     ( bp->chip_num == CHIP_NUM_57504 ) ||
@@ -1361,7 +1371,7 @@ static int bnxt_get_link_speed ( struct bnxt *bp )
 	u32 *ptr32 = ( u32 * ) DMA_DMA_ADDR ( bp );
 
 	DBGP ( "%s\n", __func__ );
-	if ( ! ( FLAG_TEST (bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ) ) {
+	if ( ! ( FLAG_TEST (bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) ) {
 	        if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
 		        ( u16 )LINK_SPEED_DRV_NUM,
 		        1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
@@ -2858,6 +2868,7 @@ static int bnxt_init_one ( struct pci_device *pci )
 
 err_down_chip:
 	bnxt_down_pci ( bp );
+	bnxt_free_hwrm_mem ( bp );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 
