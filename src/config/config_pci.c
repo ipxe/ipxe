@@ -45,3 +45,6 @@ REQUIRE_OBJECT ( pcibios );
 #ifdef PCIAPI_RUNTIME_DIRECT
 REQUIRE_OBJECT ( pcidirect );
 #endif
+#ifdef PCIAPI_RUNTIME_EFI
+REQUIRE_OBJECT ( efi_pci );
+#endif

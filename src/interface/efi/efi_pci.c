@@ -436,6 +436,7 @@ PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_word );
 PROVIDE_PCIAPI_INLINE ( efi, pci_write_config_dword );
 PROVIDE_PCIAPI ( efi, pci_ioremap, efipci_ioremap );
+PROVIDE_PCIAPI_RUNTIME ( efi, PCIAPI_PRIORITY_EFI );
 
 /******************************************************************************
  *

@@ -192,9 +192,10 @@ struct pci_api {
 #endif
 
 /* PCI runtime selectable API priorities */
-#define PCIAPI_PRIORITY_ECAM	01	/**< ACPI ECAM */
-#define PCIAPI_PRIORITY_PCBIOS	02	/**< PCI BIOS calls */
-#define PCIAPI_PRIORITY_DIRECT	03	/**< Direct Type 1 accesses */
+#define PCIAPI_PRIORITY_EFI	01	/**< EFI PCI I/O protocols */
+#define PCIAPI_PRIORITY_ECAM	02	/**< ACPI ECAM */
+#define PCIAPI_PRIORITY_PCBIOS	03	/**< PCI BIOS calls */
+#define PCIAPI_PRIORITY_DIRECT	04	/**< Direct Type 1 accesses */
 
 /** Provide a runtime selectable PCI I/O API */
 #define PROVIDE_PCIAPI_RUNTIME( subsys, priority )			   \
