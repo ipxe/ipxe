@@ -139,10 +139,11 @@ PCIAPI_INLINE ( ecam, pci_ioremap ) ( struct pci_device *pci __unused,
 /**
  * Check if PCI bus probing is allowed
  *
+ * @v pci		PCI device
  * @ret ok		Bus probing is allowed
  */
 static inline __always_inline int
-PCIAPI_INLINE ( ecam, pci_can_probe ) ( void ) {
+PCIAPI_INLINE ( ecam, pci_can_probe ) ( struct pci_device *pci __unused ) {
 	return 1;
 }
 

@@ -35,10 +35,11 @@ extern int pcibios_write ( struct pci_device *pci, uint32_t command,
 /**
  * Check if PCI bus probing is allowed
  *
+ * @v pci		PCI device
  * @ret ok		Bus probing is allowed
  */
 static inline __always_inline int
-PCIAPI_INLINE ( pcbios, pci_can_probe ) ( void ) {
+PCIAPI_INLINE ( pcbios, pci_can_probe ) ( struct pci_device *pci __unused ) {
 	return 1;
 }
 

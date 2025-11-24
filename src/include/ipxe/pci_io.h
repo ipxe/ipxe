@@ -72,9 +72,10 @@ struct pci_range {
 /**
  * Check if PCI bus probing is allowed
  *
+ * @v pci		PCI device
  * @ret ok		Bus probing is allowed
  */
-int pci_can_probe ( void );
+int pci_can_probe ( struct pci_device *pci );
 
 /**
  * Find next PCI bus:dev.fn address range in system
@@ -163,6 +164,7 @@ void * pci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 /** A runtime selectable PCI I/O API */
 struct pci_api {
 	const char *name;
+	typeof ( pci_can_probe ) ( * pci_can_probe );
 	typeof ( pci_discover ) ( * pci_discover );
 	typeof ( pci_read_config_byte ) ( * pci_read_config_byte );
 	typeof ( pci_read_config_word ) ( * pci_read_config_word );
@@ -198,6 +200,7 @@ struct pci_api {
 #define PROVIDE_PCIAPI_RUNTIME( subsys, priority )			   \
 	struct pci_api pciapi_ ## subsys __pci_api ( priority ) = {	   \
 		.name = #subsys,					   \
+		.pci_can_probe = PCIAPI_INLINE ( subsys, pci_can_probe ),  \
 		.pci_discover = PCIAPI_INLINE ( subsys, pci_discover ),	   \
 		.pci_read_config_byte =					   \
 			PCIAPI_INLINE ( subsys, pci_read_config_byte ),	   \

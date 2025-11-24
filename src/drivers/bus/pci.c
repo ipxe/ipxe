@@ -447,10 +447,6 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 	uint32_t busdevfn = 0;
 	int rc;
 
-	/* Skip automatic probing if prohibited */
-	if ( ! pci_can_probe() )
-		return 0;
-
 	do {
 		/* Allocate struct pci_device */
 		if ( ! pci )
@@ -463,6 +459,10 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 		/* Find next PCI device, if any */
 		if ( ( rc = pci_find_next ( pci, &busdevfn ) ) != 0 )
 			break;
+
+		/* Skip automatic probing if prohibited */
+		if ( ! pci_can_probe ( pci ) )
+			continue;
 
 		/* Look for a driver */
 		if ( ( rc = pci_find_driver ( pci ) ) != 0 ) {

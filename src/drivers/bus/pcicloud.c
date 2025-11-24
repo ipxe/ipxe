@@ -143,6 +143,18 @@ static struct pci_api * pcicloud_api ( struct pci_device *pci ) {
 }
 
 /**
+ * Check if PCI bus probing is allowed
+ *
+ * @v pci		PCI device
+ * @ret ok		Bus probing is allowed
+ */
+static int pcicloud_can_probe ( struct pci_device *pci ) {
+	struct pci_api *api = pcicloud_api ( pci );
+
+	return api->pci_can_probe ( pci );
+}
+
+/**
  * Read byte from PCI configuration space
  *
  * @v pci		PCI device
@@ -246,7 +258,7 @@ static void * pcicloud_ioremap ( struct pci_device *pci,
 	return api->pci_ioremap ( pci, bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( cloud, pci_can_probe );
+PROVIDE_PCIAPI ( cloud, pci_can_probe, pcicloud_can_probe );
 PROVIDE_PCIAPI ( cloud, pci_discover, pcicloud_discover );
 PROVIDE_PCIAPI ( cloud, pci_read_config_byte, pcicloud_read_config_byte );
 PROVIDE_PCIAPI ( cloud, pci_read_config_word, pcicloud_read_config_word );
