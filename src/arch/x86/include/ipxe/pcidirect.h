@@ -165,6 +165,4 @@ PCIAPI_INLINE ( direct, pci_ioremap ) ( struct pci_device *pci __unused,
 	return ioremap ( bus_addr, len );
 }
 
-extern struct pci_api pcidirect_api;
-
 #endif /* _PCIDIRECT_H */

@@ -26,9 +26,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <ipxe/pci.h>
-#include <ipxe/ecam.h>
-#include <ipxe/pcibios.h>
-#include <ipxe/pcidirect.h>
 #include <ipxe/pcicloud.h>
 
 /** @file
@@ -36,11 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Cloud VM PCI configuration space access
  *
  */
-
-/** Underlying PCI configuration space access APIs */
-static struct pci_api *pcicloud_apis[] = {
-	&ecam_api, &pcibios_api, &pcidirect_api
-};
 
 /** Cached PCI configuration space access API */
 static struct {
@@ -65,17 +57,14 @@ static struct pci_api * pcicloud_find ( uint32_t busdevfn,
 	uint32_t index;
 	uint32_t first;
 	uint32_t last;
-	unsigned int i;
 
 	/* Return empty range on error */
 	range->count = 0;
 
 	/* Try discovery via all known APIs */
-	for ( i = 0 ; i < ( sizeof ( pcicloud_apis ) /
-			    sizeof ( pcicloud_apis[0] ) ) ; i++ ) {
+	for_each_table_entry ( api, PCI_APIS ) {
 
 		/* Discover via this API */
-		api = pcicloud_apis[i];
 		api->pci_discover ( busdevfn, &candidate );
 
 		/* Check for a matching or new closest allocation */
@@ -135,8 +124,7 @@ static struct pci_api * pcicloud_api ( struct pci_device *pci ) {
 
 	/* Fall back to lowest priority API for any unclaimed gaps in ranges */
 	if ( ! api ) {
-		api = pcicloud_apis[ ( sizeof ( pcicloud_apis ) /
-				       sizeof ( pcicloud_apis[0] ) ) - 1 ];
+		api = ( table_end ( PCI_APIS ) - 1 );
 		range->count = ( range->start - pci->busdevfn );
 		range->start = pci->busdevfn;
 		first = range->start;

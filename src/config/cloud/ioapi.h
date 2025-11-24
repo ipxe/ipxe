@@ -4,4 +4,7 @@
 #ifdef PLATFORM_pcbios
 #undef PCIAPI_PCBIOS
 #define PCIAPI_CLOUD
+#define PCIAPI_RUNTIME_ECAM
+#define PCIAPI_RUNTIME_PCBIOS
+#define PCIAPI_RUNTIME_DIRECT
 #endif

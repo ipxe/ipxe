@@ -22,6 +22,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <config/settings.h>
+#include <config/ioapi.h>
 
 /** @file
  *
@@ -33,4 +34,14 @@ PROVIDE_REQUIRING_SYMBOL();
 
 #ifdef PCI_SETTINGS
 REQUIRE_OBJECT ( pci_settings );
+#endif
+
+#ifdef PCIAPI_RUNTIME_ECAM
+REQUIRE_OBJECT ( ecam );
+#endif
+#ifdef PCIAPI_RUNTIME_PCBIOS
+REQUIRE_OBJECT ( pcibios );
+#endif
+#ifdef PCIAPI_RUNTIME_DIRECT
+REQUIRE_OBJECT ( pcidirect );
 #endif
