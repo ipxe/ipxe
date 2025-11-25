@@ -47,6 +47,34 @@ FILE_LICENCE ( GPL2_OR_LATER );
  *
  */
 
+/** Dummy parent device path
+ *
+ * This is used as the parent device path when we need to construct a
+ * path for a device that has no EFI parent device.
+ */
+static struct {
+	BBS_BBS_DEVICE_PATH bbs;
+	CHAR8 tring[4];
+	EFI_DEVICE_PATH_PROTOCOL end;
+} __attribute__ (( packed )) efi_dummy_parent_path = {
+	.bbs = {
+		.Header = {
+			.Type = BBS_DEVICE_PATH,
+			.SubType = BBS_BBS_DP,
+			.Length[0] = ( sizeof ( efi_dummy_parent_path.bbs ) +
+				       sizeof ( efi_dummy_parent_path.tring )),
+		},
+		.DeviceType = BBS_TYPE_UNKNOWN,
+		.String[0] = 'i',
+	},
+	.tring = "PXE",
+	.end = {
+		.Type = END_DEVICE_PATH_TYPE,
+		.SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE,
+		.Length[0] = sizeof ( efi_dummy_parent_path.end ),
+	},
+};
+
 /** An EFI device path settings block */
 struct efi_path_settings {
 	/** Settings interface */
@@ -353,6 +381,24 @@ EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first, ... ) {
 }
 
 /**
+ * Construct EFI parent device path
+ *
+ * @v dev		Generic device
+ * @ret path		Parent (or dummy) device path
+ */
+static EFI_DEVICE_PATH_PROTOCOL * efi_parent_path ( struct device *dev ) {
+	struct efi_device *efidev;
+
+	/* Use EFI parent device's path, if possible */
+	efidev = efidev_parent ( dev );
+	if ( efidev )
+		return efidev->path;
+
+	/* Otherwise, use a dummy parent device path */
+	return &efi_dummy_parent_path.bbs.Header;
+}
+
+/**
  * Construct EFI device path for network device
  *
  * @v netdev		Network device
@@ -362,7 +408,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_paths ( EFI_DEVICE_PATH_PROTOCOL *first, ... ) {
  * allocated device path.
  */
 EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev ) {
-	struct efi_device *efidev;
+	EFI_DEVICE_PATH_PROTOCOL *parent;
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	MAC_ADDR_DEVICE_PATH *macpath;
 	VLAN_DEVICE_PATH *vlanpath;
@@ -371,13 +417,11 @@ EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev ) {
 	size_t prefix_len;
 	size_t len;
 
-	/* Find parent EFI device */
-	efidev = efidev_parent ( netdev->dev );
-	if ( ! efidev )
-		return NULL;
+	/* Get parent EFI device path */
+	parent = efi_parent_path ( netdev->dev );
 
 	/* Calculate device path length */
-	prefix_len = efi_path_len ( efidev->path );
+	prefix_len = efi_path_len ( parent );
 	len = ( prefix_len + sizeof ( *macpath ) + sizeof ( *vlanpath ) +
 		sizeof ( *end ) );
 
@@ -387,7 +431,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_netdev_path ( struct net_device *netdev ) {
 		return NULL;
 
 	/* Construct device path */
-	memcpy ( path, efidev->path, prefix_len );
+	memcpy ( path, parent, prefix_len );
 	macpath = ( ( ( void * ) path ) + prefix_len );
 	macpath->Header.Type = MESSAGING_DEVICE_PATH;
 	macpath->Header.SubType = MSG_MAC_ADDR_DP;
@@ -601,20 +645,18 @@ EFI_DEVICE_PATH_PROTOCOL * efi_ib_srp_path ( struct ib_srp_device *ib_srp ) {
 	union ib_srp_target_port_id *id =
 		container_of ( &sbft->srp.target, union ib_srp_target_port_id,
 			       srp );
-	struct efi_device *efidev;
+	EFI_DEVICE_PATH_PROTOCOL *parent;
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	INFINIBAND_DEVICE_PATH *ibpath;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	size_t prefix_len;
 	size_t len;
 
-	/* Find parent EFI device */
-	efidev = efidev_parent ( ib_srp->ibdev->dev );
-	if ( ! efidev )
-		return NULL;
+	/* Get parent EFI device path */
+	parent = efi_parent_path ( ib_srp->ibdev->dev );
 
 	/* Calculate device path length */
-	prefix_len = efi_path_len ( efidev->path );
+	prefix_len = efi_path_len ( parent );
 	len = ( prefix_len + sizeof ( *ibpath ) + sizeof ( *end ) );
 
 	/* Allocate device path */
@@ -623,7 +665,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_ib_srp_path ( struct ib_srp_device *ib_srp ) {
 		return NULL;
 
 	/* Construct device path */
-	memcpy ( path, efidev->path, prefix_len );
+	memcpy ( path, parent, prefix_len );
 	ibpath = ( ( ( void * ) path ) + prefix_len );
 	ibpath->Header.Type = MESSAGING_DEVICE_PATH;
 	ibpath->Header.SubType = MSG_INFINIBAND_DP;
@@ -653,7 +695,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_ib_srp_path ( struct ib_srp_device *ib_srp ) {
  */
 EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func ) {
 	struct usb_device *usb = func->usb;
-	struct efi_device *efidev;
+	EFI_DEVICE_PATH_PROTOCOL *parent;
 	EFI_DEVICE_PATH_PROTOCOL *path;
 	EFI_DEVICE_PATH_PROTOCOL *end;
 	USB_DEVICE_PATH *usbpath;
@@ -664,14 +706,12 @@ EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func ) {
 	/* Sanity check */
 	assert ( func->desc.count >= 1 );
 
-	/* Find parent EFI device */
-	efidev = efidev_parent ( &func->dev );
-	if ( ! efidev )
-		return NULL;
+	/* Get parent EFI device path */
+	parent = efi_parent_path ( &func->dev );
 
 	/* Calculate device path length */
 	count = ( usb_depth ( usb ) + 1 );
-	prefix_len = efi_path_len ( efidev->path );
+	prefix_len = efi_path_len ( parent );
 	len = ( prefix_len + ( count * sizeof ( *usbpath ) ) +
 		sizeof ( *end ) );
 
@@ -681,7 +721,7 @@ EFI_DEVICE_PATH_PROTOCOL * efi_usb_path ( struct usb_function *func ) {
 		return NULL;
 
 	/* Construct device path */
-	memcpy ( path, efidev->path, prefix_len );
+	memcpy ( path, parent, prefix_len );
 	end = ( ( ( void * ) path ) + len - sizeof ( *end ) );
 	efi_path_terminate ( end );
 	usbpath = ( ( ( void * ) end ) - sizeof ( *usbpath ) );

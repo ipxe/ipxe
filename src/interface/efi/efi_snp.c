@@ -1792,14 +1792,6 @@ static int efi_snp_probe ( struct net_device *netdev, void *priv __unused ) {
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Find parent EFI device */
-	efidev = efidev_parent ( netdev->dev );
-	if ( ! efidev ) {
-		DBG ( "SNP skipping non-EFI device %s\n", netdev->name );
-		rc = 0;
-		goto err_no_efidev;
-	}
-
 	/* Allocate the SNP device */
 	snpdev = zalloc ( sizeof ( *snpdev ) );
 	if ( ! snpdev ) {
@@ -1807,8 +1799,12 @@ static int efi_snp_probe ( struct net_device *netdev, void *priv __unused ) {
 		goto err_alloc_snp;
 	}
 	snpdev->netdev = netdev_get ( netdev );
-	snpdev->efidev = efidev;
 	INIT_LIST_HEAD ( &snpdev->rx );
+
+	/* Find parent EFI device, if any */
+	efidev = efidev_parent ( netdev->dev );
+	if ( efidev )
+		snpdev->parent = efidev->device;
 
 	/* Sanity check */
 	if ( netdev->ll_protocol->ll_addr_len > sizeof ( EFI_MAC_ADDRESS ) ) {
@@ -1931,8 +1927,10 @@ static int efi_snp_probe ( struct net_device *netdev, void *priv __unused ) {
 		goto err_open_nii31;
 	}
 
-	/* Add as child of EFI parent device */
-	if ( ( rc = efi_child_add ( efidev->device, snpdev->handle ) ) != 0 ) {
+	/* Add as child of EFI parent device, if applicable */
+	if ( snpdev->parent &&
+	     ( ( rc = efi_child_add ( snpdev->parent,
+				      snpdev->handle ) ) != 0 ) ) {
 		DBGC ( snpdev, "SNPDEV %p could not become child of %s: %s\n",
 		       snpdev, efi_handle_name ( efidev->device ),
 		       strerror ( rc ) );
@@ -1959,7 +1957,8 @@ static int efi_snp_probe ( struct net_device *netdev, void *priv __unused ) {
 	list_del ( &snpdev->list );
 	if ( snpdev->package_list )
 		leak |= efi_snp_hii_uninstall ( snpdev );
-	efi_child_del ( efidev->device, snpdev->handle );
+	if ( snpdev->parent )
+		efi_child_del ( snpdev->parent, snpdev->handle );
  err_efi_child_add:
 	efi_close_by_driver ( snpdev->handle, &efi_nii31_protocol_guid );
  err_open_nii31:
@@ -1996,7 +1995,6 @@ static int efi_snp_probe ( struct net_device *netdev, void *priv __unused ) {
 		free ( snpdev );
 	}
  err_alloc_snp:
- err_no_efidev:
 	if ( leak )
 		DBGC ( snpdev, "SNPDEV %p nullified and leaked\n", snpdev );
 	return rc;
@@ -2051,7 +2049,8 @@ static void efi_snp_remove ( struct net_device *netdev, void *priv __unused ) {
 	list_del ( &snpdev->list );
 	if ( snpdev->package_list )
 		leak |= efi_snp_hii_uninstall ( snpdev );
-	efi_child_del ( snpdev->efidev->device, snpdev->handle );
+	if ( snpdev->parent )
+		efi_child_del ( snpdev->parent, snpdev->handle );
 	efi_close_by_driver ( snpdev->handle, &efi_nii_protocol_guid );
 	efi_close_by_driver ( snpdev->handle, &efi_nii31_protocol_guid );
 	if ( ( ! efi_shutdown_in_progress ) &&

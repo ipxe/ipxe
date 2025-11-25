@@ -30,8 +30,8 @@ struct efi_snp_device {
 	struct list_head list;
 	/** The underlying iPXE network device */
 	struct net_device *netdev;
-	/** The underlying EFI device */
-	struct efi_device *efidev;
+	/** EFI parent device handle (if any) */
+	EFI_HANDLE parent;
 	/** EFI device handle */
 	EFI_HANDLE handle;
 	/** The SNP structure itself */
