@@ -33,6 +33,10 @@
 #include <ipxe/parseopt.h>
 #include <readline/readline.h>
 
+#include <ipxe/netdevice.h>
+#include <ipxe/hwaddr.h>
+#include <ipxe/driver.h>
+
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** @file
@@ -67,6 +71,11 @@ static int show_exec ( int argc, char **argv ) {
 	char *value;
 	int len;
 	int rc;
+
+	/* custom show all net devices */
+	if (argc == 2 && strcmp(arg[1], "net/all") == 0) {
+		return show_all_net_devices();
+	}
 
 	/* Parse options */
 	if ( ( rc = parse_options ( argc, argv, &show_cmd, &opts ) ) != 0 )
@@ -361,3 +370,27 @@ COMMAND ( set, set_exec );
 COMMAND ( clear, clear_exec );
 COMMAND ( read, read_exec );
 COMMAND ( inc, inc_exec );
+
+static int show_all_net_devices(void)
+{
+	struct net_device *nd;
+
+	if (!net_devices) {
+		printf("no network devices\n");
+		return 0;
+	}
+
+	for (nd = net_devices; nd; nd = nd->next) {
+		const char *mac = hwaddr_ntoa(&nd->hw_addr);
+		const char *chip = (nd->driver && nd->driver->name)
+                            ? nd->driver->name
+                            : "<unknown>";
+
+		printf("%s: %s (%s)\n",
+		       nd->name ? nd->name : "<noname>",
+               mac ? mac : "<no-mac>",
+               chip);
+	}
+
+	return 0;
+}
