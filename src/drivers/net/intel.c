@@ -1043,6 +1043,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x0d4f, "i219v-10", "I219-V (10)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x0d53, "i219lm-12", "I219-LM (12)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x0d55, "i219v-12", "I219-V (12)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x0d9f, "i225it", "I225-IT", INTEL_PBSIZE_RST ),
 	PCI_ROM ( 0x8086, 0x0dc5, "i219lm-23", "I219-LM (23)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x1000, "82542-f", "82542 (Fiber)", 0 ),
 	PCI_ROM ( 0x8086, 0x1001, "82543gc-f", "82543GC (Fiber)", 0 ),
@@ -1133,6 +1134,9 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x10f0, "82578dc", "82578DC", 0 ),
 	PCI_ROM ( 0x8086, 0x10f5, "82567lm", "82567LM", 0 ),
 	PCI_ROM ( 0x8086, 0x10f6, "82574l", "82574L", 0 ),
+	PCI_ROM ( 0x8086, 0x125b, "i226lm", "I226-LM", INTEL_PBSIZE_RST ),
+	PCI_ROM ( 0x8086, 0x125c, "i226v", "I226-V", INTEL_PBSIZE_RST ),
+	PCI_ROM ( 0x8086, 0x125d, "i226it", "I226-IT", INTEL_PBSIZE_RST ),
 	PCI_ROM ( 0x8086, 0x1501, "82567v-3", "82567V-3", INTEL_PBS_ERRATA ),
 	PCI_ROM ( 0x8086, 0x1502, "82579lm", "82579LM", INTEL_NO_PHY_RST ),
 	PCI_ROM ( 0x8086, 0x1503, "82579v", "82579V", 0 ),
@@ -1180,6 +1184,8 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x15e1, "i219lm-9", "I219-LM (9)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x15e2, "i219v-9", "I219-V (9)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x15e3, "i219lm-5", "I219-LM (5)", INTEL_I219 ),
+	PCI_ROM ( 0x8086, 0x15f2, "i225lm", "I225-LM", INTEL_PBSIZE_RST ),
+	PCI_ROM ( 0x8086, 0x15f3, "i225v", "I225-V", INTEL_PBSIZE_RST ),
 	PCI_ROM ( 0x8086, 0x15f4, "i219lm-15", "I219-LM (15)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x15f5, "i219v-15", "I219-V (15)", INTEL_I219 ),
 	PCI_ROM ( 0x8086, 0x15f9, "i219lm-14", "I219-LM (14)", INTEL_I219 ),
@@ -1193,6 +1199,7 @@ static struct pci_device_id intel_nics[] = {
 	PCI_ROM ( 0x8086, 0x1f41, "i354", "I354", INTEL_NO_ASDE ),
 	PCI_ROM ( 0x8086, 0x294c, "82566dc-2", "82566DC-2", 0 ),
 	PCI_ROM ( 0x8086, 0x2e6e, "cemedia", "CE Media Processor", 0 ),
+	PCI_ROM ( 0x8086, 0x5502, "i225lmvp", "I225-LMvP", INTEL_PBSIZE_RST ),
 };
 
 /** Intel PCI driver */
