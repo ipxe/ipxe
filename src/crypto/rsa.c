@@ -194,8 +194,8 @@ static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
 		asn1_skip_any ( &cursor );
 
 		/* Enter privateKey, if present */
-		if ( asn1_check_algorithm ( &cursor,
-					    &rsa_encryption_algorithm ) == 0 ) {
+		if ( asn1_check_algorithm ( &cursor, &rsa_encryption_algorithm,
+					    NULL ) == 0 ) {
 
 			/* Skip privateKeyAlgorithm */
 			asn1_skip_any ( &cursor );

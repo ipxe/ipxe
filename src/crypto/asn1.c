@@ -83,6 +83,19 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EINFO_ENOTTY_ALGORITHM \
 	__einfo_uniqify ( EINFO_ENOTTY, 0x01, "Inappropriate algorithm" )
 
+/** "ecPublicKey" object identifier */
+static uint8_t oid_ecpublickey[] = { ASN1_OID_ECPUBLICKEY };
+
+/** Generic elliptic curve container algorithm
+ *
+ * The actual curve to be used is identified via the algorithm
+ * parameters, rather than the top-level OID.
+ */
+struct asn1_algorithm ecpubkey_algorithm __asn1_algorithm = {
+	.name = "ecPublicKey",
+	.oid = ASN1_CURSOR ( oid_ecpublickey ),
+};
+
 /**
  * Start parsing ASN.1 object
  *
@@ -625,19 +638,65 @@ int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 }
 
 /**
+ * Parse ASN.1 OID-identified elliptic curve algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret algorithm	Algorithm
+ * @ret rc		Return status code
+ */
+int asn1_curve_algorithm ( const struct asn1_cursor *cursor,
+			   struct asn1_algorithm **algorithm ) {
+	struct asn1_cursor curve;
+
+	/* Elliptic curves are identified as either:
+	 *
+	 * - the algorithm "id-ecPublicKey" with the actual curve
+	 *   specified in the algorithm parameters, or
+	 *
+	 * - a standalone object identifier for the curve
+	 */
+	if ( asn1_check_algorithm ( cursor, &ecpubkey_algorithm,
+				    &curve ) != 0 ) {
+		memcpy ( &curve, cursor, sizeof ( curve ) );
+	}
+
+	/* Identify curve */
+	asn1_enter ( &curve, ASN1_OID );
+	*algorithm = asn1_find_algorithm ( &curve );
+	if ( ! *algorithm ) {
+		DBGC ( cursor, "ASN1 %p unrecognised EC algorithm:\n",
+		       cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTSUP_ALGORITHM;
+	}
+
+	/* Check algorithm has an elliptic curve */
+	if ( ! (*algorithm)->curve ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not an elliptic curve "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
+}
+
+/**
  * Check ASN.1 OID-identified algorithm
  *
  * @v cursor		ASN.1 object cursor
  * @v expected		Expected algorithm
+ * @ret params		Algorithm parameters, or NULL
  * @ret rc		Return status code
  */
 int asn1_check_algorithm ( const struct asn1_cursor *cursor,
-			   struct asn1_algorithm *expected ) {
+			   struct asn1_algorithm *expected,
+			   struct asn1_cursor *params ) {
 	struct asn1_algorithm *actual;
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, &actual, NULL ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, &actual, params ) ) != 0 )
 		return rc;
 
 	/* Check algorithm matches */
