@@ -176,7 +176,6 @@ static int rsa_parse_integer ( struct asn1_cursor *integer,
 static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
 			       struct asn1_cursor *exponent,
 			       const struct asn1_cursor *raw ) {
-	struct asn1_bit_string bits;
 	struct asn1_cursor cursor;
 	int is_private;
 	int rc;
@@ -220,10 +219,7 @@ static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
 		asn1_skip ( &cursor, ASN1_SEQUENCE );
 
 		/* Enter subjectPublicKey */
-		if ( ( rc = asn1_integral_bit_string ( &cursor, &bits ) ) != 0 )
-			return rc;
-		cursor.data = bits.data;
-		cursor.len = bits.len;
+		asn1_enter_bits ( &cursor, NULL );
 
 		/* Enter RSAPublicKey */
 		asn1_enter ( &cursor, ASN1_SEQUENCE );

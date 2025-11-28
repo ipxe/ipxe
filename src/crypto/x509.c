@@ -392,7 +392,7 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 				   const struct asn1_cursor *raw ) {
 	struct x509_public_key *public_key = &cert->subject.public_key;
 	struct asn1_algorithm **algorithm = &public_key->algorithm;
-	struct asn1_bit_string *raw_bits = &public_key->raw_bits;
+	struct asn1_cursor *value = &public_key->value;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -416,8 +416,9 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 		cert, (*algorithm)->name );
 	asn1_skip_any ( &cursor );
 
-	/* Parse bit string */
-	if ( ( rc = asn1_bit_string ( &cursor, raw_bits ) ) != 0 ) {
+	/* Parse subjectPublicKey */
+	memcpy ( value, &cursor, sizeof ( *value ) );
+	if ( ( rc = asn1_enter_bits ( value, NULL ) ) != 0 ) {
 		DBGC ( cert, "X509 %p could not parse public key bits: %s\n",
 		       cert, strerror ( rc ) );
 		return rc;
@@ -498,8 +499,9 @@ static int x509_parse_basic_constraints ( struct x509_certificate *cert,
 static int x509_parse_key_usage ( struct x509_certificate *cert,
 				  const struct asn1_cursor *raw ) {
 	struct x509_key_usage *usage = &cert->extensions.usage;
-	struct asn1_bit_string bit_string;
+	struct asn1_cursor cursor;
 	const uint8_t *bytes;
+	unsigned int unused;
 	size_t len;
 	unsigned int i;
 	int rc;
@@ -507,16 +509,17 @@ static int x509_parse_key_usage ( struct x509_certificate *cert,
 	/* Mark extension as present */
 	usage->present = 1;
 
-	/* Parse bit string */
-	if ( ( rc = asn1_bit_string ( raw, &bit_string ) ) != 0 ) {
+	/* Enter bit string */
+	memcpy ( &cursor, raw, sizeof ( cursor ) );
+	if ( ( rc = asn1_enter_bits ( &cursor, &unused ) ) != 0 ) {
 		DBGC ( cert, "X509 %p could not parse key usage: %s\n",
 		       cert, strerror ( rc ) );
 		return rc;
 	}
 
 	/* Parse key usage bits */
-	bytes = bit_string.data;
-	len = bit_string.len;
+	bytes = cursor.data;
+	len = cursor.len;
 	if ( len > sizeof ( usage->bits ) )
 		len = sizeof ( usage->bits );
 	for ( i = 0 ; i < len ; i++ ) {
@@ -1005,7 +1008,7 @@ int x509_parse ( struct x509_certificate *cert,
 		 const struct asn1_cursor *raw ) {
 	struct x509_signature *signature = &cert->signature;
 	struct asn1_algorithm **signature_algorithm = &signature->algorithm;
-	struct asn1_bit_string *signature_value = &signature->value;
+	struct asn1_cursor *signature_value = &signature->value;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -1033,8 +1036,8 @@ int x509_parse ( struct x509_certificate *cert,
 	asn1_skip_any ( &cursor );
 
 	/* Parse signatureValue */
-	if ( ( rc = asn1_integral_bit_string ( &cursor,
-					       signature_value ) ) != 0 ) {
+	memcpy ( signature_value, &cursor, sizeof ( *signature_value ) );
+	if ( ( rc = asn1_enter_bits ( signature_value, NULL ) ) != 0 ) {
 		DBGC ( cert, "X509 %p could not parse signature value: %s\n",
 		       cert, strerror ( rc ) );
 		return rc;

@@ -76,7 +76,7 @@ struct ocsp_response {
 	/** Signature algorithm */
 	struct asn1_algorithm *algorithm;
 	/** Signature value */
-	struct asn1_bit_string signature;
+	struct asn1_cursor signature;
 	/** Signing certificate */
 	struct x509_certificate *signer;
 };

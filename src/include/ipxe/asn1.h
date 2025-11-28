@@ -427,16 +427,6 @@ extern struct asn1_algorithm oid_sha224_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha512_224_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha512_256_algorithm __asn1_algorithm;
 
-/** An ASN.1 bit string */
-struct asn1_bit_string {
-	/** Data */
-	const void *data;
-	/** Length */
-	size_t len;
-	/** Unused bits at end of data */
-	unsigned int unused;
-} __attribute__ (( packed ));
-
 /**
  * Invalidate ASN.1 object cursor
  *
@@ -489,12 +479,10 @@ extern int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type );
 extern int asn1_enter_any ( struct asn1_cursor *cursor );
 extern int asn1_skip_any ( struct asn1_cursor *cursor );
 extern int asn1_shrink_any ( struct asn1_cursor *cursor );
+extern int asn1_enter_bits ( struct asn1_cursor *cursor,
+			     unsigned int *unused );
 extern int asn1_boolean ( const struct asn1_cursor *cursor );
 extern int asn1_integer ( const struct asn1_cursor *cursor, int *value );
-extern int asn1_bit_string ( const struct asn1_cursor *cursor,
-			     struct asn1_bit_string *bits );
-extern int asn1_integral_bit_string ( const struct asn1_cursor *cursor,
-				      struct asn1_bit_string *bits );
 extern int asn1_compare ( const struct asn1_cursor *cursor1,
 			  const struct asn1_cursor *cursor2 );
 extern int asn1_algorithm ( const struct asn1_cursor *cursor,
