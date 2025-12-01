@@ -99,10 +99,11 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 	struct pubkey_algorithm *pubkey = test->pubkey;
 	struct digest_algorithm *digest = test->digest;
 	size_t max_len = pubkey_max_len ( pubkey, &test->private );
-	uint8_t bad[test->signature_len];
+	uint8_t bad[test->signature.len];
 	uint8_t digestctx[digest->ctxsize ];
 	uint8_t digestout[digest->digestsize];
 	uint8_t signature[max_len];
+	struct asn1_cursor cursor;
 	int signature_len;
 
 	/* Construct digest over plaintext */
@@ -114,18 +115,19 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 	/* Test signing using private key */
 	signature_len = pubkey_sign ( pubkey, &test->private, digest,
 				      digestout, signature );
-	okx ( signature_len == ( ( int ) test->signature_len ), file, line );
-	okx ( memcmp ( signature, test->signature, test->signature_len ) == 0,
-	      file, line );
+	okx ( signature_len == ( ( int ) test->signature.len ), file, line );
+	okx ( memcmp ( signature, test->signature.data,
+		       test->signature.len ) == 0, file, line );
 
 	/* Test verification using public key */
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
-			      test->signature, test->signature_len ) == 0,
-	      file, line );
+			      &test->signature ) == 0, file, line );
 
 	/* Test verification failure of modified signature */
-	memcpy ( bad, test->signature, test->signature_len );
-	bad[ test->signature_len / 2 ] ^= 0x40;
+	memcpy ( bad, test->signature.data, test->signature.len );
+	bad[ test->signature.len / 2 ] ^= 0x40;
+	cursor.data = bad;
+	cursor.len = test->signature.len;
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
-			      bad, sizeof ( bad ) ) != 0, file, line );
+			      &cursor ) != 0, file, line );
 }

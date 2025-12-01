@@ -1152,8 +1152,7 @@ static int x509_check_signature ( struct x509_certificate *cert,
 
 	/* Verify signature using signer's public key */
 	if ( ( rc = pubkey_verify ( pubkey, &public_key->raw, digest,
-				    digest_out, signature->value.data,
-				    signature->value.len ) ) != 0 ) {
+				    digest_out, &signature->value ) ) != 0 ) {
 		DBGC ( cert, "X509 %p \"%s\" signature verification failed: "
 		       "%s\n", cert, x509_name ( cert ), strerror ( rc ) );
 		goto err_pubkey_verify;

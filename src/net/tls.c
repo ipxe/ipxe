@@ -1495,6 +1495,7 @@ static int tls_verify_dh_params ( struct tls_connection *tls,
 		uint16_t signature_len;
 		uint8_t signature[0];
 	} __attribute__ (( packed )) *sig;
+	struct asn1_cursor signature;
 	const void *data;
 	size_t remaining;
 	int rc;
@@ -1515,6 +1516,8 @@ static int tls_verify_dh_params ( struct tls_connection *tls,
 			   tls->server.exchange_len );
 		return -EINVAL_KEY_EXCHANGE;
 	}
+	signature.data = sig->signature;
+	signature.len = ntohs ( sig->signature_len );
 
 	/* Identify signature and hash algorithm */
 	if ( use_sig_hash ) {
@@ -1538,8 +1541,6 @@ static int tls_verify_dh_params ( struct tls_connection *tls,
 
 	/* Verify signature */
 	{
-		const void *signature = sig->signature;
-		size_t signature_len = ntohs ( sig->signature_len );
 		uint8_t ctx[digest->ctxsize];
 		uint8_t hash[digest->digestsize];
 
@@ -1553,9 +1554,8 @@ static int tls_verify_dh_params ( struct tls_connection *tls,
 		digest_final ( digest, ctx, hash );
 
 		/* Verify signature */
-		if ( ( rc = pubkey_verify ( pubkey, &tls->server.key,
-					    digest, hash, signature,
-					    signature_len ) ) != 0 ) {
+		if ( ( rc = pubkey_verify ( pubkey, &tls->server.key, digest,
+					    hash, &signature ) ) != 0 ) {
 			DBGC ( tls, "TLS %p ServerKeyExchange failed "
 			       "verification\n", tls );
 			DBGC_HDA ( tls, 0, tls->server.exchange,

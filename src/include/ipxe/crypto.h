@@ -164,12 +164,11 @@ struct pubkey_algorithm {
 	 * @v digest		Digest algorithm
 	 * @v value		Digest value
 	 * @v signature		Signature
-	 * @v signature_len	Signature length
 	 * @ret rc		Return status code
 	 */
 	int ( * verify ) ( const struct asn1_cursor *key,
 			   struct digest_algorithm *digest, const void *value,
-			   const void *signature, size_t signature_len );
+			   const struct asn1_cursor *signature );
 	/** Check that public key matches private key
 	 *
 	 * @v private_key	Private key
@@ -295,8 +294,8 @@ pubkey_sign ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 static inline __attribute__ (( always_inline )) int
 pubkey_verify ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 		struct digest_algorithm *digest, const void *value,
-		const void *signature, size_t signature_len ) {
-	return pubkey->verify ( key, digest, value, signature, signature_len );
+		const struct asn1_cursor *signature ) {
+	return pubkey->verify ( key, digest, value, signature );
 }
 
 static inline __attribute__ (( always_inline )) int
@@ -336,8 +335,8 @@ extern int pubkey_null_sign ( const struct asn1_cursor *key,
 			      const void *value, void *signature );
 extern int pubkey_null_verify ( const struct asn1_cursor *key,
 				struct digest_algorithm *digest,
-				const void *value, const void *signature ,
-				size_t signature_len );
+				const void *value,
+				const struct asn1_cursor *signature );
 
 extern struct digest_algorithm digest_null;
 extern struct cipher_algorithm cipher_null;

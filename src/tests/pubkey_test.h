@@ -45,9 +45,7 @@ struct pubkey_sign_test {
 	/** Signature algorithm */
 	struct digest_algorithm *digest;
 	/** Signature */
-	const void *signature;
-	/** Signature length */
-	size_t signature_len;
+	const struct asn1_cursor signature;
 };
 
 /** Define inline private key data */
@@ -129,8 +127,10 @@ struct pubkey_sign_test {
 		.plaintext = name ## _plaintext,			\
 		.plaintext_len = sizeof ( name ## _plaintext ),		\
 		.digest = DIGEST,					\
-		.signature = name ## _signature,			\
-		.signature_len = sizeof ( name ## _signature ),		\
+		.signature = {						\
+			.data = name ## _signature,			\
+			.len = sizeof ( name ## _signature ),		\
+		},							\
 	}
 
 extern void pubkey_okx ( struct pubkey_test *test,

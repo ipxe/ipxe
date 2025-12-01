@@ -591,12 +591,11 @@ static int rsa_sign ( const struct asn1_cursor *key,
  * @v digest		Digest algorithm
  * @v value		Digest value
  * @v signature		Signature
- * @v signature_len	Signature length
  * @ret rc		Return status code
  */
 static int rsa_verify ( const struct asn1_cursor *key,
 			struct digest_algorithm *digest, const void *value,
-			const void *signature, size_t signature_len ) {
+			const struct asn1_cursor *signature ) {
 	struct rsa_context context;
 	void *temp;
 	void *expected;
@@ -606,17 +605,17 @@ static int rsa_verify ( const struct asn1_cursor *key,
 	DBGC ( &context, "RSA %p verifying %s digest:\n",
 	       &context, digest->name );
 	DBGC_HDA ( &context, 0, value, digest->digestsize );
-	DBGC_HDA ( &context, 0, signature, signature_len );
+	DBGC_HDA ( &context, 0, signature->data, signature->len );
 
 	/* Initialise context */
 	if ( ( rc = rsa_init ( &context, key ) ) != 0 )
 		goto err_init;
 
 	/* Sanity check */
-	if ( signature_len != context.max_len ) {
+	if ( signature->len != context.max_len ) {
 		DBGC ( &context, "RSA %p signature incorrect length (%zd "
 		       "bytes, should be %zd)\n",
-		       &context, signature_len, context.max_len );
+		       &context, signature->len, context.max_len );
 		rc = -ERANGE;
 		goto err_sanity;
 	}
@@ -626,7 +625,7 @@ static int rsa_verify ( const struct asn1_cursor *key,
 	 */
 	temp = context.input0;
 	expected = temp;
-	rsa_cipher ( &context, signature, expected );
+	rsa_cipher ( &context, signature->data, expected );
 	DBGC ( &context, "RSA %p deciphered signature:\n", &context );
 	DBGC_HDA ( &context, 0, expected, context.max_len );
 

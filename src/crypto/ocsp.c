@@ -858,8 +858,7 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
 
 	/* Verify digest */
 	if ( ( rc = pubkey_verify ( pubkey, key, digest, digest_out,
-				    response->signature.data,
-				    response->signature.len ) ) != 0 ) {
+				    &response->signature ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" signature verification failed: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
 		return rc;

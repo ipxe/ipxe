@@ -120,8 +120,7 @@ int pubkey_null_sign ( const struct asn1_cursor *key __unused,
 int pubkey_null_verify ( const struct asn1_cursor *key __unused,
 			 struct digest_algorithm *digest __unused,
 			 const void *value __unused,
-			 const void *signature __unused ,
-			 size_t signature_len __unused ) {
+			 const struct asn1_cursor *signature __unused ) {
 	return 0;
 }
 

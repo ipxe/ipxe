@@ -757,7 +757,7 @@ static int cms_verify_digest ( struct cms_message *cms,
 
 	/* Verify digest */
 	if ( ( rc = pubkey_verify ( pubkey, key, digest, digest_out,
-				    value->data, value->len ) ) != 0 ) {
+				    value ) ) != 0 ) {
 		DBGC ( cms, "CMS %p/%p signature verification failed: %s\n",
 		       cms, part, strerror ( rc ) );
 		return rc;
