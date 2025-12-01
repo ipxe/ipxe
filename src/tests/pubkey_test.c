@@ -98,13 +98,10 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 		       unsigned int line ) {
 	struct pubkey_algorithm *pubkey = test->pubkey;
 	struct digest_algorithm *digest = test->digest;
-	size_t max_len = pubkey_max_len ( pubkey, &test->private );
-	uint8_t bad[test->signature.len];
 	uint8_t digestctx[digest->ctxsize ];
 	uint8_t digestout[digest->digestsize];
-	uint8_t signature[max_len];
-	struct asn1_cursor cursor;
-	int signature_len;
+	struct asn1_builder signature = { NULL, 0 };
+	uint8_t *bad;
 
 	/* Construct digest over plaintext */
 	digest_init ( digest, digestctx );
@@ -113,21 +110,24 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 	digest_final ( digest, digestctx, digestout );
 
 	/* Test signing using private key */
-	signature_len = pubkey_sign ( pubkey, &test->private, digest,
-				      digestout, signature );
-	okx ( signature_len == ( ( int ) test->signature.len ), file, line );
-	okx ( memcmp ( signature, test->signature.data,
-		       test->signature.len ) == 0, file, line );
+	okx ( pubkey_sign ( pubkey, &test->private, digest, digestout,
+			    &signature ) == 0, file, line );
+	okx ( signature.len != 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &signature ),
+			     &test->signature ) == 0, file, line );
 
 	/* Test verification using public key */
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
 			      &test->signature ) == 0, file, line );
 
 	/* Test verification failure of modified signature */
-	memcpy ( bad, test->signature.data, test->signature.len );
-	bad[ test->signature.len / 2 ] ^= 0x40;
-	cursor.data = bad;
-	cursor.len = test->signature.len;
+	bad = ( signature.data + ( test->signature.len / 2 ) );
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
-			      &cursor ) != 0, file, line );
+			      asn1_built ( &signature ) ) == 0, file, line );
+	*bad ^= 0x40;
+	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
+			      asn1_built ( &signature ) ) != 0, file, line );
+
+	/* Free signature */
+	free ( signature.data );
 }

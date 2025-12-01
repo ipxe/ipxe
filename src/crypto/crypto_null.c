@@ -113,7 +113,8 @@ int pubkey_null_decrypt ( const struct asn1_cursor *key __unused,
 
 int pubkey_null_sign ( const struct asn1_cursor *key __unused,
 		       struct digest_algorithm *digest __unused,
-		       const void *value __unused, void *signature __unused ) {
+		       const void *value __unused,
+		       struct asn1_builder *signature __unused ) {
 	return 0;
 }
 

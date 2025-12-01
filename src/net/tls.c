@@ -1863,6 +1863,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	struct asn1_cursor *key = privkey_cursor ( tls->client.key );
 	uint8_t digest_out[ digest->digestsize ];
 	struct tls_signature_hash_algorithm *sig_hash = NULL;
+	struct asn1_builder builder = { NULL, 0 };
 	int rc;
 
 	/* Generate digest to be signed */
@@ -1880,53 +1881,53 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 		}
 	}
 
-	/* Generate and transmit record */
+	/* Sign digest */
+	if ( ( rc = pubkey_sign ( pubkey, key, digest, digest_out,
+				  &builder ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not sign %s digest using %s client "
+		       "private key: %s\n", tls, digest->name, pubkey->name,
+		       strerror ( rc ) );
+		goto err_pubkey_sign;
+	}
+
+	/* Construct Certificate Verify record */
 	{
-		size_t max_len = pubkey_max_len ( pubkey, key );
 		int use_sig_hash = ( ( sig_hash == NULL ) ? 0 : 1 );
 		struct {
 			uint32_t type_length;
 			struct tls_signature_hash_id sig_hash[use_sig_hash];
 			uint16_t signature_len;
-			uint8_t signature[max_len];
-		} __attribute__ (( packed )) certificate_verify;
-		size_t unused;
-		int len;
+		} __attribute__ (( packed )) header;
 
-		/* Sign digest */
-		len = pubkey_sign ( pubkey, key, digest, digest_out,
-				    certificate_verify.signature );
-		if ( len < 0 ) {
-			rc = len;
-			DBGC ( tls, "TLS %p could not sign %s digest using %s "
-			       "client private key: %s\n", tls, digest->name,
-			       pubkey->name, strerror ( rc ) );
-			goto err_pubkey_sign;
-		}
-		unused = ( max_len - len );
-
-		/* Construct Certificate Verify record */
-		certificate_verify.type_length =
-			( cpu_to_le32 ( TLS_CERTIFICATE_VERIFY ) |
-			  htonl ( sizeof ( certificate_verify ) -
-				  sizeof ( certificate_verify.type_length ) -
-				  unused ) );
+		header.type_length = ( cpu_to_le32 ( TLS_CERTIFICATE_VERIFY ) |
+				       htonl ( builder.len +
+					       sizeof ( header ) -
+					       sizeof ( header.type_length )));
 		if ( use_sig_hash ) {
-			memcpy ( &certificate_verify.sig_hash[0],
-				 &sig_hash->code,
-				 sizeof ( certificate_verify.sig_hash[0] ) );
+			memcpy ( &header.sig_hash[0], &sig_hash->code,
+				 sizeof ( header.sig_hash[0] ) );
 		}
-		certificate_verify.signature_len =
-			htons ( sizeof ( certificate_verify.signature ) -
-				unused );
+		header.signature_len = htons ( builder.len );
 
-		/* Transmit record */
-		rc = tls_send_handshake ( tls, &certificate_verify,
-				   ( sizeof ( certificate_verify ) - unused ) );
+		if ( ( rc = asn1_prepend_raw ( &builder, &header,
+					       sizeof ( header ) ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not construct Certificate "
+			       "Verify: %s\n", tls, strerror ( rc ) );
+			goto err_prepend;
+		}
 	}
 
+	/* Transmit record */
+	if ( ( rc = tls_send_handshake ( tls, builder.data,
+					 builder.len ) ) != 0 ) {
+		goto err_send;
+	}
+
+ err_send:
+ err_prepend:
  err_pubkey_sign:
  err_sig_hash:
+	free ( builder.data );
 	return rc;
 }
 

@@ -153,11 +153,11 @@ struct pubkey_algorithm {
 	 * @v digest		Digest algorithm
 	 * @v value		Digest value
 	 * @v signature		Signature
-	 * @ret signature_len	Signature length, or negative error
+	 * @ret rc		Return status code
 	 */
 	int ( * sign ) ( const struct asn1_cursor *key,
 			 struct digest_algorithm *digest, const void *value,
-			 void *signature );
+			 struct asn1_builder *builder );
 	/** Verify signed digest value
 	 *
 	 * @v key		Key
@@ -287,7 +287,7 @@ pubkey_decrypt ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 static inline __attribute__ (( always_inline )) int
 pubkey_sign ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 	      struct digest_algorithm *digest, const void *value,
-	      void *signature ) {
+	      struct asn1_builder *signature ) {
 	return pubkey->sign ( key, digest, value, signature );
 }
 
@@ -332,7 +332,8 @@ extern int pubkey_null_decrypt ( const struct asn1_cursor *key,
 				 void *plaintext );
 extern int pubkey_null_sign ( const struct asn1_cursor *key,
 			      struct digest_algorithm *digest,
-			      const void *value, void *signature );
+			      const void *value,
+			      struct asn1_builder *signature );
 extern int pubkey_null_verify ( const struct asn1_cursor *key,
 				struct digest_algorithm *digest,
 				const void *value,

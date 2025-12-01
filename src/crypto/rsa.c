@@ -544,13 +544,12 @@ static int rsa_encode_digest ( struct rsa_context *context,
  * @v digest		Digest algorithm
  * @v value		Digest value
  * @v signature		Signature
- * @ret signature_len	Signature length, or negative error
+ * @ret rc		Return status code
  */
 static int rsa_sign ( const struct asn1_cursor *key,
 		      struct digest_algorithm *digest, const void *value,
-		      void *signature ) {
+		      struct asn1_builder *signature ) {
 	struct rsa_context context;
-	void *temp;
 	int rc;
 
 	DBGC ( &context, "RSA %p signing %s digest:\n",
@@ -561,24 +560,27 @@ static int rsa_sign ( const struct asn1_cursor *key,
 	if ( ( rc = rsa_init ( &context, key ) ) != 0 )
 		goto err_init;
 
-	/* Encode digest (using the big integer output buffer as
-	 * temporary storage)
-	 */
-	temp = context.output0;
-	if ( ( rc = rsa_encode_digest ( &context, digest, value, temp ) ) != 0 )
+	/* Create space for encoded digest and signature */
+	if ( ( rc = asn1_grow ( signature, context.max_len ) ) != 0 )
+		goto err_grow;
+
+	/* Encode digest */
+	if ( ( rc = rsa_encode_digest ( &context, digest, value,
+					signature->data ) ) != 0 )
 		goto err_encode;
 
 	/* Encipher the encoded digest */
-	rsa_cipher ( &context, temp, signature );
+	rsa_cipher ( &context, signature->data, signature->data );
 	DBGC ( &context, "RSA %p signed %s digest:\n", &context, digest->name );
-	DBGC_HDA ( &context, 0, signature, context.max_len );
+	DBGC_HDA ( &context, 0, signature->data, signature->len );
 
 	/* Free context */
 	rsa_free ( &context );
 
-	return context.max_len;
+	return 0;
 
  err_encode:
+ err_grow:
 	rsa_free ( &context );
  err_init:
 	return rc;
