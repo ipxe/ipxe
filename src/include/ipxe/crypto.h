@@ -131,22 +131,22 @@ struct pubkey_algorithm {
 	 *
 	 * @v key		Key
 	 * @v plaintext		Plaintext
-	 * @v plaintext_len	Length of plaintext
 	 * @v ciphertext	Ciphertext
-	 * @ret ciphertext_len	Length of ciphertext, or negative error
+	 * @ret rc		Return status code
 	 */
-	int ( * encrypt ) ( const struct asn1_cursor *key, const void *data,
-			    size_t len, void *out );
+	int ( * encrypt ) ( const struct asn1_cursor *key,
+			    const struct asn1_cursor *plaintext,
+			    struct asn1_builder *ciphertext );
 	/** Decrypt
 	 *
 	 * @v key		Key
 	 * @v ciphertext	Ciphertext
-	 * @v ciphertext_len	Ciphertext length
 	 * @v plaintext		Plaintext
-	 * @ret plaintext_len	Plaintext length, or negative error
+	 * @ret rc		Return status code
 	 */
-	int ( * decrypt ) ( const struct asn1_cursor *key, const void *data,
-			    size_t len, void *out );
+	int ( * decrypt ) ( const struct asn1_cursor *key,
+			    const struct asn1_cursor *ciphertext,
+			    struct asn1_builder *plaintext );
 	/** Sign digest value
 	 *
 	 * @v key		Key
@@ -274,14 +274,16 @@ pubkey_max_len ( struct pubkey_algorithm *pubkey,
 
 static inline __attribute__ (( always_inline )) int
 pubkey_encrypt ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
-		 const void *data, size_t len, void *out ) {
-	return pubkey->encrypt ( key, data, len, out );
+		 const struct asn1_cursor *plaintext,
+		 struct asn1_builder *ciphertext ) {
+	return pubkey->encrypt ( key, plaintext, ciphertext );
 }
 
 static inline __attribute__ (( always_inline )) int
 pubkey_decrypt ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
-		 const void *data, size_t len, void *out ) {
-	return pubkey->decrypt ( key, data, len, out );
+		 const struct asn1_cursor *ciphertext,
+		 struct asn1_builder *plaintext ) {
+	return pubkey->decrypt ( key, ciphertext, plaintext );
 }
 
 static inline __attribute__ (( always_inline )) int
@@ -325,11 +327,11 @@ extern void cipher_null_auth ( void *ctx, void *auth );
 
 extern size_t pubkey_null_max_len ( const struct asn1_cursor *key );
 extern int pubkey_null_encrypt ( const struct asn1_cursor *key,
-				 const void *plaintext, size_t plaintext_len,
-				 void *ciphertext );
+				 const struct asn1_cursor *plaintext,
+				 struct asn1_builder *ciphertext );
 extern int pubkey_null_decrypt ( const struct asn1_cursor *key,
-				 const void *ciphertext, size_t ciphertext_len,
-				 void *plaintext );
+				 const struct asn1_cursor *ciphertext,
+				 struct asn1_builder *plaintext );
 extern int pubkey_null_sign ( const struct asn1_cursor *key,
 			      struct digest_algorithm *digest,
 			      const void *value,

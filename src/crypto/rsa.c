@@ -338,12 +338,12 @@ static void rsa_cipher ( struct rsa_context *context,
  *
  * @v key		Key
  * @v plaintext		Plaintext
- * @v plaintext_len	Length of plaintext
  * @v ciphertext	Ciphertext
  * @ret ciphertext_len	Length of ciphertext, or negative error
  */
-static int rsa_encrypt ( const struct asn1_cursor *key, const void *plaintext,
-			 size_t plaintext_len, void *ciphertext ) {
+static int rsa_encrypt ( const struct asn1_cursor *key,
+			 const struct asn1_cursor *plaintext,
+			 struct asn1_builder *ciphertext ) {
 	struct rsa_context context;
 	void *temp;
 	uint8_t *encoded;
@@ -352,7 +352,7 @@ static int rsa_encrypt ( const struct asn1_cursor *key, const void *plaintext,
 	int rc;
 
 	DBGC ( &context, "RSA %p encrypting:\n", &context );
-	DBGC_HDA ( &context, 0, plaintext, plaintext_len );
+	DBGC_HDA ( &context, 0, plaintext->data, plaintext->len );
 
 	/* Initialise context */
 	if ( ( rc = rsa_init ( &context, key ) ) != 0 )
@@ -360,12 +360,12 @@ static int rsa_encrypt ( const struct asn1_cursor *key, const void *plaintext,
 
 	/* Calculate lengths */
 	max_len = ( context.max_len - 11 );
-	random_nz_len = ( max_len - plaintext_len + 8 );
+	random_nz_len = ( max_len - plaintext->len + 8 );
 
 	/* Sanity check */
-	if ( plaintext_len > max_len ) {
+	if ( plaintext->len > max_len ) {
 		DBGC ( &context, "RSA %p plaintext too long (%zd bytes, max "
-		       "%zd)\n", &context, plaintext_len, max_len );
+		       "%zd)\n", &context, plaintext->len, max_len );
 		rc = -ERANGE;
 		goto err_sanity;
 	}
@@ -383,19 +383,24 @@ static int rsa_encrypt ( const struct asn1_cursor *key, const void *plaintext,
 		goto err_random;
 	}
 	encoded[ 2 + random_nz_len ] = 0x00;
-	memcpy ( &encoded[ context.max_len - plaintext_len ],
-		 plaintext, plaintext_len );
+	memcpy ( &encoded[ context.max_len - plaintext->len ],
+		 plaintext->data, plaintext->len );
+
+	/* Create space for ciphertext */
+	if ( ( rc = asn1_grow ( ciphertext, context.max_len ) ) != 0 )
+		goto err_grow;
 
 	/* Encipher the encoded message */
-	rsa_cipher ( &context, encoded, ciphertext );
+	rsa_cipher ( &context, encoded, ciphertext->data );
 	DBGC ( &context, "RSA %p encrypted:\n", &context );
-	DBGC_HDA ( &context, 0, ciphertext, context.max_len );
+	DBGC_HDA ( &context, 0, ciphertext->data, context.max_len );
 
 	/* Free context */
 	rsa_free ( &context );
 
-	return context.max_len;
+	return 0;
 
+ err_grow:
  err_random:
  err_sanity:
 	rsa_free ( &context );
@@ -408,33 +413,33 @@ static int rsa_encrypt ( const struct asn1_cursor *key, const void *plaintext,
  *
  * @v key		Key
  * @v ciphertext	Ciphertext
- * @v ciphertext_len	Ciphertext length
  * @v plaintext		Plaintext
- * @ret plaintext_len	Plaintext length, or negative error
+ * @ret rc		Return status code
  */
-static int rsa_decrypt ( const struct asn1_cursor *key, const void *ciphertext,
-			 size_t ciphertext_len, void *plaintext ) {
+static int rsa_decrypt ( const struct asn1_cursor *key,
+			 const struct asn1_cursor *ciphertext,
+			 struct asn1_builder *plaintext ) {
 	struct rsa_context context;
 	void *temp;
 	uint8_t *encoded;
 	uint8_t *end;
 	uint8_t *zero;
 	uint8_t *start;
-	size_t plaintext_len;
+	size_t len;
 	int rc;
 
 	DBGC ( &context, "RSA %p decrypting:\n", &context );
-	DBGC_HDA ( &context, 0, ciphertext, ciphertext_len );
+	DBGC_HDA ( &context, 0, ciphertext->data, ciphertext->len );
 
 	/* Initialise context */
 	if ( ( rc = rsa_init ( &context, key ) ) != 0 )
 		goto err_init;
 
 	/* Sanity check */
-	if ( ciphertext_len != context.max_len ) {
+	if ( ciphertext->len != context.max_len ) {
 		DBGC ( &context, "RSA %p ciphertext incorrect length (%zd "
 		       "bytes, should be %zd)\n",
-		       &context, ciphertext_len, context.max_len );
+		       &context, ciphertext->len, context.max_len );
 		rc = -ERANGE;
 		goto err_sanity;
 	}
@@ -444,7 +449,7 @@ static int rsa_decrypt ( const struct asn1_cursor *key, const void *ciphertext,
 	 */
 	temp = context.input0;
 	encoded = temp;
-	rsa_cipher ( &context, ciphertext, encoded );
+	rsa_cipher ( &context, ciphertext->data, encoded );
 
 	/* Parse the message */
 	end = ( encoded + context.max_len );
@@ -454,25 +459,31 @@ static int rsa_decrypt ( const struct asn1_cursor *key, const void *ciphertext,
 	}
 	zero = memchr ( &encoded[2], 0, ( end - &encoded[2] ) );
 	if ( ! zero ) {
+		DBGC ( &context, "RSA %p invalid decrypted message:\n",
+		       &context );
+		DBGC_HDA ( &context, 0, encoded, context.max_len );
 		rc = -EINVAL;
 		goto err_invalid;
 	}
 	start = ( zero + 1 );
-	plaintext_len = ( end - start );
+	len = ( end - start );
+
+	/* Create space for plaintext */
+	if ( ( rc = asn1_grow ( plaintext, len ) ) != 0 )
+		goto err_grow;
 
 	/* Copy out message */
-	memcpy ( plaintext, start, plaintext_len );
+	memcpy ( plaintext->data, start, len );
 	DBGC ( &context, "RSA %p decrypted:\n", &context );
-	DBGC_HDA ( &context, 0, plaintext, plaintext_len );
+	DBGC_HDA ( &context, 0, plaintext->data, len );
 
 	/* Free context */
 	rsa_free ( &context );
 
-	return plaintext_len;
+	return 0;
 
+ err_grow:
  err_invalid:
-	DBGC ( &context, "RSA %p invalid decrypted message:\n", &context );
-	DBGC_HDA ( &context, 0, encoded, context.max_len );
  err_sanity:
 	rsa_free ( &context );
  err_init:

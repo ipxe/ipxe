@@ -98,16 +98,14 @@ size_t pubkey_null_max_len ( const struct asn1_cursor *key __unused ) {
 }
 
 int pubkey_null_encrypt ( const struct asn1_cursor *key __unused,
-			  const void *plaintext __unused,
-			  size_t plaintext_len __unused,
-			  void *ciphertext __unused ) {
+			  const struct asn1_cursor *plaintext __unused,
+			  struct asn1_builder *ciphertext __unused ) {
 	return 0;
 }
 
 int pubkey_null_decrypt ( const struct asn1_cursor *key __unused,
-			  const void *ciphertext __unused,
-			  size_t ciphertext_len __unused,
-			  void *plaintext __unused ) {
+			  const struct asn1_cursor *ciphertext __unused,
+			  struct asn1_builder *plaintext __unused ) {
 	return 0;
 }
 

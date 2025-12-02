@@ -50,41 +50,47 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 void pubkey_okx ( struct pubkey_test *test, const char *file,
 		  unsigned int line ) {
 	struct pubkey_algorithm *pubkey = test->pubkey;
-	size_t max_len = pubkey_max_len ( pubkey, &test->private );
-	uint8_t encrypted[max_len];
-	uint8_t decrypted[max_len];
-	int encrypted_len;
-	int decrypted_len;
+	struct asn1_builder plaintext;
+	struct asn1_builder ciphertext;
 
 	/* Test decrypting with private key to obtain known plaintext */
-	decrypted_len = pubkey_decrypt ( pubkey, &test->private,
-					 test->ciphertext, test->ciphertext_len,
-					 decrypted );
-	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
-	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
-	      file, line );
+	plaintext.data = NULL;
+	plaintext.len = 0;
+	okx ( pubkey_decrypt ( pubkey, &test->private, &test->ciphertext,
+			       &plaintext ) == 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &plaintext ),
+			     &test->plaintext ) == 0, file, line );
+	free ( plaintext.data );
 
 	/* Test encrypting with private key and decrypting with public key */
-	encrypted_len = pubkey_encrypt ( pubkey, &test->private,
-					 test->plaintext, test->plaintext_len,
-					 encrypted );
-	okx ( encrypted_len >= 0, file, line );
-	decrypted_len = pubkey_decrypt ( pubkey, &test->public, encrypted,
-					 encrypted_len, decrypted );
-	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
-	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
-	      file, line );
+	ciphertext.data = NULL;
+	ciphertext.len = 0;
+	plaintext.data = NULL;
+	plaintext.len = 0;
+	okx ( pubkey_encrypt ( pubkey, &test->private, &test->plaintext,
+			       &ciphertext ) == 0, file, line );
+	okx ( pubkey_decrypt ( pubkey, &test->public,
+			       asn1_built ( &ciphertext ),
+			       &plaintext ) == 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &plaintext ),
+			     &test->plaintext ) == 0, file, line );
+	free ( ciphertext.data );
+	free ( plaintext.data );
 
 	/* Test encrypting with public key and decrypting with private key */
-	encrypted_len = pubkey_encrypt ( pubkey, &test->public,
-					 test->plaintext, test->plaintext_len,
-					 encrypted );
-	okx ( encrypted_len >= 0, file, line );
-	decrypted_len = pubkey_decrypt ( pubkey, &test->private, encrypted,
-					 encrypted_len, decrypted );
-	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
-	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
-	      file, line );
+	ciphertext.data = NULL;
+	ciphertext.len = 0;
+	plaintext.data = NULL;
+	plaintext.len = 0;
+	okx ( pubkey_encrypt ( pubkey, &test->public, &test->plaintext,
+			       &ciphertext ) == 0, file, line );
+	okx ( pubkey_decrypt ( pubkey, &test->private,
+			       asn1_built ( &ciphertext ),
+			       &plaintext ) == 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &plaintext ),
+			     &test->plaintext ) == 0, file, line );
+	free ( ciphertext.data );
+	free ( plaintext.data );
 }
 
 /**

@@ -1416,59 +1416,69 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
-	size_t max_len = pubkey_max_len ( pubkey, &tls->server.key );
 	struct {
 		uint16_t version;
 		uint8_t random[46];
 	} __attribute__ (( packed )) pre_master_secret;
-	struct {
-		uint32_t type_length;
-		uint16_t encrypted_pre_master_secret_len;
-		uint8_t encrypted_pre_master_secret[max_len];
-	} __attribute__ (( packed )) key_xchg;
-	size_t unused;
-	int len;
+	struct asn1_cursor cursor = {
+		.data = &pre_master_secret,
+		.len = sizeof ( pre_master_secret ),
+	};
+	struct asn1_builder builder = { NULL, 0 };
 	int rc;
 
 	/* Generate pre-master secret */
 	pre_master_secret.version = htons ( TLS_VERSION_MAX );
 	if ( ( rc = tls_generate_random ( tls, &pre_master_secret.random,
 			  ( sizeof ( pre_master_secret.random ) ) ) ) != 0 ) {
-		return rc;
+		goto err_random;
 	}
 
 	/* Encrypt pre-master secret using server's public key */
-	memset ( &key_xchg, 0, sizeof ( key_xchg ) );
-	len = pubkey_encrypt ( pubkey, &tls->server.key, &pre_master_secret,
-			       sizeof ( pre_master_secret ),
-			       key_xchg.encrypted_pre_master_secret );
-	if ( len < 0 ) {
-		rc = len;
+	if ( ( rc = pubkey_encrypt ( pubkey, &tls->server.key, &cursor,
+				     &builder ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not encrypt pre-master secret: %s\n",
 		       tls, strerror ( rc ) );
-		return rc;
+		goto err_encrypt;
 	}
-	unused = ( max_len - len );
-	key_xchg.type_length =
-		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-		  htonl ( sizeof ( key_xchg ) -
-			  sizeof ( key_xchg.type_length ) - unused ) );
-	key_xchg.encrypted_pre_master_secret_len =
-		htons ( sizeof ( key_xchg.encrypted_pre_master_secret ) -
-			unused );
+
+	/* Construct Client Key Exchange record */
+	{
+		struct {
+			uint32_t type_length;
+			uint16_t encrypted_pre_master_secret_len;
+		} __attribute__ (( packed )) header;
+
+		header.type_length =
+			( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
+			  htonl ( builder.len + sizeof ( header ) -
+				  sizeof ( header.type_length ) ) );
+		header.encrypted_pre_master_secret_len = htons ( builder.len );
+
+		if ( ( rc = asn1_prepend_raw ( &builder, &header,
+					       sizeof ( header ) ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not construct Client Key "
+			       "Exchange: %s\n", tls, strerror ( rc ) );
+			goto err_prepend;
+		}
+	}
 
 	/* Transmit Client Key Exchange record */
-	if ( ( rc = tls_send_handshake ( tls, &key_xchg,
-					 ( sizeof ( key_xchg ) -
-					   unused ) ) ) != 0 ) {
-		return rc;
+	if ( ( rc = tls_send_handshake ( tls, builder.data,
+					 builder.len ) ) != 0 ) {
+		goto err_send;
 	}
 
 	/* Generate master secret */
 	tls_generate_master_secret ( tls, &pre_master_secret,
 				     sizeof ( pre_master_secret ) );
 
-	return 0;
+ err_random:
+ err_encrypt:
+ err_prepend:
+ err_send:
+	free ( builder.data );
+	return rc;
 }
 
 /** Public key exchange algorithm */

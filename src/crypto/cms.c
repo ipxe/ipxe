@@ -917,29 +917,26 @@ static int cms_cipher_key ( struct cms_message *cms,
 	struct pubkey_algorithm *pubkey = part->pubkey;
 	const struct asn1_cursor *key = privkey_cursor ( private_key );
 	const struct asn1_cursor *value = &part->value;
-	size_t max_len = pubkey_max_len ( pubkey, key );
-	uint8_t cipher_key[max_len];
-	int len;
+	struct asn1_builder cipher_key = { NULL, 0 };
 	int rc;
 
 	/* Decrypt cipher key */
-	len = pubkey_decrypt ( pubkey, key, value->data, value->len,
-			       cipher_key );
-	if ( len < 0 ) {
-		rc = len;
+	if ( ( rc = pubkey_decrypt ( pubkey, key, value,
+				     &cipher_key ) ) != 0 ) {
 		DBGC ( cms, "CMS %p/%p could not decrypt cipher key: %s\n",
 		       cms, part, strerror ( rc ) );
 		DBGC_HDA ( cms, 0, value->data, value->len );
-		return rc;
+		goto err_decrypt;
 	}
 	DBGC ( cms, "CMS %p/%p cipher key:\n", cms, part );
-	DBGC_HDA ( cms, 0, cipher_key, len );
+	DBGC_HDA ( cms, 0, cipher_key.data, cipher_key.len );
 
 	/* Set cipher key */
-	if ( ( rc = cipher_setkey ( cipher, ctx, cipher_key, len ) ) != 0 ) {
+	if ( ( rc = cipher_setkey ( cipher, ctx, cipher_key.data,
+				    cipher_key.len ) ) != 0 ) {
 		DBGC ( cms, "CMS %p could not set cipher key: %s\n",
 		       cms, strerror ( rc ) );
-		return rc;
+		goto err_setkey;
 	}
 
 	/* Set cipher initialization vector */
@@ -949,7 +946,10 @@ static int cms_cipher_key ( struct cms_message *cms,
 		DBGC_HDA ( cms, 0, cms->iv.data, cms->iv.len );
 	}
 
-	return 0;
+ err_setkey:
+ err_decrypt:
+	free ( cipher_key.data );
+	return rc;
 }
 
 /**

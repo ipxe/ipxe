@@ -16,18 +16,14 @@ struct pubkey_test {
 	/** Public key */
 	const struct asn1_cursor public;
 	/** Plaintext */
-	const void *plaintext;
-	/** Length of plaintext */
-	size_t plaintext_len;
+	const struct asn1_cursor plaintext;
 	/** Ciphertext
 	 *
 	 * Note that the encryption process may include some random
 	 * padding, so a given plaintext will encrypt to multiple
 	 * different ciphertexts.
 	 */
-	const void *ciphertext;
-	/** Length of ciphertext */
-	size_t ciphertext_len;
+	const struct asn1_cursor ciphertext;
 };
 
 /** A public-key signature test */
@@ -90,10 +86,14 @@ struct pubkey_sign_test {
 			.data = name ## _public,			\
 			.len = sizeof ( name ## _public ),		\
 		},							\
-		.plaintext = name ## _plaintext,			\
-		.plaintext_len = sizeof ( name ## _plaintext ),		\
-		.ciphertext = name ## _ciphertext,			\
-		.ciphertext_len = sizeof ( name ## _ciphertext ),	\
+		.plaintext = {						\
+			.data = name ## _plaintext,			\
+			.len = sizeof ( name ## _plaintext ),		\
+		},							\
+		.ciphertext = {						\
+			.data = name ## _ciphertext,			\
+			.len = sizeof ( name ## _ciphertext ),		\
+		},							\
 	}
 
 /**
