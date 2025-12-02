@@ -121,12 +121,6 @@ struct cipher_algorithm {
 struct pubkey_algorithm {
 	/** Algorithm name */
 	const char *name;
-	/** Calculate maximum output length
-	 *
-	 * @v key		Key
-	 * @ret max_len		Maximum output length
-	 */
-	size_t ( * max_len ) ( const struct asn1_cursor *key );
 	/** Encrypt
 	 *
 	 * @v key		Key
@@ -266,12 +260,6 @@ is_auth_cipher ( struct cipher_algorithm *cipher ) {
 	return cipher->authsize;
 }
 
-static inline __attribute__ (( always_inline )) size_t
-pubkey_max_len ( struct pubkey_algorithm *pubkey,
-		 const struct asn1_cursor *key ) {
-	return pubkey->max_len ( key );
-}
-
 static inline __attribute__ (( always_inline )) int
 pubkey_encrypt ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
 		 const struct asn1_cursor *plaintext,
@@ -325,7 +313,6 @@ extern void cipher_null_decrypt ( void *ctx, const void *src, void *dst,
 				  size_t len );
 extern void cipher_null_auth ( void *ctx, void *auth );
 
-extern size_t pubkey_null_max_len ( const struct asn1_cursor *key );
 extern int pubkey_null_encrypt ( const struct asn1_cursor *key,
 				 const struct asn1_cursor *plaintext,
 				 struct asn1_builder *ciphertext );

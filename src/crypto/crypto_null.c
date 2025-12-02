@@ -93,10 +93,6 @@ struct cipher_algorithm cipher_null = {
 	.auth = cipher_null_auth,
 };
 
-size_t pubkey_null_max_len ( const struct asn1_cursor *key __unused ) {
-	return 0;
-}
-
 int pubkey_null_encrypt ( const struct asn1_cursor *key __unused,
 			  const struct asn1_cursor *plaintext __unused,
 			  struct asn1_builder *ciphertext __unused ) {
@@ -125,7 +121,6 @@ int pubkey_null_verify ( const struct asn1_cursor *key __unused,
 
 struct pubkey_algorithm pubkey_null = {
 	.name = "null",
-	.max_len = pubkey_null_max_len,
 	.encrypt = pubkey_null_encrypt,
 	.decrypt = pubkey_null_decrypt,
 	.sign = pubkey_null_sign,

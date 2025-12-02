@@ -288,27 +288,6 @@ static int rsa_init ( struct rsa_context *context,
 }
 
 /**
- * Calculate RSA maximum output length
- *
- * @v key		Key
- * @ret max_len		Maximum output length
- */
-static size_t rsa_max_len ( const struct asn1_cursor *key ) {
-	struct asn1_cursor modulus;
-	struct asn1_cursor exponent;
-	int rc;
-
-	/* Parse moduli and exponents */
-	if ( ( rc = rsa_parse_mod_exp ( &modulus, &exponent, key ) ) != 0 ) {
-		/* Return a zero maximum length on error */
-		return 0;
-	}
-
-	/* Output length can never exceed modulus length */
-	return modulus.len;
-}
-
-/**
  * Perform RSA cipher operation
  *
  * @v context		RSA context
@@ -706,7 +685,6 @@ static int rsa_match ( const struct asn1_cursor *private_key,
 /** RSA public-key algorithm */
 struct pubkey_algorithm rsa_algorithm = {
 	.name		= "rsa",
-	.max_len	= rsa_max_len,
 	.encrypt	= rsa_encrypt,
 	.decrypt	= rsa_decrypt,
 	.sign		= rsa_sign,
