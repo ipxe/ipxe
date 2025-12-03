@@ -53,6 +53,10 @@ void pubkey_okx ( struct pubkey_test *test, const char *file,
 	struct asn1_builder plaintext;
 	struct asn1_builder ciphertext;
 
+	/* Test key matching */
+	okx ( pubkey_match ( pubkey, &test->private, &test->public ) == 0,
+	      file, line );
+
 	/* Test decrypting with private key to obtain known plaintext */
 	plaintext.data = NULL;
 	plaintext.len = 0;
@@ -108,6 +112,10 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 	uint8_t digestout[digest->digestsize];
 	struct asn1_builder signature = { NULL, 0 };
 	uint8_t *bad;
+
+	/* Test key matching */
+	okx ( pubkey_match ( pubkey, &test->private, &test->public ) == 0,
+	      file, line );
 
 	/* Construct digest over plaintext */
 	digest_init ( digest, digestctx );
