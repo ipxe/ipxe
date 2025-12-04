@@ -282,7 +282,7 @@ static void http_close ( struct http_transaction *http, int rc ) {
 	process_del ( &http->process );
 
 	/* Stop timer */
-	stop_timer ( &http->timer );
+	stop_timer ( &http->retry );
 
 	/* Close all interfaces */
 	intfs_shutdown ( rc, &http->conn, &http->transfer, &http->content,
@@ -332,14 +332,15 @@ static void http_reopen ( struct http_transaction *http ) {
 }
 
 /**
- * Handle retry timer expiry
+ * Handle connection retry timer expiry
  *
- * @v timer		Retry timer
+ * @v retry		Retry timer
  * @v over		Failure indicator
  */
-static void http_expired ( struct retry_timer *timer, int over __unused ) {
+static void http_retry_expired ( struct retry_timer *retry,
+				 int over __unused ) {
 	struct http_transaction *http =
-		container_of ( timer, struct http_transaction, timer );
+		container_of ( retry, struct http_transaction, retry );
 
 	/* Reopen connection */
 	http_reopen ( http );
@@ -649,7 +650,7 @@ int http_open ( struct interface *xfer, struct http_method *method,
 	intf_init ( &http->conn, &http_conn_desc, &http->refcnt );
 	intf_plug_plug ( &http->transfer, &http->content );
 	process_init ( &http->process, &http_process_desc, &http->refcnt );
-	timer_init ( &http->timer, http_expired, &http->refcnt );
+	timer_init ( &http->retry, http_retry_expired, &http->refcnt );
 	http->uri = uri_get ( uri );
 	http->request.method = method;
 	http->request.uri = request_uri_string;
@@ -809,7 +810,7 @@ static int http_transfer_complete ( struct http_transaction *http ) {
 	/* Start timer to initiate retry */
 	DBGC2 ( http, "HTTP %p retrying after %d seconds\n",
 		http, http->response.retry_after );
-	start_timer_fixed ( &http->timer,
+	start_timer_fixed ( &http->retry,
 			    ( http->response.retry_after * TICKS_PER_SEC ) );
 	return 0;
 }
