@@ -427,6 +427,8 @@ struct http_transaction {
 	struct process process;
 	/** Reconnection timer */
 	struct retry_timer retry;
+	/** Idle connection watchdog timer */
+	struct retry_timer watchdog;
 
 	/** Request URI */
 	struct uri *uri;
