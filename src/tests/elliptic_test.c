@@ -46,8 +46,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @v file		Test code file
  * @v line		Test code line
  */
-void elliptic_okx ( struct elliptic_test *test, const char *file,
-		    unsigned int line ) {
+void elliptic_multiply_okx ( struct elliptic_multiply_test *test,
+			     const char *file, unsigned int line ) {
 	struct elliptic_curve *curve = test->curve;
 	size_t pointsize = curve->pointsize;
 	size_t keysize = curve->keysize;

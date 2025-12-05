@@ -8,7 +8,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/test.h>
 
 /** An elliptic curve point multiplication test */
-struct elliptic_test {
+struct elliptic_multiply_test {
 	/** Elliptic curve */
 	struct elliptic_curve *curve;
 	/** Base point */
@@ -50,11 +50,11 @@ struct elliptic_test {
  * @v EXPECTED		Expected result point
  * @ret test		Elliptic curve point multiplication test
  */
-#define ELLIPTIC_TEST( name, CURVE, BASE, SCALAR, EXPECTED )		\
+#define ELLIPTIC_MULTIPLY_TEST( name, CURVE, BASE, SCALAR, EXPECTED )	\
 	static const uint8_t name ## _base[] = BASE;			\
 	static const uint8_t name ## _scalar[] = SCALAR;		\
 	static const uint8_t name ## _expected[] = EXPECTED;		\
-	static struct elliptic_test name = {				\
+	static struct elliptic_multiply_test name = {			\
 		.curve = CURVE,						\
 		.base = name ## _base,					\
 		.base_len = sizeof ( name ## _base ),			\
@@ -64,14 +64,15 @@ struct elliptic_test {
 		.expected_len = sizeof ( name ## _expected ),		\
 	};
 
-extern void elliptic_okx ( struct elliptic_test *test, const char *file,
-			   unsigned int line );
+extern void elliptic_multiply_okx ( struct elliptic_multiply_test *test,
+				    const char *file, unsigned int line );
 
 /**
  * Report an elliptic curve point multiplication test result
  *
  * @v test		Elliptic curve point multiplication test
  */
-#define elliptic_ok( test ) elliptic_okx ( test, __FILE__, __LINE__ )
+#define elliptic_multiply_ok( test ) \
+	elliptic_multiply_okx ( test, __FILE__, __LINE__ )
 
 #endif /* _ELLIPTIC_TEST_H */
