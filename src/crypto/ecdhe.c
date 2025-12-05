@@ -55,7 +55,7 @@ int ecdhe_key ( struct elliptic_curve *curve, const void *partner,
 	}
 
 	/* Construct public key */
-	if ( ( rc = elliptic_multiply ( curve, NULL, private,
+	if ( ( rc = elliptic_multiply ( curve, curve->base, private,
 					public ) ) != 0 ) {
 		DBGC ( curve, "CURVE %s could not generate public key: %s\n",
 		       curve->name, strerror ( rc ) );

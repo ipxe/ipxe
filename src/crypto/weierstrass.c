@@ -762,7 +762,7 @@ static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
  * Multiply curve point by scalar
  *
  * @v curve		Weierstrass curve
- * @v base		Base point (or NULL to use generator)
+ * @v base		Base point
  * @v scalar		Scalar multiple
  * @v result		Result point to fill in
  * @ret rc		Return status code
@@ -805,10 +805,6 @@ int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
 	 */
 	if ( ! prime2->element[0] )
 		weierstrass_init ( curve );
-
-	/* Use generator if applicable */
-	if ( ! base )
-		base = curve->base;
 
 	/* Convert input to projective coordinates in Montgomery form */
 	DBGC ( curve, "WEIERSTRASS %s base (", curve->name );

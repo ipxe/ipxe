@@ -52,6 +52,7 @@ void elliptic_okx ( struct elliptic_test *test, const char *file,
 	size_t pointsize = curve->pointsize;
 	size_t keysize = curve->keysize;
 	uint8_t actual[pointsize];
+	const void *base;
 	int rc;
 
 	/* Sanity checks */
@@ -62,8 +63,8 @@ void elliptic_okx ( struct elliptic_test *test, const char *file,
 	      file, line );
 
 	/* Perform point multiplication */
-	rc = elliptic_multiply ( curve, ( test->base_len ? test->base : NULL ),
-				 test->scalar, actual );
+	base = ( test->base_len ? test->base : curve->base );
+	rc = elliptic_multiply ( curve, base, test->scalar, actual );
 	if ( test->expected_len ) {
 		okx ( rc == 0, file, line );
 	} else {

@@ -822,17 +822,13 @@ int x25519_key ( const struct x25519_value *base,
 /**
  * Multiply scalar by curve point
  *
- * @v base		Base point (or NULL to use generator)
+ * @v base		Base point
  * @v scalar		Scalar multiple
  * @v result		Result point to fill in
  * @ret rc		Return status code
  */
 static int x25519_curve_multiply ( const void *base, const void *scalar,
 				   void *result ) {
-
-	/* Use base point if applicable */
-	if ( ! base )
-		base = &x25519_generator;
 
 	return x25519_key ( base, scalar, result );
 }
@@ -842,5 +838,6 @@ struct elliptic_curve x25519_curve = {
 	.name = "x25519",
 	.pointsize = sizeof ( struct x25519_value ),
 	.keysize = sizeof ( struct x25519_value ),
+	.base = x25519_generator.raw,
 	.multiply = x25519_curve_multiply,
 };

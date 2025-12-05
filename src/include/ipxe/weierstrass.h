@@ -160,6 +160,7 @@ extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 		.name = #_name,						\
 		.pointsize = ( WEIERSTRASS_AXES * (_len) ),		\
 		.keysize = (_len),					\
+		.base = (_base),					\
 		.multiply = _name ## _multiply,				\
 	}
 
