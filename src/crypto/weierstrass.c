@@ -858,5 +858,9 @@ int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
 	}
 	DBGC ( curve, ")\n" );
 
+	/* Verify result is not the point at infinity */
+	if ( bigint_is_zero ( &temp.multiple.z ) )
+		return -EINVAL;
+
 	return 0;
 }
