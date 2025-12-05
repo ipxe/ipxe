@@ -203,6 +203,9 @@ ELLIPTIC_MULTIPLY_TEST ( invalid_one, &p384_curve,
  */
 static void p384_test_exec ( void ) {
 
+	/* Curve sanity test */
+	elliptic_curve_ok ( &p384_curve );
+
 	/* Tests from http://point-at-infinity.org/ecc/nisttv */
 	elliptic_multiply_ok ( &poi_1 );
 	elliptic_multiply_ok ( &poi_2 );

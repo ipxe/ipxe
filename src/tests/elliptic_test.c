@@ -35,9 +35,52 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <ipxe/bigint.h>
 #include <ipxe/crypto.h>
 #include <ipxe/test.h>
 #include "elliptic_test.h"
+
+/**
+ * Report elliptic curve sanity test result
+ *
+ * @v curve		Elliptic curve
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+void elliptic_curve_okx ( struct elliptic_curve *curve, const char *file,
+			  unsigned int line ) {
+	static const uint8_t one[] = { 1 };
+	size_t pointsize = curve->pointsize;
+	size_t keysize = curve->keysize;
+	uint8_t point[pointsize];
+	uint8_t scalar[keysize];
+	struct {
+		bigint_t ( bigint_required_size ( keysize ) ) scalar;
+		bigint_t ( bigint_required_size ( keysize ) ) one;
+	} temp;
+
+	/* Check that curve has the required properties */
+	okx ( curve->base != NULL, file, line );
+	okx ( curve->order != NULL, file, line );
+
+	/* Test multiplying base point by group order.  Result should
+	 * be the point at infinity, which should not be representable
+	 * as a point in affine coordinates (and so should fail).
+	 */
+	okx ( elliptic_multiply ( curve, curve->base, curve->order,
+				  point ) != 0, file, line );
+
+	/* Test multiplying base point by group order plus one, to get
+	 * back to the base point.
+	 */
+	bigint_init ( &temp.scalar, curve->order, keysize );
+	bigint_init ( &temp.one, one, sizeof ( one ) );
+	bigint_add ( &temp.one, &temp.scalar );
+	bigint_done ( &temp.scalar, scalar, sizeof ( scalar ) );
+	okx ( elliptic_multiply ( curve, curve->base, scalar, point ) == 0,
+	      file, line );
+	okx ( memcmp ( point, curve->base, pointsize ) == 0, file, line );
+}
 
 /**
  * Report elliptic curve point multiplication test result

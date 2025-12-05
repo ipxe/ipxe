@@ -128,7 +128,8 @@ extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 				  void *result );
 
 /** Define a Weierstrass curve */
-#define WEIERSTRASS_CURVE( _name, _curve, _len, _prime, _a, _b, _base )	\
+#define WEIERSTRASS_CURVE( _name, _curve, _len, _prime, _a, _b, _base,	\
+			   _order )					\
 	static bigint_t ( weierstrass_size(_len) )			\
 		_name ## _cache[WEIERSTRASS_NUM_CACHED];		\
 	static struct weierstrass_curve _name ## _weierstrass = {	\
@@ -161,6 +162,7 @@ extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 		.pointsize = ( WEIERSTRASS_AXES * (_len) ),		\
 		.keysize = (_len),					\
 		.base = (_base),					\
+		.order = (_order),					\
 		.multiply = _name ## _multiply,				\
 	}
 

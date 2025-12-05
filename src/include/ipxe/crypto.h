@@ -183,6 +183,8 @@ struct elliptic_curve {
 	size_t keysize;
 	/** Generator base point */
 	const void *base;
+	/** Order of the generator (if prime) */
+	const void *order;
 	/** Multiply scalar by curve point
 	 *
 	 * @v base		Base point

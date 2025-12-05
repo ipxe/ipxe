@@ -64,8 +64,18 @@ struct elliptic_multiply_test {
 		.expected_len = sizeof ( name ## _expected ),		\
 	};
 
+extern void elliptic_curve_okx ( struct elliptic_curve *curve,
+				 const char *file, unsigned int line );
 extern void elliptic_multiply_okx ( struct elliptic_multiply_test *test,
 				    const char *file, unsigned int line );
+
+/**
+ * Report an elliptic curve sanity test result
+ *
+ * @v curve		Elliptic curve
+ */
+#define elliptic_curve_ok( curve ) \
+	elliptic_curve_okx ( curve, __FILE__, __LINE__ )
 
 /**
  * Report an elliptic curve point multiplication test result
