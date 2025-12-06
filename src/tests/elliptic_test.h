@@ -25,6 +25,24 @@ struct elliptic_multiply_test {
 	size_t expected_len;
 };
 
+/** An elliptic curve point addition test */
+struct elliptic_add_test {
+	/** Elliptic curve */
+	struct elliptic_curve *curve;
+	/** Addend point */
+	const void *addend;
+	/** Length of addend point */
+	size_t addend_len;
+	/** Augend point */
+	const void *augend;
+	/** Length of augend point */
+	size_t augend_len;
+	/** Expected result point */
+	const void *expected;
+	/** Length of expected result point (or 0 to expect failure) */
+	size_t expected_len;
+};
+
 /** Define inline base point */
 #define BASE(...) { __VA_ARGS__ }
 
@@ -33,6 +51,12 @@ struct elliptic_multiply_test {
 
 /** Define inline scalar multiple */
 #define SCALAR(...) { __VA_ARGS__ }
+
+/** Define inline addend point */
+#define ADDEND(...) { __VA_ARGS__ }
+
+/** Define inline augend point */
+#define AUGEND(...) { __VA_ARGS__ }
 
 /** Define inline expected result point */
 #define EXPECTED(...) { __VA_ARGS__ }
@@ -64,10 +88,36 @@ struct elliptic_multiply_test {
 		.expected_len = sizeof ( name ## _expected ),		\
 	};
 
+/**
+ * Define an elliptic curve point addition test
+ *
+ * @v name		Test name
+ * @v CURVE		Elliptic curve
+ * @v ADDEND		Addend point
+ * @v AUGEND		Augend point
+ * @v EXPECTED		Expected result point
+ * @ret test		Elliptic curve point multiplication test
+ */
+#define ELLIPTIC_ADD_TEST( name, CURVE, ADDEND, AUGEND, EXPECTED )	\
+	static const uint8_t name ## _addend[] = ADDEND;		\
+	static const uint8_t name ## _augend[] = AUGEND;		\
+	static const uint8_t name ## _expected[] = EXPECTED;		\
+	static struct elliptic_add_test name = {			\
+		.curve = CURVE,						\
+		.addend = name ## _addend,				\
+		.addend_len = sizeof ( name ## _addend ),		\
+		.augend = name ## _augend,				\
+		.augend_len = sizeof ( name ## _augend ),		\
+		.expected = name ## _expected,				\
+		.expected_len = sizeof ( name ## _expected ),		\
+	};
+
 extern void elliptic_curve_okx ( struct elliptic_curve *curve,
 				 const char *file, unsigned int line );
 extern void elliptic_multiply_okx ( struct elliptic_multiply_test *test,
 				    const char *file, unsigned int line );
+extern void elliptic_add_okx ( struct elliptic_add_test *test,
+			       const char *file, unsigned int line );
 
 /**
  * Report an elliptic curve sanity test result
@@ -84,5 +134,13 @@ extern void elliptic_multiply_okx ( struct elliptic_multiply_test *test,
  */
 #define elliptic_multiply_ok( test ) \
 	elliptic_multiply_okx ( test, __FILE__, __LINE__ )
+
+/**
+ * Report an elliptic curve point addition test result
+ *
+ * @v test		Elliptic curve point addition test
+ */
+#define elliptic_add_ok( test ) \
+	elliptic_add_okx ( test, __FILE__, __LINE__ )
 
 #endif /* _ELLIPTIC_TEST_H */

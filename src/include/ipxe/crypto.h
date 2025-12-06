@@ -194,6 +194,14 @@ struct elliptic_curve {
 	 */
 	int ( * multiply ) ( const void *base, const void *scalar,
 			     void *result );
+	/** Add curve points (as a one-off operation)
+	 *
+	 * @v addend		Curve point to add
+	 * @v augend		Curve point to add
+	 * @v result		Curve point to hold result
+	 * @ret rc		Return status code
+	 */
+	int ( * add ) ( const void *addend, const void *augend, void *result );
 };
 
 static inline __attribute__ (( always_inline )) void
@@ -303,6 +311,12 @@ static inline __attribute__ (( always_inline )) int
 elliptic_multiply ( struct elliptic_curve *curve,
 		    const void *base, const void *scalar, void *result ) {
 	return curve->multiply ( base, scalar, result );
+}
+
+static inline __attribute__ (( always_inline )) int
+elliptic_add ( struct elliptic_curve *curve, const void *addend,
+	       const void *augend, void *result ) {
+	return curve->add ( addend, augend, result );
 }
 
 extern void digest_null_init ( void *ctx );

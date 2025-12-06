@@ -118,3 +118,36 @@ void elliptic_multiply_okx ( struct elliptic_multiply_test *test,
 	okx ( memcmp ( actual, test->expected, test->expected_len ) == 0,
 	      file, line );
 }
+
+/**
+ * Report elliptic curve point addition test result
+ *
+ * @v test		Elliptic curve point addition test
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+void elliptic_add_okx ( struct elliptic_add_test *test,
+			const char *file, unsigned int line ) {
+	struct elliptic_curve *curve = test->curve;
+	size_t pointsize = curve->pointsize;
+	uint8_t actual[pointsize];
+	int rc;
+
+	/* Sanity checks */
+	okx ( test->addend_len == pointsize, file, line );
+	okx ( test->augend_len == pointsize, file, line );
+	okx ( ( test->expected_len == pointsize ) || ( ! test->expected_len ),
+	      file, line );
+
+	/* Perform point addition */
+	rc = elliptic_add ( curve, test->addend, test->augend, actual );
+	if ( test->expected_len ) {
+		okx ( rc == 0, file, line );
+	} else {
+		okx ( rc != 0, file, line );
+	}
+
+	/* Check expected result */
+	okx ( memcmp ( actual, test->expected, test->expected_len ) == 0,
+	      file, line );
+}

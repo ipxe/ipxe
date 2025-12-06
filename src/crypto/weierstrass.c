@@ -953,3 +953,44 @@ int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
 
 	return 0;
 }
+
+/**
+ * Add curve points (as a one-off operation)
+ *
+ * @v curve		Weierstrass curve
+ * @v addend		Curve point to add
+ * @v augend		Curve point to add
+ * @v result		Curve point to hold result
+ * @ret rc		Return status code
+ */
+int weierstrass_add_once ( struct weierstrass_curve *curve, const void *addend,
+			   const void *augend, void *result ) {
+	unsigned int size = curve->size;
+	struct {
+		weierstrass_t ( size ) addend;
+		weierstrass_t ( size ) augend;
+		weierstrass_t ( size ) result;
+	} temp;
+	int rc;
+
+	/* Convert inputs to projective coordinates in Montgomery form */
+	if ( ( rc = weierstrass_init ( curve, &temp.addend, &temp.result,
+				       addend ) ) != 0 ) {
+		return rc;
+	}
+	if ( ( rc = weierstrass_init ( curve, &temp.augend, &temp.result,
+				       augend ) ) != 0 ) {
+		return rc;
+	}
+
+	/* Add curve points */
+	weierstrass_add ( curve, &temp.augend, &temp.addend, &temp.result );
+
+	/* Convert result back to affine co-ordinates */
+	if ( ( rc = weierstrass_done ( curve, &temp.result, &temp.addend,
+				       result ) ) != 0 ) {
+		return rc;
+	}
+
+	return 0;
+}
