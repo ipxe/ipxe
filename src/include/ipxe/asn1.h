@@ -488,6 +488,7 @@ extern int asn1_skip_any ( struct asn1_cursor *cursor );
 extern int asn1_shrink_any ( struct asn1_cursor *cursor );
 extern int asn1_enter_bits ( struct asn1_cursor *cursor,
 			     unsigned int *unused );
+extern int asn1_enter_unsigned ( struct asn1_cursor *cursor );
 extern int asn1_boolean ( const struct asn1_cursor *cursor );
 extern int asn1_integer ( const struct asn1_cursor *cursor, int *value );
 extern int asn1_compare ( const struct asn1_cursor *cursor1,

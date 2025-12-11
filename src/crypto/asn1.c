@@ -373,6 +373,29 @@ int asn1_enter_bits ( struct asn1_cursor *cursor, unsigned int *unused ) {
 }
 
 /**
+ * Enter ASN.1 unsigned integer
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret rc		Return status code
+ */
+int asn1_enter_unsigned ( struct asn1_cursor *cursor ) {
+	int rc;
+
+	/* Enter integer */
+	if ( ( rc = asn1_enter ( cursor, ASN1_INTEGER ) ) != 0 )
+		return rc;
+
+	/* Skip initial positive sign byte if applicable */
+	if ( ( cursor->len > 1 ) &&
+	     ( *( ( uint8_t * ) cursor->data ) == 0x00 ) ) {
+		cursor->data++;
+		cursor->len--;
+	}
+
+	return 0;
+}
+
+/**
  * Parse value of ASN.1 boolean
  *
  * @v cursor		ASN.1 object cursor

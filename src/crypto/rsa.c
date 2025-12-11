@@ -138,34 +138,6 @@ static int rsa_alloc ( struct rsa_context *context, size_t modulus_len,
 }
 
 /**
- * Parse RSA integer
- *
- * @v integer		Integer to fill in
- * @v raw		ASN.1 cursor
- * @ret rc		Return status code
- */
-static int rsa_parse_integer ( struct asn1_cursor *integer,
-			       const struct asn1_cursor *raw ) {
-
-	/* Enter integer */
-	memcpy ( integer, raw, sizeof ( *integer ) );
-	asn1_enter ( integer, ASN1_INTEGER );
-
-	/* Skip initial sign byte if applicable */
-	if ( ( integer->len > 1 ) &&
-	     ( *( ( uint8_t * ) integer->data ) == 0x00 ) ) {
-		integer->data++;
-		integer->len--;
-	}
-
-	/* Fail if cursor or integer are invalid */
-	if ( ! integer->len )
-		return -EINVAL;
-
-	return 0;
-}
-
-/**
  * Parse RSA modulus and exponent
  *
  * @v modulus		Modulus to fill in
@@ -226,7 +198,8 @@ static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
 	}
 
 	/* Extract modulus */
-	if ( ( rc = rsa_parse_integer ( modulus, &cursor ) ) != 0 )
+	memcpy ( modulus, &cursor, sizeof ( *modulus ) );
+	if ( ( rc = asn1_enter_unsigned ( modulus ) ) != 0 )
 		return rc;
 	asn1_skip_any ( &cursor );
 
@@ -235,7 +208,8 @@ static int rsa_parse_mod_exp ( struct asn1_cursor *modulus,
 		asn1_skip ( &cursor, ASN1_INTEGER );
 
 	/* Extract publicExponent/privateExponent */
-	if ( ( rc = rsa_parse_integer ( exponent, &cursor ) ) != 0 )
+	memcpy ( exponent, &cursor, sizeof ( *exponent ) );
+	if ( ( rc = asn1_enter_unsigned ( exponent ) ) != 0 )
 		return rc;
 
 	return 0;
