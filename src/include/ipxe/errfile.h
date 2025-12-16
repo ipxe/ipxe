@@ -443,6 +443,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_usb_settings	      ( ERRFILE_OTHER | 0x00650000 )
 #define ERRFILE_weierstrass	      ( ERRFILE_OTHER | 0x00660000 )
 #define ERRFILE_efi_cacert	      ( ERRFILE_OTHER | 0x00670000 )
+#define ERRFILE_tpm		      ( ERRFILE_OTHER | 0x00680000 )
 
 /** @} */
 
