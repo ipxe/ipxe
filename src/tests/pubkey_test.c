@@ -108,9 +108,11 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 		       unsigned int line ) {
 	struct pubkey_algorithm *pubkey = test->pubkey;
 	struct digest_algorithm *digest = test->digest;
-	uint8_t digestctx[digest->ctxsize ];
+	uint8_t digestctx[digest->ctxsize];
 	uint8_t digestout[digest->digestsize];
-	struct asn1_builder signature = { NULL, 0 };
+	uint8_t signature[test->signature.len];
+	struct asn1_cursor cursor = { signature, sizeof ( signature ) };
+	struct asn1_builder builder = { NULL, 0 };
 	uint8_t *bad;
 
 	/* Test key matching */
@@ -123,25 +125,27 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 			test->plaintext_len );
 	digest_final ( digest, digestctx, digestout );
 
-	/* Test signing using private key */
-	okx ( pubkey_sign ( pubkey, &test->private, digest, digestout,
-			    &signature ) == 0, file, line );
-	okx ( signature.len != 0, file, line );
-	okx ( asn1_compare ( asn1_built ( &signature ),
-			     &test->signature ) == 0, file, line );
-
 	/* Test verification using public key */
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
 			      &test->signature ) == 0, file, line );
 
 	/* Test verification failure of modified signature */
-	bad = ( signature.data + ( test->signature.len / 2 ) );
-	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
-			      asn1_built ( &signature ) ) == 0, file, line );
+	memcpy ( signature, test->signature.data, sizeof ( signature ) );
+	bad = ( signature + ( sizeof ( signature ) / 2 ) );
 	*bad ^= 0x40;
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
-			      asn1_built ( &signature ) ) != 0, file, line );
+			      &cursor ) != 0, file, line );
+	*bad ^= 0x40;
+	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
+			      &cursor ) == 0, file, line );
+
+	/* Test signing using private key */
+	okx ( pubkey_sign ( pubkey, &test->private, digest, digestout,
+			    &builder ) == 0, file, line );
+	okx ( builder.len != 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &builder ), &test->signature ) == 0,
+	      file, line );
 
 	/* Free signature */
-	free ( signature.data );
+	free ( builder.data );
 }
