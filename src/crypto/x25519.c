@@ -784,16 +784,29 @@ static void x25519_reverse ( struct x25519_value *value ) {
 }
 
 /**
+ * Check if X25519 value is zero
+ *
+ * @v value		Value to check
+ * @ret is_zero		Value is zero
+ */
+int x25519_is_zero ( const struct x25519_value *value ) {
+	x25519_t point;
+
+	/* Check if value is zero */
+	bigint_init ( &point, value->raw, sizeof ( value->raw ) );
+	return bigint_is_zero ( &point );
+}
+
+/**
  * Calculate X25519 key
  *
  * @v base		Base point
  * @v scalar		Scalar multiple
  * @v result		Point to hold result (may overlap base point)
- * @ret rc		Return status code
  */
-int x25519_key ( const struct x25519_value *base,
-		 const struct x25519_value *scalar,
-		 struct x25519_value *result ) {
+void x25519_key ( const struct x25519_value *base,
+		  const struct x25519_value *scalar,
+		  struct x25519_value *result ) {
 	struct x25519_value *tmp = result;
 	union x25519_quad257 point;
 
@@ -814,9 +827,18 @@ int x25519_key ( const struct x25519_value *base,
 	/* Reverse result */
 	bigint_done ( &point.value, result->raw, sizeof ( result->raw ) );
 	x25519_reverse ( result );
+}
 
-	/* Fail if result was all zeros (as required by RFC8422) */
-	return ( bigint_is_zero ( &point.value ) ? -EPERM : 0 );
+/**
+ * Check if this is the point at infinity
+ *
+ * @v point		Curve point
+ * @ret is_infinity	This is the point at infinity
+ */
+static int x25519_curve_is_infinity ( const void *point ) {
+
+	/* We use all zeroes for the point at infinity (as per RFC8422) */
+	return x25519_is_zero ( point );
 }
 
 /**
@@ -830,7 +852,8 @@ int x25519_key ( const struct x25519_value *base,
 static int x25519_curve_multiply ( const void *base, const void *scalar,
 				   void *result ) {
 
-	return x25519_key ( base, scalar, result );
+	x25519_key ( base, scalar, result );
+	return 0;
 }
 
 /**
@@ -854,6 +877,7 @@ struct elliptic_curve x25519_curve = {
 	.pointsize = sizeof ( struct x25519_value ),
 	.keysize = sizeof ( struct x25519_value ),
 	.base = x25519_generator.raw,
+	.is_infinity = x25519_curve_is_infinity,
 	.multiply = x25519_curve_multiply,
 	.add = x25519_curve_add,
 };

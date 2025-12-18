@@ -62,13 +62,14 @@ void elliptic_curve_okx ( struct elliptic_curve *curve, const char *file,
 	/* Check that curve has the required properties */
 	okx ( curve->base != NULL, file, line );
 	okx ( curve->order != NULL, file, line );
+	okx ( ( ! elliptic_is_infinity ( curve, curve->base ) ), file, line );
 
 	/* Test multiplying base point by group order.  Result should
-	 * be the point at infinity, which should not be representable
-	 * as a point in affine coordinates (and so should fail).
+	 * be the point at infinity.
 	 */
 	okx ( elliptic_multiply ( curve, curve->base, curve->order,
-				  point ) != 0, file, line );
+				  point ) == 0, file, line );
+	okx ( elliptic_is_infinity ( curve, point ), file, line );
 
 	/* Test multiplying base point by group order plus one, to get
 	 * back to the base point.

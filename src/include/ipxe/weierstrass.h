@@ -62,6 +62,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 			bigint_t ( size ) y;				\
 			bigint_t ( size ) z;				\
 		};							\
+		bigint_t ( size * 2 ) xy;				\
 		bigint_t ( size * 3 ) all;				\
 	}
 
@@ -123,6 +124,8 @@ struct weierstrass_curve {
 	};
 };
 
+extern int weierstrass_is_infinity ( struct weierstrass_curve *curve,
+				     const void *point );
 extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 				  const void *base, const void *scalar,
 				  void *result );
@@ -154,6 +157,10 @@ extern int weierstrass_add_once ( struct weierstrass_curve *curve,
 		.a = (_name ## _cache)[6].element,			\
 		.b3 = (_name ## _cache)[7].element,			\
 	};								\
+	static int _name ## _is_infinity ( const void *point) {		\
+		return weierstrass_is_infinity ( &_name ## _weierstrass,\
+						 point );		\
+	}								\
 	static int _name ## _multiply ( const void *base,		\
 					const void *scalar,		\
 					void *result ) {		\
@@ -171,6 +178,7 @@ extern int weierstrass_add_once ( struct weierstrass_curve *curve,
 		.keysize = (_len),					\
 		.base = (_base),					\
 		.order = (_order),					\
+		.is_infinity = _name ## _is_infinity,			\
 		.multiply = _name ## _multiply,				\
 		.add = _name ## _add,					\
 	}

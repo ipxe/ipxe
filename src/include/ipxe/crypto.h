@@ -185,6 +185,16 @@ struct elliptic_curve {
 	const void *base;
 	/** Order of the generator (if prime) */
 	const void *order;
+	/** Check if this is the point at infinity
+	 *
+	 * @v point		Curve point
+	 * @ret is_infinity	This is the point at infinity
+	 *
+	 * The point at infinity cannot be represented in affine
+	 * coordinates.  Each curve must choose a representation of
+	 * the point at infinity (e.g. all zeroes).
+	 */
+	int ( * is_infinity ) ( const void *point );
 	/** Multiply scalar by curve point
 	 *
 	 * @v base		Base point
@@ -305,6 +315,11 @@ pubkey_match ( struct pubkey_algorithm *pubkey,
 	       const struct asn1_cursor *private_key,
 	       const struct asn1_cursor *public_key ) {
 	return pubkey->match ( private_key, public_key );
+}
+
+static inline __attribute__ (( always_inline )) int
+elliptic_is_infinity ( struct elliptic_curve *curve, const void *point ) {
+	return curve->is_infinity ( point );
 }
 
 static inline __attribute__ (( always_inline )) int
