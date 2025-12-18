@@ -146,6 +146,10 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 	okx ( asn1_compare ( asn1_built ( &builder ), &test->signature ) == 0,
 	      file, line );
 
+	/* Test verification of constructed signature */
+	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
+			      asn1_built ( &builder ) ) == 0, file, line );
+
 	/* Free signature */
 	free ( builder.data );
 }
