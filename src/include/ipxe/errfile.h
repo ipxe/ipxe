@@ -444,6 +444,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_weierstrass	      ( ERRFILE_OTHER | 0x00660000 )
 #define ERRFILE_efi_cacert	      ( ERRFILE_OTHER | 0x00670000 )
 #define ERRFILE_ecdhe		      ( ERRFILE_OTHER | 0x00680000 )
+#define ERRFILE_ecdsa		      ( ERRFILE_OTHER | 0x00690000 )
 
 /** @} */
 
