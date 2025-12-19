@@ -63,6 +63,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EINFO_EINVAL_SIGNATURE \
 	__einfo_uniqify ( EINFO_EINVAL, 0x05, "Invalid signature" )
 
+/** "ecPublicKey" object identifier */
+static uint8_t oid_ecpublickey[] = { ASN1_OID_ECPUBLICKEY };
+
+/** Generic elliptic curve container algorithm
+ *
+ * The actual curve to be used is identified via the algorithm
+ * parameters, rather than the top-level OID.
+ */
+struct asn1_algorithm ecpubkey_algorithm __asn1_algorithm = {
+	.name = "ecPublicKey",
+	.oid = ASN1_CURSOR ( oid_ecpublickey ),
+	.pubkey = &ecdsa_algorithm,
+};
+
 /** An ECDSA key */
 struct ecdsa_key {
 	/** Elliptic curve */
@@ -197,7 +211,8 @@ static int ecdsa_parse_key ( struct ecdsa_key *key,
 	asn1_enter_bits ( &cursor, NULL );
 
 	/* Identify curve */
-	if ( ( rc = asn1_curve_algorithm ( &curve, &algorithm ) ) != 0 ) {
+	if ( ( rc = asn1_curve_algorithm ( &curve, &ecpubkey_algorithm,
+					   &algorithm ) ) != 0 ) {
 		DBGC ( key, "ECDSA %p unknown curve: %s\n",
 		       key, strerror ( rc ) );
 		DBGC_HDA ( key, 0, raw->data, raw->len );

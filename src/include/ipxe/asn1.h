@@ -506,6 +506,7 @@ extern int asn1_cipher_algorithm ( const struct asn1_cursor *cursor,
 extern int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 				      struct asn1_algorithm **algorithm );
 extern int asn1_curve_algorithm ( const struct asn1_cursor *cursor,
+				  struct asn1_algorithm *wrapper,
 				  struct asn1_algorithm **algorithm );
 extern int asn1_check_algorithm ( const struct asn1_cursor *cursor,
 				  struct asn1_algorithm *expected,
