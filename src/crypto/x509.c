@@ -232,7 +232,7 @@ static int x509_parse_serial ( struct x509_certificate *cert,
 		       cert, strerror ( rc ) );
 		return rc;
 	}
-	DBGC2 ( cert, "X509 %p issuer is:\n", cert );
+	DBGC2 ( cert, "X509 %p serial is:\n", cert );
 	DBGC2_HDA ( cert, 0, serial->raw.data, serial->raw.len );
 
 	return 0;
