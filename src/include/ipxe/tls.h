@@ -113,6 +113,7 @@ struct tls_header {
 
 /* TLS signature algorithm identifiers */
 #define TLS_RSA_ALGORITHM 1
+#define TLS_ECDSA_ALGORITHM 3
 
 /* TLS server name extension */
 #define TLS_SERVER_NAME 0
