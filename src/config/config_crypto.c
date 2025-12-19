@@ -235,3 +235,33 @@ REQUIRE_OBJECT ( ecdsa_sha384 );
 #if defined ( CRYPTO_PUBKEY_ECDSA ) && defined ( CRYPTO_DIGEST_SHA512 )
 REQUIRE_OBJECT ( ecdsa_sha512 );
 #endif
+
+/* ECDHE, ECDSA, AES-CBC, and SHA-1 */
+#if defined ( CRYPTO_EXCHANGE_ECDHE ) && defined ( CRYPTO_PUBKEY_ECDSA ) && \
+    defined ( CRYPTO_CIPHER_AES_CBC ) && defined ( CRYPTO_DIGEST_SHA1 )
+REQUIRE_OBJECT ( ecdhe_ecdsa_aes_cbc_sha1 );
+#endif
+
+/* ECDHE, ECDSA, AES-CBC, and SHA-256 */
+#if defined ( CRYPTO_EXCHANGE_ECDHE ) && defined ( CRYPTO_PUBKEY_ECDSA ) && \
+    defined ( CRYPTO_CIPHER_AES_CBC ) && defined ( CRYPTO_DIGEST_SHA256 )
+REQUIRE_OBJECT ( ecdhe_ecdsa_aes_cbc_sha256 );
+#endif
+
+/* ECDHE, ECDSA, AES-CBC, and SHA-384 */
+#if defined ( CRYPTO_EXCHANGE_ECDHE ) && defined ( CRYPTO_PUBKEY_ECDSA ) && \
+    defined ( CRYPTO_CIPHER_AES_CBC ) && defined ( CRYPTO_DIGEST_SHA384 )
+REQUIRE_OBJECT ( ecdhe_ecdsa_aes_cbc_sha384 );
+#endif
+
+/* ECDHE, ECDSA, AES-GCM, and SHA-256 */
+#if defined ( CRYPTO_EXCHANGE_ECDHE ) && defined ( CRYPTO_PUBKEY_ECDSA ) && \
+    defined ( CRYPTO_CIPHER_AES_GCM ) && defined ( CRYPTO_DIGEST_SHA256 )
+REQUIRE_OBJECT ( ecdhe_ecdsa_aes_gcm_sha256 );
+#endif
+
+/* ECDHE, ECDSA, AES-GCM, and SHA-384 */
+#if defined ( CRYPTO_EXCHANGE_ECDHE ) && defined ( CRYPTO_PUBKEY_ECDSA ) && \
+    defined ( CRYPTO_CIPHER_AES_GCM ) && defined ( CRYPTO_DIGEST_SHA384 )
+REQUIRE_OBJECT ( ecdhe_ecdsa_aes_gcm_sha384 );
+#endif
