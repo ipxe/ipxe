@@ -667,8 +667,8 @@ int asn1_curve_algorithm ( const struct asn1_cursor *cursor,
 	 *
 	 * - a standalone object identifier for the curve
 	 */
-	if ( wrapper && asn1_check_algorithm ( cursor, wrapper,
-					       &curve ) != 0 ) {
+	if ( ( wrapper == NULL ) ||
+	     ( asn1_check_algorithm ( cursor, wrapper, &curve ) != 0 ) ) {
 		memcpy ( &curve, cursor, sizeof ( curve ) );
 	}
 
