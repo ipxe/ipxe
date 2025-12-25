@@ -32,33 +32,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Threshold for port I/O-mapped addresses
- *
- * On x86, port I/O instructions (inb/outb/etc) can take only an 8-bit
- * or 16-bit address (in %dx).  All I/O ports must therefore have a
- * value in the first 64kB of the address space.
- *
- * Virtual addresses below 64kB can never be MMIO addresses:
- *
- * - In the UEFI memory model and x86_64 BIOS memory model, virtual
- *   addresses below 64kB are identity-mapped to the corresponding
- *   physical address.  Since the first 64kB of address space is
- *   always RAM, no MMIO device can exist within this region.
- *
- * - In the i386 BIOS memory model, virtual addresses below 64kB cover
- *   the iPXE binary itself (which starts at address zero).  Since the
- *   size of .textdata can never realistically be below 64kB (not
- *   least since the heap alone is 512kB), and since iPXE is placed
- *   into RAM as a contiguous block, no MMIO device can exist within
- *   this region.
- *
- * We therefore know that any (virtual) address returned by ioremap()
- * must be outside the first 64kB of the address space.  We can
- * therefore use this as a threshold to determine whether a given
- * address is a port I/O address or an MMIO address.
- */
-#define PIO_THRESHOLD 0x10000
-
 /**
  * Read from I/O-mapped or memory-mapped device
  *
@@ -67,7 +40,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define X86_IOREADX( _api_func, _suffix, _type )			      \
 static _type x86_ ## _api_func ( volatile _type *io_addr ) {		      \
-	if ( ( ( intptr_t ) io_addr ) < PIO_THRESHOLD ) {		      \
+	if ( x86_pio_addr( ( intptr_t ) io_addr ) ) {			      \
 		return in ## _suffix ( io_addr );			      \
 	} else {							      \
 		return read ## _suffix ( io_addr );			      \
@@ -85,7 +58,7 @@ X86_IOREADX ( ioread32, l, uint32_t );
  */
 #define X86_IOWRITEX( _api_func, _suffix, _type )			      \
 static void x86_ ## _api_func ( _type data, volatile _type *io_addr ) {	      \
-	if ( ( ( intptr_t ) io_addr ) < PIO_THRESHOLD ) {		      \
+	if ( x86_pio_addr( ( intptr_t ) io_addr ) ) {			      \
 		out ## _suffix ( data, io_addr );			      \
 	} else {							      \
 		write ## _suffix ( data, io_addr );			      \
