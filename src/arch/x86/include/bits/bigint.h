@@ -32,10 +32,12 @@ bigint_init_raw ( uint32_t *value0, unsigned int size,
 	long discard_c;
 
 	/* Copy raw data in reverse order, padding with zeros */
-	__asm__ __volatile__ ( "\n1:\n\t"
+	__asm__ __volatile__ ( "jecxz 2f\n\t"
+			       "\n1:\n\t"
 			       "movb -1(%3,%1), %%al\n\t"
 			       "stosb\n\t"
 			       "loop 1b\n\t"
+			       "\n2:\n\t"
 			       "xorl %%eax, %%eax\n\t"
 			       "mov %4, %1\n\t"
 			       "rep stosb\n\t"
@@ -308,10 +310,12 @@ bigint_done_raw ( const uint32_t *value0, unsigned int size __unused,
 	long discard_c;
 
 	/* Copy raw data in reverse order */
-	__asm__ __volatile__ ( "\n1:\n\t"
+	__asm__ __volatile__ ( "jecxz 2f\n\t"
+			       "\n1:\n\t"
 			       "movb -1(%3,%1), %%al\n\t"
 			       "stosb\n\t"
 			       "loop 1b\n\t"
+			       "\n2:\n\t"
 			       : "=&D" ( discard_D ), "=&c" ( discard_c ),
 				 "+m" ( *out_bytes )
 			       : "r" ( value0 ), "0" ( out ), "1" ( len )

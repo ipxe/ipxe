@@ -28,8 +28,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @ret size		Number of elements
  */
 #define bigint_required_size( len )					\
-	( ( (len) + sizeof ( bigint_element_t ) - 1 ) /			\
-	  sizeof ( bigint_element_t ) )
+	( (len) ? ( ( (len) + sizeof ( bigint_element_t ) - 1 ) /	\
+		    sizeof ( bigint_element_t ) ) : 1 )
 
 /**
  * Determine number of elements in big-integer type

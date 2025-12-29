@@ -841,6 +841,7 @@ static void bigint_mod_exp_okx ( struct bigint_test *base,
  */
 static void bigint_test_exec ( void ) {
 
+	bigint_add_ok ( BIGINT(), BIGINT(), BIGINT(), 0 );
 	bigint_add_ok ( BIGINT ( 0x8a ),
 			BIGINT ( 0x43 ),
 			BIGINT ( 0xcd ), 0 );
@@ -934,6 +935,7 @@ static void bigint_test_exec ( void ) {
 				 0x9f, 0x60, 0x58, 0xff, 0xb6, 0x76, 0x45,
 				 0xe6, 0xed, 0x61, 0x8d, 0xe6, 0xc0, 0x72,
 				 0x1c, 0x07 ), 0 );
+	bigint_subtract_ok ( BIGINT(), BIGINT(), BIGINT(), 0 );
 	bigint_subtract_ok ( BIGINT ( 0x83 ),
 			     BIGINT ( 0x50 ),
 			     BIGINT ( 0xcd ), 1 );
@@ -1033,6 +1035,7 @@ static void bigint_test_exec ( void ) {
 				      0xda, 0xc8, 0x8c, 0x71, 0x86, 0x97,
 				      0x7f, 0xcb, 0x94, 0x31, 0x1d, 0xbc,
 				      0x44, 0x1a ), 0 );
+	bigint_shl_ok ( BIGINT(), BIGINT(), 0 );
 	bigint_shl_ok ( BIGINT ( 0xe0 ),
 			BIGINT ( 0xc0 ), 1 );
 	bigint_shl_ok ( BIGINT ( 0x43, 0x1d ),
@@ -1099,6 +1102,7 @@ static void bigint_test_exec ( void ) {
 				 0x49, 0x7c, 0x1e, 0xdb, 0xc7, 0x65, 0xa6,
 				 0x0e, 0xd1, 0xd2, 0x00, 0xb3, 0x41, 0xc9,
 				 0x3c, 0xbc ), 0 );
+	bigint_shr_ok ( BIGINT(), BIGINT(), 0 );
 	bigint_shr_ok ( BIGINT ( 0x8f ),
 			BIGINT ( 0x47 ), 1 );
 	bigint_shr_ok ( BIGINT ( 0xaa, 0x1d ),
@@ -1165,6 +1169,7 @@ static void bigint_test_exec ( void ) {
 				 0x46, 0xa8, 0x94, 0xb0, 0xf7, 0xa4, 0x57,
 				 0x1f, 0x72, 0x88, 0x5f, 0xed, 0x4d, 0xc9,
 				 0x59, 0xbb ), 1 );
+	bigint_is_zero_ok ( BIGINT(), 1 );
 	bigint_is_zero_ok ( BIGINT ( 0x9b ),
 			    0 );
 	bigint_is_zero_ok ( BIGINT ( 0x5a, 0x9d ),
@@ -1273,6 +1278,7 @@ static void bigint_test_exec ( void ) {
 				     0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 				     0xff, 0xff ),
 			    0 );
+	bigint_is_geq_ok ( BIGINT(), BIGINT(), 1 );
 	bigint_is_geq_ok ( BIGINT ( 0xa2 ),
 			   BIGINT ( 0x58 ),
 			   1 );
@@ -1540,6 +1546,7 @@ static void bigint_test_exec ( void ) {
 					0x83, 0xf8, 0xa2, 0x11, 0xf5, 0xd4,
 					0xcb, 0xe0 ),
 			       1013, 0 );
+	bigint_max_set_bit_ok ( BIGINT(), 0 );
 	bigint_max_set_bit_ok ( BIGINT ( 0x3a ),
 				6 );
 	bigint_max_set_bit_ok ( BIGINT ( 0x03 ),
