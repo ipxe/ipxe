@@ -29,7 +29,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <time.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <ipxe/pending.h>
@@ -3985,7 +3984,6 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.pending );
 	tls_clear_handshake ( tls );
-	tls->client.random.gmt_unix_time = time ( NULL );
 	iob_populate ( &tls->rx.iobuf, &tls->rx.header, 0,
 		       sizeof ( tls->rx.header ) );
 	INIT_LIST_HEAD ( &tls->rx.data );
