@@ -77,7 +77,7 @@ extern int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 			  struct net_protocol *net_protocol,
 			  const void *net_dest,
 			  struct neighbour_discovery *discovery,
-			  const void *net_source, const void *ll_source );
+			  const void *net_source );
 extern int neighbour_update ( struct net_device *netdev,
 			      struct net_protocol *net_protocol,
 			      const void *net_dest, const void *ll_dest );

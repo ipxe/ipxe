@@ -617,8 +617,8 @@ static int ipv6_tx ( struct io_buffer *iobuf,
 			return rc;
 		}
 	} else {
-		if ( ( rc = ndp_tx ( iobuf, netdev, next_hop, &iphdr->src,
-				     netdev->ll_addr ) ) != 0 ) {
+		if ( ( rc = ndp_tx ( iobuf, netdev, next_hop,
+				     &iphdr->src ) ) != 0 ) {
 			DBGC ( ipv6col ( &iphdr->dest ), "IPv6 could not "
 			       "transmit packet via %s: %s\n",
 			       netdev->name, strerror ( rc ) );

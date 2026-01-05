@@ -293,13 +293,12 @@ static void neighbour_expired ( struct retry_timer *timer, int fail ) {
  * @v net_protocol	Network-layer protocol
  * @v net_dest		Destination network-layer address
  * @v net_source	Source network-layer address
- * @v ll_source		Source link-layer address
  * @ret rc		Return status code
  */
 int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		   struct net_protocol *net_protocol, const void *net_dest,
 		   struct neighbour_discovery *discovery,
-		   const void *net_source, const void *ll_source ) {
+		   const void *net_source ) {
 	struct neighbour *neighbour;
 
 	/* Find or create neighbour cache entry */
@@ -316,7 +315,7 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 	 */
 	if ( neighbour_has_ll_dest ( neighbour ) ) {
 		return net_tx ( iobuf, netdev, net_protocol, neighbour->ll_dest,
-				ll_source );
+				netdev->ll_addr );
 	} else {
 		DBGC2 ( neighbour, "NEIGHBOUR %s %s %s deferring packet\n",
 			netdev->name, net_protocol->name,

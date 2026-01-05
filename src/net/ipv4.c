@@ -563,7 +563,7 @@ static int ipv4_tx ( struct io_buffer *iobuf,
 		}
 	} else {
 		if ( ( rc = arp_tx ( iobuf, netdev, &ipv4_protocol, &next_hop,
-				     &iphdr->src, netdev->ll_addr ) ) != 0 ) {
+				     &iphdr->src ) ) != 0 ) {
 			DBGC ( sin_dest->sin_addr, "IPv4 could not transmit "
 			       "packet via %s: %s\n",
 			       netdev->name, strerror ( rc ) );
