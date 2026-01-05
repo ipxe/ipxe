@@ -164,30 +164,19 @@ static void neighbour_discover ( struct neighbour *neighbour,
 }
 
 /**
- * Complete neighbour discovery
+ * Transmit deferred packets
  *
  * @v neighbour		Neighbour cache entry
- * @v ll_dest		Destination link-layer address
  */
-static void neighbour_discovered ( struct neighbour *neighbour,
-				   const void *ll_dest ) {
+static void neighbour_tx_queue ( struct neighbour *neighbour ) {
 	struct net_device *netdev = neighbour->netdev;
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_protocol *net_protocol = neighbour->net_protocol;
+	const void *ll_dest = neighbour->ll_dest;
 	struct io_buffer *iobuf;
 	int rc;
 
-	/* Fill in link-layer address */
-	memcpy ( neighbour->ll_dest, ll_dest, ll_protocol->ll_addr_len );
-	DBGC ( neighbour, "NEIGHBOUR %s %s %s is %s %s\n", netdev->name,
-	       net_protocol->name, net_protocol->ntoa ( neighbour->net_dest ),
-	       ll_protocol->name, ll_protocol->ntoa ( neighbour->ll_dest ) );
-
 	/* Stop retransmission timer */
 	stop_timer ( &neighbour->timer );
-
-	/* Mark discovery as complete */
-	neighbour->discovery = NULL;
 
 	/* Transmit any packets in queue.  Take out a temporary
 	 * reference on the entry to prevent it from going out of
@@ -211,6 +200,31 @@ static void neighbour_discovered ( struct neighbour *neighbour,
 		}
 	}
 	ref_put ( &neighbour->refcnt );
+}
+
+/**
+ * Complete neighbour discovery
+ *
+ * @v neighbour		Neighbour cache entry
+ * @v ll_dest		Destination link-layer address
+ */
+static void neighbour_discovered ( struct neighbour *neighbour,
+				   const void *ll_dest ) {
+	struct net_device *netdev = neighbour->netdev;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	struct net_protocol *net_protocol = neighbour->net_protocol;
+
+	/* Fill in link-layer address */
+	memcpy ( neighbour->ll_dest, ll_dest, ll_protocol->ll_addr_len );
+	DBGC ( neighbour, "NEIGHBOUR %s %s %s is %s %s\n", netdev->name,
+	       net_protocol->name, net_protocol->ntoa ( neighbour->net_dest ),
+	       ll_protocol->name, ll_protocol->ntoa ( neighbour->ll_dest ) );
+
+	/* Mark discovery as complete */
+	neighbour->discovery = NULL;
+
+	/* Transmit any deferred packets */
+	neighbour_tx_queue ( neighbour );
 }
 
 /**
