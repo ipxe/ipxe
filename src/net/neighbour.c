@@ -186,6 +186,9 @@ static void neighbour_discovered ( struct neighbour *neighbour,
 	/* Stop retransmission timer */
 	stop_timer ( &neighbour->timer );
 
+	/* Mark discovery as complete */
+	neighbour->discovery = NULL;
+
 	/* Transmit any packets in queue.  Take out a temporary
 	 * reference on the entry to prevent it from going out of
 	 * scope during the call to net_tx().
@@ -300,6 +303,7 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		   struct neighbour_discovery *discovery,
 		   const void *net_source ) {
 	struct neighbour *neighbour;
+	int rc;
 
 	/* Find or create neighbour cache entry */
 	neighbour = neighbour_find ( netdev, net_protocol, net_dest );
@@ -310,19 +314,24 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		neighbour_discover ( neighbour, discovery, net_source );
 	}
 
-	/* If a link-layer address is available then transmit
-	 * immediately, otherwise queue for later transmission.
+	/* If discovery is still in progress then queue for later
+	 * transmission.
 	 */
-	if ( neighbour_has_ll_dest ( neighbour ) ) {
-		return net_tx ( iobuf, netdev, net_protocol, neighbour->ll_dest,
-				netdev->ll_addr );
-	} else {
+	if ( neighbour->discovery ) {
 		DBGC2 ( neighbour, "NEIGHBOUR %s %s %s deferring packet\n",
 			netdev->name, net_protocol->name,
 			net_protocol->ntoa ( net_dest ) );
 		list_add_tail ( &iobuf->list, &neighbour->tx_queue );
 		return 0;
 	}
+
+	/* Otherwise, transmit immediately */
+	if ( ( rc = net_tx ( iobuf, netdev, net_protocol, neighbour->ll_dest,
+			     netdev->ll_addr ) ) != 0 ) {
+		return rc;
+	}
+
+	return 0;
 }
 
 /**

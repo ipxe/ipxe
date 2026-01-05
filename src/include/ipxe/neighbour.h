@@ -49,9 +49,9 @@ struct neighbour {
 	/** Link-layer destination address */
 	uint8_t ll_dest[MAX_LL_ADDR_LEN];
 
-	/** Neighbour discovery protocol (if any) */
+	/** Neighbour discovery protocol (if discovery is ongoing) */
 	struct neighbour_discovery *discovery;
-	/** Network-layer source address (if any) */
+	/** Network-layer source address (for discovery requests) */
 	uint8_t net_source[MAX_NET_ADDR_LEN];
 	/** Retransmission timer */
 	struct retry_timer timer;
@@ -59,17 +59,6 @@ struct neighbour {
 	/** Pending I/O buffers */
 	struct list_head tx_queue;
 };
-
-/**
- * Test if neighbour cache entry has a valid link-layer address
- *
- * @v neighbour		Neighbour cache entry
- * @ret has_ll_dest	Neighbour cache entry has a valid link-layer address
- */
-static inline __attribute__ (( always_inline )) int
-neighbour_has_ll_dest ( struct neighbour *neighbour ) {
-	return ( ! timer_running ( &neighbour->timer ) );
-}
 
 extern struct list_head neighbours;
 
