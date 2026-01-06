@@ -60,6 +60,12 @@ struct neighbour {
 	struct list_head tx_queue;
 };
 
+/** A neighbour transmission delay pseudo-header */
+struct neighbour_delay {
+	/** Original transmission time (in ticks) */
+	unsigned long start;
+};
+
 extern struct list_head neighbours;
 
 extern int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,

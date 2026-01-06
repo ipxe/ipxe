@@ -32,6 +32,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/timer.h>
 #include <ipxe/malloc.h>
 #include <ipxe/neighbour.h>
+#include <config/fault.h>
 
 /** @file
  *
@@ -47,6 +48,18 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** Neighbour discovery maximum timeout */
 #define NEIGHBOUR_MAX_TIMEOUT ( TICKS_PER_SEC * 3 )
+
+/** Neighbour discovery maximum burst count for delayed transmissions
+ *
+ * When using delay injection, timer quantisation can cause a large
+ * number of delayed packets to be scheduled at the same time.  This
+ * can quickly exhaust available transmit descriptors, leading to
+ * packets that are dropped completely (not just delayed).
+ *
+ * Limit the number of delayed packets that we will attempt to
+ * transmit at once, to allow time for transmit completions to occur.
+ */
+#define NEIGHBOUR_DELAY_MAX_BURST 2
 
 /** The neighbour cache */
 struct list_head neighbours = LIST_HEAD_INIT ( neighbours );
@@ -172,7 +185,11 @@ static void neighbour_tx_queue ( struct neighbour *neighbour ) {
 	struct net_device *netdev = neighbour->netdev;
 	struct net_protocol *net_protocol = neighbour->net_protocol;
 	const void *ll_dest = neighbour->ll_dest;
+	struct neighbour_delay *delay;
 	struct io_buffer *iobuf;
+	unsigned long elapsed;
+	unsigned long threshold;
+	unsigned int count = 0;
 	int rc;
 
 	/* Stop retransmission timer */
@@ -185,6 +202,33 @@ static void neighbour_tx_queue ( struct neighbour *neighbour ) {
 	ref_get ( &neighbour->refcnt );
 	while ( ( iobuf = list_first_entry ( &neighbour->tx_queue,
 					     struct io_buffer, list )) != NULL){
+
+		/* Handle delay injection */
+		if ( NEIGHBOUR_DELAY_MS ) {
+
+			/* Determine elapsed time since transmission attempt */
+			delay = iobuf->data;
+			elapsed = ( currticks() - delay->start );
+			threshold = ( NEIGHBOUR_DELAY_MS * TICKS_PER_MS );
+
+			/* Defer transmission if not yet scheduled */
+			if ( elapsed < threshold ) {
+				start_timer_fixed ( &neighbour->timer,
+						    ( threshold - elapsed ) );
+				break;
+			}
+
+			/* Defer transmission if maximum burst count reached */
+			if ( ++count >= NEIGHBOUR_DELAY_MAX_BURST ) {
+				start_timer_nodelay ( &neighbour->timer );
+				break;
+			}
+
+			/* Strip pseudo-header */
+			iob_pull ( iobuf, sizeof ( *delay ) );
+		}
+
+		/* Transmit deferred packet */
 		DBGC2 ( neighbour, "NEIGHBOUR %s %s %s transmitting deferred "
 			"packet\n", netdev->name, net_protocol->name,
 			net_protocol->ntoa ( neighbour->net_dest ) );
@@ -280,6 +324,14 @@ static void neighbour_expired ( struct retry_timer *timer, int fail ) {
 	const void *net_source = neighbour->net_source;
 	int rc;
 
+	/* If the timer is being (ab)used for delay injection, then
+	 * transmit the deferred packet queue.
+	 */
+	if ( NEIGHBOUR_DELAY_MS && ( ! neighbour->discovery ) ) {
+		neighbour_tx_queue ( neighbour );
+		return;
+	}
+
 	/* If we have failed, destroy the cache entry */
 	if ( fail ) {
 		neighbour_destroy ( neighbour, -ETIMEDOUT );
@@ -317,6 +369,7 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		   struct neighbour_discovery *discovery,
 		   const void *net_source ) {
 	struct neighbour *neighbour;
+	struct neighbour_delay *delay;
 	int rc;
 
 	/* Find or create neighbour cache entry */
@@ -328,14 +381,29 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		neighbour_discover ( neighbour, discovery, net_source );
 	}
 
-	/* If discovery is still in progress then queue for later
-	 * transmission.
+	/* If discovery is still in progress or if delay injection is
+	 * in use, then queue for later transmission.
 	 */
-	if ( neighbour->discovery ) {
+	if ( NEIGHBOUR_DELAY_MS || neighbour->discovery ) {
+
+		/* Add to deferred packet queue */
 		DBGC2 ( neighbour, "NEIGHBOUR %s %s %s deferring packet\n",
 			netdev->name, net_protocol->name,
 			net_protocol->ntoa ( net_dest ) );
 		list_add_tail ( &iobuf->list, &neighbour->tx_queue );
+
+		/* Handle delay injection, if applicable */
+		if ( NEIGHBOUR_DELAY_MS ) {
+
+			/* Record original transmission time */
+			delay = iob_push ( iobuf, sizeof ( *delay ) );
+			delay->start = currticks();
+
+			/* Process deferred packet queue, if possible */
+			if ( ! neighbour->discovery )
+				neighbour_tx_queue ( neighbour );
+		}
+
 		return 0;
 	}
 
