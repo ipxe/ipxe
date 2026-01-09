@@ -24,23 +24,25 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdio.h>
+#include <ipxe/tcp.h>
 #include <ipxe/ipstat.h>
 #include <usr/ipstat.h>
 
 /** @file
  *
- * IP statistics
+ * TCP/IP statistics
  *
  */
 
 /**
- * Print IP statistics
+ * Print TCP/IP statistics
  *
  */
 void ipstat ( void ) {
 	struct ip_statistics_family *family;
 	struct ip_statistics *stats;
 
+	/* Print per-family statistics */
 	for_each_table_entry ( family, IP_STATISTICS_FAMILIES ) {
 		stats = family->stats;
 		printf ( "IP version %d:\n", family->version );
@@ -63,4 +65,12 @@ void ipstat ( void ) {
 			 stats->out_mcast_pkts, stats->out_bcast_pkts,
 			 stats->out_octets );
 	}
+
+	/* Print TCP statistics */
+	printf ( "TCP:\n" );
+	printf ( "  InSegs:%ld InOctets:%ld InOctetsGood:%ld\n",
+		 tcp_stats.in_segs, tcp_stats.in_octets,
+		 tcp_stats.in_octets_good );
+	printf ( "  InDiscards:%ld InOutOfOrder:%ld\n",
+		 tcp_stats.in_discards, tcp_stats.in_out_of_order );
 }

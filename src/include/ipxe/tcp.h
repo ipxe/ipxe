@@ -439,6 +439,23 @@ static inline int tcp_in_window ( uint32_t seq, uint32_t start,
  */
 #define TCP_FINISH_TIMEOUT ( 1 * TICKS_PER_SEC )
 
+/** TCP statistics */
+struct tcp_statistics {
+	/** Number of packets received */
+	unsigned long in_segs;
+	/** Total number of packets discarded due to lack of memory */
+	unsigned long in_discards;
+	/** Total number of packets received out of order */
+	unsigned long in_out_of_order;
+
+	/** Number of octets received (including duplicate data) */
+	unsigned long in_octets;
+	/** Number of octets processed and passed to upper layer */
+	unsigned long in_octets_good;
+};
+
 extern struct tcpip_protocol tcp_protocol __tcpip_protocol;
+
+extern struct tcp_statistics tcp_stats;
 
 #endif /* _IPXE_TCP_H */
