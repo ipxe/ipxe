@@ -31,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/retry.h>
 #include <ipxe/timer.h>
 #include <ipxe/malloc.h>
+#include <ipxe/pending.h>
 #include <ipxe/neighbour.h>
 #include <config/fault.h>
 
@@ -63,6 +64,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** The neighbour cache */
 struct list_head neighbours = LIST_HEAD_INIT ( neighbours );
+
+/** Pending operation for delayed transmissions */
+static struct pending_operation neighbour_delayed;
 
 static void neighbour_expired ( struct retry_timer *timer, int over );
 
@@ -226,6 +230,9 @@ static void neighbour_tx_queue ( struct neighbour *neighbour ) {
 
 			/* Strip pseudo-header */
 			iob_pull ( iobuf, sizeof ( *delay ) );
+
+			/* Remove pending operation */
+			pending_put ( &neighbour_delayed );
 		}
 
 		/* Transmit deferred packet */
@@ -296,6 +303,8 @@ static void neighbour_destroy ( struct neighbour *neighbour, int rc ) {
 			net_protocol->ntoa ( neighbour->net_dest ),
 			strerror ( rc ) );
 		list_del ( &iobuf->list );
+		if ( NEIGHBOUR_DELAY_MS )
+			pending_put ( &neighbour_delayed );
 		netdev_tx_err ( neighbour->netdev, iobuf, rc );
 	}
 
@@ -398,6 +407,9 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 			/* Record original transmission time */
 			delay = iob_push ( iobuf, sizeof ( *delay ) );
 			delay->start = currticks();
+
+			/* Add pending operation */
+			pending_get ( &neighbour_delayed );
 
 			/* Process deferred packet queue, if possible */
 			if ( ! neighbour->discovery )
