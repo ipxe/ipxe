@@ -1317,7 +1317,7 @@ static void tcp_rx_enqueue ( struct tcp_connection *tcp, uint32_t seq,
 	 */
 	if ( ( ! ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) ) ||
 	     ( tcp_cmp ( seq, tcp->rcv_ack + tcp->rcv_win ) >= 0 ) ||
-	     ( tcp_cmp ( nxt, tcp->rcv_ack ) < 0 ) ||
+	     ( tcp_cmp ( nxt, tcp->rcv_ack ) <= 0 ) ||
 	     ( seq_len == 0 ) ) {
 		free_iob ( iobuf );
 		return;
