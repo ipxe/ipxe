@@ -45,7 +45,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 	.section ".note.GNU-stack", "", @progbits
 	.code32
+#ifdef I386_SUPPORT
+	.arch i386
+#else
 	.arch i486
+#endif
 	.section ".prefix.lib", "ax", @progbits
 
 #ifdef CODE16
@@ -962,7 +966,24 @@ decompress:
 	ADDR32 lodsb	/* discard initial byte */
 	print_hex_byte %al
 	ADDR32 lodsl
+#ifdef I386_SUPPORT
+	/* "bswapl %eax" replacement for i386 */
+	pushl   %ebx
+	movb    %al, %bl
+	rorl	$8, %eax
+	roll	$8, %ebx
+	movb    %al, %bl
+	rorl	$8, %eax
+	roll	$8, %ebx
+	movb    %al, %bl
+	rorl	$8, %eax
+	roll	$8, %ebx
+	movb    %al, %bl
+	movl    %ebx, %eax
+	popl    %ebx
+#else
 	bswapl	%eax
+#endif
 	print_hex_dword %eax
 	print_character $('\n')
 	movl	%eax, rc_code(%ebp)
