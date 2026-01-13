@@ -18,6 +18,7 @@
  */
 
 #define FILE_LICENCE(...) extern void __file_licence ( void )
+#define FILE_SECBOOT(...) extern void __file_secboot ( void )
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>

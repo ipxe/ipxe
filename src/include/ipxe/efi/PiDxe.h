@@ -11,6 +11,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __PI_DXE_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Uefi/UefiBaseType.h>
 #include <ipxe/efi/Uefi/UefiSpec.h>

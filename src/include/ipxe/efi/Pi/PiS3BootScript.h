@@ -11,6 +11,7 @@
 #define _PI_S3_BOOT_SCRIPT_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 // *******************************************
 // EFI Boot Script Opcode definitions

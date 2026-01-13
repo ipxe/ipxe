@@ -14,6 +14,7 @@
 #define __EFI_SERVICE_BINDING_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// Forward reference for pure ANSI compatability

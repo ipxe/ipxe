@@ -14,6 +14,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __EFI_DEVICE_PATH_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Guid/PcAnsi.h>
 #include <ipxe/efi/IndustryStandard/Bluetooth.h>

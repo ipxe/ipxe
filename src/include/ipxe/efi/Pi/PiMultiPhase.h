@@ -13,6 +13,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __PI_MULTIPHASE_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Pi/PiFirmwareVolume.h>
 #include <ipxe/efi/Pi/PiFirmwareFile.h>

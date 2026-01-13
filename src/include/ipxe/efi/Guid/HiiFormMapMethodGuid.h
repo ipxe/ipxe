@@ -12,6 +12,7 @@
 #define __EFI_HII_FORMMAP_GUID_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_HII_STANDARD_FORM_GUID \
   { 0x3bd2f4ec, 0xe524, 0x46e4, { 0xa9, 0xd8, 0x51, 0x1, 0x17, 0x42, 0x55, 0x62 } }

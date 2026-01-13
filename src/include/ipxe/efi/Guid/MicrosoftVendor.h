@@ -20,6 +20,7 @@
 #define MICROSOFT_VENDOR_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Uefi/UefiBaseType.h>
 

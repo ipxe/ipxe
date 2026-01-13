@@ -17,6 +17,7 @@
 #define _USB_HOSTCONTROLLER_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Protocol/Usb2HostController.h>
 

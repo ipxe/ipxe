@@ -15,6 +15,7 @@
 #define _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// Global ID for the Bus Specific Driver Override Protocol

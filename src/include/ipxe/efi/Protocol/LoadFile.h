@@ -16,6 +16,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __EFI_LOAD_FILE_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_LOAD_FILE_PROTOCOL_GUID \
   { \

@@ -11,6 +11,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __TCG2_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/IndustryStandard/UefiTcgPlatform.h>
 #include <ipxe/efi/IndustryStandard/Tpm20.h>

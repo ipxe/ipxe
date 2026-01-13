@@ -12,6 +12,7 @@
 #define __USB_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 //
 // Subset of Class and Subclass definitions from USB Specs

@@ -14,6 +14,7 @@
 #define __USB_IO_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/IndustryStandard/Usb.h>
 

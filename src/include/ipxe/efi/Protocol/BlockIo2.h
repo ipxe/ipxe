@@ -14,6 +14,7 @@
 #define __BLOCK_IO2_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Protocol/BlockIo.h>
 

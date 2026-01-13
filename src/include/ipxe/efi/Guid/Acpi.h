@@ -17,6 +17,7 @@
 #define __ACPI_GUID_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define ACPI_TABLE_GUID \
   { \

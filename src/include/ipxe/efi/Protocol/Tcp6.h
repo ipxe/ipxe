@@ -16,6 +16,7 @@
 #define __EFI_TCP6_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Protocol/ManagedNetwork.h>
 #include <ipxe/efi/Protocol/Ip6.h>

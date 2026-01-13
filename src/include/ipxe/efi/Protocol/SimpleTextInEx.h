@@ -14,6 +14,7 @@
 #define __SIMPLE_TEXT_IN_EX_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Protocol/SimpleTextIn.h>
 

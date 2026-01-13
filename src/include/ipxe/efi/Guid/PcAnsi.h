@@ -13,6 +13,7 @@
 #define __PC_ANSI_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_PC_ANSI_GUID \
   { \

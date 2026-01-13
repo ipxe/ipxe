@@ -14,6 +14,7 @@ This Protocol is introduced in UEFI Specification 2.5
 #define __EFI_IP4CONFIG2_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Protocol/Ip4.h>
 

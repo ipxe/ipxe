@@ -14,6 +14,7 @@
 #define __PCI_ROOT_BRIDGE_IO_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Library/BaseLib.h>
 

@@ -15,6 +15,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __PI_STATUS_CODE_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 //
 // Required for IA32, X64, IPF, and EBC defines for CPU exception types

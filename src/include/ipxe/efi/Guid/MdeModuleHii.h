@@ -10,6 +10,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __MDEMODULE_HII_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define NARROW_CHAR        0xFFF0
 #define WIDE_CHAR          0xFFF1
