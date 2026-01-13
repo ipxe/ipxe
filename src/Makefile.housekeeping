@@ -1299,15 +1299,17 @@ endef
 $(BIN)/%.nodeps : $(BIN)/%.tmp
 	$(Q)$(ECHO) $(call nodeps_list,$<)
 
-# Get licensing verdict for the specified target
-#
-define licensable_deps_list
+# Get annotated dependency list for the specified target
+define annotated_deps_list
 	$(filter-out config/local/%.h,\
 	  $(filter-out $(BIN)/.%.list,\
 	    $(call deps_list,$(1))))
 endef
+
+# Get licensing verdict for the specified target
+#
 define unlicensed_deps_list
-	$(shell grep -L FILE_LICENCE $(call licensable_deps_list,$(1)))
+	$(shell grep -L FILE_LICENCE $(call annotated_deps_list,$(1)))
 endef
 define licence_list
 	$(sort $(foreach LICENCE,\
@@ -1319,11 +1321,34 @@ $(BIN)/%.licence_list : $(BIN)/%.tmp
 $(BIN)/%.licence : $(BIN)/%.tmp
 	$(QM)$(ECHO) "  [LICENCE] $@"
 	$(Q)$(if $(strip $(call unlicensed_deps_list,$<)),\
-		echo -n "Unable to determine licence because the following " ;\
-		echo "files are missing a licence declaration:" ;\
+		echo -n "The following files are missing a FILE_LICENCE() " ;\
+		echo "declaration:" ;\
 		echo $(call unlicensed_deps_list,$<);\
-		exit 1,\
-		$(PERL) $(LICENCE) $(call licence_list,$<))
+		exit 1)
+	$(PERL) $(LICENCE) $(call licence_list,$<)
+
+# Get Secure Boot permissibility verdict for the specified target
+#
+define nosecboot_deps_list
+	$(shell grep -L FILE_SECBOOT $(call annotated_deps_list,$(1)))
+endef
+define secboot_list
+	$(sort $(foreach SECBOOT,\
+		 $(filter __secboot__%,$(shell $(NM) $(1) | cut -d" " -f3)),\
+		 $(word 2,$(subst __, ,$(SECBOOT)))))
+endef
+$(BIN)/%.secboot : $(BIN)/%.tmp
+	$(QM)$(ECHO) "  [SECBOOT] $@"
+	$(Q)$(if $(strip $(call nosecboot_deps_list,$<)),\
+		echo -n "The following files are missing a FILE_SECBOOT() " ;\
+		echo "declaration:" ;\
+		echo $(call nosecboot_deps_list,$<);\
+		exit 1)
+	echo $(call secboot_list,$<)
+	$(Q)$(if $(strip $(filter-out permitted,$(call secboot_list,$<))),\
+		echo -n "This build includes files that are not permitted " ;\
+		echo "to be signed for UEFI Secure Boot" ;\
+		exit 1)
 
 # Extract compression information from intermediate object file
 #
