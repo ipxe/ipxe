@@ -18,6 +18,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include <string.h>
 #include <ipxe/net80211.h>

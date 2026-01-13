@@ -107,16 +107,12 @@ SRCDIRS		+= hci/mucurses hci/mucurses/widgets
 SRCDIRS		+= hci/keymap
 SRCDIRS		+= usr
 SRCDIRS		+= config
-
-# These directories contain code that is not eligible for UEFI Secure
-# Boot signing.
-#
-SRCDIRS_INSEC	+= net/oncrpc
-SRCDIRS_INSEC	+= net/80211
-SRCDIRS_INSEC	+= drivers/net/rtl818x
-SRCDIRS_INSEC	+= drivers/net/ath
-SRCDIRS_INSEC	+= drivers/net/ath/ath5k
-SRCDIRS_INSEC	+= drivers/net/ath/ath9k
+SRCDIRS		+= net/oncrpc
+SRCDIRS		+= net/80211
+SRCDIRS		+= drivers/net/rtl818x
+SRCDIRS		+= drivers/net/ath
+SRCDIRS		+= drivers/net/ath/ath5k
+SRCDIRS		+= drivers/net/ath/ath9k
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.

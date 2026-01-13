@@ -22,6 +22,7 @@
 #define _ATH5K_H
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include <stddef.h>
 #include <string.h>

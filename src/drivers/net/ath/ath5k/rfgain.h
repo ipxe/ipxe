@@ -18,6 +18,8 @@
  *
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /*
  * Mode-specific RF Gain table (64bytes) for RF5111/5112
  * (RF5110 only comes with AR5210 and only supports a/turbo a mode so initial

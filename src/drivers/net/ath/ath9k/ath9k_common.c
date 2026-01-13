@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /*
  * Module for common driver code between ath9k and ath9k_htc
  */

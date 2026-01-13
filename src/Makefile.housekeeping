@@ -436,11 +436,6 @@ endif
 #
 # Source file handling
 
-# Exclude known-insecure files from Secure Boot builds
-ifeq ($(SECUREBOOT),0)
-SRCDIRS		+= $(SRCDIRS_INSEC)
-endif
-
 # SRCDIRS lists all directories containing source files.
 srcdirs :
 	@$(ECHO) $(SRCDIRS)

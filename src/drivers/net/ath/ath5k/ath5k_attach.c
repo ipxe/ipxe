@@ -20,6 +20,7 @@
  */
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( FORBIDDEN );
 
 /*************************************\
 * Attach/Detach Functions and helpers *

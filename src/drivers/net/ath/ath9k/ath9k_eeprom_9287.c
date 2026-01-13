@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 #include <ipxe/io.h>
 
 #include "hw.h"

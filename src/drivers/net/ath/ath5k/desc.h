@@ -16,6 +16,8 @@
  *
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /*
  * Internal RX/TX descriptor structures
  * (rX: reserved fields possibily used by future versions of the ar5k chipset)

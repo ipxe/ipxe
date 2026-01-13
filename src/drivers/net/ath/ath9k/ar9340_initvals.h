@@ -17,6 +17,8 @@
 #ifndef INITVALS_9340_H
 #define INITVALS_9340_H
 
+FILE_SECBOOT ( FORBIDDEN );
+
 static __unused const u32 ar9340_1p0_radio_postamble[][5] = {
 	/*  Addr      5G_HT20     5G_HT40     2G_HT40     2G_HT20  */
 	{0x000160ac, 0xa4646800, 0xa4646800, 0xa4646800, 0xa4646800},

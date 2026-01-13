@@ -21,6 +21,7 @@
 #define ATH_H
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include <unistd.h>
 #include <string.h>

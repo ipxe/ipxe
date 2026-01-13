@@ -17,6 +17,8 @@
 #ifndef AR9003_PHY_H
 #define AR9003_PHY_H
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /*
  * Channel Register Map
  */

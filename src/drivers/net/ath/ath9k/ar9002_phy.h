@@ -17,6 +17,7 @@
 #define AR9002_PHY_H
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #define AR_PHY_TEST             0x9800
 #define PHY_AGC_CLR             0x10000000

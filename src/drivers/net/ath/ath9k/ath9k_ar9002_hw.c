@@ -18,6 +18,7 @@
  */
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include "hw.h"
 #include "ar5008_initvals.h"

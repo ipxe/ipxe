@@ -27,6 +27,7 @@
 #include "rtl818x.h"
 
 FILE_LICENCE(GPL2_ONLY);
+FILE_SECBOOT(FORBIDDEN);
 
 #define MAXIM_ANTENNA 0xb3
 

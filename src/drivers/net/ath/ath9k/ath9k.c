@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 #include <ipxe/pci.h>
 
 #include "ath9k.h"

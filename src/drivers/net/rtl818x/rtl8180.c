@@ -1,6 +1,7 @@
 /* Realtek 8180 card: rtl818x driver + rtl8180 RF modules */
 
 FILE_LICENCE(GPL2_OR_LATER);
+FILE_SECBOOT(FORBIDDEN);
 
 #include <ipxe/pci.h>
 #include "rtl818x.h"

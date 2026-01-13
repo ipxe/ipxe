@@ -17,6 +17,8 @@
  * 02110-1301, USA.
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>

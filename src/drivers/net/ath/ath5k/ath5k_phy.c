@@ -23,6 +23,7 @@
  */
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( FORBIDDEN );
 
 #define _ATH5K_PHY
 

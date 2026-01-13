@@ -18,6 +18,7 @@
 #define PHY_H
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #define CHANSEL_DIV		15
 #define CHANSEL_2G(_freq)	(((_freq) * 0x10000) / CHANSEL_DIV)

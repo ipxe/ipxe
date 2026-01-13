@@ -20,6 +20,8 @@
 #ifndef AR9003_MAC_H
 #define AR9003_MAC_H
 
+FILE_SECBOOT ( FORBIDDEN );
+
 #define AR_DescId	0xffff0000
 #define AR_DescId_S	16
 #define AR_CtrlStat	0x00004000

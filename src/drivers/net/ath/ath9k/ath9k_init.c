@@ -18,6 +18,7 @@
  */
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include <ipxe/malloc.h>
 #include <ipxe/pci_io.h>

@@ -17,6 +17,7 @@
  *
  */
 
+FILE_SECBOOT ( FORBIDDEN );
 
 /*
  * There are some special registers on the RF chip

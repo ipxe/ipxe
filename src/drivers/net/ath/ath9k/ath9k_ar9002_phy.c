@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /**
  * DOC: Programming Atheros 802.11n analog front end radios
  *
