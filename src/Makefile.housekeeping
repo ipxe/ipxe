@@ -12,6 +12,8 @@ COMMA	:= ,
 EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
 HASH	:= \#
+LPAREN	:= (
+RPAREN	:= )
 define NEWLINE
 
 
@@ -1295,16 +1297,24 @@ $(BIN)/%.nodeps : $(BIN)/%.tmp
 	$(Q)$(ECHO) $(call nodeps_list,$<)
 
 # Get annotated dependency list for the specified target
+#
 define annotated_deps_list
 	$(filter-out config/local/%.h,\
 	  $(filter-out $(BIN)/.%.list,\
 	    $(call deps_list,$(1))))
 endef
 
+# Get dependency list missing specified declaration for the specified target
+#
+define undeclared_deps_list
+	$(shell grep -L '^[[:space:]]*$(2)[[:space:]]*$(LPAREN)' \
+		$(call annotated_deps_list,$(1)))
+endef
+
 # Get licensing verdict for the specified target
 #
 define unlicensed_deps_list
-	$(shell grep -L FILE_LICENCE $(call annotated_deps_list,$(1)))
+	$(call undeclared_deps_list,$(1),FILE_LICENCE)
 endef
 define licence_list
 	$(sort $(foreach LICENCE,\
@@ -1325,7 +1335,7 @@ $(BIN)/%.licence : $(BIN)/%.tmp
 # Get Secure Boot permissibility verdict for the specified target
 #
 define nosecboot_deps_list
-	$(shell grep -L FILE_SECBOOT $(call annotated_deps_list,$(1)))
+	$(call undeclared_deps_list,$(1),FILE_SECBOOT)
 endef
 define secboot_list
 	$(sort $(foreach SECBOOT,\
@@ -1339,7 +1349,6 @@ $(BIN)/%.secboot : $(BIN)/%.tmp
 		echo "declaration:" ;\
 		echo $(call nosecboot_deps_list,$<);\
 		exit 1)
-	echo $(call secboot_list,$<)
 	$(Q)$(if $(strip $(filter-out permitted,$(call secboot_list,$<))),\
 		echo -n "This build includes files that are not permitted " ;\
 		echo "to be signed for UEFI Secure Boot" ;\
