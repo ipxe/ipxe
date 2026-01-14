@@ -25,6 +25,7 @@
 #define _IFMGMT_CMD_H
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/parseopt.h>
 

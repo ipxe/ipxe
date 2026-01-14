@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( BSD3 );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_APPLE_NET_BOOT_PROTOCOL_GUID				\
 	{ 0x78ee99fb, 0x6a5e, 0x4186,					\

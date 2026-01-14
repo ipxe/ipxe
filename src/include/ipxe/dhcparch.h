@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /* Include platform-specific client architecture definitions */
 #define PLATFORM_DHCPARCH(_platform) <ipxe/_platform/dhcparch.h>

@@ -2,6 +2,7 @@
 #define CONFIG_DEFAULTS_H
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #define CONFIG_DEFAULTS(_platform) <config/defaults/_platform.h>
 

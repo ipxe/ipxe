@@ -2,6 +2,7 @@
 #define _STDARG_H
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 typedef __builtin_va_list va_list;
 #define va_start( ap, last ) __builtin_va_start ( ap, last )

@@ -2,6 +2,7 @@
 #define _STDINT_H
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /*
  * This is a standard predefined macro on all gcc's I've seen. It's

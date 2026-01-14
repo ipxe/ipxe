@@ -26,6 +26,7 @@
  */
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stdlib.h>

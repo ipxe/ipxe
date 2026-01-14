@@ -49,6 +49,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /* Unique IP datagram identification number (high byte) */
 static uint8_t next_ident_high = 0;

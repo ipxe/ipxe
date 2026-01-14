@@ -74,6 +74,7 @@
 #define __VALGRIND_H
 
 FILE_LICENCE ( BSD3 );
+FILE_SECBOOT ( PERMITTED );
 
 
 /* ------------------------------------------------------------------ */

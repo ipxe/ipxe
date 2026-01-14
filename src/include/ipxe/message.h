@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 extern void msg ( unsigned int row, const char *fmt, ... );
 extern void clearmsg ( unsigned int row );

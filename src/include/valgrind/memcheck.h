@@ -61,6 +61,7 @@
 #define __MEMCHECK_H
 
 FILE_LICENCE ( BSD3 );
+FILE_SECBOOT ( PERMITTED );
 
 
 /* This file is for inclusion into client (your!) code.
