@@ -11,6 +11,7 @@
 #define __XEN_PUBLIC_ARCH_X86_XEN_X86_64_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 /*
  * Hypercall interface:

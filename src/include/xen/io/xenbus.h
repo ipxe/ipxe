@@ -11,6 +11,7 @@
 #define _XEN_PUBLIC_IO_XENBUS_H
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 /*
  * The state of either end of the Xenbus, i.e. the current communication

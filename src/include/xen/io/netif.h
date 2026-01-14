@@ -11,6 +11,7 @@
 #define __XEN_PUBLIC_IO_NETIF_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 #include "ring.h"
 #include "../grant_table.h"

@@ -13,6 +13,7 @@
 #define __XEN_PUBLIC_ARCH_X86_XEN_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 /* Structural guest handles introduced in 0x00030201. */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030201

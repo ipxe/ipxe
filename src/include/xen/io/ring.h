@@ -11,6 +11,7 @@
 #define __XEN_PUBLIC_IO_RING_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 /*
  * When #include'ing this header, you need to provide the following

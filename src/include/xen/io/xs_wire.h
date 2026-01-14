@@ -10,6 +10,7 @@
 #define _XS_WIRE_H
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 enum xsd_sockmsg_type
 {

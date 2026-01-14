@@ -12,6 +12,7 @@
 #define __XEN_PUBLIC_GRANT_TABLE_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 #include "xen.h"
 

@@ -11,6 +11,7 @@
 #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 #include "xen.h"
 
