@@ -226,10 +226,10 @@ BIN_ELEMENTS	:= $(subst -,$(SPACE),$(BIN))
 BIN_APS		:= $(wordlist 2,4,$(BIN_ELEMENTS))
 ifeq ($(lastword $(BIN_APS)),sb)
 BIN_AP		:= $(wordlist 2,$(words $(BIN_APS)),discard $(BIN_APS))
-BIN_SECUREBOOT	:= 1
+BIN_SECUREBOOT	:= sb
 else
 BIN_AP		:= $(BIN_APS)
-BIN_SECUREBOOT	:= 0
+BIN_SECUREBOOT	:=
 endif
 ifeq ($(BIN_AP),efi)
 BIN_ARCH	:= i386
@@ -259,9 +259,7 @@ platform :
 	@$(ECHO) $(PLATFORM)
 
 # Determine security flag
-DEFAULT_SECUREBOOT := 0
-SECUREBOOT	:= $(firstword $(BIN_SECUREBOOT) $(DEFAULT_SECUREBOOT))
-CFLAGS		+= -DSECUREBOOT=$(SECUREBOOT)
+SECUREBOOT	:= $(BIN_SECUREBOOT)
 secureboot :
 	@$(ECHO) $(SECUREBOOT)
 

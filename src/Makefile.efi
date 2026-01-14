@@ -29,11 +29,13 @@ DRIVERS_net += snp mnp
 
 # Rules for building EFI files
 #
-$(BIN)/%.efi : $(BIN)/%.efi.tmp $(ELF2EFI)
+$(BIN)/%.efi : $(BIN)/%.efi.tmp $(ELF2EFI) \
+		$(if $(SECUREBOOT),$(BIN)/%.efi.secboot)
 	$(QM)$(ECHO) "  [FINISH] $@"
 	$(Q)$(ELF2EFI) --subsystem=10 $< $@
 
-$(BIN)/%.efidrv : $(BIN)/%.efidrv.tmp $(ELF2EFI)
+$(BIN)/%.efidrv : $(BIN)/%.efidrv.tmp $(ELF2EFI) \
+		$(if $(SECUREBOOT),$(BIN)/%.efidrv.secboot)
 	$(QM)$(ECHO) "  [FINISH] $@"
 	$(Q)$(ELF2EFI) --subsystem=11 $< $@
 
