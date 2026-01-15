@@ -106,30 +106,58 @@ FILE_SECBOOT ( PERMITTED );
 
 #define	DNS_RESOLVER		/* DNS resolver */
 
-/*
+/*****************************************************************************
+ *
  * Image types
  *
- * Etherboot supports various image formats.  Select whichever ones
- * you want to use.
+ * iPXE supports various image formats.  Select whichever ones you
+ * want to use.
  *
  */
-//#define	IMAGE_NBI		/* NBI image support */
-//#define	IMAGE_ELF		/* ELF image support */
-//#define	IMAGE_MULTIBOOT		/* MultiBoot image support */
-//#define	IMAGE_PXE		/* PXE image support */
-//#define	IMAGE_SCRIPT		/* iPXE script image support */
-//#define	IMAGE_LKRN		/* Linux kernel image support */
-//#define	IMAGE_COMBOOT		/* SYSLINUX COMBOOT image support */
-//#define	IMAGE_EFI		/* EFI image support */
-//#define	IMAGE_SDI		/* SDI image support */
-//#define	IMAGE_PNM		/* PNM image support */
-#define	IMAGE_PNG		/* PNG image support */
-#define	IMAGE_DER		/* DER image support */
-#define	IMAGE_PEM		/* PEM image support */
-//#define	IMAGE_EFISIG		/* EFI signature list image support */
-//#define	IMAGE_ZLIB		/* ZLIB image support */
-//#define	IMAGE_GZIP		/* GZIP image support */
-//#define	IMAGE_UCODE		/* Microcode update image support */
+
+/* Image types supported on all platforms */
+#define IMAGE_DER		/* ASN.1 DER-encoded image support */
+//#define IMAGE_GZIP		/* GZIP compressed image support */
+#define IMAGE_PEM		/* ASN.1 PEM-encoded image support */
+//#define IMAGE_PNM		/* PNM graphical image support */
+#define IMAGE_PNG		/* PNG graphical image support */
+#define IMAGE_SCRIPT		/* iPXE script image support */
+//#define IMAGE_ZLIB		/* ZLIB compressed image support */
+
+/* Image types supported only on BIOS platforms */
+#if defined ( PLATFORM_pcbios )
+  #define IMAGE_BZIMAGE		/* Linux bzImage image support */
+  //#define IMAGE_COMBOOT	/* SYSLINUX COMBOOT image support */
+  #define IMAGE_ELF		/* ELF image support */
+  #define IMAGE_MULTIBOOT	/* MultiBoot image support */
+  //#define IMAGE_NBI		/* NBI image support */
+  #define IMAGE_PXE		/* PXE image support */
+  //#define IMAGE_SDI		/* SDI image support */
+#endif
+
+/* Image types supported only on EFI platforms */
+#if defined ( PLATFORM_efi )
+  #define IMAGE_EFI		/* EFI image support */
+  #define IMAGE_EFISIG		/* EFI signature list image support */
+#endif
+
+/* Image types supported only on RISC-V SBI platforms */
+#if defined ( PLATFORM_sbi )
+  #define IMAGE_LKRN		/* Linux kernel image support */
+#endif
+
+/* Image types supported only on x86 CPUs */
+#if defined ( __i386__ ) || defined ( __x86_64__ )
+  //#define IMAGE_UCODE		/* Microcode update image support */
+#endif
+
+/* Enable commonly encountered compressed versions of some image types */
+#if defined ( IMAGE_EFI ) && defined ( __aarch64__ )
+  #define IMAGE_GZIP
+#endif
+#if defined ( IMAGE_LKRN ) && defined ( __riscv )
+  #define IMAGE_GZIP
+#endif
 
 /*
  * Command-line commands to include

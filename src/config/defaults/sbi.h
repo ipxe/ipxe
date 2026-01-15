@@ -37,10 +37,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SMBIOS_NULL
 #define TIME_NULL
 
-#define IMAGE_SCRIPT
-#define IMAGE_LKRN
-#define IMAGE_GZIP
-
 #define REBOOT_CMD
 #define POWEROFF_CMD
 #define FDT_CMD

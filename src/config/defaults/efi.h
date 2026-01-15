@@ -36,10 +36,6 @@ FILE_SECBOOT ( PERMITTED );
 
 #define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
 
-#define	IMAGE_EFI		/* EFI image support */
-#define	IMAGE_SCRIPT		/* iPXE script image support */
-#define IMAGE_EFISIG		/* EFI signature list support */
-
 #define	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
 #define	SANBOOT_PROTO_AOE	/* AoE protocol */
 #define	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
@@ -71,7 +67,6 @@ FILE_SECBOOT ( PERMITTED );
 #endif
 
 #if defined ( __aarch64__ )
-#define	IMAGE_GZIP		/* GZIP image support */
 #define FDT_CMD
 #endif
 
