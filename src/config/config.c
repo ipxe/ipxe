@@ -303,9 +303,6 @@ REQUIRE_OBJECT ( shim_cmd );
 #ifdef IMAGE_CRYPT_CMD
 REQUIRE_OBJECT ( image_crypt_cmd );
 #endif
-#ifdef USB_CMD
-REQUIRE_OBJECT ( usb_cmd );
-#endif
 #ifdef FDT_CMD
 REQUIRE_OBJECT ( fdt_cmd );
 #endif
