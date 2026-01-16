@@ -13,7 +13,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <config/defaults.h>
 
 /* Settings sources supported on all platforms */
-//#define ACPI_SETTINGS		/* ACPI settings */
+#define ACPI_SETTINGS		/* ACPI settings */
 #define PCI_SETTINGS		/* PCI device settings */
 #define USB_SETTINGS		/* USB device settings */
 
@@ -29,9 +29,15 @@ FILE_SECBOOT ( PERMITTED );
 
 /* Settings sources supported only on x86 CPUs */
 #if defined ( __i386__ ) || defined ( __x86_64__ )
-  //#define CPUID_SETTINGS	/* CPUID settings */
+  #define CPUID_SETTINGS	/* CPUID settings */
   //#define VMWARE_SETTINGS	/* VMware GuestInfo settings */
   //#define VRAM_SETTINGS	/* Video RAM dump settings */
+#endif
+
+/* Disable settings sources not historically included in BIOS builds */
+#if defined ( PLATFORM_pcbios )
+  #undef ACPI_SETTINGS
+  #undef CPUID_SETTINGS
 #endif
 
 #include <config/named.h>

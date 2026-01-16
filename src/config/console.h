@@ -22,9 +22,9 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 /* Console types supported on all platforms */
-//#define CONSOLE_FRAMEBUFFER	/* Graphical framebuffer console */
-//#define CONSOLE_SYSLOG	/* Syslog console */
-//#define CONSOLE_SYSLOGS	/* Encrypted syslog console */
+#define CONSOLE_FRAMEBUFFER	/* Graphical framebuffer console */
+#define CONSOLE_SYSLOG		/* Syslog console */
+#define CONSOLE_SYSLOGS		/* Encrypted syslog console */
 
 /* Console types supported only on systems with serial ports */
 #if ! defined ( SERIAL_NULL )
@@ -63,6 +63,13 @@ FILE_SECBOOT ( PERMITTED );
 /* Enable serial console on platforms that are typically headless */
 #if defined ( CONSOLE_SBI )
   #define CONSOLE_SERIAL
+#endif
+
+/* Disable console types not historically included in BIOS builds */
+#if defined ( PLATFORM_pcbios )
+  #undef CONSOLE_FRAMEBUFFER
+  #undef CONSOLE_SYSLOG
+  #undef CONSOLE_SYSLOGS
 #endif
 
 /*****************************************************************************

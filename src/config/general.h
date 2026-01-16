@@ -27,8 +27,8 @@ FILE_SECBOOT ( PERMITTED );
 #define NET_PROTO_LLDP		/* Link Layer Discovery protocol */
 #define NET_PROTO_STP		/* Spanning Tree protocol */
 
-/* Disable protocols not historically included in 32-bit BIOS builds */
-#if defined ( PLATFORM_pcbios ) && ! defined ( __x86_64__ )
+/* Disable protocols not historically included in BIOS builds */
+#if defined ( PLATFORM_pcbios )
   #undef NET_PROTO_IPV6
   #undef NET_PROTO_LLDP
 #endif
@@ -42,7 +42,7 @@ FILE_SECBOOT ( PERMITTED );
 /* Protocols supported on all platforms */
 #define DOWNLOAD_PROTO_TFTP	/* Trivial File Transfer Protocol */
 #define DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
-//#define DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
+#define DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
 //#define DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
 //#define DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
 //#define DOWNLOAD_PROTO_NFS	/* Network File System Protocol */
@@ -55,9 +55,15 @@ FILE_SECBOOT ( PERMITTED );
 /* HTTP(S) protocol extensions */
 #define HTTP_AUTH_BASIC		/* Basic authentication */
 #define HTTP_AUTH_DIGEST	/* Digest authentication */
-//#define HTTP_AUTH_NTLM	/* NTLM authentication */
+#define HTTP_AUTH_NTLM		/* NTLM authentication */
 //#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
 //#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
+
+/* Disable protocols not historically included in BIOS builds */
+#if defined ( PLATFORM_pcbios )
+  #undef DOWNLOAD_PROTO_HTTPS
+  #undef HTTP_AUTH_NTLM
+#endif
 
 /*****************************************************************************
  *
@@ -82,10 +88,10 @@ FILE_SECBOOT ( PERMITTED );
 
 /* Commands supported on all platforms */
 #define AUTOBOOT_CMD		/* Automatic booting */
-//#define CERT_CMD		/* Certificate management commands */
+#define CERT_CMD		/* Certificate management commands */
 #define CONFIG_CMD		/* Option configuration console */
-//#define CONSOLE_CMD		/* Console command */
-//#define DIGEST_CMD		/* Image crypto digest commands */
+#define CONSOLE_CMD		/* Console command */
+#define DIGEST_CMD		/* Image crypto digest commands */
 #define DHCP_CMD		/* DHCP management commands */
 #define FCMGMT_CMD		/* Fibre Channel management commands */
 #define FORM_CMD		/* Form commands */
@@ -103,10 +109,10 @@ FILE_SECBOOT ( PERMITTED );
 #define MENU_CMD		/* Menu commands */
 //#define NEIGHBOUR_CMD		/* Neighbour management commands */
 //#define NSLOOKUP_CMD		/* DNS resolving command */
-//#define NTP_CMD		/* NTP commands */
+#define NTP_CMD			/* NTP commands */
 #define NVO_CMD			/* Non-volatile option storage commands */
-//#define PARAM_CMD		/* Request parameter commands */
-//#define PCI_CMD		/* PCI commands */
+#define PARAM_CMD		/* Request parameter commands */
+#define PCI_CMD			/* PCI commands */
 //#define PING_CMD		/* Ping command */
 //#define PROFSTAT_CMD		/* Profiling commands */
 //#define PXE_CMD		/* PXE commands */
@@ -116,8 +122,8 @@ FILE_SECBOOT ( PERMITTED );
 #define SHIM_CMD		/* EFI shim command (or dummy command) */
 #define SYNC_CMD		/* Sync command */
 //#define TIME_CMD		/* Time commands */
-//#define USB_CMD		/* USB commands */
-//#define VLAN_CMD		/* VLAN commands */
+#define USB_CMD			/* USB commands */
+#define VLAN_CMD		/* VLAN commands */
 
 /* Commands supported only on systems capable of rebooting */
 #if ! defined ( REBOOT_NULL )
@@ -133,6 +139,18 @@ FILE_SECBOOT ( PERMITTED );
 /* Commands supported only on x86 CPUs */
 #if defined ( __i386__ ) || defined ( __x86_64__ )
   #define CPUID_CMD		/* x86 CPU feature detection command */
+#endif
+
+/* Disable commands not historically included in BIOS builds */
+#if defined ( PLATFORM_pcbios )
+  #undef CERT_CMD
+  #undef CONSOLE_CMD
+  #undef DIGEST_CMD
+  #undef NTP_CMD
+  #undef PARAM_CMD
+  #undef PCI_CMD
+  #undef USB_CMD
+  #undef VLAN_CMD
 #endif
 
 /*****************************************************************************
