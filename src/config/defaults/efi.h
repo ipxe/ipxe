@@ -14,7 +14,6 @@ FILE_SECBOOT ( PERMITTED );
 #define IOMAP_VIRT
 #define PCIAPI_EFI
 #define DMAAPI_OP
-#define CONSOLE_EFI
 #define TIMER_EFI
 #define UMALLOC_EFI
 #define MEMMAP_NULL
