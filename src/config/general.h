@@ -58,18 +58,24 @@ FILE_SECBOOT ( PERMITTED );
 //#undef	PXE_STACK		/* PXE stack in iPXE - you want this! */
 //#undef	PXE_MENU		/* PXE menu booting */
 
-/*
+/*****************************************************************************
+ *
  * Download protocols
  *
  */
 
-#define	DOWNLOAD_PROTO_TFTP	/* Trivial File Transfer Protocol */
-#define	DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
-#undef	DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
-#undef	DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
-#undef	DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
-#undef	DOWNLOAD_PROTO_NFS	/* Network File System Protocol */
-//#undef DOWNLOAD_PROTO_FILE	/* Local filesystem access */
+/* Protocols supported on all platforms */
+#define DOWNLOAD_PROTO_TFTP	/* Trivial File Transfer Protocol */
+#define DOWNLOAD_PROTO_HTTP	/* Hypertext Transfer Protocol */
+//#define DOWNLOAD_PROTO_HTTPS	/* Secure Hypertext Transfer Protocol */
+//#define DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
+//#define DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
+//#define DOWNLOAD_PROTO_NFS	/* Network File System Protocol */
+
+/* Protocols supported only on platforms with filesystem abstractions */
+#if defined ( PLATFORM_efi )
+  #define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
+#endif
 
 /*
  * SAN boot protocols

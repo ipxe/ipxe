@@ -30,8 +30,6 @@ FILE_SECBOOT ( PERMITTED );
 #define NAP_EFI
 #define SERIAL_SPCR
 
-#define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
-
 #define	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
 #define	SANBOOT_PROTO_AOE	/* AoE protocol */
 #define	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
