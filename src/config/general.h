@@ -14,26 +14,6 @@ FILE_SECBOOT ( PERMITTED );
 
 /*****************************************************************************
  *
- * Banner timeout configuration
- *
- * This controls the timeout for the "Press Ctrl-B for the iPXE
- * command line" banner displayed when iPXE starts up.  The value is
- * specified in tenths of a second for which the banner should appear.
- * A value of 0 disables the banner.
- *
- * ROM_BANNER_TIMEOUT controls the "Press Ctrl-B to configure iPXE"
- * banner displayed only by ROM builds of iPXE during POST.  This
- * defaults to being twice the length of BANNER_TIMEOUT, to allow for
- * BIOSes that switch video modes immediately before calling the
- * initialisation vector, thus rendering the banner almost invisible
- * to the user.
- */
-
-#define BANNER_TIMEOUT		20
-#define ROM_BANNER_TIMEOUT	( 2 * BANNER_TIMEOUT )
-
-/*****************************************************************************
- *
  * Network protocols
  *
  */
@@ -55,17 +35,6 @@ FILE_SECBOOT ( PERMITTED );
 
 /*****************************************************************************
  *
- * PXE support
- *
- */
-
-#if defined ( PLATFORM_pcbios )
-  #define PXE_MENU		/* PXE menu booting */
-  #define PXE_STACK		/* PXE stack in iPXE - you want this! */
-#endif
-
-/*****************************************************************************
- *
  * Download protocols
  *
  */
@@ -82,6 +51,13 @@ FILE_SECBOOT ( PERMITTED );
 #if defined ( PLATFORM_efi )
   #define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
 #endif
+
+/* HTTP(S) protocol extensions */
+#define HTTP_AUTH_BASIC		/* Basic authentication */
+#define HTTP_AUTH_DIGEST	/* Digest authentication */
+//#define HTTP_AUTH_NTLM	/* NTLM authentication */
+//#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
+//#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
 
 /*****************************************************************************
  *
@@ -100,99 +76,7 @@ FILE_SECBOOT ( PERMITTED );
 
 /*****************************************************************************
  *
- * HTTP extensions
- *
- */
-
-#define HTTP_AUTH_BASIC		/* Basic authentication */
-#define HTTP_AUTH_DIGEST	/* Digest authentication */
-//#define HTTP_AUTH_NTLM	/* NTLM authentication */
-//#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
-//#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
-
-/*****************************************************************************
- *
- * 802.11 cryptosystems and handshaking protocols
- *
- */
-
-#define CRYPTO_80211_WEP	/* WEP encryption (deprecated and insecure!) */
-#define CRYPTO_80211_WPA	/* WPA Personal, with passphrase */
-#define CRYPTO_80211_WPA2	/* Add support for stronger WPA cryptography */
-
-/*****************************************************************************
- *
- * 802.1x EAP authentication methods
- *
- */
-
-#define EAP_METHOD_MD5		/* MD5-Challenge port authentication */
-//#define EAP_METHOD_MSCHAPV2	/* MS-CHAPv2 port authentication */
-
-/*****************************************************************************
-*
- * Name resolution modules
- *
- */
-
-#define DNS_RESOLVER		/* DNS resolver */
-
-/*****************************************************************************
- *
- * Image types
- *
- * iPXE supports various image formats.  Select whichever ones you
- * want to use.
- *
- */
-
-/* Image types supported on all platforms */
-#define IMAGE_DER		/* ASN.1 DER-encoded image support */
-//#define IMAGE_GZIP		/* GZIP compressed image support */
-#define IMAGE_PEM		/* ASN.1 PEM-encoded image support */
-//#define IMAGE_PNM		/* PNM graphical image support */
-#define IMAGE_PNG		/* PNG graphical image support */
-#define IMAGE_SCRIPT		/* iPXE script image support */
-//#define IMAGE_ZLIB		/* ZLIB compressed image support */
-
-/* Image types supported only on BIOS platforms */
-#if defined ( PLATFORM_pcbios )
-  #define IMAGE_BZIMAGE		/* Linux bzImage image support */
-  //#define IMAGE_COMBOOT	/* SYSLINUX COMBOOT image support */
-  #define IMAGE_ELF		/* ELF image support */
-  #define IMAGE_MULTIBOOT	/* MultiBoot image support */
-  //#define IMAGE_NBI		/* NBI image support */
-  #define IMAGE_PXE		/* PXE image support */
-  //#define IMAGE_SDI		/* SDI image support */
-#endif
-
-/* Image types supported only on EFI platforms */
-#if defined ( PLATFORM_efi )
-  #define IMAGE_EFI		/* EFI image support */
-  #define IMAGE_EFISIG		/* EFI signature list image support */
-#endif
-
-/* Image types supported only on RISC-V SBI platforms */
-#if defined ( PLATFORM_sbi )
-  #define IMAGE_LKRN		/* Linux kernel image support */
-#endif
-
-/* Image types supported only on x86 CPUs */
-#if defined ( __i386__ ) || defined ( __x86_64__ )
-  //#define IMAGE_UCODE		/* Microcode update image support */
-#endif
-
-/* Enable commonly encountered compressed versions of some image types */
-#if defined ( IMAGE_EFI ) && defined ( __aarch64__ )
-  #define IMAGE_GZIP
-#endif
-#if defined ( IMAGE_LKRN ) && defined ( __riscv )
-  #define IMAGE_GZIP
-#endif
-
-/*****************************************************************************
- *
- * Command-line and script commands to include
+ * Command-line and script commands
  *
  */
 
@@ -253,13 +137,73 @@ FILE_SECBOOT ( PERMITTED );
 
 /*****************************************************************************
  *
- * Certificate sources
+ * Image types
  *
  */
 
-#if defined ( PLATFORM_efi )
-  #define CERTS_EFI		/* EFI certificate sources */
+/* Image types supported on all platforms */
+#define IMAGE_DER		/* ASN.1 DER-encoded image support */
+//#define IMAGE_GZIP		/* GZIP compressed image support */
+#define IMAGE_PEM		/* ASN.1 PEM-encoded image support */
+//#define IMAGE_PNM		/* PNM graphical image support */
+#define IMAGE_PNG		/* PNG graphical image support */
+#define IMAGE_SCRIPT		/* iPXE script image support */
+//#define IMAGE_ZLIB		/* ZLIB compressed image support */
+
+/* Image types supported only on BIOS platforms */
+#if defined ( PLATFORM_pcbios )
+  #define IMAGE_BZIMAGE		/* Linux bzImage image support */
+  //#define IMAGE_COMBOOT	/* SYSLINUX COMBOOT image support */
+  #define IMAGE_ELF		/* ELF image support */
+  #define IMAGE_MULTIBOOT	/* MultiBoot image support */
+  //#define IMAGE_NBI		/* NBI image support */
+  #define IMAGE_PXE		/* PXE image support */
+  //#define IMAGE_SDI		/* SDI image support */
 #endif
+
+/* Image types supported only on EFI platforms */
+#if defined ( PLATFORM_efi )
+  #define IMAGE_EFI		/* EFI image support */
+  #define IMAGE_EFISIG		/* EFI signature list image support */
+#endif
+
+/* Image types supported only on RISC-V SBI platforms */
+#if defined ( PLATFORM_sbi )
+  #define IMAGE_LKRN		/* Linux kernel image support */
+#endif
+
+/* Image types supported only on x86 CPUs */
+#if defined ( __i386__ ) || defined ( __x86_64__ )
+  //#define IMAGE_UCODE		/* Microcode update image support */
+#endif
+
+/* Enable commonly encountered compressed versions of some image types */
+#if defined ( IMAGE_EFI ) && defined ( __aarch64__ )
+  #define IMAGE_GZIP
+#endif
+#if defined ( IMAGE_LKRN ) && defined ( __riscv )
+  #define IMAGE_GZIP
+#endif
+
+/*****************************************************************************
+ *
+ * Banner timeout configuration
+ *
+ * This controls the timeout for the "Press Ctrl-B for the iPXE
+ * command line" banner displayed when iPXE starts up.  The value is
+ * specified in tenths of a second for which the banner should appear.
+ * A value of 0 disables the banner.
+ *
+ * ROM_BANNER_TIMEOUT controls the "Press Ctrl-B to configure iPXE"
+ * banner displayed only by ROM builds of iPXE during POST.  This
+ * defaults to being twice the length of BANNER_TIMEOUT, to allow for
+ * BIOSes that switch video modes immediately before calling the
+ * initialisation vector, thus rendering the banner almost invisible
+ * to the user.
+ */
+
+#define BANNER_TIMEOUT		20
+#define ROM_BANNER_TIMEOUT	( 2 * BANNER_TIMEOUT )
 
 /*****************************************************************************
  *
@@ -272,12 +216,60 @@ FILE_SECBOOT ( PERMITTED );
 
 /*****************************************************************************
  *
+ * PXE support
+ *
+ */
+
+#if defined ( PLATFORM_pcbios )
+  #define PXE_MENU		/* PXE menu booting */
+  #define PXE_STACK		/* PXE stack in iPXE - you want this! */
+#endif
+
+/*****************************************************************************
+*
+ * Name resolution modules
+ *
+ */
+
+#define DNS_RESOLVER		/* DNS resolver */
+
+/*****************************************************************************
+ *
+ * Certificate sources
+ *
+ */
+
+#if defined ( PLATFORM_efi )
+  #define CERTS_EFI		/* EFI certificate sources */
+#endif
+
+/*****************************************************************************
+ *
  * Virtual network devices
  *
  */
 
 #define VNIC_IPOIB		/* Infiniband IPoIB virtual NICs */
 //#define VNIC_XSIGO		/* Infiniband Xsigo virtual NICs */
+
+/*****************************************************************************
+ *
+ * 802.1x EAP authentication methods
+ *
+ */
+
+#define EAP_METHOD_MD5		/* MD5-Challenge port authentication */
+//#define EAP_METHOD_MSCHAPV2	/* MS-CHAPv2 port authentication */
+
+/*****************************************************************************
+ *
+ * 802.11 cryptosystems and handshaking protocols
+ *
+ */
+
+#define CRYPTO_80211_WEP	/* WEP encryption (deprecated and insecure!) */
+#define CRYPTO_80211_WPA	/* WPA Personal, with passphrase */
+#define CRYPTO_80211_WPA2	/* Add support for stronger WPA cryptography */
 
 /*****************************************************************************
  *
