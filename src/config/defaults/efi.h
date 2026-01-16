@@ -30,12 +30,6 @@ FILE_SECBOOT ( PERMITTED );
 #define NAP_EFI
 #define SERIAL_SPCR
 
-#define	USB_HCD_XHCI		/* xHCI USB host controller */
-#define	USB_HCD_EHCI		/* EHCI USB host controller */
-#define	USB_HCD_UHCI		/* UHCI USB host controller */
-#define	USB_EFI			/* Provide EFI_USB_IO_PROTOCOL interface */
-#define USB_BLOCK		/* USB block devices */
-
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define ENTROPY_RDRAND

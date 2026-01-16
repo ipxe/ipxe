@@ -35,10 +35,4 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define IOMAP_VIRT
 #endif
 
-#define	USB_HCD_XHCI		/* xHCI USB host controller */
-#define	USB_HCD_EHCI		/* EHCI USB host controller */
-#define	USB_HCD_UHCI		/* UHCI USB host controller */
-#define	USB_KEYBOARD		/* USB keyboards */
-#define USB_BLOCK		/* USB block devices */
-
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */
