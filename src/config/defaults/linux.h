@@ -29,12 +29,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define DRIVERS_LINUX
 
-#define SANBOOT_PROTO_ISCSI
-#define SANBOOT_PROTO_AOE
-#define SANBOOT_PROTO_IB_SRP
-#define SANBOOT_PROTO_FCP
-#define SANBOOT_PROTO_HTTP
-
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define ENTROPY_RDRAND
 #endif

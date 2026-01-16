@@ -77,16 +77,20 @@ FILE_SECBOOT ( PERMITTED );
   #define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
 #endif
 
-/*
+/*****************************************************************************
+ *
  * SAN boot protocols
  *
  */
 
-//#undef	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
-//#undef	SANBOOT_PROTO_AOE	/* AoE protocol */
-//#undef	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
-//#undef	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
-//#undef	SANBOOT_PROTO_HTTP	/* HTTP SAN protocol */
+/* Protocols supported on all platforms with SAN boot abstractions */
+#if ! defined ( SANBOOT_NULL )
+  #define SANBOOT_PROTO_AOE	/* AoE protocol */
+  #define SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
+  #define SANBOOT_PROTO_HTTP	/* HTTP SAN protocol */
+  #define SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
+  #define SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
+#endif
 
 /*
  * HTTP extensions

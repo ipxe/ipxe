@@ -30,12 +30,6 @@ FILE_SECBOOT ( PERMITTED );
 #define NAP_EFI
 #define SERIAL_SPCR
 
-#define	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
-#define	SANBOOT_PROTO_AOE	/* AoE protocol */
-#define	SANBOOT_PROTO_IB_SRP	/* Infiniband SCSI RDMA protocol */
-#define	SANBOOT_PROTO_FCP	/* Fibre Channel protocol */
-#define	SANBOOT_PROTO_HTTP	/* HTTP SAN protocol */
-
 #define	USB_HCD_XHCI		/* xHCI USB host controller */
 #define	USB_HCD_EHCI		/* EHCI USB host controller */
 #define	USB_HCD_UHCI		/* UHCI USB host controller */
