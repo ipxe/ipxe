@@ -22,6 +22,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
+#include <config/general.h>
 #include <config/settings.h>
 #include <config/ioapi.h>
 
@@ -33,6 +34,9 @@ FILE_SECBOOT ( PERMITTED );
 
 PROVIDE_REQUIRING_SYMBOL();
 
+#ifdef PCI_CMD
+REQUIRE_OBJECT ( pci_cmd );
+#endif
 #ifdef PCI_SETTINGS
 REQUIRE_OBJECT ( pci_settings );
 #endif

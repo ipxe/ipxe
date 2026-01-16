@@ -270,9 +270,6 @@ REQUIRE_OBJECT ( shell );
 #ifdef NSLOOKUP_CMD
 REQUIRE_OBJECT ( nslookup_cmd );
 #endif
-#ifdef PCI_CMD
-REQUIRE_OBJECT ( pci_cmd );
-#endif
 #ifdef PARAM_CMD
 REQUIRE_OBJECT ( param_cmd );
 #endif
