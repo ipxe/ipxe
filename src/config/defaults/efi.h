@@ -38,8 +38,6 @@ FILE_SECBOOT ( PERMITTED );
 
 #define EFI_SETTINGS		/* EFI variable settings */
 
-#define CERTS_EFI		/* EFI certificate sources */
-
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define ENTROPY_RDRAND

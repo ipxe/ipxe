@@ -12,7 +12,8 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <config/defaults.h>
 
-/*
+/*****************************************************************************
+ *
  * Banner timeout configuration
  *
  * This controls the timeout for the "Press Ctrl-B for the iPXE
@@ -27,6 +28,7 @@ FILE_SECBOOT ( PERMITTED );
  * initialisation vector, thus rendering the banner almost invisible
  * to the user.
  */
+
 #define BANNER_TIMEOUT		20
 #define ROM_BANNER_TIMEOUT	( 2 * BANNER_TIMEOUT )
 
@@ -51,12 +53,16 @@ FILE_SECBOOT ( PERMITTED );
   #undef NET_PROTO_LLDP
 #endif
 
-/*
+/*****************************************************************************
+ *
  * PXE support
  *
  */
-//#undef	PXE_STACK		/* PXE stack in iPXE - you want this! */
-//#undef	PXE_MENU		/* PXE menu booting */
+
+#if defined ( PLATFORM_pcbios )
+  #define PXE_MENU		/* PXE menu booting */
+  #define PXE_STACK		/* PXE stack in iPXE - you want this! */
+#endif
 
 /*****************************************************************************
  *
@@ -92,37 +98,44 @@ FILE_SECBOOT ( PERMITTED );
   #define SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
 #endif
 
-/*
+/*****************************************************************************
+ *
  * HTTP extensions
  *
  */
+
 #define HTTP_AUTH_BASIC		/* Basic authentication */
 #define HTTP_AUTH_DIGEST	/* Digest authentication */
 //#define HTTP_AUTH_NTLM	/* NTLM authentication */
 //#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
 //#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
 
-/*
+/*****************************************************************************
+ *
  * 802.11 cryptosystems and handshaking protocols
  *
  */
-#define	CRYPTO_80211_WEP	/* WEP encryption (deprecated and insecure!) */
-#define	CRYPTO_80211_WPA	/* WPA Personal, authenticating with passphrase */
-#define	CRYPTO_80211_WPA2	/* Add support for stronger WPA cryptography */
 
-/*
+#define CRYPTO_80211_WEP	/* WEP encryption (deprecated and insecure!) */
+#define CRYPTO_80211_WPA	/* WPA Personal, with passphrase */
+#define CRYPTO_80211_WPA2	/* Add support for stronger WPA cryptography */
+
+/*****************************************************************************
+ *
  * 802.1x EAP authentication methods
  *
  */
+
 #define EAP_METHOD_MD5		/* MD5-Challenge port authentication */
 //#define EAP_METHOD_MSCHAPV2	/* MS-CHAPv2 port authentication */
 
-/*
+/*****************************************************************************
+*
  * Name resolution modules
  *
  */
 
-#define	DNS_RESOLVER		/* DNS resolver */
+#define DNS_RESOLVER		/* DNS resolver */
 
 /*****************************************************************************
  *
@@ -238,53 +251,50 @@ FILE_SECBOOT ( PERMITTED );
   #define CPUID_CMD		/* x86 CPU feature detection command */
 #endif
 
-/*
+/*****************************************************************************
+ *
  * Certificate sources
  *
  */
-//#undef CERTS_EFI		/* EFI certificate sources */
 
-/*
+#if defined ( PLATFORM_efi )
+  #define CERTS_EFI		/* EFI certificate sources */
+#endif
+
+/*****************************************************************************
+ *
  * ROM-specific options
  *
  */
-#undef	NONPNP_HOOK_INT19	/* Hook INT19 on non-PnP BIOSes */
-#define	AUTOBOOT_ROM_FILTER	/* Autoboot only devices matching our ROM */
 
-/*
+#define AUTOBOOT_ROM_FILTER	/* Autoboot only devices matching our ROM */
+//#define NONPNP_HOOK_INT19	/* Hook INT19 on non-PnP BIOSes */
+
+/*****************************************************************************
+ *
  * Virtual network devices
  *
  */
+
 #define VNIC_IPOIB		/* Infiniband IPoIB virtual NICs */
 //#define VNIC_XSIGO		/* Infiniband Xsigo virtual NICs */
 
-/*
- * Error message tables to include
+/*****************************************************************************
  *
- */
-#undef	ERRMSG_80211		/* All 802.11 error descriptions (~3.3kb) */
-
-/*
- * Obscure configuration options
+ * Very obscure configuration options
  *
  * You probably don't need to touch these.
  *
  */
 
-#undef	BUILD_SERIAL		/* Include an automatic build serial
-				 * number.  Add "bs" to the list of
-				 * make targets.  For example:
-				 * "make bin/rtl8139.dsk bs" */
-#undef	BUILD_ID		/* Include a custom build ID string,
-				 * e.g "test-foo" */
-#undef	NULL_TRAP		/* Attempt to catch NULL function calls */
-#undef	GDBSERIAL		/* Remote GDB debugging over serial */
-#undef	GDBUDP			/* Remote GDB debugging over UDP
-				 * (both may be set) */
+//#define NULL_TRAP		/* Attempt to catch NULL function calls */
+//#define GDBSERIAL		/* Remote GDB debugging over serial */
+//#define GDBUDP		/* Remote GDB debugging over UDP */
 //#define EFI_DOWNGRADE_UX	/* Downgrade UEFI user experience */
-#define	TIVOLI_VMM_WORKAROUND	/* Work around the Tivoli VMM's garbling of SSE
+#define TIVOLI_VMM_WORKAROUND	/* Work around the Tivoli VMM's garbling of SSE
 				 * registers when iPXE traps to it due to
 				 * privileged instructions */
+//#define ERRMSG_80211		/* All 802.11 error descriptions (~3.3kb) */
 
 #include <config/named.h>
 #include NAMED_CONFIG(general.h)

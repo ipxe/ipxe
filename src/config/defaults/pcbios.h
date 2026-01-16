@@ -35,9 +35,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define IOMAP_VIRT
 #endif
 
-#define PXE_STACK		/* PXE stack in iPXE - required for PXELINUX */
-#define PXE_MENU		/* PXE menu booting */
-
 #define	USB_HCD_XHCI		/* xHCI USB host controller */
 #define	USB_HCD_EHCI		/* EHCI USB host controller */
 #define	USB_HCD_UHCI		/* UHCI USB host controller */
