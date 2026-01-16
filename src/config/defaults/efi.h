@@ -36,8 +36,6 @@ FILE_SECBOOT ( PERMITTED );
 #define	USB_EFI			/* Provide EFI_USB_IO_PROTOCOL interface */
 #define USB_BLOCK		/* USB block devices */
 
-#define EFI_SETTINGS		/* EFI variable settings */
-
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define ENTROPY_RDRAND
