@@ -30,18 +30,26 @@ FILE_SECBOOT ( PERMITTED );
 #define BANNER_TIMEOUT		20
 #define ROM_BANNER_TIMEOUT	( 2 * BANNER_TIMEOUT )
 
-/*
+/*****************************************************************************
+ *
  * Network protocols
  *
  */
 
-#define	NET_PROTO_IPV4		/* IPv4 protocol */
-//#define NET_PROTO_IPV6	/* IPv6 protocol */
-#undef	NET_PROTO_FCOE		/* Fibre Channel over Ethernet protocol */
-#define	NET_PROTO_STP		/* Spanning Tree protocol */
-#define	NET_PROTO_LACP		/* Link Aggregation control protocol */
-#define	NET_PROTO_EAPOL		/* EAP over LAN protocol */
-//#define NET_PROTO_LLDP	/* Link Layer Discovery protocol */
+/* Protocols supported on all platforms */
+#define NET_PROTO_EAPOL		/* EAP over LAN protocol */
+//#define NET_PROTO_FCOE	/* Fibre Channel over Ethernet protocol */
+#define NET_PROTO_IPV4		/* IPv4 protocol */
+#define NET_PROTO_IPV6		/* IPv6 protocol */
+#define NET_PROTO_LACP		/* Link Aggregation control protocol */
+#define NET_PROTO_LLDP		/* Link Layer Discovery protocol */
+#define NET_PROTO_STP		/* Spanning Tree protocol */
+
+/* Disable protocols not historically included in 32-bit BIOS builds */
+#if defined ( PLATFORM_pcbios ) && ! defined ( __x86_64__ )
+  #undef NET_PROTO_IPV6
+  #undef NET_PROTO_LLDP
+#endif
 
 /*
  * PXE support

@@ -30,9 +30,6 @@ FILE_SECBOOT ( PERMITTED );
 #define NAP_EFI
 #define SERIAL_SPCR
 
-#define	NET_PROTO_IPV6		/* IPv6 protocol */
-#define	NET_PROTO_LLDP		/* Link Layer Discovery protocol */
-
 #define DOWNLOAD_PROTO_FILE	/* Local filesystem access */
 
 #define	SANBOOT_PROTO_ISCSI	/* iSCSI protocol */
