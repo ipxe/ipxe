@@ -68,6 +68,19 @@ struct ndp_prefix_information_option {
 /** NDP autonomous address configuration flag */
 #define NDP_PREFIX_AUTONOMOUS 0x40
 
+/** NDP MTU information option */
+#define NDP_OPT_MTU 5
+
+/** NDP MTU information */
+struct ndp_mtu_option {
+	/** NDP option header */
+	struct ndp_option_header header;
+	/** Reserved */
+	uint16_t reserved;
+	/** MTU */
+	uint32_t mtu;
+} __attribute__ (( packed ));
+
 /** NDP recursive DNS server option */
 #define NDP_OPT_RDNSS 25
 
@@ -106,6 +119,8 @@ union ndp_option {
 	struct ndp_ll_addr_option ll_addr;
 	/** Prefix information option */
 	struct ndp_prefix_information_option prefix;
+	/** MTU option */
+	struct ndp_mtu_option mtu;
 	/** Recursive DNS server option */
 	struct ndp_rdnss_option rdnss;
 	/** DNS search list option */
