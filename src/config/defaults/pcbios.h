@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ACPI_RSDP
 #define MPAPI_PCBIOS
 #define SERIAL_SPCR
+#define FDT_NULL
 
 #ifdef __x86_64__
 #define IOMAP_PAGES
@@ -48,8 +49,5 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define	USB_HCD_UHCI		/* UHCI USB host controller */
 #define	USB_KEYBOARD		/* USB keyboards */
 #define USB_BLOCK		/* USB block devices */
-
-#define	REBOOT_CMD		/* Reboot command */
-#define	CPUID_CMD		/* x86 CPU feature detection command */
 
 #endif /* CONFIG_DEFAULTS_PCBIOS_H */

@@ -26,7 +26,6 @@ FILE_SECBOOT ( PERMITTED );
 #define TIME_EFI
 #define REBOOT_EFI
 #define ACPI_EFI
-#define FDT_EFI
 #define MPAPI_EFI
 #define NAP_EFI
 #define SERIAL_SPCR
@@ -48,8 +47,6 @@ FILE_SECBOOT ( PERMITTED );
 #define	USB_EFI			/* Provide EFI_USB_IO_PROTOCOL interface */
 #define USB_BLOCK		/* USB block devices */
 
-#define	REBOOT_CMD		/* Reboot command */
-
 #define EFI_SETTINGS		/* EFI variable settings */
 
 #define CERTS_EFI		/* EFI certificate sources */
@@ -57,26 +54,23 @@ FILE_SECBOOT ( PERMITTED );
 #if defined ( __i386__ ) || defined ( __x86_64__ )
 #define IOAPI_X86
 #define ENTROPY_RDRAND
-#define	CPUID_CMD		/* x86 CPU feature detection command */
 #define	UNSAFE_STD		/* Avoid setting direction flag */
+#define FDT_NULL
 #endif
 
 #if defined ( __arm__ ) || defined ( __aarch64__ )
 #define IOAPI_ARM
-#define FDT_CMD
-#endif
-
-#if defined ( __aarch64__ )
-#define FDT_CMD
+#define FDT_EFI
 #endif
 
 #if defined ( __loongarch__ )
 #define IOAPI_LOONG64
+#define FDT_EFI
 #endif
 
 #if defined ( __riscv )
 #define IOAPI_RISCV
-#define FDT_CMD
+#define FDT_EFI
 #endif
 
 #endif /* CONFIG_DEFAULTS_EFI_H */

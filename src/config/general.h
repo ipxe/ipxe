@@ -159,50 +159,66 @@ FILE_SECBOOT ( PERMITTED );
   #define IMAGE_GZIP
 #endif
 
-/*
- * Command-line commands to include
+/*****************************************************************************
+ *
+ * Command-line and script commands to include
  *
  */
-#define	AUTOBOOT_CMD		/* Automatic booting */
-#define	NVO_CMD			/* Non-volatile option storage commands */
-#define	CONFIG_CMD		/* Option configuration console */
-#define	IFMGMT_CMD		/* Interface management commands */
-#define	IWMGMT_CMD		/* Wireless interface management commands */
-#define IBMGMT_CMD		/* Infiniband management commands */
-#define FCMGMT_CMD		/* Fibre Channel management commands */
-#define	ROUTE_CMD		/* Routing table management commands */
-#define IMAGE_CMD		/* Image management commands */
-#define DHCP_CMD		/* DHCP management commands */
-#define SANBOOT_CMD		/* SAN boot commands */
-#define MENU_CMD		/* Menu commands */
-#define FORM_CMD		/* Form commands */
-#define LOGIN_CMD		/* Login command */
-#define SYNC_CMD		/* Sync command */
-#define SHELL_CMD		/* Shell command */
-//#define NSLOOKUP_CMD		/* DNS resolving command */
-//#define TIME_CMD		/* Time commands */
-//#define DIGEST_CMD		/* Image crypto digest commands */
-//#define LOTEST_CMD		/* Loopback testing commands */
-//#define VLAN_CMD		/* VLAN commands */
-//#define PXE_CMD		/* PXE commands */
-//#define REBOOT_CMD		/* Reboot command */
-//#define POWEROFF_CMD		/* Power off command */
-//#define IMAGE_TRUST_CMD	/* Image trust management commands */
-//#define IMAGE_CRYPT_CMD	/* Image encryption management commands */
-//#define PCI_CMD		/* PCI commands */
-//#define PARAM_CMD		/* Request parameter commands */
-//#define NEIGHBOUR_CMD		/* Neighbour management commands */
-//#define PING_CMD		/* Ping command */
-//#define CONSOLE_CMD		/* Console command */
-//#define IPSTAT_CMD		/* IP statistics commands */
-//#define PROFSTAT_CMD		/* Profiling commands */
-//#define NTP_CMD		/* NTP commands */
+
+/* Commands supported on all platforms */
+#define AUTOBOOT_CMD		/* Automatic booting */
 //#define CERT_CMD		/* Certificate management commands */
-//#define IMAGE_MEM_CMD		/* Read memory command */
+#define CONFIG_CMD		/* Option configuration console */
+//#define CONSOLE_CMD		/* Console command */
+//#define DIGEST_CMD		/* Image crypto digest commands */
+#define DHCP_CMD		/* DHCP management commands */
+#define FCMGMT_CMD		/* Fibre Channel management commands */
+#define FORM_CMD		/* Form commands */
+#define IBMGMT_CMD		/* Infiniband management commands */
+#define IFMGMT_CMD		/* Interface management commands */
+#define IMAGE_CMD		/* Image management commands */
 #define IMAGE_ARCHIVE_CMD	/* Archive image management commands */
+//#define IMAGE_CRYPT_CMD	/* Image encryption management commands */
+//#define IMAGE_MEM_CMD		/* Read memory command */
+//#define IMAGE_TRUST_CMD	/* Image trust management commands */
+//#define IPSTAT_CMD		/* IP statistics commands */
+#define IWMGMT_CMD		/* Wireless interface management commands */
+#define LOGIN_CMD		/* Login command */
+//#define LOTEST_CMD		/* Loopback testing commands */
+#define MENU_CMD		/* Menu commands */
+//#define NEIGHBOUR_CMD		/* Neighbour management commands */
+//#define NSLOOKUP_CMD		/* DNS resolving command */
+//#define NTP_CMD		/* NTP commands */
+#define NVO_CMD			/* Non-volatile option storage commands */
+//#define PARAM_CMD		/* Request parameter commands */
+//#define PCI_CMD		/* PCI commands */
+//#define PING_CMD		/* Ping command */
+//#define PROFSTAT_CMD		/* Profiling commands */
+//#define PXE_CMD		/* PXE commands */
+#define ROUTE_CMD		/* Routing table management commands */
+#define SANBOOT_CMD		/* SAN boot commands */
+#define SHELL_CMD		/* Shell command */
 #define SHIM_CMD		/* EFI shim command (or dummy command) */
+#define SYNC_CMD		/* Sync command */
+//#define TIME_CMD		/* Time commands */
 //#define USB_CMD		/* USB commands */
-//#define FDT_CMD		/* Flattened Device Tree commands */
+//#define VLAN_CMD		/* VLAN commands */
+
+/* Commands supported only on systems capable of rebooting */
+#if ! defined ( REBOOT_NULL )
+  #define POWEROFF_CMD		/* Power off command */
+  #define REBOOT_CMD		/* Reboot command */
+#endif
+
+/* Commands supported only on systems that may use FDTs */
+#if ! defined ( FDT_NULL )
+  #define FDT_CMD		/* Flattened Device Tree commands */
+#endif
+
+/* Commands supported only on x86 CPUs */
+#if defined ( __i386__ ) || defined ( __x86_64__ )
+  #define CPUID_CMD		/* x86 CPU feature detection command */
+#endif
 
 /*
  * Certificate sources

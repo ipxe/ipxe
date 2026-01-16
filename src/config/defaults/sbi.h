@@ -22,6 +22,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define DMAAPI_FLAT
 #endif
 
+#define FDT_SBI
 #define CONSOLE_SBI
 #define CONSOLE_SERIAL
 #define REBOOT_SBI
@@ -36,9 +37,5 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define SANBOOT_NULL
 #define SMBIOS_NULL
 #define TIME_NULL
-
-#define REBOOT_CMD
-#define POWEROFF_CMD
-#define FDT_CMD
 
 #endif /* CONFIG_DEFAULTS_SBI_H */
