@@ -6,7 +6,7 @@ jobs:
 
   cache:
     name: Cache
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Cache permissions
         run: |
@@ -22,13 +22,13 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y -d -o Acquire::Retries=50 \
-                           mtools syslinux isolinux \
-                           libc6-dev-i386 valgrind \
+                           mtools syslinux isolinux genisoimage \
+                           libc6-dev-i386 liblzma-dev valgrind \
                            gcc-arm-none-eabi gcc-aarch64-linux-gnu
 
   x86:
     name: x86
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: cache
     steps:
       - name: Check out code
@@ -48,8 +48,8 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt update
           sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux \
-                           libc6-dev-i386 valgrind \
+                           mtools syslinux isolinux genisoimage \
+                           libc6-dev-i386 liblzma-dev valgrind \
                            libgcc-s1:i386 libc6-dbg:i386
       - name: Build (BIOS)
         run: |
@@ -64,7 +64,7 @@ jobs:
 
   arm32:
     name: ARM32
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: cache
     steps:
       - name: Check out code
@@ -83,7 +83,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-arm-none-eabi
+                           mtools syslinux isolinux genisoimage \
+                           gcc-arm-none-eabi
       - name: Build
         run: |
           make -j 4 -C src CROSS=arm-none-eabi- \
@@ -93,7 +94,7 @@ jobs:
 
   arm64:
     name: ARM64
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: cache
     steps:
       - name: Check out code
@@ -112,7 +113,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-aarch64-linux-gnu
+                           mtools syslinux isolinux genisoimage \
+                           gcc-aarch64-linux-gnu
       - name: Build
         run: |
           make -j 4 -C src CROSS=aarch64-linux-gnu- \
