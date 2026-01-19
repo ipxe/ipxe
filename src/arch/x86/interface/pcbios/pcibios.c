@@ -44,6 +44,37 @@ static void pcibios_discover ( uint32_t busdevfn __unused,
 	int discard_a, discard_D;
 	uint16_t num_bus;
 
+#ifdef PCIBIOS_GUARD
+	/* The purpose of PCIBIOS_GUARD is to allow operation on pre-PCI
+	   era computers where the PCI BIOS installation check can cause
+	   the system to freeze. However, in rare cases, the following
+	   two methods may fail to detect PCI buses on exotic hardware
+	   even though the PCI BIOS installation check is supported
+	   and works correctly. There is no easy solution for that,
+	   as iPXE has no room for various hardware-specific quirks
+	   providing dirty workarounds. */
+	uint32_t backup;
+	static uint8_t pci_bus_found = 0;
+
+	if ( ! pci_bus_found ) {
+		/* Method 1 of PCI bus detection */
+		outb ( 0x01, 0xCFB );
+		backup = inl ( 0xCF8 );
+		outl ( 0x80000000, 0xCF8 );
+		pci_bus_found = ( inl ( 0xCF8 ) == 0x80000000 );
+		outl ( backup, 0xCF8 );
+	}
+
+	if ( ! pci_bus_found ) {
+		/* Method 2 of PCI bus detection */
+		outb ( 0x00, 0xCFB );
+		outb ( 0x00, 0xCF8 );
+		outb ( 0x00, 0xCFA );
+		pci_bus_found = ( ( ! inb ( 0xCF8 ) ) && ( ! inb ( 0xCFA ) ) );
+	}
+
+	if ( pci_bus_found ) {
+#endif
 	/* We issue this call using flat real mode, to work around a
 	 * bug in some HP BIOSes.
 	 */
@@ -60,6 +91,9 @@ static void pcibios_discover ( uint32_t busdevfn __unused,
 			       : "a" ( PCIBIOS_INSTALLATION_CHECK >> 16 ),
 				 "D" ( 0 )
 			       : "ebx", "edx" );
+#ifdef PCIBIOS_GUARD
+	} else num_bus = 0;
+#endif
 
 	/* Populate range */
 	range->start = PCI_BUSDEVFN ( 0, 0, 0, 0 );
