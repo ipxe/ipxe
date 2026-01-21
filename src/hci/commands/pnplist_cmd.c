@@ -212,6 +212,32 @@ static int pnplist_show_device ( struct net_device *netdev, char *buffer, size_t
 	}
 	printf ( "DEBUG: Successfully obtained PCI device (need_free=%d)\n", need_free );
 
+	/* If vendor/device IDs are zero, try reading directly from config space */
+	if ( pci->vendor == 0x0000 || pci->device == 0x0000 ) {
+		uint16_t vendor_from_cfg = 0x0000, device_from_cfg = 0x0000;
+		
+		printf ( "DEBUG: Vendor/Device IDs are zero, attempting to read from PCI config space\n" );
+		
+		/* Read vendor ID from config space */
+		rc = pci_read_config_word ( pci, PCI_VENDOR_ID, &vendor_from_cfg );
+		printf ( "DEBUG: Read vendor ID from config: rc=%d value=0x%04x\n", rc, vendor_from_cfg );
+		
+		/* Read device ID from config space */
+		rc = pci_read_config_word ( pci, PCI_DEVICE_ID, &device_from_cfg );
+		printf ( "DEBUG: Read device ID from config: rc=%d value=0x%04x\n", rc, device_from_cfg );
+		
+		/* If we successfully read valid IDs, update the pci structure */
+		if ( vendor_from_cfg != 0x0000 && device_from_cfg != 0x0000 &&
+		     vendor_from_cfg != 0xFFFF && device_from_cfg != 0xFFFF ) {
+			printf ( "DEBUG: Successfully recovered vendor=0x%04x device=0x%04x from config space\n",
+				 vendor_from_cfg, device_from_cfg );
+			pci->vendor = vendor_from_cfg;
+			pci->device = device_from_cfg;
+		} else {
+			printf ( "DEBUG: WARNING - Could not recover valid vendor/device IDs from config space\n" );
+		}
+	}
+
 	/* Try to read subsystem vendor ID */
 	rc = pci_read_config_word ( pci, PCI_SUBSYSTEM_VENDOR_ID, &subsys_vendor );
 	printf ( "DEBUG: Read subsystem vendor ID: rc=%d value=0x%04x\n", rc, subsys_vendor );
