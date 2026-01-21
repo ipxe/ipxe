@@ -1230,8 +1230,6 @@ BUILD_ID_CMD = cat $^ | cksum | awk '{print $$1}'
 #
 ifdef SOURCE_DATE_EPOCH
 BUILD_TIMESTAMP := $(SOURCE_DATE_EPOCH)
-else ifdef GITVERSION
-BUILD_TIMESTAMP := $(shell git log -1 --pretty=%ct)
 else
 BUILD_TIMESTAMP := $(shell date +%s)
 endif
