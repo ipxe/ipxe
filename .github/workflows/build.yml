@@ -33,8 +33,6 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Cache permissions
         run: |
           sudo chown $(id -un) /var/cache/apt/archives
@@ -69,8 +67,6 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Cache permissions
         run: |
           sudo chown $(id -un) /var/cache/apt/archives
@@ -99,8 +95,6 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Cache permissions
         run: |
           sudo chown $(id -un) /var/cache/apt/archives
