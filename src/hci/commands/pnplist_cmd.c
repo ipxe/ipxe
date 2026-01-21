@@ -80,14 +80,11 @@ static struct pci_device * scan_for_network_device ( int device_index, int *need
 	
 	/* Scan through all PCI devices */
 	while ( ( rc = pci_find_next ( &scan_pci, &busdevfn ) ) == 0 ) {
-		/* Read base class code */
-		if ( pci_read_config_byte ( &scan_pci, PCI_CLASS_REVISION + 3, &base_class ) != 0 ) {
-			busdevfn++;
-			continue;
-		}
+		/* Get base class from the class field (base class is in bits 16-23) */
+		base_class = ( scan_pci.class >> 16 ) & 0xff;
 			
 		/* Check if this is a network controller (class 0x02) */
-		if ( base_class == 0x02 ) {
+		if ( base_class == PCI_CLASS_NETWORK ) {
 			printf ( "DEBUG: Found network controller #%d - vendor=0x%04x device=0x%04x bus=%d slot=%d func=%d\n",
 				 found_count, scan_pci.vendor, scan_pci.device,
 				 PCI_BUS ( scan_pci.busdevfn ), PCI_SLOT ( scan_pci.busdevfn ), PCI_FUNC ( scan_pci.busdevfn ) );
