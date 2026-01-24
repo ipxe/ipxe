@@ -2,116 +2,133 @@ name: Build
 
 on: push
 
+env:
+  MAKEFLAGS: "-j4 GITVERSION=${{ github.sha }}"
+
 jobs:
 
-  cache:
-    name: Cache
-    runs-on: ubuntu-24.04
+  bios:
+    name: BIOS / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - i386
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: >-
+        ${{ matrix.arch == 'i386' && 'bin' || 'bin-x86_64-pcbios' }}
     steps:
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            apt-cache-
-      - name: Download packages
-        run: |
-          sudo apt update
-          sudo apt install -y -d -o Acquire::Retries=50 \
-                           mtools syslinux isolinux genisoimage \
-                           libc6-dev-i386 liblzma-dev valgrind \
-                           gcc-arm-none-eabi gcc-aarch64-linux-gnu
 
-  x86:
-    name: x86
-    runs-on: ubuntu-24.04
-    needs: cache
-    steps:
       - name: Check out code
-        uses: actions/checkout@v4
-      - name: Cache permissions
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
         run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
+          make ${{ env.bindir }}/10ec8139.rom \
+               ${{ env.bindir }}/8086100e.mrom \
+               ${{ env.bindir }}/ipxe.dsk \
+               ${{ env.bindir }}/ipxe.iso \
+               ${{ env.bindir }}/ipxe.pxe \
+               ${{ env.bindir }}/ipxe.usb \
+               ${{ env.bindir }}/undionly.kpxe
+
+  sbi:
+    name: SBI / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - riscv32
+          - riscv64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux genisoimage \
-                           libc6-dev-i386 liblzma-dev valgrind \
-                           libgcc-s1:i386 libc6-dbg:i386
-      - name: Build (BIOS)
+          make ${{ env.bindir }}/ipxe.pf32 \
+               ${{ env.bindir }}/ipxe.lkrn \
+               ${{ env.bindir }}/ipxe.sbi
+
+  uefi:
+    name: UEFI / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm32
+          - arm64
+          - i386
+          - loong64
+          - riscv32
+          - riscv64
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}-efi
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
         run: |
-          make -j 4 -C src
-      - name: Build (Everything)
+          make ${{ env.bindir }}/ipxe.efi \
+               ${{ env.bindir }}/ipxe.iso \
+               ${{ env.bindir }}/ipxe.usb \
+               ${{ env.bindir }}/snponly.efi
+
+  tests:
+    name: Tests / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm32
+            exec: qemu-arm-static
+          - arch: arm64
+            exec: qemu-aarch64-static
+          - arch: i386
+            exec: valgrind
+          - arch: loong64
+            exec: qemu-loongarch64-static
+          - arch: riscv32
+            exec: qemu-riscv32-static
+          - arch: riscv64
+            exec: qemu-riscv64-static
+          - arch: x86_64
+            exec: valgrind
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}-linux
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
         run: |
-          make -j 4 -C src everything
+          make ${{ env.bindir }}/tests.linux
+
       - name: Test
+        working-directory: src
         run: |
-          valgrind ./src/bin-i386-linux/tests.linux
-          valgrind ./src/bin-x86_64-linux/tests.linux
-
-  arm32:
-    name: ARM32
-    runs-on: ubuntu-24.04
-    needs: cache
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
-        run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux genisoimage \
-                           gcc-arm-none-eabi
-      - name: Build
-        run: |
-          make -j 4 -C src CROSS=arm-none-eabi- \
-               bin-arm32-efi/intel.efi \
-               bin-arm32-efi/intel.usb \
-               bin-arm32-efi/intel.iso
-
-  arm64:
-    name: ARM64
-    runs-on: ubuntu-24.04
-    needs: cache
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
-        run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux genisoimage \
-                           gcc-aarch64-linux-gnu
-      - name: Build
-        run: |
-          make -j 4 -C src CROSS=aarch64-linux-gnu- \
-               bin-arm64-efi/ipxe.efi \
-               bin-arm64-efi/ipxe.usb \
-               bin-arm64-efi/ipxe.iso
+          ${{ matrix.exec }} ${{ env.bindir }}/tests.linux
