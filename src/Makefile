@@ -215,27 +215,24 @@ VERSION_MINOR	:= 21
 VERSION_PATCH	:= 1
 EXTRAVERSION	:= +
 ifneq ($(wildcard ../.git/HEAD),)
-GITHEAD		:= $(shell cat ../.git/HEAD)
-ifneq ($(firstword $(GITHEAD)),ref:)
-GITCOMMIT	:= $(GITHEAD)
-else
-GITREF		:= $(word 2,$(GITHEAD))
+GITVERSION	:= $(shell cat ../.git/HEAD)
+ifeq ($(firstword $(GITVERSION)),ref:)
+GITREF		:= $(word 2,$(GITVERSION))
 ifneq ($(wildcard ../.git/$(GITREF)),)
-GITCOMMIT	:= $(shell cat ../.git/$(GITREF))
+GITVERSION	:= $(shell cat ../.git/$(GITREF))
 else
-GITCOMMIT	:= $(shell awk -v ref="$(GITREF)" '$$2 == ref { print $1 }' \
+GITVERSION	:= $(shell awk -v ref="$(GITREF)" '$$2 == ref { print $1 }' \
 			   ../.git/packed-refs)
 endif
 endif
-ifeq ($(GITCOMMIT),)
+ifeq ($(GITVERSION),)
 $(error Unable to determine git commit ID)
 endif
-GITVERSION	:= g$(shell echo "$(GITCOMMIT)" | cut -c1-5)
 endif
 MM_VERSION	= $(VERSION_MAJOR).$(VERSION_MINOR)
 VERSION		= $(MM_VERSION).$(VERSION_PATCH)$(EXTRAVERSION)
 ifneq ($(GITVERSION),)
-VERSION		+= ($(GITVERSION))
+VERSION		+= (g$(shell echo "$(GITVERSION)" | cut -c1-5))
 endif
 version :
 	@$(ECHO) "$(VERSION)"
