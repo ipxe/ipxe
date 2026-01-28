@@ -204,6 +204,10 @@ ifneq ($(strip $(filter-out $(NO_DEP_TARGETS),$(MAKECMDGOALS))),)
 NEED_DEPS	:= 1
 endif
 
+# Mark the various build-tracking files as unannotated
+#
+UNANNOTATED	:= $(BIN)/.%.list
+
 ###############################################################################
 #
 # Select build architecture and platform based on $(BIN)
@@ -608,7 +612,8 @@ EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
 		     EMBED ( $(i), \"$(word $(i), $(EMBEDDED_FILES))\",\
 			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
 
-embedded_DEPS += $(EMBEDDED_FILES) $(EMBEDDED_LIST)
+embedded_DEPS	+= $(EMBEDDED_FILES) $(EMBEDDED_LIST)
+UNANNOTATED	+= $(EMBEDDED_FILES) $(EMBEDDED_LIST)
 
 CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
 
@@ -637,7 +642,8 @@ TRUSTED_FPS	:= $(foreach CERT,$(TRUSTED_CERTS),\
 			 $(shell $(OPENSSL) x509 -in $(CERT) -noout -sha256 \
 				 -fingerprint))))$(COMMA))
 
-rootcert_DEPS += $(TRUSTED_FILES) $(TRUSTED_LIST)
+rootcert_DEPS	+= $(TRUSTED_FILES) $(TRUSTED_LIST)
+UNANNOTATED	+= $(TRUSTED_FILES) $(TRUSTED_LIST)
 
 CFLAGS_rootcert += $(if $(TRUST_EXT),-DALLOW_TRUST_OVERRIDE=$(TRUST_EXT))
 CFLAGS_rootcert += $(if $(TRUSTED_FPS),-DTRUSTED="$(TRUSTED_FPS)")
@@ -688,7 +694,8 @@ CERT_ALL := $(foreach i,$(call seq,1,$(CERT_COUNT)),\
 
 endif
 
-certstore_DEPS += $(CERT_LIST) $(CERT_FILES) $(CERT_PEMS) $(CERT_DERS)
+certstore_DEPS	+= $(CERT_LIST) $(CERT_FILES) $(CERT_PEMS) $(CERT_DERS)
+UNANNOTATED	+= $(CERT_LIST) $(CERT_FILES) $(CERT_PEMS) $(CERT_DERS)
 
 CFLAGS_certstore += -DCERT_ALL="$(CERT_ALL)"
 
@@ -721,12 +728,14 @@ ifdef PRIVKEY
 $(PRIVKEY_INC) : $(PRIVKEY) $(PRIVKEY_LIST)
 	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
 
-privkey_DEPS += $(PRIVKEY_INC)
+privkey_DEPS	+= $(PRIVKEY_INC)
+UNANNOTATED	+= $(PRIVKEY_INC)
 endif
 
 CLEANUP += $(BIN)/.private_key.*
 
-privkey_DEPS += $(PRIVKEY_LIST)
+privkey_DEPS	+= $(PRIVKEY_LIST)
+UNANNOTATED	+= $(PRIVKEY_LIST)
 
 CFLAGS_privkey += $(if $(PRIVKEY),-DPRIVATE_KEY="\"$(PRIVKEY_INC)\"")
 
@@ -1300,9 +1309,7 @@ $(BIN)/%.nodeps : $(BIN)/%.tmp
 # Get annotated dependency list for the specified target
 #
 define annotated_deps_list
-	$(filter-out config/local/%.h,\
-	  $(filter-out $(BIN)/.%.list,\
-	    $(call deps_list,$(1))))
+	$(filter-out $(UNANNOTATED),$(call deps_list,$(1)))
 endef
 
 # Get dependency list missing specified declaration for the specified target
@@ -1532,6 +1539,8 @@ $(CONFIG_LOCAL_HEADERS) :
 	$(Q)$(TOUCH) $@
 
 .PRECIOUS : $(CONFIG_LOCAL_HEADERS)
+
+UNANNOTATED	+= $(CONFIG_LOCAL_HEADERS)
 
 ifneq ($(CONFIG),)
 
