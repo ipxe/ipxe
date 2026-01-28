@@ -19,6 +19,10 @@ FILE_SECBOOT ( PERMITTED );
 #include "arch-x86/xen.h"
 #elif defined(__arm__) || defined (__aarch64__)
 #include "arch-arm.h"
+#elif defined(__powerpc64__)
+#include "arch-ppc.h"
+#elif defined(__riscv)
+#include "arch-riscv.h"
 #else
 #include <bits/xen.h>
 #endif
@@ -158,25 +162,34 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *
  * Virtual interrupts that a guest OS may receive from Xen.
  *
- * In the side comments, 'V.' denotes a per-VCPU VIRQ while 'G.' denotes a
- * global VIRQ. The former can be bound once per VCPU and cannot be re-bound.
- * The latter can be allocated only once per guest: they must initially be
- * allocated to VCPU0 but can subsequently be re-bound.
+ * There are three types:
+ *
+ * 1. (V) Per-vcpu:
+ *    These can be bound once per vCPU, each using a different evtchn port.
+ *    An evtchn for one vCPU cannot be rebound to a different vCPU.
+ *
+ * 2. (D) Per-domain:
+ *    These can be bound once per domain.  They must be bound on vCPU 0 first,
+ *    but can be rebound to other vCPUs afterwards.
+ *
+ * 3. (G) Global:
+ *    Like per-domain, but can only be bound to a single domain at a time.
+ *    The owning domain must unbind before a new domain can bind.
  */
 /* ` enum virq { */
 #define VIRQ_TIMER      0  /* V. Timebase update, and/or requested timeout.  */
 #define VIRQ_DEBUG      1  /* V. Request guest to dump debug info.           */
-#define VIRQ_CONSOLE    2  /* G. (DOM0) Bytes received on emergency console. */
-#define VIRQ_DOM_EXC    3  /* G. (DOM0) Exceptional event for some domain.   */
-#define VIRQ_TBUF       4  /* G. (DOM0) Trace buffer has records available.  */
-#define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
+#define VIRQ_CONSOLE    2  /* G. Bytes received on emergency console.        */
+#define VIRQ_DOM_EXC    3  /* G. Exceptional event for some domain.          */
+#define VIRQ_TBUF       4  /* G. Trace buffer has records available.         */
+#define VIRQ_DEBUGGER   6  /* G. A domain has paused for debugging.          */
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
-#define VIRQ_CON_RING   8  /* G. (DOM0) Bytes received on console            */
-#define VIRQ_PCPU_STATE 9  /* G. (DOM0) PCPU state changed                   */
-#define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occurred          */
-#define VIRQ_ARGO       11 /* G. Argo interdomain message notification       */
-#define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
-#define VIRQ_XENPMU     13 /* V.  PMC interrupt                              */
+#define VIRQ_CON_RING   8  /* G. Bytes received on console                   */
+#define VIRQ_PCPU_STATE 9  /* G. PCPU state changed                          */
+#define VIRQ_MEM_EVENT  10 /* G. A memory event has occurred                 */
+#define VIRQ_ARGO       11 /* D. Argo interdomain message notification       */
+#define VIRQ_ENOMEM     12 /* G. Low on heap memory                          */
+#define VIRQ_XENPMU     13 /* V. PMC interrupt                               */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
@@ -622,7 +635,7 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 /*
  * ` enum neg_errnoval
  * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
- * `                      uint32_t nr_calls);
+ * `                      unsigned long nr_calls);
  *
  * NB. The fields are logically the natural register size for this
  * architecture. In cases where xen_ulong_t is larger than this then
@@ -630,7 +643,11 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
  */
 struct multicall_entry {
     xen_ulong_t op, result;
+#ifndef __XEN__
     xen_ulong_t args[6];
+#else /* Only 5 arguments are supported in reality. */
+    xen_ulong_t args[5], unused;
+#endif
 };
 typedef struct multicall_entry multicall_entry_t;
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);

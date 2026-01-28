@@ -15,7 +15,7 @@ FILE_SECBOOT ( PERMITTED );
 
 /*
  * Hypercall interface:
- *  Input:  %rdi, %rsi, %rdx, %r10, %r8, %r9 (arguments 1-6)
+ *  Input:  %rdi, %rsi, %rdx, %r10, %r8 (arguments 1-5)
  *  Output: %rax
  * Access is via hypercall page (set up by guest loader or via a Xen MSR):
  *  call hypercall_page + hypercall-number * 32
@@ -162,6 +162,10 @@ struct iret_context {
 #define __DECL_REG_HI(num)    uint64_t r ## num
 #endif
 
+#ifdef __XEN__
+#define cpu_user_regs guest_user_regs
+#endif
+
 struct cpu_user_regs {
     __DECL_REG_HI(15);
     __DECL_REG_HI(14);
@@ -192,8 +196,13 @@ struct cpu_user_regs {
     uint16_t fs, _pad5[3];
     uint16_t gs, _pad6[3];
 };
+
+#ifdef __XEN__
+#undef cpu_user_regs
+#else
 typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);
+#endif
 
 #undef __DECL_REG
 #undef __DECL_REG_LOHI

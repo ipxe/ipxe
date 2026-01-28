@@ -11,6 +11,7 @@
 #define __XEN_PUBLIC_FEATURES_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 /*
  * `incontents 200 elfnotes_features XEN_ELFNOTE_FEATURES
@@ -112,6 +113,23 @@ FILE_LICENCE ( MIT );
  */
 #define XENFEAT_not_direct_mapped         16
 #define XENFEAT_direct_mapped             17
+
+/*
+ * Signal whether the domain is able to use the following hypercalls:
+ *
+ * VCPUOP_register_runstate_phys_area
+ * VCPUOP_register_vcpu_time_phys_area
+ */
+#define XENFEAT_runstate_phys_area        18
+#define XENFEAT_vcpu_time_phys_area       19
+
+/*
+ * If set, Xen will passthrough all MSI-X vector ctrl writes to device model,
+ * not only those unmasking an entry. This allows device model to properly keep
+ * track of the MSI-X table without having to read it from the device behind
+ * Xen's backs. This information is relevant only for device models.
+ */
+#define XENFEAT_dm_msix_all_writes        20
 
 #define XENFEAT_NR_SUBMAPS 1
 

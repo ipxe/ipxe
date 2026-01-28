@@ -9,6 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+/* Provide stub definitions if no platform-specific header exists */
+#ifndef XEN_GUEST_HANDLE
+
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
 
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
@@ -31,6 +34,8 @@ struct arch_vcpu_info {};
 struct arch_shared_info {};
 
 #define XEN_LEGACY_MAX_VCPUS 0
+
+#endif
 
 struct xen_hypervisor;
 

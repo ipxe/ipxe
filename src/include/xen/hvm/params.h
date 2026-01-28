@@ -7,6 +7,7 @@
 #define __XEN_PUBLIC_HVM_PARAMS_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 #include "hvm_op.h"
 
@@ -248,16 +249,11 @@ FILE_LICENCE ( MIT );
 #define HVM_PARAM_VM_GENERATION_ID_ADDR 34
 
 /*
- * Set mode for altp2m:
- *  disabled: don't activate altp2m (default)
+ * Get mode for altp2m:
+ *  disabled: altp2m not active (default)
  *  mixed: allow access to all altp2m ops for both in-guest and external tools
  *  external: allow access to external privileged tools only
  *  limited: guest only has limited access (ie. control VMFUNC and #VE)
- *
- * Note that 'mixed' mode has not been evaluated for safety from a
- * security perspective.  Before using this mode in a
- * security-critical environment, each subop should be evaluated for
- * safety, with unsafe subops blacklisted in XSM.
  */
 #define HVM_PARAM_ALTP2M       35
 #define XEN_ALTP2M_disabled      0

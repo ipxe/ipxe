@@ -7,8 +7,6 @@
  * Copyright (c) 2004-2006, K A Fraser
  */
 
-#include "../xen.h"
-
 #ifndef __XEN_PUBLIC_ARCH_X86_XEN_H__
 #define __XEN_PUBLIC_ARCH_X86_XEN_H__
 
@@ -39,7 +37,7 @@ FILE_SECBOOT ( PERMITTED );
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
 #define XEN_GUEST_HANDLE_PARAM(name)    XEN_GUEST_HANDLE(name)
-#define set_xen_guest_handle_raw(hnd, val)  do { (hnd).p = val; } while (0)
+#define set_xen_guest_handle_raw(hnd, val)  do { (hnd).p = (val); } while (0)
 #define set_xen_guest_handle(hnd, val) set_xen_guest_handle_raw(hnd, val)
 
 #if defined(__i386__)
@@ -178,7 +176,18 @@ struct vcpu_guest_context {
 #define _VGCF_online                   5
 #define VGCF_online                    (1<<_VGCF_online)
     unsigned long flags;                    /* VGCF_* flags                 */
+
+    /*
+     * Outside of Xen, regs type stays named cpu_user_regs for backwards
+     * compatibility.  Inside Xen, the type called cpu_user_regs is different,
+     * and the public API type is renamed to guest_user_regs.
+     */
+#ifdef __XEN__
+    struct guest_user_regs user_regs;       /* User-level CPU registers     */
+#else
     struct cpu_user_regs user_regs;         /* User-level CPU registers     */
+#endif
+
     struct trap_info trap_ctxt[256];        /* Virtual IDT                  */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */

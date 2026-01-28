@@ -38,15 +38,15 @@ enum xsd_sockmsg_type
     /* XS_RESTRICT has been removed */
     XS_RESET_WATCHES = XS_SET_TARGET + 2,
     XS_DIRECTORY_PART,
+    XS_GET_FEATURE,
+    XS_SET_FEATURE,
+    XS_GET_QUOTA,
+    XS_SET_QUOTA,
 
     XS_TYPE_COUNT,      /* Number of valid types. */
 
     XS_INVALID = 0xffff /* Guaranteed to remain an invalid type */
 };
-
-#define XS_WRITE_NONE "NONE"
-#define XS_WRITE_CREATE "CREATE"
-#define XS_WRITE_CREATE_EXCL "CREATE|EXCL"
 
 /* We hand errors as strings, for portability. */
 struct xsd_errors
@@ -113,6 +113,7 @@ struct xenstore_domain_interface {
     uint32_t server_features; /* Bitmap of features supported by the server */
     uint32_t connection;
     uint32_t error;
+    uint32_t evtchn_port;
 };
 
 /* Violating this is very bad.  See docs/misc/xenstore.txt. */
@@ -136,6 +137,12 @@ struct xenstore_domain_interface {
 #define XENSTORE_ERROR_COMM    1 /* Communication problem */
 #define XENSTORE_ERROR_RINGIDX 2 /* Invalid ring index */
 #define XENSTORE_ERROR_PROTO   3 /* Protocol violation (payload too long) */
+
+/*
+ * The evtchn_port field is the domain's event channel for xenstored to signal.
+ * It is filled in by Xen for dom0less/Hyperlaunch domains.  It is only used
+ * when non-zero.  Otherwise the event channel from XS_INTRODUCE is used.
+ */
 
 #endif /* _XS_WIRE_H */
 

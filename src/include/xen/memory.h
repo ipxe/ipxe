@@ -11,6 +11,7 @@
 #define __XEN_PUBLIC_MEMORY_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 #include "xen.h"
 #include "physdev.h"
@@ -236,7 +237,7 @@ struct xen_add_to_physmap {
 
     unsigned int space; /* => enum phys_map_space */
 
-#define XENMAPIDX_grant_table_status 0x80000000
+#define XENMAPIDX_grant_table_status 0x80000000U
 
     /* Index into space being mapped. */
     xen_ulong_t idx;
@@ -428,6 +429,15 @@ typedef enum {
      * pausing the vcpu
      */
     XENMEM_access_n2rwx,
+
+    /*
+     * Same as XENMEM_access_r, but on processors with
+     * the TERTIARY_EXEC_EPT_PAGING_WRITE support,
+     * CPU-initiated page-table walks can still
+     * write to it (e.g., update A/D bits)
+     */
+    XENMEM_access_r_pw,
+
     /* Take the domain default */
     XENMEM_access_default
 } xenmem_access_t;

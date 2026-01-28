@@ -117,10 +117,10 @@ typedef struct evtchn_bind_interdomain evtchn_bind_interdomain_t;
  * EVTCHNOP_bind_virq: Bind a local event channel to VIRQ <irq> on specified
  * vcpu.
  * NOTES:
- *  1. Virtual IRQs are classified as per-vcpu or global. See the VIRQ list
- *     in xen.h for the classification of each VIRQ.
- *  2. Global VIRQs must be allocated on VCPU0 but can subsequently be
- *     re-bound via EVTCHNOP_bind_vcpu.
+ *  1. Virtual IRQs are classified as per-vcpu, per-domain or global. See the
+ *     VIRQ list in xen.h for the classification of each VIRQ.
+ *  2. Per-domain and global VIRQs must be allocated on vCPU0 but can
+ *     subsequently be re-bound via EVTCHNOP_bind_vcpu.
  *  3. Per-vcpu VIRQs may be bound to at most one event channel per vcpu.
  *     The allocated event channel is bound to the specified vcpu and the
  *     binding cannot be changed.
