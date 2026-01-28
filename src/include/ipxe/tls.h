@@ -309,10 +309,8 @@ struct tls_signature_hash_algorithm {
 
 /** TLS client random data */
 struct tls_client_random {
-	/** GMT Unix time */
-	uint32_t gmt_unix_time;
 	/** Random data */
-	uint8_t random[28];
+	uint8_t random[32];
 } __attribute__ (( packed ));
 
 /** An MD5+SHA1 context */
