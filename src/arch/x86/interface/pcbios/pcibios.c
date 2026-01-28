@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006 Michael Brown <mbrown@fensystems.co.uk>.
+ * Copyright (C) 2026 Jaromir Capik <jaromir.capik@email.cz>.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -44,22 +45,25 @@ static void pcibios_discover ( uint32_t busdevfn __unused,
 	int discard_a, discard_D;
 	uint16_t num_bus;
 
-	/* We issue this call using flat real mode, to work around a
-	 * bug in some HP BIOSes.
-	 */
-	__asm__ __volatile__ ( REAL_CODE ( "call flatten_real_mode\n\t"
-					   "stc\n\t"
-					   "int $0x1a\n\t"
-					   "movzbw %%cl, %%cx\n\t"
-					   "incw %%cx\n\t"
-					   "jnc 1f\n\t"
-					   "xorw %%cx, %%cx\n\t"
-					   "\n1:\n\t" )
-			       : "=c" ( num_bus ), "=a" ( discard_a ),
-				 "=D" ( discard_D )
-			       : "a" ( PCIBIOS_INSTALLATION_CHECK >> 16 ),
-				 "D" ( 0 )
-			       : "ebx", "edx" );
+	if ( pcibios_safe() ) {
+		/* We issue this call using flat real mode, to work around a
+		 * bug in some HP BIOSes.
+		 */
+		__asm__ __volatile__ ( 
+			REAL_CODE ( "call flatten_real_mode\n\t"
+				    "stc\n\t"
+				    "int $0x1a\n\t"
+				    "movzbw %%cl, %%cx\n\t"
+				    "incw %%cx\n\t"
+				    "jnc 1f\n\t"
+				    "xorw %%cx, %%cx\n\t"
+				    "\n1:\n\t" )
+			: "=c" ( num_bus ), "=a" ( discard_a ),
+			  "=D" ( discard_D )
+			: "a" ( PCIBIOS_INSTALLATION_CHECK >> 16 ),
+			  "D" ( 0 )
+			: "ebx", "edx" );
+	} else num_bus = 0;
 
 	/* Populate range */
 	range->start = PCI_BUSDEVFN ( 0, 0, 0, 0 );
