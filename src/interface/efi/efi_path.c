@@ -994,6 +994,16 @@ static int efi_path_fetch_dns ( struct efi_path_setting *pathset,
 	return ( count * pathset->len );
 }
 
+/* Avoid dragging in IPv4, IPv6, and DNS support if not otherwise used */
+extern const struct setting ip_setting __attribute__ (( weak ));
+extern const struct setting netmask_setting __attribute__ (( weak ));
+extern const struct setting gateway_setting __attribute__ (( weak ));
+extern const struct setting ip6_setting __attribute__ (( weak ));
+extern const struct setting len6_setting __attribute__ (( weak ));
+extern const struct setting gateway6_setting __attribute__ (( weak ));
+extern const struct setting dns_setting __attribute__ (( weak ));
+extern const struct setting dns6_setting __attribute__ (( weak ));
+
 /** EFI device path settings */
 static struct efi_path_setting efi_path_settings[] = {
 	{ &ip_setting, efi_path_fetch_fixed, MESSAGING_DEVICE_PATH,
@@ -1047,6 +1057,8 @@ static int efi_path_fetch ( struct settings *settings, struct setting *setting,
 
 		/* Check for a matching setting */
 		pathset = &efi_path_settings[i];
+		if ( ! pathset->setting )
+			continue;
 		if ( setting_cmp ( setting, pathset->setting ) != 0 )
 			continue;
 
