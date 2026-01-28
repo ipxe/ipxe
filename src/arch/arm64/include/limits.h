@@ -1,6 +1,8 @@
 #ifndef LIMITS_H
 #define LIMITS_H	1
 
+FILE_SECBOOT ( PERMITTED );
+
 /* Number of bits in a `char' */
 #define CHAR_BIT	8
 
