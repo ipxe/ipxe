@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( FORBIDDEN );
 
 /** Header magic value */
 #define LKRN_MAGIC_ARCH LKRN_MAGIC_AARCH64
