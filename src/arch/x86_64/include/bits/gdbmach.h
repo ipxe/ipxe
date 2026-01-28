@@ -10,6 +10,8 @@
  *
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 #include <stdint.h>
 
 typedef unsigned long gdbreg_t;
