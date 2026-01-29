@@ -8,7 +8,7 @@ env:
 jobs:
 
   bios:
-    name: BIOS / ${{ matrix.arch }}
+    name: BIOS
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -49,7 +49,7 @@ jobs:
             src/${{ env.bindir }}/undionly.kpxe
 
   sbi:
-    name: SBI / ${{ matrix.arch }}
+    name: SBI
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -83,7 +83,7 @@ jobs:
             src/${{ env.bindir }}/ipxe.sbi
 
   uefi:
-    name: UEFI / ${{ matrix.arch }}
+    name: UEFI
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -123,7 +123,7 @@ jobs:
             src/${{ env.bindir }}/snponly.efi
 
   tests:
-    name: Tests / ${{ matrix.arch }}
+    name: Tests (${{ matrix.arch }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -206,8 +206,73 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v6
         with:
-          name: bin-combined
+          name: bin-combi
           if-no-files-found: error
           path: |
             ipxe.iso
             ipxe.usb
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      vars.ROLLING_PREFIX
+    needs:
+      - bios
+      - sbi
+      - uefi
+      - tests
+      - combine
+    strategy:
+      fail-fast: false
+      matrix:
+        bindir:
+          - bin
+          - bin-arm32-efi
+          - bin-arm64-efi
+          - bin-combi
+          - bin-i386-efi
+          - bin-loong64-efi
+          - bin-riscv32
+          - bin-riscv32-efi
+          - bin-riscv64
+          - bin-riscv64-efi
+          - bin-x86_64-efi
+          - bin-x86_64-pcbios
+    env:
+      tag: ${{ vars.ROLLING_PREFIX }}/${{ matrix.bindir }}
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Rolling tag
+        run: |
+          git tag -f ${{ env.tag }} ${{ github.sha }}
+
+      - name: Download
+        uses: actions/download-artifact@v7
+        with:
+          path: ${{ matrix.bindir }}
+          name: ${{ matrix.bindir }}
+
+      - name: List artifacts
+        run: |
+          find ${{ matrix.bindir }} -type f
+
+      - name: Update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push -f origin ${{ env.tag }}
+          gh release view ${{ env.tag }} >/dev/null 2>&1 || \
+              gh release create ${{ env.tag }} --prerelease
+          gh release edit ${{ env.tag }} \
+              --prerelease \
+              --tag ${{ env.tag }} \
+              --target ${{ github.sha }} \
+              --title ${{ env.tag }} \
+              --notes "Rolling release of ${{ matrix.bindir }} directory"
+          gh release upload ${{ env.tag }} --clobber ${{ matrix.bindir }}/*
