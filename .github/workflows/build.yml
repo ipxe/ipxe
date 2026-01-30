@@ -8,7 +8,7 @@ env:
 jobs:
 
   bios:
-    name: BIOS
+    name: BIOS / ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -49,7 +49,7 @@ jobs:
             src/${{ env.bindir }}/undionly.kpxe
 
   sbi:
-    name: SBI
+    name: SBI / ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -83,7 +83,7 @@ jobs:
             src/${{ env.bindir }}/ipxe.sbi
 
   uefi:
-    name: UEFI
+    name: UEFI / ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -123,7 +123,7 @@ jobs:
             src/${{ env.bindir }}/snponly.efi
 
   tests:
-    name: Tests (${{ matrix.arch }})
+    name: Tests / ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -215,64 +215,30 @@ jobs:
   publish:
     name: Publish
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
-      vars.ROLLING_PREFIX
     needs:
       - bios
       - sbi
       - uefi
       - tests
       - combine
-    strategy:
-      fail-fast: false
-      matrix:
-        bindir:
-          - bin
-          - bin-arm32-efi
-          - bin-arm64-efi
-          - bin-combi
-          - bin-i386-efi
-          - bin-loong64-efi
-          - bin-riscv32
-          - bin-riscv32-efi
-          - bin-riscv64
-          - bin-riscv64-efi
-          - bin-x86_64-efi
-          - bin-x86_64-pcbios
-    env:
-      tag: ${{ vars.ROLLING_PREFIX }}/${{ matrix.bindir }}
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      vars.PAGES_REPO_NAME
     steps:
 
-      - name: Check out code
-        uses: actions/checkout@v6
-
-      - name: Rolling tag
-        run: |
-          git tag -f ${{ env.tag }} ${{ github.sha }}
-
-      - name: Download
-        uses: actions/download-artifact@v7
+      - name: Get token
+        id: token
+        uses: actions/create-github-app-token@v2
         with:
-          path: ${{ matrix.bindir }}
-          name: ${{ matrix.bindir }}
+          app-id: ${{ vars.WORKFLOW_DISPATCHER_ID }}
+          private-key: ${{ secrets.WORKFLOW_DISPATCHER_KEY }}
+          owner: ${{ vars.PAGES_REPO_OWNER }}
+          repositories: ${{ vars.PAGES_REPO_NAME }}
 
-      - name: List artifacts
-        run: |
-          find ${{ matrix.bindir }} -type f
-
-      - name: Update release
+      - name: Dispatch
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ vars.PAGES_REPO_OWNER }}/${{ vars.PAGES_REPO_NAME }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
-          git push -f origin ${{ env.tag }}
-          gh release view ${{ env.tag }} >/dev/null 2>&1 || \
-              gh release create ${{ env.tag }} --prerelease
-          gh release edit ${{ env.tag }} \
-              --prerelease \
-              --tag ${{ env.tag }} \
-              --target ${{ github.sha }} \
-              --title ${{ env.tag }} \
-              --notes "Rolling release of ${{ matrix.bindir }} directory"
-          gh release upload ${{ env.tag }} --clobber ${{ matrix.bindir }}/*
+          gh workflow run build.yml -f run_id=${{ github.run_id }}
