@@ -518,6 +518,10 @@ void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	if ( qp->send.cq->op->complete_send ) {
 		qp->send.cq->op->complete_send ( ibdev, qp, iobuf, rc );
 	} else {
+		/* Unmap I/O buffer, if applicable */
+		if ( dma_mapped ( &iobuf->map ) )
+			iob_unmap ( iobuf );
+
 		free_iob ( iobuf );
 	}
 	qp->send.fill--;
@@ -542,7 +546,10 @@ void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		qp->recv.cq->op->complete_recv ( ibdev, qp, dest, source,
 						 iobuf, rc );
 	} else {
-		free_iob ( iobuf );
+		if (ibdev->dma)
+			free_rx_iob ( iobuf );
+		else
+			free_iob ( iobuf );
 	}
 	qp->recv.fill--;
 }
@@ -561,7 +568,10 @@ void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 	while ( qp->recv.fill < qp->recv.num_wqes ) {
 
 		/* Allocate I/O buffer */
-		iobuf = qp->op->alloc_iob ( IB_MAX_PAYLOAD_SIZE );
+		if (ibdev->dma)
+			iobuf = qp->op->alloc_rx_iob ( IB_MAX_PAYLOAD_SIZE, ibdev->dma );
+		else
+			iobuf = qp->op->alloc_iob ( IB_MAX_PAYLOAD_SIZE );
 		if ( ! iobuf ) {
 			/* Non-fatal; we will refill on next attempt */
 			return;
@@ -571,7 +581,10 @@ void ib_refill_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp ) {
 		if ( ( rc = ib_post_recv ( ibdev, qp, iobuf ) ) != 0 ) {
 			DBGC ( ibdev, "IBDEV %s could not refill: %s\n",
 			       ibdev->name, strerror ( rc ) );
-			free_iob ( iobuf );
+			if (ibdev->dma)
+				free_rx_iob ( iobuf );
+			else
+				free_iob ( iobuf );
 			/* Give up */
 			return;
 		}
