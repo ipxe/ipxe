@@ -32,6 +32,7 @@ extern int pcibios_read ( struct pci_device *pci, uint32_t command,
 			  uint32_t *value );
 extern int pcibios_write ( struct pci_device *pci, uint32_t command,
 			   uint32_t value );
+extern int pcibios_safe ( void );
 
 /**
  * Check if PCI bus probing is allowed
