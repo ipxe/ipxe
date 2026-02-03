@@ -1255,6 +1255,7 @@ $(BIN)/version.%.o : core/version.c $(MAKEDEPS) $(version_DEPS) $(GIT_INDEX)
 		-DVERSION="\"$(VERSION)\"" \
 		-c $< -o $@
 	$(Q)$(OBJCOPY) --prefix-symbols=$(SYMBOL_PREFIX) $@
+$(BIN)/deps/core/version.c.d : $(version_DEPS)
 
 # Build an intermediate object file from the objects required for the
 # specified target.
