@@ -255,12 +255,18 @@ static void efipci_discover ( uint32_t busdevfn, struct pci_range *range ) {
  */
 static int efipci_root_open ( struct pci_device *pci, EFI_HANDLE *handle,
 			      EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL **root ) {
-	struct pci_range tmp;
+	static struct {
+		struct pci_range range;
+		EFI_HANDLE handle;
+	} cache;
 	int rc;
 
-	/* Find matching root bridge I/O protocol handle */
-	if ( ( rc = efipci_discover_any ( pci, &tmp, handle ) ) != 0 )
-		return rc;
+	/* Find and cache matching root bridge I/O protocol handle, if any */
+	if ( ( pci->busdevfn - cache.range.start ) >= cache.range.count )
+		efipci_discover_any ( pci, &cache.range, &cache.handle );
+	if ( ! cache.handle )
+		return -ENOENT;
+	*handle = cache.handle;
 
 	/* Open PCI root bridge I/O protocol */
 	if ( ( rc = efi_open ( *handle, &efi_pci_root_bridge_io_protocol_guid,
