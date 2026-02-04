@@ -227,6 +227,13 @@ jobs:
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       vars.PAGES_REPO_NAME
+    env:
+      workflow_url: >-
+        ${{ github.server_url }}/${{ vars.PAGES_REPO_OWNER }}/${{ ''
+        }}${{ vars.PAGES_REPO_NAME }}/actions/workflows/build.yml
+    environment:
+      name: publish
+      url: ${{ env.workflow_url }}
     steps:
 
       - name: Get token
@@ -244,3 +251,4 @@ jobs:
           GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           gh workflow run build.yml -f run_id=${{ github.run_id }}
+          echo "Results at ${{ env.workflow_url }}"
