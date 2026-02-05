@@ -41,6 +41,14 @@ jobs:
                ${{ env.bindir }}/undionly.kpxe \
                ${{ env.bindir }}/errors
 
+      - name: Hardware list
+        working-directory: src
+        run: |
+          ./util/niclist.pl \
+              --format dokuwiki \
+              --sort bus-,vendor_id,device_id,device_name \
+              --output ${{ env.bindir }}/niclist.txt
+
       - name: Upload
         uses: actions/upload-artifact@v6
         with:
@@ -51,6 +59,7 @@ jobs:
             src/${{ env.bindir }}/ipxe.pxe
             src/${{ env.bindir }}/undionly.kpxe
             src/${{ env.bindir }}/errors
+            src/${{ env.bindir }}/niclist.txt
 
   sbi:
     name: SBI / ${{ matrix.arch }}
