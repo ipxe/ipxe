@@ -38,7 +38,8 @@ jobs:
                ${{ env.bindir }}/ipxe.lkrn \
                ${{ env.bindir }}/ipxe.pxe \
                ${{ env.bindir }}/ipxe.usb \
-               ${{ env.bindir }}/undionly.kpxe
+               ${{ env.bindir }}/undionly.kpxe \
+               ${{ env.bindir }}/errors
 
       - name: Upload
         uses: actions/upload-artifact@v6
@@ -49,6 +50,7 @@ jobs:
             src/${{ env.bindir }}/ipxe.lkrn
             src/${{ env.bindir }}/ipxe.pxe
             src/${{ env.bindir }}/undionly.kpxe
+            src/${{ env.bindir }}/errors
 
   sbi:
     name: SBI / ${{ matrix.arch }}
@@ -73,7 +75,8 @@ jobs:
         run: |
           make ${{ env.bindir }}/ipxe.pf32 \
                ${{ env.bindir }}/ipxe.lkrn \
-               ${{ env.bindir }}/ipxe.sbi
+               ${{ env.bindir }}/ipxe.sbi \
+               ${{ env.bindir }}/errors
 
       - name: Upload
         uses: actions/upload-artifact@v6
@@ -83,6 +86,7 @@ jobs:
           path: |
             src/${{ env.bindir }}/ipxe.lkrn
             src/${{ env.bindir }}/ipxe.sbi
+            src/${{ env.bindir }}/errors
 
   uefi:
     name: UEFI / ${{ matrix.arch }}
@@ -113,7 +117,8 @@ jobs:
           make ${{ env.bindir }}/ipxe.efi \
                ${{ env.bindir }}/ipxe.iso \
                ${{ env.bindir }}/ipxe.usb \
-               ${{ env.bindir }}/snponly.efi
+               ${{ env.bindir }}/snponly.efi \
+               ${{ env.bindir }}/errors
 
       - name: Upload
         uses: actions/upload-artifact@v6
@@ -123,6 +128,7 @@ jobs:
           path: |
             src/${{ env.bindir }}/ipxe.efi
             src/${{ env.bindir }}/snponly.efi
+            src/${{ env.bindir }}/errors
 
   tests:
     name: Tests / ${{ matrix.arch }}
