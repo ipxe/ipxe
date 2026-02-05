@@ -1,6 +1,8 @@
 name: Build
 
-on: push
+on:
+  push:
+  pull_request:
 
 env:
   MAKEFLAGS: "-j4 GITVERSION=${{ github.sha }}"
@@ -36,7 +38,16 @@ jobs:
                ${{ env.bindir }}/ipxe.lkrn \
                ${{ env.bindir }}/ipxe.pxe \
                ${{ env.bindir }}/ipxe.usb \
-               ${{ env.bindir }}/undionly.kpxe
+               ${{ env.bindir }}/undionly.kpxe \
+               ${{ env.bindir }}/errors
+
+      - name: Hardware list
+        working-directory: src
+        run: |
+          ./util/niclist.pl \
+              --format dokuwiki \
+              --sort bus-,vendor_id,device_id,device_name \
+              --output ${{ env.bindir }}/niclist.txt
 
       - name: Upload
         uses: actions/upload-artifact@v6
@@ -47,6 +58,8 @@ jobs:
             src/${{ env.bindir }}/ipxe.lkrn
             src/${{ env.bindir }}/ipxe.pxe
             src/${{ env.bindir }}/undionly.kpxe
+            src/${{ env.bindir }}/errors
+            src/${{ env.bindir }}/niclist.txt
 
   sbi:
     name: SBI / ${{ matrix.arch }}
@@ -71,7 +84,8 @@ jobs:
         run: |
           make ${{ env.bindir }}/ipxe.pf32 \
                ${{ env.bindir }}/ipxe.lkrn \
-               ${{ env.bindir }}/ipxe.sbi
+               ${{ env.bindir }}/ipxe.sbi \
+               ${{ env.bindir }}/errors
 
       - name: Upload
         uses: actions/upload-artifact@v6
@@ -81,6 +95,7 @@ jobs:
           path: |
             src/${{ env.bindir }}/ipxe.lkrn
             src/${{ env.bindir }}/ipxe.sbi
+            src/${{ env.bindir }}/errors
 
   uefi:
     name: UEFI / ${{ matrix.arch }}
@@ -111,7 +126,8 @@ jobs:
           make ${{ env.bindir }}/ipxe.efi \
                ${{ env.bindir }}/ipxe.iso \
                ${{ env.bindir }}/ipxe.usb \
-               ${{ env.bindir }}/snponly.efi
+               ${{ env.bindir }}/snponly.efi \
+               ${{ env.bindir }}/errors
 
       - name: Upload
         uses: actions/upload-artifact@v6
@@ -121,6 +137,7 @@ jobs:
           path: |
             src/${{ env.bindir }}/ipxe.efi
             src/${{ env.bindir }}/snponly.efi
+            src/${{ env.bindir }}/errors
 
   tests:
     name: Tests / ${{ matrix.arch }}
@@ -225,6 +242,13 @@ jobs:
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       vars.PAGES_REPO_NAME
+    env:
+      workflow_url: >-
+        ${{ github.server_url }}/${{ vars.PAGES_REPO_OWNER }}/${{ ''
+        }}${{ vars.PAGES_REPO_NAME }}/actions/workflows/build.yml
+    environment:
+      name: publish
+      url: ${{ env.workflow_url }}
     steps:
 
       - name: Get token
@@ -242,3 +266,4 @@ jobs:
           GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
           gh workflow run build.yml -f run_id=${{ github.run_id }}
+          echo "Results at ${{ env.workflow_url }}"
