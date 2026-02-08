@@ -45,7 +45,7 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 /** Current system clock offset */
-signed long time_offset;
+signed long long time_offset;
 
 /** Days of week (for debugging) */
 static const char *weekdays[] = {
