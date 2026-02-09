@@ -33,6 +33,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <byteswap.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
@@ -54,9 +55,7 @@ FILE_SECBOOT ( PERMITTED );
 struct console_driver syslogs_console __console_driver;
 
 /** The encrypted syslog server */
-static struct sockaddr_tcpip logserver = {
-	.st_port = htons ( SYSLOG_PORT ),
-};
+static struct sockaddr_tcpip logserver;
 
 /**
  * Handle encrypted syslog TLS interface close
@@ -211,6 +210,9 @@ const struct setting syslogs_setting __setting ( SETTING_MISC, syslogs ) = {
 static int apply_syslogs_settings ( void ) {
 	static char *old_server;
 	char *server;
+	char *sep;
+	char *end;
+	unsigned int port;
 	int rc;
 
 	/* Fetch log server */
@@ -236,7 +238,22 @@ static int apply_syslogs_settings ( void ) {
 		rc = 0;
 		goto out_no_server;
 	}
-	DBG ( "SYSLOGS using log server %s\n", server );
+
+	/* Identify port */
+	port = SYSLOG_PORT;
+	if ( ( sep = strrchr ( server, ':' ) ) &&
+	     ( server[ strlen ( server ) - 1 ] != ']' ) ) {
+		*(sep++) = '\0';
+		port = strtoul ( sep, &end, 0 );
+		if ( *end || ( ! *sep ) ) {
+			DBG ( "SYSLOGS log server %s:%s has invalid port\n",
+			      server, sep );
+			rc = -EINVAL;
+			goto err_port;
+		}
+	}
+	logserver.st_port = htons ( port );
+	DBG ( "SYSLOGS using log server %s:%d\n", server, port );
 
 	/* Connect to log server */
 	if ( ( rc = xfer_open_named_socket ( &syslogs, SOCK_STREAM,
@@ -256,12 +273,15 @@ static int apply_syslogs_settings ( void ) {
 
 	/* Record log server */
 	old_server = server;
+	if ( sep )
+		*(--sep) = ':';
 
 	return 0;
 
  err_add_tls:
  err_open_named_socket:
 	syslogs_close ( &syslogs, rc );
+ err_port:
  out_no_server:
  out_no_change:
 	free ( server );
