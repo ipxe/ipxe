@@ -36,9 +36,9 @@ if ( $debug ) {
 my %RE = (
     'parse_driver_class'    => qr{ drivers/ (\w+?) / }x,
     'parse_family'          => qr{^ (?:\./)? (.*) \..+? $}x,
-    'find_rom_line'         => qr/^ \s* ( (PCI|ISA)_ROM \s*
+    'find_rom_line'         => qr/^ \s* ( (PCI|ISA|USB)_ROM \s*
                                     \( \s* (.*?) \s* \) \s* ) [,;]/msx,
-    'extract_pci_id'        => qr/^ \s* 0x([0-9A-Fa-f]{4}) \s* ,? \s* (.*) $/sx,
+    'extract_hex_id'        => qr/^ \s* 0x([0-9A-Fa-f]{4}) \s* ,? \s* (.*) $/sx,
     'extract_quoted_string' => qr/^ \s* \" ([^\"]*?) \" \s* ,? \s* (.*) $/sx,
 );
 
@@ -117,6 +117,7 @@ sub process_rom_decl {
     $state->{'type'} = lc $rom_type;
     return process_pci_rom($state, $rom_decl) if $rom_type eq "PCI";
     return process_isa_rom($state, $rom_decl) if $rom_type eq "ISA";
+    return process_usb_rom($state, $rom_decl) if $rom_type eq "USB";
     return;
 }
 
@@ -126,16 +127,15 @@ sub process_pci_rom {
     my ($state, $decl) = @_;
     return unless defined $decl;
     return unless length $decl;
-    (my $vendor, $decl) = extract_pci_id($decl,        'PCI_VENDOR');
-    (my $device, $decl) = extract_pci_id($decl,        'PCI_DEVICE');
+    (my $vendor, $decl) = extract_hex_id($decl,        'PCI_VENDOR');
+    (my $device, $decl) = extract_hex_id($decl,        'PCI_DEVICE');
     (my $image,  $decl) = extract_quoted_string($decl, 'IMAGE');
     (my $desc,   $decl) = extract_quoted_string($decl, 'DESCRIPTION');
     if ( $vendor and $device and $image and $desc ) {
-        print_make_rules( $state, "pci", "${vendor}${device}", $desc,
-                          $vendor, $device );
-        print_make_rules( $state, "pci", $image, $desc, $vendor, $device, 1 );
-    }
-    else {
+        print_make_rules( $state, "${vendor}${device}", $desc,
+			  $vendor, $device );
+        print_make_rules( $state, $image, $desc, $vendor, $device, 1 );
+    } else {
         log_debug("WARNING", "Malformed PCI_ROM macro on line $. of $state->{source_file}");
     }
     return 1;
@@ -150,21 +150,41 @@ sub process_isa_rom {
     (my $image, $decl) = extract_quoted_string($decl, 'IMAGE');
     (my $desc,  $decl) = extract_quoted_string($decl, 'DESCRIPTION');
     if ( $image and $desc ) {
-        print_make_rules( $state, "isa", $image, $desc );
+        print_make_rules( $state, $image, $desc );
+    } else {
+	log_debug("WARNING", "Malformed ISA_ROM macro on line $. of $state->{source_file}");
     }
-    else {
-        log_debug("WARNING", "Malformed ISA_ROM macro on line $. of $state->{source_file}");
+    return 1;
+}
+
+# Extract values from USB_ROM declaration lines and dispatch to
+# Makefile rule generator
+sub process_usb_rom {
+    my ($state, $decl) = @_;
+    return unless defined $decl;
+    return unless length $decl;
+    (my $vendor, $decl) = extract_hex_id($decl,        'USB_VENDOR');
+    (my $device, $decl) = extract_hex_id($decl,        'USB_PRODUCT');
+    (my $image,  $decl) = extract_quoted_string($decl, 'IMAGE');
+    (my $desc,   $decl) = extract_quoted_string($decl, 'DESCRIPTION');
+    if ( $vendor and $device and $image and $desc ) {
+        print_make_rules( $state, "${vendor}${device}", $desc,
+			  $vendor, $device );
+        print_make_rules( $state, $image, $desc, $vendor, $device, 1 );
+    } else {
+        log_debug("WARNING", "Malformed USB_ROM macro on line $. of $state->{source_file}");
     }
     return 1;
 }
 
 # Output Makefile rules for the specified ROM declarations
 sub print_make_rules {
-    my ( $state, $bus, $image, $desc, $vendor, $device, $dup ) = @_;
+    my ( $state, $image, $desc, $vendor, $device, $dup ) = @_;
     unless ( $state->{'is_header_printed'} ) {
         print "# NIC\t\n";
         print "# NIC\tfamily\t$state->{family}\n";
-        print "DRIVERS_${bus}_$state->{driver_class} += $state->{driver_name}\n";
+        print "DRIVERS_$state->{type}_$state->{driver_class} ".
+	      "+= $state->{driver_name}\n";
         print "DRIVERS += $state->{driver_name}\n";
         print "\n";
         $state->{'is_header_printed'} = 1;
@@ -175,8 +195,13 @@ sub print_make_rules {
     print "DRIVER_$image = $state->{driver_name}\n";
     print "ROM_TYPE_$image = $state->{type}\n";
     print "ROM_DESCRIPTION_$image = \"$desc\"\n";
-    print "PCI_VENDOR_$image = 0x$vendor\n" if $vendor;
-    print "PCI_DEVICE_$image = 0x$device\n" if $device;
+    if ( $state->{'type'} eq 'pci' ) {
+	print "PCI_VENDOR_$image = 0x$vendor\n";
+	print "PCI_DEVICE_$image = 0x$device\n";
+    } elsif ( $state->{'type'} eq 'usb' ) {
+	print "USB_VENDOR_$image = 0x$vendor\n";
+	print "USB_PRODUCT_$image = 0x$device\n";
+    }
     print "ROMS += $image\n" unless $dup;
     print "ROMS_$state->{driver_name} += $image\n" unless $dup;
     print "\n";
@@ -223,11 +248,11 @@ sub parse_driver_name {
 
 # Extract a PCI vendor/device ID e.g. 0x8086, possibly followed by a comma
 # Should always be 4-digit lower-case hex number
-sub extract_pci_id {
+sub extract_hex_id {
     my ($str, $label) = @_;
     return "", $str unless defined $str;
     return "", $str unless length $str;
-    if ( $str =~ m/$RE{extract_pci_id}/ ) {
+    if ( $str =~ m/$RE{extract_hex_id}/ ) {
         my $id = lc $1;
         log_debug($label, $id);
         return $id, $2;
