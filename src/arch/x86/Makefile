@@ -29,6 +29,10 @@ CFLAGS		+= -DNVALGRIND
 #
 CFLAGS_lkrnprefix	+= -DVERSION="\"$(VERSION)\""
 
+# Include Xen driver in the all-drivers build
+#
+DRIVERS_ipxe		+= $(DRIVERS_xenbus_net)
+
 # Include Hyper-V driver in the all-drivers build
 #
-DRIVERS_hyperv += hyperv
+DRIVERS_ipxe		+= $(DRIVERS_vmbus_net)

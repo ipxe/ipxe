@@ -400,3 +400,9 @@ void xenbus_remove ( struct xen_hypervisor *xen __unused,
 		xenbus_remove_device ( xendev );
 	}
 }
+
+/* Drag in objects via xenbus_set_state() */
+REQUIRING_SYMBOL ( xenbus_set_state );
+
+/* Drag in backing hardware device */
+REQUIRE_OBJECT ( hvm );

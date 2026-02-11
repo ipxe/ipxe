@@ -246,12 +246,15 @@ version :
 DRIVERS_ipxe	+= $(DRIVERS_isa_net)
 DRIVERS_ipxe	+= $(DRIVERS_pci_net)
 DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
-DRIVERS_ipxe	+= $(DRIVERS_pci_xen)
-DRIVERS_ipxe	+= $(DRIVERS_hyperv)
 
 # Raspberry Pi
 #
 DRIVERS_rpi	+= smsc95xx lan78xx
+
+# Virtualised NIC drivers with hypervisor-specific bus types
+#
+DRIVERS_vmbus_net	+= netvsc
+DRIVERS_xenbus_net	+= netfront
 
 ###############################################################################
 #
