@@ -254,23 +254,27 @@ sub build_ipxe_nic_list {
     my $hex_id = qr/0 x [[:xdigit:]]{4} /x;
     my $quote = qr/ ['"] /x;
     my $non_space = qr/ [^\s] /x;
+    my $rom_decl = qr/^ \s* ( (PCI|ISA)_ROM \s*
+                        \( \s* .*? \s* \) \s* ) [,;]/msx;
     my $rom_line_counter = 0;
     foreach my $c_path ( sort @c_files ) {
         my $legacy = 0;
         open( my $fh, "<", $c_path );
+        my $content = do { local $/ = undef; <$fh> };
+        close($fh);
         my $c_file = $c_path;
         $c_file =~ s{^\Q$dir\E/?}{} if -d $dir; # Strip directory from reported filename
         my $ipxe_driver = basename($c_file, '.c');
-        while(<$fh>) {
-            # Most likely EtherBoot legacy API
-            $legacy = 1 if m/struct \s* nic \s*/x;
+        $legacy = 1 if $content =~ m/struct \s* nic \s*/x;
+        while( $content =~ m/$rom_decl/g ) {
+            local $_ = $1;
 
             # parse ISA|PCI_ROM lines into hashref and append to $ipxe_nic_list
-            next unless m/^ \s* (?:ISA|PCI)_ROM /x;
+            next unless m/^ \s* (?:ISA|PCI)_ROM /sx;
             $rom_line_counter++;
             chomp;
             #say; # for debugging regexp
-            if ( m/^ \s* ISA_ROM \s* \( \s* $quote ( .*? ) $quote \s* , \s* $quote ( .*? ) $quote \s* \) /x ) {
+            if ( m/^ \s* ISA_ROM \s* \( \s* $quote ( .*? ) $quote \s* , \s* $quote ( .*? ) $quote \s* \) /sx ) {
                 my $image = $1;
                 my $name = $2;
                 push @$ipxe_nic_list, {
@@ -283,7 +287,7 @@ sub build_ipxe_nic_list {
                 };
                 next;
             }
-            if ( m/^ \s* PCI_ROM \s* \( \s* ($hex_id) \s* , \s* ($hex_id) \s* , \s* $quote (.*?) $quote \s* , \s* $quote (.*?) $quote /x ) {
+            if ( m/^ \s* PCI_ROM \s* \( \s* ($hex_id) \s* , \s* ($hex_id) \s* , \s* $quote (.*?) $quote \s* , \s* $quote (.*?) $quote /sx ) {
                 my $vendor_id = lc $1;
                 my $device_id = lc $2;
                 my $name = $3;
@@ -301,7 +305,6 @@ sub build_ipxe_nic_list {
                 next;
             }
         }
-        close($fh);
     }
 
     # Verify all ROM lines where parsed properly

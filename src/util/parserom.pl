@@ -36,9 +36,10 @@ if ( $debug ) {
 my %RE = (
     'parse_driver_class'    => qr{ drivers/ (\w+?) / }x,
     'parse_family'          => qr{^ (?:\./)? (.*) \..+? $}x,
-    'find_rom_line'         => qr/^ \s* ( (PCI|ISA)_ROM \s* \( \s* (.*?) ) $/x,
-    'extract_pci_id'        => qr/^ \s* 0x([0-9A-Fa-f]{4}) \s* ,? \s* (.*) $/x,
-    'extract_quoted_string' => qr/^ \s* \" ([^\"]*?) \" \s* ,? \s* (.*) $/x,
+    'find_rom_line'         => qr/^ \s* ( (PCI|ISA)_ROM \s*
+                                    \( \s* (.*?) \s* \) \s* ) [,;]/msx,
+    'extract_pci_id'        => qr/^ \s* 0x([0-9A-Fa-f]{4}) \s* ,? \s* (.*) $/sx,
+    'extract_quoted_string' => qr/^ \s* \" ([^\"]*?) \" \s* ,? \s* (.*) $/sx,
 );
 
 # Show help if required arguments are missing or help was requested
@@ -95,10 +96,11 @@ sub process_source_file {
     # and # output Makefile rules
     open( my $fh, "<", $state->{'source_file'} )
         or die "Couldn't open $state->{source_file}: $!\n";
-    while (<$fh>) {
-        process_rom_decl($state, $1, $2, $3) if m/$RE{find_rom_line}/;
-    }
+    my $content = do { local $/ = undef; <$fh> };
     close($fh) or die "Couldn't close $source_file: $!\n";
+    while ( $content =~ m/$RE{find_rom_line}/g ) {
+        process_rom_decl($state, $1, $2, $3);
+    }
     return 1;
 }
 
