@@ -644,96 +644,24 @@ static void smsc95xx_remove ( struct usb_function *func ) {
 
 /** SMSC95xx device IDs */
 static struct usb_device_id smsc95xx_ids[] = {
-	{
-		.name = "smsc9500",
-		.vendor = 0x0424,
-		.product = 0x9500,
-	},
-	{
-		.name = "smsc9505",
-		.vendor = 0x0424,
-		.product = 0x9505,
-	},
-	{
-		.name = "smsc9500a",
-		.vendor = 0x0424,
-		.product = 0x9e00,
-	},
-	{
-		.name = "smsc9505a",
-		.vendor = 0x0424,
-		.product = 0x9e01,
-	},
-	{
-		.name = "smsc9514",
-		.vendor = 0x0424,
-		.product = 0xec00,
-	},
-	{
-		.name = "smsc9500-s",
-		.vendor = 0x0424,
-		.product = 0x9900,
-	},
-	{
-		.name = "smsc9505-s",
-		.vendor = 0x0424,
-		.product = 0x9901,
-	},
-	{
-		.name = "smsc9500a-s",
-		.vendor = 0x0424,
-		.product = 0x9902,
-	},
-	{
-		.name = "smsc9505a-s",
-		.vendor = 0x0424,
-		.product = 0x9903,
-	},
-	{
-		.name = "smsc9514-s",
-		.vendor = 0x0424,
-		.product = 0x9904,
-	},
-	{
-		.name = "smsc9500a-h",
-		.vendor = 0x0424,
-		.product = 0x9905,
-	},
-	{
-		.name = "smsc9505a-h",
-		.vendor = 0x0424,
-		.product = 0x9906,
-	},
-	{
-		.name = "smsc9500-2",
-		.vendor = 0x0424,
-		.product = 0x9907,
-	},
-	{
-		.name = "smsc9500a-2",
-		.vendor = 0x0424,
-		.product = 0x9908,
-	},
-	{
-		.name = "smsc9514-2",
-		.vendor = 0x0424,
-		.product = 0x9909,
-	},
-	{
-		.name = "smsc9530",
-		.vendor = 0x0424,
-		.product = 0x9530,
-	},
-	{
-		.name = "smsc9730",
-		.vendor = 0x0424,
-		.product = 0x9730,
-	},
-	{
-		.name = "smsc89530",
-		.vendor = 0x0424,
-		.product = 0x9e08,
-	},
+	USB_ROM ( 0x0424, 0x9500, "smsc9500", "SMSC LAN9500", 0 ),
+	USB_ROM ( 0x0424, 0x9505, "smsc9505", "SMSC LAN9505", 0 ),
+	USB_ROM ( 0x0424, 0x9e00, "smsc9500a", "SMSC LAN9500A", 0 ),
+	USB_ROM ( 0x0424, 0x9e01, "smsc9505a", "SMSC LAN9505A", 0 ),
+	USB_ROM ( 0x0424, 0xec00, "smsc9514", "SMSC LAN9512/9514", 0 ),
+	USB_ROM ( 0x0424, 0x9900, "smsc9500-s", "SMSC LAN9500-S", 0 ),
+	USB_ROM ( 0x0424, 0x9901, "smsc9505-s", "SMSC LAN9505-S", 0 ),
+	USB_ROM ( 0x0424, 0x9902, "smsc9500a-s", "SMSC LAN9500A-S", 0 ),
+	USB_ROM ( 0x0424, 0x9903, "smsc9505a-s", "SMSC LAN9505A-S", 0 ),
+	USB_ROM ( 0x0424, 0x9904, "smsc9514-s", "SMSC LAN9512/9514-S", 0 ),
+	USB_ROM ( 0x0424, 0x9905, "smsc9500a-h", "SMSC LAN9500A-H", 0 ),
+	USB_ROM ( 0x0424, 0x9906, "smsc9505a-h", "SMSC LAN9505A-H", 0 ),
+	USB_ROM ( 0x0424, 0x9907, "smsc9500-2", "SMSC LAN9500-2", 0 ),
+	USB_ROM ( 0x0424, 0x9908, "smsc9500a-2", "SMSC LAN9500A-2", 0 ),
+	USB_ROM ( 0x0424, 0x9909, "smsc9514-2", "SMSC LAN9512/9514-2", 0 ),
+	USB_ROM ( 0x0424, 0x9530, "smsc9530", "SMSC LAN9530", 0 ),
+	USB_ROM ( 0x0424, 0x9730, "smsc9730", "SMSC LAN9730", 0 ),
+	USB_ROM ( 0x0424, 0x9e08, "smsc89530", "SMSC LAN89530", 0 ),
 };
 
 /** SMSC LAN95xx driver */

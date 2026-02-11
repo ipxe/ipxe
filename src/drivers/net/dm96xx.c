@@ -591,76 +591,20 @@ static void dm96xx_remove ( struct usb_function *func ) {
 
 /** DM96xx device IDs */
 static struct usb_device_id dm96xx_ids[] = {
-	{
-		.name = "dm9601-corega",
-		.vendor = 0x07aa,
-		.product = 0x9601,
-	},
-	{
-		.name = "dm9601",
-		.vendor = 0x0a46,
-		.product = 0x9601,
-	},
-	{
-		.name = "zt6688",
-		.vendor = 0x0a46,
-		.product = 0x6688,
-	},
-	{
-		.name = "st268",
-		.vendor = 0x0a46,
-		.product = 0x0268,
-	},
-	{
-		.name = "adm8515",
-		.vendor = 0x0a46,
-		.product = 0x8515,
-	},
-	{
-		.name = "dm9601-hirose",
-		.vendor = 0x0a47,
-		.product = 0x9601,
-	},
-	{
-		.name = "dm9601-8101",
-		.vendor = 0x0fe6,
-		.product = 0x8101,
-	},
-	{
-		.name = "dm9601-9700",
-		.vendor = 0x0fe6,
-		.product = 0x9700,
-	},
-	{
-		.name = "dm9000e",
-		.vendor = 0x0a46,
-		.product = 0x9000,
-	},
-	{
-		.name = "dm9620",
-		.vendor = 0x0a46,
-		.product = 0x9620,
-	},
-	{
-		.name = "dm9621A",
-		.vendor = 0x0a46,
-		.product = 0x9621,
-	},
-	{
-		.name = "dm9622",
-		.vendor = 0x0a46,
-		.product = 0x9622,
-	},
-	{
-		.name = "dm962Oa",
-		.vendor = 0x0a46,
-		.product = 0x0269,
-	},
-	{
-		.name = "dm9621a",
-		.vendor = 0x0a46,
-		.product = 0x1269,
-	},
+	USB_ROM ( 0x07aa, 0x9601, "dm9601-corega", "Corega FEther", 0 ),
+	USB_ROM ( 0x0a46, 0x9601, "dm9601", "DM9601", 0 ),
+	USB_ROM ( 0x0a46, 0x6688, "zt6688", "ZT6688", 0 ),
+	USB_ROM ( 0x0a46, 0x0268, "st268", "ST268", 0 ),
+	USB_ROM ( 0x0a46, 0x8515, "adm8515", "ADMtek ADM8515", 0 ),
+	USB_ROM ( 0x0a47, 0x9601, "dm9601-hirose", "DM9601 (Hirose)", 0 ),
+	USB_ROM ( 0x0fe6, 0x8101, "dm9601-8101", "DM9601 (ICS8101)", 0 ),
+	USB_ROM ( 0x0fe6, 0x9700, "dm9601-9700", "DM9601 (ICS9700)", 0 ),
+	USB_ROM ( 0x0a46, 0x9000, "dm9000e", "DM9000E", 0 ),
+	USB_ROM ( 0x0a46, 0x9620, "dm9620", "DM9620", 0 ),
+	USB_ROM ( 0x0a46, 0x9621, "dm9621A", "DM9621A", 0 ),
+	USB_ROM ( 0x0a46, 0x9622, "dm9622", "DM9622", 0 ),
+	USB_ROM ( 0x0a46, 0x0269, "dm962Oa", "DM9620A", 0 ),
+	USB_ROM ( 0x0a46, 0x1269, "dm9621a", "DM9621A", 0 ),
 };
 
 /** Davicom DM96xx driver */

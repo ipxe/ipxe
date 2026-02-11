@@ -1369,6 +1369,18 @@ struct usb_device_id {
 	unsigned long driver_data;
 };
 
+/* Define a USB device ID */
+#define USB_ID( _vendor, _product, _name, _description, _data ) {	\
+	.vendor = _vendor,						\
+	.product = _product,						\
+	.name = _name,							\
+	.driver_data = _data						\
+}
+
+/* Define a USB device ID with a corresponding build rule */
+#define USB_ROM( _vendor, _product, _name, _description, _data )	\
+	USB_ID ( _vendor, _product, _name, _description, _data )
+
 /** Match-anything ID */
 #define USB_ANY_ID 0xffff
 

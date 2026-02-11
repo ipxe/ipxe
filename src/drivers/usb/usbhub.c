@@ -529,17 +529,9 @@ static void hub_remove ( struct usb_function *func ) {
 
 /** USB hub device IDs */
 static struct usb_device_id hub_ids[] = {
-	{
-		.name = "avocent-hub",
-		.vendor = 0x0624,
-		.product = 0x0248,
-		.driver_data = USB_HUB_SLOW_START,
-	},
-	{
-		.name = "hub",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ID ( 0x0624, 0x0248, "avocent-hub", "Avocent USB hub",
+		 USB_HUB_SLOW_START ),
+	USB_ID ( 0xffff, 0xffff, "hub", "USB hub", 0 ),
 };
 
 /** USB hub driver */

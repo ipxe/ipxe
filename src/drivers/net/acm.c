@@ -491,11 +491,7 @@ static void acm_remove ( struct usb_function *func ) {
 
 /** USB CDC-ACM device IDs */
 static struct usb_device_id cdc_acm_ids[] = {
-	{
-		.name = "cdc-acm",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ROM ( 0xffff, 0xffff, "cdc-acm", "USB CDC-ACM NIC", 0 ),
 };
 
 /** USB CDC-ACM driver */
@@ -511,11 +507,7 @@ struct usb_driver cdc_acm_driver __usb_driver = {
 
 /** USB RF-RNDIS device IDs */
 static struct usb_device_id rf_rndis_ids[] = {
-	{
-		.name = "rf-rndis",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ROM ( 0xffff, 0xffff, "rf-rndis", "USB RNDIS NIC", 0 ),
 };
 
 /** USB RF-RNDIS driver */

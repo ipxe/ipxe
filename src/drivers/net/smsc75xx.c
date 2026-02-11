@@ -555,16 +555,8 @@ static void smsc75xx_remove ( struct usb_function *func ) {
 
 /** SMSC75xx device IDs */
 static struct usb_device_id smsc75xx_ids[] = {
-	{
-		.name = "smsc7500",
-		.vendor = 0x0424,
-		.product = 0x7500,
-	},
-	{
-		.name = "smsc7505",
-		.vendor = 0x0424,
-		.product = 0x7505,
-	},
+	USB_ROM ( 0x0424, 0x7500, "smsc7500", "SMSC LAN7500", 0 ),
+	USB_ROM ( 0x0424, 0x7505, "smsc7505", "SMSC LAN7505", 0 ),
 };
 
 /** SMSC LAN75xx driver */

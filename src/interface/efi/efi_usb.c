@@ -1349,11 +1349,7 @@ static void efi_usb_remove ( struct usb_function *func ) {
 
 /** USB I/O protocol device IDs */
 static struct usb_device_id efi_usb_ids[] = {
-	{
-		.name = "usbio",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ID ( 0xffff, 0xffff, "usbio", "USB passthrough", 0 ),
 };
 
 /** USB I/O protocol driver */

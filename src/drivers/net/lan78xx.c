@@ -387,16 +387,8 @@ static void lan78xx_remove ( struct usb_function *func ) {
 
 /** LAN78xx device IDs */
 static struct usb_device_id lan78xx_ids[] = {
-	{
-		.name = "lan7800",
-		.vendor = 0x0424,
-		.product = 0x7800,
-	},
-	{
-		.name = "lan7850",
-		.vendor = 0x0424,
-		.product = 0x7850,
-	},
+	USB_ROM ( 0x0424, 0x7800, "lan7800", "SMSC LAN7800", 0 ),
+	USB_ROM ( 0x0424, 0x7850, "lan7850", "SMSC LAN7850", 0 ),
 };
 
 /** LAN78xx driver */

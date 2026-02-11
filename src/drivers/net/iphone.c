@@ -1172,11 +1172,7 @@ static void imux_remove ( struct usb_function *func ) {
 
 /** USB multiplexer device IDs */
 static struct usb_device_id imux_ids[] = {
-	{
-		.name = "imux",
-		.vendor = 0x05ac,
-		.product = USB_ANY_ID,
-	},
+	USB_ID ( 0x05ac, 0xffff, "imux", "iPhone (multiplexer)", 0 ),
 };
 
 /** USB multiplexer driver */
@@ -2226,11 +2222,7 @@ static void iphone_remove ( struct usb_function *func ) {
 
 /** iPhone device IDs */
 static struct usb_device_id iphone_ids[] = {
-	{
-		.name = "iphone",
-		.vendor = 0x05ac,
-		.product = USB_ANY_ID,
-	},
+	USB_ROM ( 0x05ac, 0xffff, "iphone", "iPhone", 0 ),
 };
 
 /** iPhone driver */

@@ -779,36 +779,12 @@ static void axge_remove ( struct usb_function *func ) {
 
 /** AXGE device IDs */
 static struct usb_device_id axge_ids[] = {
-	{
-		.name = "ax88179",
-		.vendor = 0x0b95,
-		.product = 0x1790,
-	},
-	{
-		.name = "ax88178a",
-		.vendor = 0x0b95,
-		.product = 0x178a,
-	},
-	{
-		.name = "dub1312",
-		.vendor = 0x2001,
-		.product = 0x4a00,
-	},
-	{
-		.name = "axge-sitecom",
-		.vendor = 0x0df6,
-		.product = 0x0072,
-	},
-	{
-		.name = "axge-samsung",
-		.vendor = 0x04e8,
-		.product = 0xa100,
-	},
-	{
-		.name = "onelinkdock",
-		.vendor = 0x17ef,
-		.product = 0x304b,
-	},
+	USB_ROM ( 0x0b95, 0x1790, "ax88179", "AX88179", 0 ),
+	USB_ROM ( 0x0b95, 0x178a, "ax88178a", "AX88178A", 0 ),
+	USB_ROM ( 0x2001, 0x4a00, "dub1312", "DUB-1312", 0 ),
+	USB_ROM ( 0x0df6, 0x0072, "axge-sitecom", "AX88179 (Sitecom)", 0 ),
+	USB_ROM ( 0x04e8, 0xa100, "axge-samsung", "AX88179 (Samsung)", 0 ),
+	USB_ROM ( 0x17ef, 0x304b, "onelinkdock", "ThinkPad OneLink dock", 0 ),
 };
 
 /** AXGE driver */
