@@ -139,6 +139,39 @@ jobs:
             src/${{ env.bindir }}/snponly.efi
             src/${{ env.bindir }}/errors
 
+  uefi-sb:
+    name: UEFI SB / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm64
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}-efi-sb
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
+        run: |
+          make ${{ env.bindir }}/ipxe.efi \
+               ${{ env.bindir }}/snponly.efi
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.efi
+            src/${{ env.bindir }}/snponly.efi
+
   tests:
     name: Tests / ${{ matrix.arch }}
     runs-on: ubuntu-latest
@@ -236,6 +269,7 @@ jobs:
       - bios
       - sbi
       - uefi
+      - uefi-sb
       - tests
       - combine
     if: >-
