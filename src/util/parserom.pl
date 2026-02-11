@@ -38,6 +38,8 @@ my %RE = (
     'parse_family'          => qr{^ (?:\./)? (.*) \..+? $}x,
     'find_rom_line'         => qr/^ \s* ( (PCI|ISA|USB)_ROM \s*
                                     \( \s* (.*?) \s* \) \s* ) [,;]/msx,
+    'find_secboot'          => qr/^ \s* FILE_SECBOOT \s*
+                                    \( \s* PERMITTED \s* \) \s* ; \s* $/mx,
     'extract_hex_id'        => qr/^ \s* 0x([0-9A-Fa-f]{4}) \s* ,? \s* (.*) $/sx,
     'extract_quoted_string' => qr/^ \s* \" ([^\"]*?) \" \s* ,? \s* (.*) $/sx,
 );
@@ -98,6 +100,7 @@ sub process_source_file {
         or die "Couldn't open $state->{source_file}: $!\n";
     my $content = do { local $/ = undef; <$fh> };
     close($fh) or die "Couldn't close $source_file: $!\n";
+    $state->{secboot} = ( $content =~ m/$RE{find_secboot}/ );
     while ( $content =~ m/$RE{find_rom_line}/g ) {
         process_rom_decl($state, $1, $2, $3);
     }
@@ -186,6 +189,8 @@ sub print_make_rules {
         print "DRIVERS_$state->{type}_$state->{driver_class} ".
 	      "+= $state->{driver_name}\n";
         print "DRIVERS += $state->{driver_name}\n";
+        print "DRIVERS_SECBOOT += $state->{driver_name}\n"
+            if $state->{'secboot'};
         print "\n";
         $state->{'is_header_printed'} = 1;
     }

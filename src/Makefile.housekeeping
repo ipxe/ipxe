@@ -1475,6 +1475,12 @@ endif
 $(BIN)/etherboot.% : $(BIN)/ipxe.%
 	ln -sf $(notdir $<) $@
 
+# Filter out non-permitted drivers if security flag is set
+#
+ifneq ($(SECUREBOOT),)
+DRIVERS_ipxe	:= $(filter $(DRIVERS_SECBOOT),$(DRIVERS_ipxe))
+endif
+
 endif # defined(BIN)
 
 ###############################################################################
