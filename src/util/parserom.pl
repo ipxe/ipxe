@@ -131,8 +131,9 @@ sub process_pci_rom {
     (my $image,  $decl) = extract_quoted_string($decl, 'IMAGE');
     (my $desc,   $decl) = extract_quoted_string($decl, 'DESCRIPTION');
     if ( $vendor and $device and $image and $desc ) {
-        print_make_rules( $state, "${vendor}${device}", $desc, $vendor, $device );
-        print_make_rules( $state, $image, $desc, $vendor, $device, 1 );
+        print_make_rules( $state, "pci", "${vendor}${device}", $desc,
+                          $vendor, $device );
+        print_make_rules( $state, "pci", $image, $desc, $vendor, $device, 1 );
     }
     else {
         log_debug("WARNING", "Malformed PCI_ROM macro on line $. of $state->{source_file}");
@@ -149,7 +150,7 @@ sub process_isa_rom {
     (my $image, $decl) = extract_quoted_string($decl, 'IMAGE');
     (my $desc,  $decl) = extract_quoted_string($decl, 'DESCRIPTION');
     if ( $image and $desc ) {
-        print_make_rules( $state, $image, $desc );
+        print_make_rules( $state, "isa", $image, $desc );
     }
     else {
         log_debug("WARNING", "Malformed ISA_ROM macro on line $. of $state->{source_file}");
@@ -159,11 +160,11 @@ sub process_isa_rom {
 
 # Output Makefile rules for the specified ROM declarations
 sub print_make_rules {
-    my ( $state, $image, $desc, $vendor, $device, $dup ) = @_;
+    my ( $state, $bus, $image, $desc, $vendor, $device, $dup ) = @_;
     unless ( $state->{'is_header_printed'} ) {
         print "# NIC\t\n";
         print "# NIC\tfamily\t$state->{family}\n";
-        print "DRIVERS_$state->{driver_class} += $state->{driver_name}\n";
+        print "DRIVERS_${bus}_$state->{driver_class} += $state->{driver_name}\n";
         print "DRIVERS += $state->{driver_name}\n";
         print "\n";
         $state->{'is_header_printed'} = 1;

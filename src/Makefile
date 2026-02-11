@@ -243,12 +243,15 @@ version :
 
 # All drivers (excluding USB)
 #
-DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
-		  $(DRIVERS_xen) $(DRIVERS_hyperv)
+DRIVERS_ipxe	+= $(DRIVERS_isa_net)
+DRIVERS_ipxe	+= $(DRIVERS_pci_net)
+DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
+DRIVERS_ipxe	+= $(DRIVERS_pci_xen)
+DRIVERS_ipxe	+= $(DRIVERS_hyperv)
 
 # Raspberry Pi
 #
-DRIVERS_rpi	= smsc95xx lan78xx
+DRIVERS_rpi	+= smsc95xx lan78xx
 
 ###############################################################################
 #
