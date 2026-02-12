@@ -241,10 +241,9 @@ version :
 #
 # Predefined build shortcuts (for e.g. bin/ipxe.iso)
 
-# All drivers (excluding USB)
+# All drivers (defined on a per-platform basis)
 #
-DRIVERS_ipxe	+= $(DRIVERS_pci_net)
-DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
+DRIVERS_ipxe	+=
 
 # Raspberry Pi
 #

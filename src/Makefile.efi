@@ -23,6 +23,11 @@ NON_AUTO_MEDIA	+= efidrv
 NON_AUTO_MEDIA	+= drv.efi
 NON_AUTO_MEDIA	+= efirom
 
+# Include PCI drivers in the all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_pci_net)
+DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
+
 # Include SNP and MNP drivers in the all-drivers build
 #
 DRIVERS_efi_net	+= snp mnp
