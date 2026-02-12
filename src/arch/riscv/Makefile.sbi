@@ -29,3 +29,7 @@ NON_AUTO_MEDIA	+= pf32
 %.pf32 : %.sbi $(MAKEDEPS)
 	$(Q)$(CP) $< $@
 	$(Q)$(TRUNCATE) -s 32M $@
+
+# Include Devicetree drivers in the all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_dt_net)
