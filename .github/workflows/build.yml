@@ -172,8 +172,8 @@ jobs:
             src/${{ env.bindir }}/ipxe.efi
             src/${{ env.bindir }}/snponly.efi
 
-  tests:
-    name: Tests / ${{ matrix.arch }}
+  linux:
+    name: Linux / ${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -205,7 +205,19 @@ jobs:
       - name: Build
         working-directory: src
         run: |
-          make ${{ env.bindir }}/tests.linux
+          make ${{ env.bindir }}/ipxe.linux \
+               ${{ env.bindir }}/tests.linux \
+               ${{ env.bindir }}/errors
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.linux
+            src/${{ env.bindir }}/tests.linux
+            src/${{ env.bindir }}/errors
 
       - name: Test
         working-directory: src
@@ -270,7 +282,7 @@ jobs:
       - sbi
       - uefi
       - uefi-sb
-      - tests
+      - linux
       - combine
     if: >-
       github.event_name == 'push' &&
