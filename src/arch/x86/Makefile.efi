@@ -4,3 +4,8 @@
 #
 MAKEDEPS	+= Makefile.efi
 include Makefile.efi
+
+# Include Xen and Hyper-V drivers in the all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_xenbus_net)
+DRIVERS_ipxe	+= $(DRIVERS_vmbus_net)

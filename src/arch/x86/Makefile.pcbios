@@ -105,3 +105,8 @@ NON_AUTO_MEDIA += pdsk
 %pdsk : %dsk
 	$(Q)cp $< $@
 	$(Q)$(PADIMG) --blksize=1474560 $@
+
+# Include Xen and Hyper-V drivers in the all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_xenbus_net)
+DRIVERS_ipxe	+= $(DRIVERS_vmbus_net)
