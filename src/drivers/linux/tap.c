@@ -258,5 +258,4 @@ struct linux_driver tap_driver __linux_driver = {
 	.name = "tap",
 	.probe = tap_probe,
 	.remove = tap_remove,
-	.can_probe = 1,
 };

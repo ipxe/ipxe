@@ -58,8 +58,6 @@ struct linux_driver {
 	int (*probe)(struct linux_device *device, struct linux_device_request *request);
 	/** Remove function */
 	void (*remove)(struct linux_device *device);
-	/** Can the driver probe any more devices? */
-	int can_probe;
 };
 
 /** Linux driver table */

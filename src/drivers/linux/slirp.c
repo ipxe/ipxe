@@ -549,5 +549,4 @@ struct linux_driver slirp_driver __linux_driver = {
 	.name = "slirp",
 	.probe = slirp_probe,
 	.remove = slirp_remove,
-	.can_probe = 1,
 };
