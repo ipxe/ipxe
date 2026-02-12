@@ -26,6 +26,13 @@ NON_AUTO_SRCS	+= interface/linux/linux_api.c
 #
 NON_AUTO_MEDIA = linux
 
+# Include Linux-specific drivers in all-drivers build
+#
+DRIVERS_linux_net += af_packet
+DRIVERS_linux_net += slirp
+DRIVERS_linux_net += tap
+DRIVERS_ipxe	+= $(DRIVERS_linux_net)
+
 # Compiler flags for building host API wrapper
 #
 LINUX_CFLAGS	+= -Os -idirafter include -DSYMBOL_PREFIX=$(SYMBOL_PREFIX)
