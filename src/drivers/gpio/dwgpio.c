@@ -105,7 +105,7 @@ static void dwgpio_group_remove ( struct dt_device *dt ) {
 
 /** DesignWare GPIO port group compatible model identifiers */
 static const char * dwgpio_group_ids[] = {
-	"snps,dw-apb-gpio",
+	DT_ID ( "snps,dw-apb-gpio", "DesignWare GPIO" ),
 };
 
 /** DesignWare GPIO port group devicetree driver */
@@ -320,7 +320,7 @@ static void dwgpio_remove ( struct dt_device *dt ) {
 
 /** DesignWare GPIO port compatible model identifiers */
 static const char * dwgpio_ids[] = {
-	"snps,dw-apb-gpio-port",
+	DT_ID ( "snps,dw-apb-gpio-port", "DesignWare GPIO port" ),
 };
 
 /** DesignWare GPIO port devicetree driver */

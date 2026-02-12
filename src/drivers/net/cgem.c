@@ -698,7 +698,7 @@ static void cgem_remove ( struct dt_device *dt ) {
 
 /** Cadence GEM compatible model identifiers */
 static const char * cgem_ids[] = {
-	"sifive,fu540-c000-gem",
+	DT_ROM ( "sifive,fu540-c000-gem", "SiFive GEM" ),
 };
 
 /** Cadence GEM devicetree driver */
