@@ -243,7 +243,6 @@ version :
 
 # All drivers (excluding USB)
 #
-DRIVERS_ipxe	+= $(DRIVERS_isa_net)
 DRIVERS_ipxe	+= $(DRIVERS_pci_net)
 DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
 
