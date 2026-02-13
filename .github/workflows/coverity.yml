@@ -1,17 +1,37 @@
 name: Coverity Scan
 
 on:
-  push:
-    branches:
-      - coverity_scan
+  workflow_dispatch:
+  schedule:
+    - cron: '42 0 * * *'
 
 jobs:
+
+  secrets:
+    name: Secrets check
+    runs-on: ubuntu-latest
+    env:
+      COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+    outputs:
+      present: ${{ steps.check.outputs.present }}
+    steps:
+
+      - name: Check secret presence
+        id: check
+        if: env.COVERITY_SCAN_TOKEN
+        run: |
+          echo "present=true" >> $GITHUB_OUTPUT
+
   submit:
     name: Submit
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    needs: secrets
+    if: needs.secrets.outputs.present
     steps:
+
       - name: Check out code
         uses: actions/checkout@v4
+
       - name: Download Coverity Scan
         run: |
           curl --form token=${{ secrets.COVERITY_SCAN_TOKEN }} \
@@ -20,13 +40,16 @@ jobs:
                https://scan.coverity.com/download/cxx/linux64
           mkdir -p /opt/coverity
           sudo tar xvzf coverity.tar.gz --strip 1 --directory /opt/coverity
+
       - name: Build via Coverity Scan
         run: |
           make -C src bin/deps
           /opt/coverity/bin/cov-build --dir cov-int make -C src bin/blib.a
+
       - name: Create submission
         run : |
           tar cvzf cov-int.tar.gz cov-int
+
       - name: Submit to Coverity Scan
         run: |
           curl --form token=${{ secrets.COVERITY_SCAN_TOKEN }} \
