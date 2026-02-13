@@ -259,3 +259,6 @@ struct linux_driver tap_driver __linux_driver = {
 	.probe = tap_probe,
 	.remove = tap_remove,
 };
+
+/* Generate build rules */
+LINUX_ROM ( "tap", "Linux TUN/TAP NIC" );

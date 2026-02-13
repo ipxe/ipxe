@@ -894,3 +894,6 @@ struct vmbus_driver netvsc_driver __vmbus_driver = {
 	.reset = netvsc_reset,
 	.remove = netvsc_remove,
 };
+
+/* Generate build rules */
+VMBUS_ROM ( "netvsc", "Hyper-V NetVSC RNDIS virtual NIC" );

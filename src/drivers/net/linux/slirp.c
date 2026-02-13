@@ -550,3 +550,6 @@ struct linux_driver slirp_driver __linux_driver = {
 	.probe = slirp_probe,
 	.remove = slirp_remove,
 };
+
+/* Generate build rules */
+LINUX_ROM ( "slirp", "libslirp NIC" );

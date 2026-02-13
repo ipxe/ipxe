@@ -36,7 +36,8 @@ if ( $debug ) {
 my %RE = (
     'parse_driver_class'    => qr{ drivers/ (\w+?) / }x,
     'parse_family'          => qr{^ (?:\./)? (.*) \..+? $}x,
-    'find_rom_line'         => qr/^ \s* ( (PCI|ISA|USB|DT)_ROM \s*
+    'find_rom_line'         => qr/^ \s* ( (PCI|ISA|USB|DT|EFI|
+                                           LINUX|XEN|VMBUS)_ROM \s*
                                     \( \s* (.*?) \s* \) \s* ) [,;]/msx,
     'find_secboot'          => qr/^ \s* FILE_SECBOOT \s*
                                     \( \s* PERMITTED \s* \) \s* ; \s* $/mx,
@@ -122,7 +123,7 @@ sub process_rom_decl {
     return process_isa_rom($state, $rom_decl) if $rom_type eq "ISA";
     return process_usb_rom($state, $rom_decl) if $rom_type eq "USB";
     return process_dt_rom($state, $rom_decl) if $rom_type eq "DT";
-    return;
+    return process_basic_rom($state, $rom_decl);
 }
 
 # Extract values from PCI_ROM declaration lines and dispatch to
@@ -194,6 +195,23 @@ sub process_dt_rom {
         print_make_rules( $state, $image, $desc );
     } else {
 	log_debug("WARNING", "Malformed DT_ROM macro on line $. of $state->{source_file}");
+    }
+    return 1;
+}
+
+# Extract values from basic ROM declaration lines and dispatch to
+# Makefile rule generator
+sub process_basic_rom {
+    my ($state, $decl) = @_;
+    return unless defined $decl;
+    return unless length $decl;
+    (my $image,  $decl) = extract_quoted_string($decl, 'IMAGE');
+    (my $desc,   $decl) = extract_quoted_string($decl, 'DESCRIPTION');
+    if ( $image and $desc ) {
+        print_make_rules( $state, $image, $desc );
+    } else {
+	my $macro = (uc $state->{'type'})."_ROM";
+	log_debug("WARNING", "Malformed $macro macro on line $. of $state->{source_file}");
     }
     return 1;
 }

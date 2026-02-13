@@ -66,6 +66,9 @@ struct linux_driver {
 /** Declare a Linux driver */
 #define __linux_driver __table_entry(LINUX_DRIVERS, 01)
 
+/** Define build rules for a Linux driver */
+#define LINUX_ROM( _name, _desc )
+
 /**
  * Set linux device driver-private data
  *

@@ -80,3 +80,6 @@ struct efi_driver nii_driver __efi_driver ( EFI_DRIVER_NII ) = {
 /** Drag in MNP driver */
 REQUIRING_SYMBOL ( snp_driver );
 REQUIRE_SYMBOL ( mnp_driver );
+
+/* Generate build rules */
+EFI_ROM ( "snp", "Simple Network Protocol NIC" );

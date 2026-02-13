@@ -30,7 +30,6 @@ DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
 
 # Include SNP and MNP drivers in the all-drivers build
 #
-DRIVERS_efi_net	+= snp mnp
 DRIVERS_ipxe	+= $(DRIVERS_efi_net)
 
 # Rules for building EFI files

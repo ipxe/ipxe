@@ -75,6 +75,9 @@ struct efi_driver {
 #define EFI_DRIVER_SNP		04	/**< SNP protocol drivers */
 #define EFI_DRIVER_MNP		05	/**< MNP protocol drivers */
 
+/** Define build rules for an EFI driver */
+#define EFI_ROM( _name, _desc )
+
 /**
  * Set EFI driver-private data
  *

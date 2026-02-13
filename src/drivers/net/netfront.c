@@ -1046,6 +1046,9 @@ struct xen_driver netfront_driver __xen_driver = {
 	.remove = netfront_remove,
 };
 
+/* Generate build rules */
+XEN_ROM ( "netfront", "Xen netfront virtual NIC" );
+
 /******************************************************************************
  *
  * Emulated PCI device inhibitor

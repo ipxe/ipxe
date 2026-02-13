@@ -547,6 +547,9 @@ struct vmbus_driver {
 /** Declare a VMBus device driver */
 #define __vmbus_driver __table_entry ( VMBUS_DRIVERS, 01 )
 
+/** Define build rules for a VMBus device driver */
+#define VMBUS_ROM( _name, _desc )
+
 /**
  * Set VMBus device driver-private data
  *
