@@ -245,6 +245,10 @@ version :
 #
 DRIVERS_ipxe	+=
 
+# All drivers (excluding USB network devices)
+#
+DRIVERS_ipxe-legacy = $(filter-out $(DRIVERS_usb_net),$(DRIVERS_ipxe))
+
 # Raspberry Pi
 #
 DRIVERS_rpi	+= smsc95xx lan78xx

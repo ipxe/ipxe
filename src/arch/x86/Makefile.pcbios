@@ -111,6 +111,10 @@ NON_AUTO_MEDIA += pdsk
 DRIVERS_ipxe	+= $(DRIVERS_pci_net)
 DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
 
+# Include USB drivers in the all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_usb_net)
+
 # Include Xen and Hyper-V drivers in the all-drivers build
 #
 DRIVERS_ipxe	+= $(DRIVERS_xen_net)

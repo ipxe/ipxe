@@ -38,6 +38,8 @@ jobs:
                ${{ env.bindir }}/ipxe.lkrn \
                ${{ env.bindir }}/ipxe.pxe \
                ${{ env.bindir }}/ipxe.usb \
+               ${{ env.bindir }}/ipxe-legacy.lkrn \
+               ${{ env.bindir }}/ipxe-legacy.pxe \
                ${{ env.bindir }}/undionly.kpxe \
                ${{ env.bindir }}/errors
 
@@ -57,6 +59,8 @@ jobs:
           path: |
             src/${{ env.bindir }}/ipxe.lkrn
             src/${{ env.bindir }}/ipxe.pxe
+            src/${{ env.bindir }}/ipxe-legacy.lkrn
+            src/${{ env.bindir }}/ipxe-legacy.pxe
             src/${{ env.bindir }}/undionly.kpxe
             src/${{ env.bindir }}/errors
             src/${{ env.bindir }}/niclist.txt
@@ -126,6 +130,7 @@ jobs:
           make ${{ env.bindir }}/ipxe.efi \
                ${{ env.bindir }}/ipxe.iso \
                ${{ env.bindir }}/ipxe.usb \
+               ${{ env.bindir }}/ipxe-legacy.efi \
                ${{ env.bindir }}/snponly.efi \
                ${{ env.bindir }}/errors
 
@@ -136,6 +141,7 @@ jobs:
           if-no-files-found: error
           path: |
             src/${{ env.bindir }}/ipxe.efi
+            src/${{ env.bindir }}/ipxe-legacy.efi
             src/${{ env.bindir }}/snponly.efi
             src/${{ env.bindir }}/errors
 
@@ -234,14 +240,14 @@ jobs:
       image: ghcr.io/ipxe/ipxe-signer
     env:
       binaries: >-
-        bin-x86_64-pcbios/ipxe.lkrn
-        bin-arm32-efi/ipxe.efi
-        bin-arm64-efi/ipxe.efi
-        bin-i386-efi/ipxe.efi
-        bin-loong64-efi/ipxe.efi
-        bin-riscv32-efi/ipxe.efi
-        bin-riscv64-efi/ipxe.efi
-        bin-x86_64-efi/ipxe.efi
+        bin-x86_64-pcbios/${DRIVERS}.lkrn
+        bin-arm32-efi/${DRIVERS}.efi
+        bin-arm64-efi/${DRIVERS}.efi
+        bin-i386-efi/${DRIVERS}.efi
+        bin-loong64-efi/${DRIVERS}.efi
+        bin-riscv32-efi/${DRIVERS}.efi
+        bin-riscv64-efi/${DRIVERS}.efi
+        bin-x86_64-efi/${DRIVERS}.efi
     steps:
 
       - name: Check out code
@@ -262,8 +268,11 @@ jobs:
               Press Ctrl-B for the iPXE command line... \
               && shell || autoboot
           EOF
-          ./src/util/genfsimg -o ipxe.iso ${{ env.binaries }}
-          ./src/util/genfsimg -o ipxe.usb -s autoexec.ipxe ${{ env.binaries }}
+          for DRIVERS in ipxe ipxe-legacy ; do
+              ./src/util/genfsimg -o ${DRIVERS}.iso ${{ env.binaries }}
+              ./src/util/genfsimg -o ${DRIVERS}.usb -s autoexec.ipxe \
+                                  ${{ env.binaries }}
+          done
 
       - name: Upload
         uses: actions/upload-artifact@v6
@@ -273,6 +282,8 @@ jobs:
           path: |
             ipxe.iso
             ipxe.usb
+            ipxe-legacy.iso
+            ipxe-legacy.usb
 
   publish:
     name: Publish
