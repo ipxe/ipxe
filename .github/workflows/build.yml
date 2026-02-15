@@ -158,6 +158,8 @@ jobs:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
     env:
       bindir: bin-${{ matrix.arch }}-efi-sb
+    outputs:
+      sbsignenv: ${{ steps.sbsignenv.outputs.sbsignenv }}
     steps:
 
       - name: Check out code
@@ -172,11 +174,108 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ env.bindir }}
+          name: unsigned-${{ env.bindir }}
           if-no-files-found: error
           path: |
             src/${{ env.bindir }}/ipxe.efi
             src/${{ env.bindir }}/snponly.efi
+
+      - name: Select environment
+        id: sbsignenv
+        if: >-
+          github.ref == 'refs/heads/sbsign' ||
+          startsWith ( github.ref, 'refs/tags/v' )
+        run: |
+          echo "sbsignenv=${{ vars.SBSIGN_ENVIRONMENT }}" >> $GITHUB_OUTPUT
+
+  sbsign:
+    name: SB Sign / ${{ matrix.arch }}
+    runs-on: ${{ needs.uefi-sb.outputs.sbsignenv || 'ubuntu-latest' }}
+    needs:
+      - uefi-sb
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm64
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-signer
+      volumes:
+        - run-pcscd:/run/pcscd
+    services:
+      pcscd:
+        image: ghcr.io/ipxe/ipxe-signer-pcscd
+        volumes:
+          - run-pcscd:/run/pcscd
+        options: >-
+          ${{ needs.uefi-sb.outputs.sbsignenv && '--device /dev/bus/usb' }}
+          --label OPTIONS_VALUE_CANNOT_BE_EMPTY=1
+    env:
+      binaries: >-
+        ipxe.efi
+        snponly.efi
+      bindir: bin-${{ matrix.arch }}-efi-sb
+      cacert: ${{ vars.SBSIGN_CA_CERT || 'testsign.crt' }}
+      pkcs11: ${{ secrets.SBSIGN_PASSWORD && 'true' }}
+      signcerts: ${{ vars.SBSIGN_CERTS || 'testsign.crt' }}
+      signkey: ${{ vars.SBSIGN_KEY || 'testsign.key' }}
+      signpass: ${{ secrets.SBSIGN_PASSWORD || 'testpw' }}
+    environment: ${{ needs.uefi-sb.outputs.sbsignenv }}
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          repository: ipxe/secure-boot-ca
+
+      - name: Download
+        uses: actions/download-artifact@v7
+        with:
+          name: unsigned-${{ env.bindir }}
+          path: unsigned
+
+      - name: Test certificate
+        run: |
+          openssl req \
+              -newkey rsa:2048 -passout 'pass:testpw' -keyout testsign.key \
+              -subj '/CN=Test Signing/' -x509 -out testsign.crt
+
+      - name: Certificate chain
+        run: |
+          for cert in ${{ env.signcerts }} ; do
+              openssl x509 -in ${cert} -noout -text
+              cat ${cert} >> chain.crts
+          done
+
+      - name: Sign
+        run: |
+          for binary in ${{ env.binaries }} ; do
+              osslsigncode sign \
+                  ${{ env.pkcs11 && '-pkcs11module' }} \
+                  ${{ env.pkcs11 && '/usr/lib64/opensc-pkcs11.so' }} \
+                  -certs chain.crts \
+                  -key ${{ env.signkey }} \
+                  -pass ${{ env.signpass }} \
+                  -ts http://timestamp.digicert.com \
+                  -in unsigned/${binary} \
+                  -out signed/${binary}
+          done
+
+      - name: Verify
+        run: |
+          for binary in ${{ env.binaries }} ; do
+              osslsigncode verify -CAfile ${{ env.cacert }} signed/${binary}
+          done
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            signed/ipxe.efi
+            signed/snponly.efi
 
   linux:
     name: Linux / ${{ matrix.arch }}
@@ -292,7 +391,7 @@ jobs:
       - bios
       - sbi
       - uefi
-      - uefi-sb
+      - sbsign
       - linux
       - combine
     if: >-
