@@ -238,9 +238,11 @@ jobs:
 
       - name: Test certificate
         run: |
+          COMMITID=$(echo ${{ github.sha }} | cut -c1-9)
+          SUBJECT="iPXE Test Signing (${COMMITID}, ${{ matrix.arch }})"
           openssl req \
               -newkey rsa:2048 -passout 'pass:testpw' -keyout testsign.key \
-              -subj '/CN=Test Signing/' -x509 -out testsign.crt
+              -subj "/CN=${SUBJECT}/" -x509 -out testsign.crt
 
       - name: Certificate chain
         run: |
@@ -260,13 +262,13 @@ jobs:
                   -pass ${{ env.signpass }} \
                   -ts http://timestamp.digicert.com \
                   -in unsigned/${binary} \
-                  -out signed/${binary}
+                  -out ${binary}
           done
 
       - name: Verify
         run: |
           for binary in ${{ env.binaries }} ; do
-              osslsigncode verify -CAfile ${{ env.cacert }} signed/${binary}
+              osslsigncode verify -CAfile ${{ env.cacert }} ${binary}
           done
 
       - name: Upload
@@ -275,8 +277,9 @@ jobs:
           name: ${{ env.bindir }}
           if-no-files-found: error
           path: |
-            signed/ipxe.efi
-            signed/snponly.efi
+            ${{ env.cacert }}
+            ipxe.efi
+            snponly.efi
 
   linux:
     name: Linux / ${{ matrix.arch }}
