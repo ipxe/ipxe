@@ -3,6 +3,7 @@ name: Build
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 env:
   MAKEFLAGS: "-j4 GITVERSION=${{ github.sha }}"
@@ -395,7 +396,6 @@ jobs:
       - linux
       - combine
     if: >-
-      github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       vars.PAGES_REPO_NAME
     env:
