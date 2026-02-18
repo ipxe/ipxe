@@ -77,11 +77,13 @@ sub try_import_file {
 	}
 	# Write out line
 	print $outfh "$_\n";
-	# Apply FILE_LICENCE() immediately after include guard
+	# Apply FILE_LICENCE()/FILE_SECBOOT() immediately after include guard
 	if ( defined $maybe_guard && ! defined $guard ) {
 	  if ( /^\#define\s+${maybe_guard}$/ ) {
 	    $guard = $maybe_guard;
-	    print $outfh "\nFILE_LICENCE ( $licence );\n" if $licence;
+	    print $outfh "\n";
+	    print $outfh "FILE_LICENCE ( $licence );\n" if $licence;
+	    print $outfh "FILE_SECBOOT ( PERMITTED );\n";
 	  }
 	  undef $maybe_guard;
 	}
@@ -119,7 +121,8 @@ my $edktop = shift;
 
 # Identify edk import directories
 my $edkdirs = [ "MdePkg/Include", "MdeModulePkg/Include",
-		"NetworkPkg/Include", "EmbeddedPkg/Include" ];
+		"NetworkPkg/Include", "EmbeddedPkg/Include",
+		"OvmfPkg/Include" ];
 foreach my $edkdir ( @$edkdirs ) {
   die "Directory \"$edktop\" does not appear to contain the EFI EDK2 "
       ."(missing \"$edkdir\")\n" unless -d catdir ( $edktop, $edkdir );

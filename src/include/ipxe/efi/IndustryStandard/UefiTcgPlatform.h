@@ -11,6 +11,7 @@
 #define __UEFI_TCG_PLATFORM_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/IndustryStandard/Tpm12.h>
 #include <ipxe/efi/IndustryStandard/Tpm20.h>

@@ -2,6 +2,7 @@
 #define _PCIDIRECT_H
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/io.h>
@@ -28,10 +29,11 @@ extern void pcidirect_prepare ( struct pci_device *pci, int where );
 /**
  * Check if PCI bus probing is allowed
  *
+ * @v pci		PCI device
  * @ret ok		Bus probing is allowed
  */
 static inline __always_inline int
-PCIAPI_INLINE ( direct, pci_can_probe ) ( void ) {
+PCIAPI_INLINE ( direct, pci_can_probe ) ( struct pci_device *pci __unused ) {
 	return 1;
 }
 
@@ -164,7 +166,5 @@ PCIAPI_INLINE ( direct, pci_ioremap ) ( struct pci_device *pci __unused,
 					unsigned long bus_addr, size_t len ) {
 	return ioremap ( bus_addr, len );
 }
-
-extern struct pci_api pcidirect_api;
 
 #endif /* _PCIDIRECT_H */

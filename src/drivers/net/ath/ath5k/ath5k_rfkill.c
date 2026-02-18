@@ -35,6 +35,7 @@
  */
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include "base.h"
 

@@ -263,7 +263,6 @@ static void x25519_key_okx ( struct x25519_key_test *test,
 	struct x25519_value scalar;
 	struct x25519_value actual;
 	unsigned int i;
-	int rc;
 
 	/* Construct input values */
 	memcpy ( &base, &test->base, sizeof ( test->base ) );
@@ -277,11 +276,11 @@ static void x25519_key_okx ( struct x25519_key_test *test,
 
 	/* Calculate key */
 	for ( i = 0 ; i < test->count ; i++ ) {
-		rc = x25519_key ( &base, &scalar, &actual );
+		x25519_key ( &base, &scalar, &actual );
 		if ( test->fail ) {
-			okx ( rc != 0, file, line );
+			okx ( x25519_is_zero ( &actual ), file, line );
 		} else {
-			okx ( rc == 0, file, line );
+			okx ( ( ! x25519_is_zero ( &actual ) ), file, line );
 		}
 		memcpy ( &base, &scalar, sizeof ( base ) );
 		memcpy ( &scalar, &actual, sizeof ( scalar ) );

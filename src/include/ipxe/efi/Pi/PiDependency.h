@@ -13,6 +13,7 @@
 #define __PI_DEPENDENCY_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// If present, this must be the first and only opcode,

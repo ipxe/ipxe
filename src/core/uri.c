@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /** @file
  *
@@ -320,7 +321,8 @@ struct uri * parse_uri ( const char *uri_string ) {
 	if ( ( tmp = strstr ( raw, "##params" ) ) ) {
 		*tmp = '\0';
 		tmp += 8 /* "##params" */;
-		params = find_parameters ( *tmp ? ( tmp + 1 ) : NULL );
+		params = find_parameters ( ( *tmp == '=' ) ?
+					   ( tmp + 1 ) : NULL );
 		if ( params ) {
 			uri->params = claim_parameters ( params );
 		} else {

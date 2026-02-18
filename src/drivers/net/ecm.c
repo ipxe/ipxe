@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <errno.h>
@@ -518,11 +519,7 @@ static void ecm_remove ( struct usb_function *func ) {
 
 /** CDC-ECM device IDs */
 static struct usb_device_id ecm_ids[] = {
-	{
-		.name = "cdc-ecm",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ROM ( 0xffff, 0xffff, "cdc-ecm", "USB CDC-ECM NIC", 0 ),
 };
 
 /** CDC-ECM driver */

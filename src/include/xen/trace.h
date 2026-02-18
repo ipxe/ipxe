@@ -10,6 +10,7 @@
 #define __XEN_PUBLIC_TRACE_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 #define TRACE_EXTRA_MAX    7
 #define TRACE_EXTRA_SHIFT 28
@@ -69,7 +70,7 @@ FILE_LICENCE ( MIT );
 #define TRC_SCHED_CLASS_EVT(_c, _e) \
   ( ( TRC_SCHED_CLASS | \
       ((TRC_SCHED_##_c << TRC_SCHED_ID_SHIFT) & TRC_SCHED_ID_MASK) ) + \
-    (_e & TRC_SCHED_EVT_MASK) )
+    ((_e) & TRC_SCHED_EVT_MASK) )
 
 /* Trace classes for DOM0 operations */
 #define TRC_DOM0_DOMOPS     0x00041000   /* Domains manipulations */
@@ -180,8 +181,10 @@ FILE_LICENCE ( MIT );
 /* trace events per subclass */
 #define TRC_HVM_NESTEDFLAG      (0x400)
 #define TRC_HVM_VMENTRY         (TRC_HVM_ENTRYEXIT + 0x01)
-#define TRC_HVM_VMEXIT          (TRC_HVM_ENTRYEXIT + 0x02)
-#define TRC_HVM_VMEXIT64        (TRC_HVM_ENTRYEXIT + TRC_64_FLAG + 0x02)
+#define TRC_HVM_VMX_EXIT        (TRC_HVM_ENTRYEXIT + 0x02)
+#define TRC_HVM_VMX_EXIT64      (TRC_HVM_ENTRYEXIT + TRC_64_FLAG + 0x02)
+#define TRC_HVM_SVM_EXIT        (TRC_HVM_ENTRYEXIT + 0x03)
+#define TRC_HVM_SVM_EXIT64      (TRC_HVM_ENTRYEXIT + TRC_64_FLAG + 0x03)
 #define TRC_HVM_PF_XEN          (TRC_HVM_HANDLER + 0x01)
 #define TRC_HVM_PF_XEN64        (TRC_HVM_HANDLER + TRC_64_FLAG + 0x01)
 #define TRC_HVM_PF_INJECT       (TRC_HVM_HANDLER + 0x02)

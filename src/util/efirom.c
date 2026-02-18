@@ -18,6 +18,7 @@
  */
 
 #define FILE_LICENCE(...) extern void __file_licence ( void )
+#define FILE_SECBOOT(...) extern void __file_secboot ( void )
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -33,6 +34,9 @@
 #include <ipxe/efi/Uefi.h>
 #include <ipxe/efi/IndustryStandard/PeImage.h>
 #include <ipxe/efi/IndustryStandard/Pci22.h>
+
+/* Provide constants spuriously deleted from EDK2 headers */
+#define EFI_IMAGE_MACHINE_ARMTHUMB_MIXED 0x01c2
 
 #define eprintf(...) fprintf ( stderr, __VA_ARGS__ )
 

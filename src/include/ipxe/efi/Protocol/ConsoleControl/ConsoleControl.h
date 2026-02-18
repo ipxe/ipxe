@@ -26,6 +26,7 @@ Abstract:
 #define __CONSOLE_CONTROL_H__
 
 FILE_LICENCE ( BSD3 );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_CONSOLE_CONTROL_PROTOCOL_GUID \
   { 0xf42f7782, 0x12e, 0x4c12, {0x99, 0x56, 0x49, 0xf9, 0x43, 0x4, 0xf7, 0x21} }

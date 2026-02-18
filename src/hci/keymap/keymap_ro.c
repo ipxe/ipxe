@@ -7,6 +7,7 @@
  */
 
 FILE_LICENCE ( PUBLIC_DOMAIN );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/keymap.h>
 

@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /** @file
  *
@@ -30,6 +31,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 #include <string.h>
+#include <errno.h>
 #include <ipxe/ecdhe.h>
 
 /**
@@ -55,11 +57,18 @@ int ecdhe_key ( struct elliptic_curve *curve, const void *partner,
 	}
 
 	/* Construct public key */
-	if ( ( rc = elliptic_multiply ( curve, NULL, private,
+	if ( ( rc = elliptic_multiply ( curve, curve->base, private,
 					public ) ) != 0 ) {
 		DBGC ( curve, "CURVE %s could not generate public key: %s\n",
 		       curve->name, strerror ( rc ) );
 		return rc;
+	}
+
+	/* Check that partner and shared keys are not the point at infinity */
+	if ( elliptic_is_infinity ( curve, shared ) ) {
+		DBGC ( curve, "CURVE %s constructed point at infinity\n",
+		       curve->name );
+		return -EPERM;
 	}
 
 	return 0;

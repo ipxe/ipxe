@@ -27,6 +27,12 @@ struct dt_device {
 	void *priv;
 };
 
+/* Define a devicetree device ID */
+#define DT_ID( _name, _desc ) _name
+
+/* Define a devicetree device ID with a corresponding build rule */
+#define DT_ROM( _name, _desc ) DT_ID ( _name, _desc )
+
 /** A devicetree driver */
 struct dt_driver {
 	/** Driver name */

@@ -13,6 +13,7 @@
 #define __EFI_SUPPLICANT_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Protocol/WiFi2.h>
 

@@ -17,6 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 #include "regd.h"
 #include "regd_common.h"
 

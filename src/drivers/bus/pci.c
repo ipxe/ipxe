@@ -25,6 +25,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -351,13 +352,20 @@ int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn ) {
 		hdrtype &= PCI_HEADER_TYPE_MASK;
 		if ( hdrtype == PCI_HEADER_TYPE_BRIDGE ) {
 			pci_read_config_byte ( pci, PCI_SUBORDINATE, &sub );
-			end = PCI_BUSDEVFN ( PCI_SEG ( *busdevfn ),
-					     ( sub + 1 ), 0, 0 );
-			count = ( end - range.start );
-			if ( count > range.count ) {
-				DBGC ( pci, PCI_FMT " found subordinate bus "
-				       "%#02x\n", PCI_ARGS ( pci ), sub );
-				range.count = count;
+			if ( sub <= PCI_BUS ( *busdevfn ) ) {
+				DBGC ( pci, PCI_FMT " ignoring invalid "
+				       "subordinate bus %#02x\n",
+				       PCI_ARGS ( pci ), sub );
+			} else {
+				end = PCI_BUSDEVFN ( PCI_SEG ( *busdevfn ),
+						     ( sub + 1 ), 0, 0 );
+				count = ( end - range.start );
+				if ( count > range.count ) {
+					DBGC ( pci, PCI_FMT " found "
+					       "subordinate bus %#02x\n",
+					       PCI_ARGS ( pci ), sub );
+					range.count = count;
+				}
 			}
 		}
 
@@ -447,10 +455,6 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 	uint32_t busdevfn = 0;
 	int rc;
 
-	/* Skip automatic probing if prohibited */
-	if ( ! pci_can_probe() )
-		return 0;
-
 	do {
 		/* Allocate struct pci_device */
 		if ( ! pci )
@@ -463,6 +467,10 @@ static int pcibus_probe ( struct root_device *rootdev ) {
 		/* Find next PCI device, if any */
 		if ( ( rc = pci_find_next ( pci, &busdevfn ) ) != 0 )
 			break;
+
+		/* Skip automatic probing if prohibited */
+		if ( ! pci_can_probe ( pci ) )
+			continue;
 
 		/* Look for a driver */
 		if ( ( rc = pci_find_driver ( pci ) ) != 0 ) {

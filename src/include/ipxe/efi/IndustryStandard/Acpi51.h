@@ -13,6 +13,7 @@
 #define _ACPI_5_1_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/IndustryStandard/Acpi50.h>
 
@@ -1835,6 +1836,25 @@ typedef struct {
   UINT32    TableSize;
   UINT32    EntryCount;
 } EFI_ACPI_5_1_EINJ_TRIGGER_ACTION_TABLE;
+
+///
+/// Windows ACPI Emulated devices Table
+///
+typedef struct {
+  EFI_ACPI_DESCRIPTION_HEADER    Header;
+  ///
+  /// Container of a bitmask of Windows behavior that this system requires
+  /// Bit 0 - RTC good
+  /// Bit 1 - ACPI PM timer good
+  ///
+  UINT32                         EmulatedDeviceFlags;
+} EFI_ACPI_5_1_WAET_TABLE;
+
+///
+/// WAET Flags. All other bits are reserved and must be 0.
+///
+#define EFI_ACPI_5_1_WAET_FLAGS_RTC_GOOD            BIT0
+#define EFI_ACPI_5_1_WAET_FLAGS_ACPI_PM_TIMER_GOOD  BIT1
 
 ///
 /// Platform Communications Channel Table (PCCT)

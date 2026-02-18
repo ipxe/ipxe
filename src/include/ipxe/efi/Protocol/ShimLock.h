@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( BSD3 );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_SHIM_LOCK_PROTOCOL_GUID					\
 	{ 0x605dab50, 0xe046, 0x4300,					\

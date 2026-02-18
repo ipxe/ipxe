@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stddef.h>
 #include <stdint.h>
@@ -127,11 +128,41 @@ struct asn1_builder_header {
 #define ASN1_OID_TRIPLE( value ) \
 	( 0x80 | ( ( (value) >> 14 ) & 0x7f ) ), ASN1_OID_DOUBLE ( (value) )
 
+/** ASN.1 OID for ecPublicKey (1.2.840.10045.2.1) */
+#define ASN1_OID_ECPUBLICKEY					\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 2 ),	\
+	ASN1_OID_SINGLE ( 1 )
+
 /** ASN.1 OID for prime256v1 (1.2.840.10045.3.1.7) */
 #define ASN1_OID_PRIME256V1					\
-	ASN1_OID_INITIAL ( 1, 1 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
 	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 3 ),	\
 	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 7 )
+
+/** ASN.1 OID for ecdsa-with-SHA224 (1.2.840.10045.4.3.1) */
+#define ASN1_OID_ECDSA_WITH_SHA224				\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 4 ),	\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 1 )
+
+/** ASN.1 OID for ecdsa-with-SHA256 (1.2.840.10045.4.3.2) */
+#define ASN1_OID_ECDSA_WITH_SHA256				\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 4 ),	\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 2 )
+
+/** ASN.1 OID for ecdsa-with-SHA384 (1.2.840.10045.4.3.3) */
+#define ASN1_OID_ECDSA_WITH_SHA384				\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 4 ),	\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 3 )
+
+/** ASN.1 OID for ecdsa-with-SHA512 (1.2.840.10045.4.3.4) */
+#define ASN1_OID_ECDSA_WITH_SHA512				\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_DOUBLE ( 10045 ), ASN1_OID_SINGLE ( 4 ),	\
+	ASN1_OID_SINGLE ( 3 ), ASN1_OID_SINGLE ( 4 )
 
 /** ASN.1 OID for rsaEncryption (1.2.840.113549.1.1.1) */
 #define ASN1_OID_RSAENCRYPTION					\
@@ -426,16 +457,7 @@ extern struct asn1_algorithm oid_sha512_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha224_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha512_224_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha512_256_algorithm __asn1_algorithm;
-
-/** An ASN.1 bit string */
-struct asn1_bit_string {
-	/** Data */
-	const void *data;
-	/** Length */
-	size_t len;
-	/** Unused bits at end of data */
-	unsigned int unused;
-} __attribute__ (( packed ));
+extern struct asn1_algorithm ecpubkey_algorithm __asn1_algorithm;
 
 /**
  * Invalidate ASN.1 object cursor
@@ -489,12 +511,11 @@ extern int asn1_shrink ( struct asn1_cursor *cursor, unsigned int type );
 extern int asn1_enter_any ( struct asn1_cursor *cursor );
 extern int asn1_skip_any ( struct asn1_cursor *cursor );
 extern int asn1_shrink_any ( struct asn1_cursor *cursor );
+extern int asn1_enter_bits ( struct asn1_cursor *cursor,
+			     unsigned int *unused );
+extern int asn1_enter_unsigned ( struct asn1_cursor *cursor );
 extern int asn1_boolean ( const struct asn1_cursor *cursor );
 extern int asn1_integer ( const struct asn1_cursor *cursor, int *value );
-extern int asn1_bit_string ( const struct asn1_cursor *cursor,
-			     struct asn1_bit_string *bits );
-extern int asn1_integral_bit_string ( const struct asn1_cursor *cursor,
-				      struct asn1_bit_string *bits );
 extern int asn1_compare ( const struct asn1_cursor *cursor1,
 			  const struct asn1_cursor *cursor2 );
 extern int asn1_algorithm ( const struct asn1_cursor *cursor,
@@ -509,8 +530,12 @@ extern int asn1_cipher_algorithm ( const struct asn1_cursor *cursor,
 				   struct asn1_cursor *params );
 extern int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 				      struct asn1_algorithm **algorithm );
+extern int asn1_curve_algorithm ( const struct asn1_cursor *cursor,
+				  struct asn1_algorithm *wrapper,
+				  struct asn1_algorithm **algorithm );
 extern int asn1_check_algorithm ( const struct asn1_cursor *cursor,
-				  struct asn1_algorithm *expected );
+				  struct asn1_algorithm *expected,
+				  struct asn1_cursor *params );
 extern int asn1_parse_cbc ( struct asn1_algorithm *algorithm,
 			    struct asn1_cursor *params );
 extern int asn1_parse_gcm ( struct asn1_algorithm *algorithm,

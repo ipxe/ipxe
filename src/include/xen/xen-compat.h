@@ -11,8 +11,9 @@
 #define __XEN_PUBLIC_XEN_COMPAT_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
-#define __XEN_LATEST_INTERFACE_VERSION__ 0x00040e00
+#define __XEN_LATEST_INTERFACE_VERSION__ 0x00041300
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 /* Xen is built with matching headers and implements the latest interface. */

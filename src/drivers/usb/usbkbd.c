@@ -518,11 +518,7 @@ static void usbkbd_remove ( struct usb_function *func ) {
 
 /** USB keyboard device IDs */
 static struct usb_device_id usbkbd_ids[] = {
-	{
-		.name = "kbd",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ID ( 0xffff, 0xffff, "kbd", "USB keyboard", 0 ),
 };
 
 /** USB keyboard driver */

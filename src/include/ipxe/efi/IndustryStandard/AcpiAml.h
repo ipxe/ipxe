@@ -11,6 +11,7 @@
 #define _ACPI_AML_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 //
 // ACPI AML definition

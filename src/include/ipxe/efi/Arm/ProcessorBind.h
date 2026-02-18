@@ -1,3 +1,7 @@
+#ifndef _IPXE_EFI_ARM_PROCESSORBIND_H
+#define _IPXE_EFI_ARM_PROCESSORBIND_H
+
+
 /** @file
   Processor or Compiler specific defines and types for ARM.
 
@@ -15,7 +19,11 @@ FILE_LICENCE ( BSD2_PATENT );
 ///
 /// Define the processor type so other code can make processor based choices
 ///
-#define MDE_CPU_ARM
+/// Upstream EDK2 headers no longer accept MDE_CPU_ARM: define
+/// MDE_CPU_EBC to prevent build errors.  (The definition doesn't
+/// actually affect anything used by iPXE.)
+///
+#define MDE_CPU_EBC
 
 //
 // Make sure we are using the correct packing rules per EFI specification
@@ -238,3 +246,5 @@ typedef INT32 INTN;
 #endif
 
 #endif
+
+#endif /* _IPXE_EFI_ARM_PROCESSORBIND_H */

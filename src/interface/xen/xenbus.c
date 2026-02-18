@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdio.h>
 #include <string.h>
@@ -399,3 +400,9 @@ void xenbus_remove ( struct xen_hypervisor *xen __unused,
 		xenbus_remove_device ( xendev );
 	}
 }
+
+/* Drag in objects via xenbus_set_state() */
+REQUIRING_SYMBOL ( xenbus_set_state );
+
+/* Drag in backing hardware device */
+REQUIRE_OBJECT ( hvm );

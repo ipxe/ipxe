@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/in.h>
@@ -189,15 +190,13 @@ extern struct neighbour_discovery ndp_discovery;
  * @v netdev		Network device
  * @v net_dest		Destination network-layer address
  * @v net_source	Source network-layer address
- * @v ll_source		Source link-layer address
  * @ret rc		Return status code
  */
 static inline int ndp_tx ( struct io_buffer *iobuf, struct net_device *netdev,
-			   const void *net_dest, const void *net_source,
-			   const void *ll_source ) {
+			   const void *net_dest, const void *net_source ) {
 
 	return neighbour_tx ( iobuf, netdev, &ipv6_protocol, net_dest,
-			      &ndp_discovery, net_source, ll_source );
+			      &ndp_discovery, net_source );
 }
 
 /** NDP settings block name */

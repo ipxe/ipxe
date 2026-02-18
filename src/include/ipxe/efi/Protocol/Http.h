@@ -17,6 +17,7 @@
 #define __EFI_HTTP_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_HTTP_SERVICE_BINDING_PROTOCOL_GUID \
   { \
@@ -191,10 +192,25 @@ typedef struct {
   /// The URI of a remote host. From the information in this field, the HTTP instance
   /// will be able to determine whether to use HTTP or HTTPS and will also be able to
   /// determine the port number to use. If no port number is specified, port 80 (HTTP)
-  /// is assumed. See RFC 3986 for more details on URI syntax.
+  /// or 443 (HTTPS) is assumed. See RFC 3986 for more details on URI syntax.
   ///
   CHAR16             *Url;
 } EFI_HTTP_REQUEST_DATA;
+
+///
+/// EFI_HTTP_CONNECT_REQUEST_DATA
+///
+typedef struct {
+  EFI_HTTP_REQUEST_DATA    Base;
+  ///
+  /// The URI of an Proxy Host. This field will be NULL if there is no Proxy Host
+  /// in the device path. From the information in this field, the HTTP instance will
+  /// be able to determine whether to use HTTP or HTTPS and will also be able to
+  /// determine the port number to use. If no port number is specified, port 80 (HTTP)
+  /// or 443 (HTTPS) is assumed. See RFC 3986 for more details on URI syntax.
+  ///
+  CHAR16                   *ProxyUrl;
+} EFI_HTTP_CONNECT_REQUEST_DATA;
 
 ///
 /// EFI_HTTP_RESPONSE_DATA

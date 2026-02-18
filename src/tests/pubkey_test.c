@@ -50,41 +50,51 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 void pubkey_okx ( struct pubkey_test *test, const char *file,
 		  unsigned int line ) {
 	struct pubkey_algorithm *pubkey = test->pubkey;
-	size_t max_len = pubkey_max_len ( pubkey, &test->private );
-	uint8_t encrypted[max_len];
-	uint8_t decrypted[max_len];
-	int encrypted_len;
-	int decrypted_len;
+	struct asn1_builder plaintext;
+	struct asn1_builder ciphertext;
+
+	/* Test key matching */
+	okx ( pubkey_match ( pubkey, &test->private, &test->public ) == 0,
+	      file, line );
 
 	/* Test decrypting with private key to obtain known plaintext */
-	decrypted_len = pubkey_decrypt ( pubkey, &test->private,
-					 test->ciphertext, test->ciphertext_len,
-					 decrypted );
-	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
-	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
-	      file, line );
+	plaintext.data = NULL;
+	plaintext.len = 0;
+	okx ( pubkey_decrypt ( pubkey, &test->private, &test->ciphertext,
+			       &plaintext ) == 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &plaintext ),
+			     &test->plaintext ) == 0, file, line );
+	free ( plaintext.data );
 
 	/* Test encrypting with private key and decrypting with public key */
-	encrypted_len = pubkey_encrypt ( pubkey, &test->private,
-					 test->plaintext, test->plaintext_len,
-					 encrypted );
-	okx ( encrypted_len >= 0, file, line );
-	decrypted_len = pubkey_decrypt ( pubkey, &test->public, encrypted,
-					 encrypted_len, decrypted );
-	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
-	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
-	      file, line );
+	ciphertext.data = NULL;
+	ciphertext.len = 0;
+	plaintext.data = NULL;
+	plaintext.len = 0;
+	okx ( pubkey_encrypt ( pubkey, &test->private, &test->plaintext,
+			       &ciphertext ) == 0, file, line );
+	okx ( pubkey_decrypt ( pubkey, &test->public,
+			       asn1_built ( &ciphertext ),
+			       &plaintext ) == 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &plaintext ),
+			     &test->plaintext ) == 0, file, line );
+	free ( ciphertext.data );
+	free ( plaintext.data );
 
 	/* Test encrypting with public key and decrypting with private key */
-	encrypted_len = pubkey_encrypt ( pubkey, &test->public,
-					 test->plaintext, test->plaintext_len,
-					 encrypted );
-	okx ( encrypted_len >= 0, file, line );
-	decrypted_len = pubkey_decrypt ( pubkey, &test->private, encrypted,
-					 encrypted_len, decrypted );
-	okx ( decrypted_len == ( ( int ) test->plaintext_len ), file, line );
-	okx ( memcmp ( decrypted, test->plaintext, test->plaintext_len ) == 0,
-	      file, line );
+	ciphertext.data = NULL;
+	ciphertext.len = 0;
+	plaintext.data = NULL;
+	plaintext.len = 0;
+	okx ( pubkey_encrypt ( pubkey, &test->public, &test->plaintext,
+			       &ciphertext ) == 0, file, line );
+	okx ( pubkey_decrypt ( pubkey, &test->private,
+			       asn1_built ( &ciphertext ),
+			       &plaintext ) == 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &plaintext ),
+			     &test->plaintext ) == 0, file, line );
+	free ( ciphertext.data );
+	free ( plaintext.data );
 }
 
 /**
@@ -98,12 +108,16 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 		       unsigned int line ) {
 	struct pubkey_algorithm *pubkey = test->pubkey;
 	struct digest_algorithm *digest = test->digest;
-	size_t max_len = pubkey_max_len ( pubkey, &test->private );
-	uint8_t bad[test->signature_len];
-	uint8_t digestctx[digest->ctxsize ];
+	uint8_t digestctx[digest->ctxsize];
 	uint8_t digestout[digest->digestsize];
-	uint8_t signature[max_len];
-	int signature_len;
+	uint8_t signature[test->signature.len];
+	struct asn1_cursor cursor = { signature, sizeof ( signature ) };
+	struct asn1_builder builder = { NULL, 0 };
+	uint8_t *bad;
+
+	/* Test key matching */
+	okx ( pubkey_match ( pubkey, &test->private, &test->public ) == 0,
+	      file, line );
 
 	/* Construct digest over plaintext */
 	digest_init ( digest, digestctx );
@@ -111,21 +125,31 @@ void pubkey_sign_okx ( struct pubkey_sign_test *test, const char *file,
 			test->plaintext_len );
 	digest_final ( digest, digestctx, digestout );
 
-	/* Test signing using private key */
-	signature_len = pubkey_sign ( pubkey, &test->private, digest,
-				      digestout, signature );
-	okx ( signature_len == ( ( int ) test->signature_len ), file, line );
-	okx ( memcmp ( signature, test->signature, test->signature_len ) == 0,
-	      file, line );
-
 	/* Test verification using public key */
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
-			      test->signature, test->signature_len ) == 0,
-	      file, line );
+			      &test->signature ) == 0, file, line );
 
 	/* Test verification failure of modified signature */
-	memcpy ( bad, test->signature, test->signature_len );
-	bad[ test->signature_len / 2 ] ^= 0x40;
+	memcpy ( signature, test->signature.data, sizeof ( signature ) );
+	bad = ( signature + ( sizeof ( signature ) / 2 ) );
+	*bad ^= 0x40;
 	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
-			      bad, sizeof ( bad ) ) != 0, file, line );
+			      &cursor ) != 0, file, line );
+	*bad ^= 0x40;
+	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
+			      &cursor ) == 0, file, line );
+
+	/* Test signing using private key */
+	okx ( pubkey_sign ( pubkey, &test->private, digest, digestout,
+			    &builder ) == 0, file, line );
+	okx ( builder.len != 0, file, line );
+	okx ( asn1_compare ( asn1_built ( &builder ), &test->signature ) == 0,
+	      file, line );
+
+	/* Test verification of constructed signature */
+	okx ( pubkey_verify ( pubkey, &test->public, digest, digestout,
+			      asn1_built ( &builder ) ) == 0, file, line );
+
+	/* Free signature */
+	free ( builder.data );
 }

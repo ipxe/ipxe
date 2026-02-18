@@ -16,6 +16,8 @@
  *
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /*
  * Common ar5xxx EEPROM data offsets (set these on AR5K_EEPROM_BASE)
  */

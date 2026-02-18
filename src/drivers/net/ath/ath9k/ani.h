@@ -21,6 +21,7 @@
 #define ANI_H
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #define HAL_PROCESS_ANI           0x00000001
 

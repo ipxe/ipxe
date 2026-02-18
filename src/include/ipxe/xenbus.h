@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/device.h>
 #include <ipxe/tables.h>
@@ -56,6 +57,9 @@ struct xen_driver {
 
 /** Declare a Xen device driver */
 #define __xen_driver __table_entry ( XEN_DRIVERS, 01 )
+
+/** Define build rules for a Xen device driver */
+#define XEN_ROM( _name, _desc )
 
 /**
  * Set Xen device driver-private data

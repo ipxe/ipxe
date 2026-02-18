@@ -11,6 +11,7 @@
 #define __XEN_PUBLIC_ARCH_ARM_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 /*
  * `incontents 50 arm_abi Hypercall Calling Convention
@@ -106,6 +107,7 @@ FILE_LICENCE ( MIT );
  *   Exactly these sub-operations are supported:
  *    * HVMOP_set_param
  *    * HVMOP_get_param
+ *    * HVMOP_guest_request_vm_event
  *
  *  HYPERVISOR_grant_table_op
  *   All generic sub-operations
@@ -117,6 +119,32 @@ FILE_LICENCE ( MIT );
  *
  *  HYPERVISOR_argo_op
  *   All generic sub-operations
+ *
+ *  HYPERVISOR_hypfs_op
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_platform_op
+ *   Exactly these sub-operations are supported:
+ *    * XENPF_settime64
+ *
+ *  HYPERVISOR_vm_assist
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_dm_op
+ *   Exactly these sub-operations are supported:
+ *    * XEN_DMOP_create_ioreq_server
+ *    * XEN_DMOP_get_ioreq_server_info
+ *    * XEN_DMOP_map_io_range_to_ioreq_server
+ *    * XEN_DMOP_unmap_io_range_from_ioreq_server
+ *    * XEN_DMOP_set_ioreq_server_state
+ *    * XEN_DMOP_destroy_ioreq_server
+ *    * XEN_DMOP_set_irq_level
+ *    * XEN_DMOP_nr_vcpus
+ *
+ *  HYPERVISOR_xsm_op
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_multicall
  *
  * Other notes on the ARM ABI:
  *
@@ -154,8 +182,10 @@ FILE_LICENCE ( MIT );
 
 #define XEN_HYPERCALL_TAG   0XEA1
 
-#define  int64_aligned_t  int64_t __attribute__((aligned(8)))
-#define uint64_aligned_t uint64_t __attribute__((aligned(8)))
+#if defined(__XEN__) || defined(__XEN_TOOLS__) || defined(__GNUC__)
+#define  int64_aligned_t  int64_t __attribute__((__aligned__(8)))
+#define uint64_aligned_t uint64_t __attribute__((__aligned__(8)))
+#endif
 
 #ifndef __ASSEMBLY__
 #define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
@@ -182,7 +212,7 @@ FILE_LICENCE ( MIT );
     do {                                                    \
         __typeof__(&(hnd)) _sxghr_tmp = &(hnd);             \
         _sxghr_tmp->q = 0;                                  \
-        _sxghr_tmp->p = val;                                \
+        _sxghr_tmp->p = (val);                              \
     } while ( 0 )
 #define set_xen_guest_handle(hnd, val) set_xen_guest_handle_raw(hnd, val)
 
@@ -298,10 +328,16 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 #define XEN_DOMCTL_CONFIG_TEE_NONE      0
 #define XEN_DOMCTL_CONFIG_TEE_OPTEE     1
+#define XEN_DOMCTL_CONFIG_TEE_FFA       2
+
+#define XEN_DOMCTL_CONFIG_ARM_SCI_NONE      0
+#define XEN_DOMCTL_CONFIG_ARM_SCI_SCMI_SMC  1
 
 struct xen_arch_domainconfig {
     /* IN/OUT */
     uint8_t gic_version;
+    /* IN - Contains SVE vector length divided by 128 */
+    uint8_t sve_vl;
     /* IN */
     uint16_t tee_type;
     /* IN */
@@ -320,6 +356,8 @@ struct xen_arch_domainconfig {
      *
      */
     uint32_t clock_frequency;
+    /* IN */
+    uint8_t arm_sci_type;
 };
 #endif /* __XEN__ || __XEN_TOOLS__ */
 
@@ -338,36 +376,36 @@ typedef uint64_t xen_callback_t;
 
 /* PSR bits (CPSR, SPSR) */
 
-#define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
-#define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
-#define PSR_IRQ_MASK    (1<<7)        /* Interrupt mask */
-#define PSR_ABT_MASK    (1<<8)        /* Asynchronous Abort mask */
-#define PSR_BIG_ENDIAN  (1<<9)        /* arm32: Big Endian Mode */
-#define PSR_DBG_MASK    (1<<9)        /* arm64: Debug Exception mask */
-#define PSR_IT_MASK     (0x0600fc00)  /* Thumb If-Then Mask */
-#define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
-#define PSR_Z           (1<<30)       /* Zero condition flag */
+#define PSR_THUMB       (1U <<5)      /* Thumb Mode enable */
+#define PSR_FIQ_MASK    (1U <<6)      /* Fast Interrupt mask */
+#define PSR_IRQ_MASK    (1U <<7)      /* Interrupt mask */
+#define PSR_ABT_MASK    (1U <<8)      /* Asynchronous Abort mask */
+#define PSR_BIG_ENDIAN  (1U << 9)     /* arm32: Big Endian Mode */
+#define PSR_DBG_MASK    (1U << 9)     /* arm64: Debug Exception mask */
+#define PSR_IT_MASK     (0x0600fc00U) /* Thumb If-Then Mask */
+#define PSR_JAZELLE     (1U << 24)    /* Jazelle Mode */
+#define PSR_Z           (1U << 30)    /* Zero condition flag */
 
 /* 32 bit modes */
-#define PSR_MODE_USR 0x10
-#define PSR_MODE_FIQ 0x11
-#define PSR_MODE_IRQ 0x12
-#define PSR_MODE_SVC 0x13
-#define PSR_MODE_MON 0x16
-#define PSR_MODE_ABT 0x17
-#define PSR_MODE_HYP 0x1a
-#define PSR_MODE_UND 0x1b
-#define PSR_MODE_SYS 0x1f
+#define PSR_MODE_USR 0x10U
+#define PSR_MODE_FIQ 0x11U
+#define PSR_MODE_IRQ 0x12U
+#define PSR_MODE_SVC 0x13U
+#define PSR_MODE_MON 0x16U
+#define PSR_MODE_ABT 0x17U
+#define PSR_MODE_HYP 0x1aU
+#define PSR_MODE_UND 0x1bU
+#define PSR_MODE_SYS 0x1fU
 
 /* 64 bit modes */
-#define PSR_MODE_BIT  0x10 /* Set iff AArch32 */
-#define PSR_MODE_EL3h 0x0d
-#define PSR_MODE_EL3t 0x0c
-#define PSR_MODE_EL2h 0x09
-#define PSR_MODE_EL2t 0x08
-#define PSR_MODE_EL1h 0x05
-#define PSR_MODE_EL1t 0x04
-#define PSR_MODE_EL0t 0x00
+#define PSR_MODE_BIT  0x10U /* Set iff AArch32 */
+#define PSR_MODE_EL3h 0x0dU
+#define PSR_MODE_EL3t 0x0cU
+#define PSR_MODE_EL2h 0x09U
+#define PSR_MODE_EL2t 0x08U
+#define PSR_MODE_EL1h 0x05U
+#define PSR_MODE_EL1t 0x04U
+#define PSR_MODE_EL0t 0x00U
 
 /*
  * We set PSR_Z to be able to boot Linux kernel versions with an invalid
@@ -457,7 +495,7 @@ typedef uint64_t xen_callback_t;
 #define GUEST_RAM0_SIZE   xen_mk_ullong(0xc0000000)
 
 /* 4GB @ 4GB Prefetch Memory for VPCI */
-#define GUEST_VPCI_ADDR_TYPE_PREFETCH_MEM   xen_mk_ullong(0x42000000)
+#define GUEST_VPCI_ADDR_TYPE_PREFETCH_MEM   xen_mk_ullong(0x43000000)
 #define GUEST_VPCI_PREFETCH_MEM_ADDR        xen_mk_ullong(0x100000000)
 #define GUEST_VPCI_PREFETCH_MEM_SIZE        xen_mk_ullong(0x100000000)
 
@@ -475,6 +513,7 @@ typedef uint64_t xen_callback_t;
 #define GUEST_MAX_VCPUS 128
 
 /* Interrupts */
+
 #define GUEST_TIMER_VIRT_PPI    27
 #define GUEST_TIMER_PHYS_S_PPI  29
 #define GUEST_TIMER_PHYS_NS_PPI 30
@@ -484,6 +523,19 @@ typedef uint64_t xen_callback_t;
 
 #define GUEST_VIRTIO_MMIO_SPI_FIRST   33
 #define GUEST_VIRTIO_MMIO_SPI_LAST    43
+
+/*
+ * SGI is the preferred delivery mechanism of FF-A pending notifications or
+ * schedule recveive interrupt. SGIs 8-15 are normally not used by a guest
+ * as they in a non-virtualized system typically are assigned to the secure
+ * world. Here we're free to use SGI 8-15 since they are virtual and have
+ * nothing to do with the secure world.
+ *
+ * For partitioning of SGIs see also Arm Base System Architecture v1.0C,
+ * https://developer.arm.com/documentation/den0094/
+ */
+#define GUEST_FFA_NOTIF_PEND_INTR_ID      8
+#define GUEST_FFA_SCHEDULE_RECV_INTR_ID   9
 
 /* PSCI functions */
 #define PSCI_cpu_suspend 0

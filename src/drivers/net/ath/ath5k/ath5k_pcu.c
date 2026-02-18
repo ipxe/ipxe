@@ -23,6 +23,7 @@
  */
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( FORBIDDEN );
 
 /*********************************\
 * Protocol Control Unit Functions *

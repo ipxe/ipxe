@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #ifdef PCIAPI_EFI
 #define PCIAPI_PREFIX_efi
@@ -35,10 +36,11 @@ extern int efipci_write ( struct pci_device *pci, unsigned long location,
 /**
  * Check if PCI bus probing is allowed
  *
+ * @v pci		PCI device
  * @ret ok		Bus probing is allowed
  */
 static inline __always_inline int
-PCIAPI_INLINE ( efi, pci_can_probe ) ( void ) {
+PCIAPI_INLINE ( efi, pci_can_probe ) ( struct pci_device *pci __unused ) {
 	return 0;
 }
 

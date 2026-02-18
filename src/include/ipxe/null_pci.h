@@ -10,6 +10,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #ifdef PCIAPI_NULL
 #define PCIAPI_PREFIX_null
@@ -22,10 +23,11 @@ struct pci_device;
 /**
  * Check if PCI bus probing is allowed
  *
+ * @v pci		PCI device
  * @ret ok		Bus probing is allowed
  */
 static inline __always_inline int
-PCIAPI_INLINE ( null, pci_can_probe ) ( void ) {
+PCIAPI_INLINE ( null, pci_can_probe ) ( struct pci_device *pci __unused ) {
 	return 0;
 }
 

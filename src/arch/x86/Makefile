@@ -28,7 +28,3 @@ CFLAGS		+= -DNVALGRIND
 # Define version string for lkrnprefix.S
 #
 CFLAGS_lkrnprefix	+= -DVERSION="\"$(VERSION)\""
-
-# Include Hyper-V driver in the all-drivers build
-#
-DRIVERS_hyperv += hyperv

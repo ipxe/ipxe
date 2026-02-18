@@ -1,3 +1,5 @@
+FILE_SECBOOT ( FORBIDDEN );
+
 /*
  * Interrupt handlers for GDB stub
  */

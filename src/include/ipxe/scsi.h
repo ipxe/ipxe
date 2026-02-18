@@ -11,6 +11,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /** Maximum block for READ/WRITE (10) commands */
 #define SCSI_MAX_BLOCK_10 0xffffffffULL

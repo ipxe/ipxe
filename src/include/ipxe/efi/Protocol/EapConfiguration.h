@@ -13,6 +13,7 @@
 #define __EFI_EAP_CONFIGURATION_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// EFI EAP Configuration protocol provides a way to set and get EAP configuration.

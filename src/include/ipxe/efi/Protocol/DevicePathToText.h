@@ -11,6 +11,7 @@
 #define __DEVICE_PATH_TO_TEXT_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// Device Path To Text protocol

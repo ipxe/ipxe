@@ -11,6 +11,7 @@
 #define _BLUETOOTH_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #pragma pack(1)
 

@@ -8,9 +8,9 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/pcibios.h>
 #include <ipxe/pcidirect.h>
-#include <ipxe/pcicloud.h>
 
 #endif /* _BITS_PCI_IO_H */

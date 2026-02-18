@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <string.h>
 #include <errno.h>
@@ -663,11 +664,7 @@ static void ncm_remove ( struct usb_function *func ) {
 
 /** CDC-NCM device IDs */
 static struct usb_device_id ncm_ids[] = {
-	{
-		.name = "cdc-ncm",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ROM ( 0xffff, 0xffff, "cdc-ncm", "USB CDC-NCM NIC", 0 ),
 };
 
 /** CDC-NCM driver */

@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stddef.h>
@@ -51,8 +52,8 @@ struct x509_public_key {
 	struct asn1_cursor raw;
 	/** Public key algorithm */
 	struct asn1_algorithm *algorithm;
-	/** Raw public key bit string */
-	struct asn1_bit_string raw_bits;
+	/** Public key value */
+	struct asn1_cursor value;
 };
 
 /** An X.509 certificate subject */
@@ -70,7 +71,7 @@ struct x509_signature {
 	/** Signature algorithm */
 	struct asn1_algorithm *algorithm;
 	/** Signature value */
-	struct asn1_bit_string value;
+	struct asn1_cursor value;
 };
 
 /** An X.509 certificate basic constraints set */

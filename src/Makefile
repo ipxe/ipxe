@@ -107,16 +107,12 @@ SRCDIRS		+= hci/mucurses hci/mucurses/widgets
 SRCDIRS		+= hci/keymap
 SRCDIRS		+= usr
 SRCDIRS		+= config
-
-# These directories contain code that is not eligible for UEFI Secure
-# Boot signing.
-#
-SRCDIRS_INSEC	+= net/oncrpc
-SRCDIRS_INSEC	+= net/80211
-SRCDIRS_INSEC	+= drivers/net/rtl818x
-SRCDIRS_INSEC	+= drivers/net/ath
-SRCDIRS_INSEC	+= drivers/net/ath/ath5k
-SRCDIRS_INSEC	+= drivers/net/ath/ath9k
+SRCDIRS		+= net/oncrpc
+SRCDIRS		+= net/80211
+SRCDIRS		+= drivers/net/rtl818x
+SRCDIRS		+= drivers/net/ath
+SRCDIRS		+= drivers/net/ath/ath5k
+SRCDIRS		+= drivers/net/ath/ath9k
 
 # NON_AUTO_SRCS lists files that are excluded from the normal
 # automatic build system.
@@ -214,28 +210,29 @@ install :
 #
 # Version number calculations
 #
-ifneq ($(wildcard ../.git),)
-VERSIONS := $(shell git describe --tags --always --long --abbrev=1 --match "v*")
-VERSION_TUPLE	:= $(subst ., ,$(subst -, ,$(patsubst v%,%,$(VERSIONS))))
-VERSION_MAJOR	:= $(word 1,$(VERSION_TUPLE))
-VERSION_MINOR	:= $(word 2,$(VERSION_TUPLE))
-VERSION_PATCH	:= $(word 3,$(VERSION_TUPLE))
-ifeq ($(word 4,$(VERSION_TUPLE)),0)
-EXTRAVERSION	:=
-else
+VERSION_MAJOR	:= 1
+VERSION_MINOR	:= 21
+VERSION_PATCH	:= 1
 EXTRAVERSION	:= +
-endif
-GITVERSION	= $(word 5,$(VERSION_TUPLE))
+ifneq ($(wildcard ../.git/HEAD),)
+GITVERSION	:= $(shell cat ../.git/HEAD)
+ifeq ($(firstword $(GITVERSION)),ref:)
+GITREF		:= $(word 2,$(GITVERSION))
+ifneq ($(wildcard ../.git/$(GITREF)),)
+GITVERSION	:= $(shell cat ../.git/$(GITREF))
 else
-VERSION_MAJOR	= 1
-VERSION_MINOR	= 0
-VERSION_PATCH	= 0
-EXTRAVERSION	= +
+GITVERSION	:= $(shell awk -v ref="$(GITREF)" '$$2 == ref { print $1 }' \
+			   ../.git/packed-refs)
+endif
+endif
+ifeq ($(GITVERSION),)
+$(error Unable to determine git commit ID)
+endif
 endif
 MM_VERSION	= $(VERSION_MAJOR).$(VERSION_MINOR)
 VERSION		= $(MM_VERSION).$(VERSION_PATCH)$(EXTRAVERSION)
 ifneq ($(GITVERSION),)
-VERSION		+= ($(GITVERSION))
+VERSION		+= (g$(shell echo "$(GITVERSION)" | cut -c1-5))
 endif
 version :
 	@$(ECHO) "$(VERSION)"
@@ -244,14 +241,17 @@ version :
 #
 # Predefined build shortcuts (for e.g. bin/ipxe.iso)
 
-# All drivers (excluding USB)
+# All drivers (defined on a per-platform basis)
 #
-DRIVERS_ipxe	= $(DRIVERS_net) $(DRIVERS_infiniband) \
-		  $(DRIVERS_xen) $(DRIVERS_hyperv)
+DRIVERS_ipxe	+=
+
+# All drivers (excluding USB network devices)
+#
+DRIVERS_ipxe-legacy = $(filter-out $(DRIVERS_usb_net),$(DRIVERS_ipxe))
 
 # Raspberry Pi
 #
-DRIVERS_rpi	= smsc95xx lan78xx
+DRIVERS_rpi	+= smsc95xx lan78xx
 
 ###############################################################################
 #

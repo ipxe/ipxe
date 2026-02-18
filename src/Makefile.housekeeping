@@ -12,6 +12,8 @@ COMMA	:= ,
 EMPTY	:=
 SPACE	:= $(EMPTY) $(EMPTY)
 HASH	:= \#
+LPAREN	:= (
+RPAREN	:= )
 define NEWLINE
 
 
@@ -202,6 +204,10 @@ ifneq ($(strip $(filter-out $(NO_DEP_TARGETS),$(MAKECMDGOALS))),)
 NEED_DEPS	:= 1
 endif
 
+# Mark the various build-tracking files as unannotated
+#
+UNANNOTATED	:= $(BIN)/.%.list
+
 ###############################################################################
 #
 # Select build architecture and platform based on $(BIN)
@@ -224,10 +230,10 @@ BIN_ELEMENTS	:= $(subst -,$(SPACE),$(BIN))
 BIN_APS		:= $(wordlist 2,4,$(BIN_ELEMENTS))
 ifeq ($(lastword $(BIN_APS)),sb)
 BIN_AP		:= $(wordlist 2,$(words $(BIN_APS)),discard $(BIN_APS))
-BIN_SECUREBOOT	:= 1
+BIN_SECUREBOOT	:= sb
 else
 BIN_AP		:= $(BIN_APS)
-BIN_SECUREBOOT	:= 0
+BIN_SECUREBOOT	:=
 endif
 ifeq ($(BIN_AP),efi)
 BIN_ARCH	:= i386
@@ -257,15 +263,18 @@ platform :
 	@$(ECHO) $(PLATFORM)
 
 # Determine security flag
-DEFAULT_SECUREBOOT := 0
-SECUREBOOT	:= $(firstword $(BIN_SECUREBOOT) $(DEFAULT_SECUREBOOT))
-CFLAGS		+= -DSECUREBOOT=$(SECUREBOOT)
+SECUREBOOT	:= $(BIN_SECUREBOOT)
 secureboot :
 	@$(ECHO) $(SECUREBOOT)
 
 # Set cross-compilation prefix automatically if not specified
 ifeq ($(CROSS_COMPILE),)
 CROSS_COMPILE	:= $(CROSS_COMPILE_$(ARCH))
+endif
+
+# Set cross-compilation sysroot automatically if not specified
+ifeq ($(SYSROOT),)
+SYSROOT		:= $(SYSROOT_$(ARCH))
 endif
 
 endif # defined(BIN)
@@ -436,11 +445,6 @@ endif
 #
 # Source file handling
 
-# Exclude known-insecure files from Secure Boot builds
-ifeq ($(SECUREBOOT),0)
-SRCDIRS		+= $(SRCDIRS_INSEC)
-endif
-
 # SRCDIRS lists all directories containing source files.
 srcdirs :
 	@$(ECHO) $(SRCDIRS)
@@ -608,7 +612,8 @@ EMBED_ALL	:= $(foreach i,$(call seq,1,$(words $(EMBEDDED_FILES))),\
 		     EMBED ( $(i), \"$(word $(i), $(EMBEDDED_FILES))\",\
 			     \"$(notdir $(word $(i),$(EMBEDDED_FILES)))\" ))
 
-embedded_DEPS += $(EMBEDDED_FILES) $(EMBEDDED_LIST)
+embedded_DEPS	+= $(EMBEDDED_FILES) $(EMBEDDED_LIST)
+UNANNOTATED	+= $(EMBEDDED_FILES) $(EMBEDDED_LIST)
 
 CFLAGS_embedded = -DEMBED_ALL="$(EMBED_ALL)"
 
@@ -637,7 +642,8 @@ TRUSTED_FPS	:= $(foreach CERT,$(TRUSTED_CERTS),\
 			 $(shell $(OPENSSL) x509 -in $(CERT) -noout -sha256 \
 				 -fingerprint))))$(COMMA))
 
-rootcert_DEPS += $(TRUSTED_FILES) $(TRUSTED_LIST)
+rootcert_DEPS	+= $(TRUSTED_FILES) $(TRUSTED_LIST)
+UNANNOTATED	+= $(TRUSTED_FILES) $(TRUSTED_LIST)
 
 CFLAGS_rootcert += $(if $(TRUST_EXT),-DALLOW_TRUST_OVERRIDE=$(TRUST_EXT))
 CFLAGS_rootcert += $(if $(TRUSTED_FPS),-DTRUSTED="$(TRUSTED_FPS)")
@@ -688,7 +694,8 @@ CERT_ALL := $(foreach i,$(call seq,1,$(CERT_COUNT)),\
 
 endif
 
-certstore_DEPS += $(CERT_LIST) $(CERT_FILES) $(CERT_PEMS) $(CERT_DERS)
+certstore_DEPS	+= $(CERT_LIST) $(CERT_FILES) $(CERT_PEMS) $(CERT_DERS)
+UNANNOTATED	+= $(CERT_LIST) $(CERT_FILES) $(CERT_PEMS) $(CERT_DERS)
 
 CFLAGS_certstore += -DCERT_ALL="$(CERT_ALL)"
 
@@ -721,12 +728,14 @@ ifdef PRIVKEY
 $(PRIVKEY_INC) : $(PRIVKEY) $(PRIVKEY_LIST)
 	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
 
-privkey_DEPS += $(PRIVKEY_INC)
+privkey_DEPS	+= $(PRIVKEY_INC)
+UNANNOTATED	+= $(PRIVKEY_INC)
 endif
 
 CLEANUP += $(BIN)/.private_key.*
 
-privkey_DEPS += $(PRIVKEY_LIST)
+privkey_DEPS	+= $(PRIVKEY_LIST)
+UNANNOTATED	+= $(PRIVKEY_LIST)
 
 CFLAGS_privkey += $(if $(PRIVKEY),-DPRIVATE_KEY="\"$(PRIVKEY_INC)\"")
 
@@ -1230,8 +1239,6 @@ BUILD_ID_CMD = cat $^ | cksum | awk '{print $$1}'
 #
 ifdef SOURCE_DATE_EPOCH
 BUILD_TIMESTAMP := $(SOURCE_DATE_EPOCH)
-else ifdef GITVERSION
-BUILD_TIMESTAMP := $(shell git log -1 --pretty=%ct)
 else
 BUILD_TIMESTAMP := $(shell date +%s)
 endif
@@ -1248,6 +1255,7 @@ $(BIN)/version.%.o : core/version.c $(MAKEDEPS) $(version_DEPS) $(GIT_INDEX)
 		-DVERSION="\"$(VERSION)\"" \
 		-c $< -o $@
 	$(Q)$(OBJCOPY) --prefix-symbols=$(SYMBOL_PREFIX) $@
+$(BIN)/deps/core/version.c.d : $(version_DEPS)
 
 # Build an intermediate object file from the objects required for the
 # specified target.
@@ -1299,15 +1307,23 @@ endef
 $(BIN)/%.nodeps : $(BIN)/%.tmp
 	$(Q)$(ECHO) $(call nodeps_list,$<)
 
+# Get annotated dependency list for the specified target
+#
+define annotated_deps_list
+	$(filter-out $(UNANNOTATED),$(call deps_list,$(1)))
+endef
+
+# Get dependency list missing specified declaration for the specified target
+#
+define undeclared_deps_list
+	$(shell grep -L '^[[:space:]]*$(2)[[:space:]]*$(LPAREN)' \
+		$(call annotated_deps_list,$(1)))
+endef
+
 # Get licensing verdict for the specified target
 #
-define licensable_deps_list
-	$(filter-out config/local/%.h,\
-	  $(filter-out $(BIN)/.%.list,\
-	    $(call deps_list,$(1))))
-endef
 define unlicensed_deps_list
-	$(shell grep -L FILE_LICENCE $(call licensable_deps_list,$(1)))
+	$(call undeclared_deps_list,$(1),FILE_LICENCE)
 endef
 define licence_list
 	$(sort $(foreach LICENCE,\
@@ -1319,11 +1335,33 @@ $(BIN)/%.licence_list : $(BIN)/%.tmp
 $(BIN)/%.licence : $(BIN)/%.tmp
 	$(QM)$(ECHO) "  [LICENCE] $@"
 	$(Q)$(if $(strip $(call unlicensed_deps_list,$<)),\
-		echo -n "Unable to determine licence because the following " ;\
-		echo "files are missing a licence declaration:" ;\
+		echo -n "The following files are missing a FILE_LICENCE() " ;\
+		echo "declaration:" ;\
 		echo $(call unlicensed_deps_list,$<);\
-		exit 1,\
-		$(PERL) $(LICENCE) $(call licence_list,$<))
+		exit 1)
+	$(PERL) $(LICENCE) $(call licence_list,$<)
+
+# Get Secure Boot permissibility verdict for the specified target
+#
+define nosecboot_deps_list
+	$(call undeclared_deps_list,$(1),FILE_SECBOOT)
+endef
+define secboot_list
+	$(sort $(foreach SECBOOT,\
+		 $(filter __secboot__%,$(shell $(NM) $(1) | cut -d" " -f3)),\
+		 $(word 2,$(subst __, ,$(SECBOOT)))))
+endef
+$(BIN)/%.secboot : $(BIN)/%.tmp
+	$(QM)$(ECHO) "  [SECBOOT] $@"
+	$(Q)$(if $(strip $(call nosecboot_deps_list,$<)),\
+		echo -n "The following files are missing a FILE_SECBOOT() " ;\
+		echo "declaration:" ;\
+		echo $(call nosecboot_deps_list,$<);\
+		exit 1)
+	$(Q)$(if $(strip $(filter-out permitted,$(call secboot_list,$<))),\
+		echo -n "This build includes files that are not permitted " ;\
+		echo "to be signed for UEFI Secure Boot" ;\
+		exit 1)
 
 # Extract compression information from intermediate object file
 #
@@ -1437,6 +1475,12 @@ endif
 $(BIN)/etherboot.% : $(BIN)/ipxe.%
 	ln -sf $(notdir $<) $@
 
+# Filter out non-permitted drivers if security flag is set
+#
+ifneq ($(SECUREBOOT),)
+DRIVERS_ipxe	:= $(filter $(DRIVERS_SECBOOT),$(DRIVERS_ipxe))
+endif
+
 endif # defined(BIN)
 
 ###############################################################################
@@ -1503,6 +1547,8 @@ $(CONFIG_LOCAL_HEADERS) :
 
 .PRECIOUS : $(CONFIG_LOCAL_HEADERS)
 
+UNANNOTATED	+= $(CONFIG_LOCAL_HEADERS)
+
 ifneq ($(CONFIG),)
 
 CONFIG_LOCAL_NAMED_HEADERS := $(foreach HEADER,$(CONFIG_HEADERS),\
@@ -1513,6 +1559,8 @@ $(CONFIG_LOCAL_NAMED_HEADERS) :
 	$(Q)$(TOUCH) $@
 
 .PRECIOUS : $(CONFIG_LOCAL_NAMED_HEADERS)
+
+UNANNOTATED	+= $(CONFIG_LOCAL_NAMED_HEADERS)
 
 endif
 

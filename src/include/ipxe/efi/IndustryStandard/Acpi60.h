@@ -12,6 +12,7 @@
 #define _ACPI_6_0_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/IndustryStandard/Acpi51.h>
 

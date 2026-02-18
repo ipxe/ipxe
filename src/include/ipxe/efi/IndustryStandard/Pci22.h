@@ -17,6 +17,7 @@
 #define _PCI22_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define PCI_MAX_BUS     255
 #define PCI_MAX_DEVICE  31

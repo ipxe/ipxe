@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -31,7 +32,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/retry.h>
 #include <ipxe/timer.h>
 #include <ipxe/malloc.h>
+#include <ipxe/pending.h>
 #include <ipxe/neighbour.h>
+#include <config/fault.h>
 
 /** @file
  *
@@ -48,8 +51,23 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Neighbour discovery maximum timeout */
 #define NEIGHBOUR_MAX_TIMEOUT ( TICKS_PER_SEC * 3 )
 
+/** Neighbour discovery maximum burst count for delayed transmissions
+ *
+ * When using delay injection, timer quantisation can cause a large
+ * number of delayed packets to be scheduled at the same time.  This
+ * can quickly exhaust available transmit descriptors, leading to
+ * packets that are dropped completely (not just delayed).
+ *
+ * Limit the number of delayed packets that we will attempt to
+ * transmit at once, to allow time for transmit completions to occur.
+ */
+#define NEIGHBOUR_DELAY_MAX_BURST 2
+
 /** The neighbour cache */
 struct list_head neighbours = LIST_HEAD_INIT ( neighbours );
+
+/** Pending operation for delayed transmissions */
+static struct pending_operation neighbour_delayed;
 
 static void neighbour_expired ( struct retry_timer *timer, int over );
 
@@ -164,24 +182,20 @@ static void neighbour_discover ( struct neighbour *neighbour,
 }
 
 /**
- * Complete neighbour discovery
+ * Transmit deferred packets
  *
  * @v neighbour		Neighbour cache entry
- * @v ll_dest		Destination link-layer address
  */
-static void neighbour_discovered ( struct neighbour *neighbour,
-				   const void *ll_dest ) {
+static void neighbour_tx_queue ( struct neighbour *neighbour ) {
 	struct net_device *netdev = neighbour->netdev;
-	struct ll_protocol *ll_protocol = netdev->ll_protocol;
 	struct net_protocol *net_protocol = neighbour->net_protocol;
+	const void *ll_dest = neighbour->ll_dest;
+	struct neighbour_delay *delay;
 	struct io_buffer *iobuf;
+	unsigned long elapsed;
+	unsigned long threshold;
+	unsigned int count = 0;
 	int rc;
-
-	/* Fill in link-layer address */
-	memcpy ( neighbour->ll_dest, ll_dest, ll_protocol->ll_addr_len );
-	DBGC ( neighbour, "NEIGHBOUR %s %s %s is %s %s\n", netdev->name,
-	       net_protocol->name, net_protocol->ntoa ( neighbour->net_dest ),
-	       ll_protocol->name, ll_protocol->ntoa ( neighbour->ll_dest ) );
 
 	/* Stop retransmission timer */
 	stop_timer ( &neighbour->timer );
@@ -193,6 +207,36 @@ static void neighbour_discovered ( struct neighbour *neighbour,
 	ref_get ( &neighbour->refcnt );
 	while ( ( iobuf = list_first_entry ( &neighbour->tx_queue,
 					     struct io_buffer, list )) != NULL){
+
+		/* Handle delay injection */
+		if ( NEIGHBOUR_DELAY_MS ) {
+
+			/* Determine elapsed time since transmission attempt */
+			delay = iobuf->data;
+			elapsed = ( currticks() - delay->start );
+			threshold = ( NEIGHBOUR_DELAY_MS * TICKS_PER_MS );
+
+			/* Defer transmission if not yet scheduled */
+			if ( elapsed < threshold ) {
+				start_timer_fixed ( &neighbour->timer,
+						    ( threshold - elapsed ) );
+				break;
+			}
+
+			/* Defer transmission if maximum burst count reached */
+			if ( ++count >= NEIGHBOUR_DELAY_MAX_BURST ) {
+				start_timer_nodelay ( &neighbour->timer );
+				break;
+			}
+
+			/* Strip pseudo-header */
+			iob_pull ( iobuf, sizeof ( *delay ) );
+
+			/* Remove pending operation */
+			pending_put ( &neighbour_delayed );
+		}
+
+		/* Transmit deferred packet */
 		DBGC2 ( neighbour, "NEIGHBOUR %s %s %s transmitting deferred "
 			"packet\n", netdev->name, net_protocol->name,
 			net_protocol->ntoa ( neighbour->net_dest ) );
@@ -208,6 +252,31 @@ static void neighbour_discovered ( struct neighbour *neighbour,
 		}
 	}
 	ref_put ( &neighbour->refcnt );
+}
+
+/**
+ * Complete neighbour discovery
+ *
+ * @v neighbour		Neighbour cache entry
+ * @v ll_dest		Destination link-layer address
+ */
+static void neighbour_discovered ( struct neighbour *neighbour,
+				   const void *ll_dest ) {
+	struct net_device *netdev = neighbour->netdev;
+	struct ll_protocol *ll_protocol = netdev->ll_protocol;
+	struct net_protocol *net_protocol = neighbour->net_protocol;
+
+	/* Fill in link-layer address */
+	memcpy ( neighbour->ll_dest, ll_dest, ll_protocol->ll_addr_len );
+	DBGC ( neighbour, "NEIGHBOUR %s %s %s is %s %s\n", netdev->name,
+	       net_protocol->name, net_protocol->ntoa ( neighbour->net_dest ),
+	       ll_protocol->name, ll_protocol->ntoa ( neighbour->ll_dest ) );
+
+	/* Mark discovery as complete */
+	neighbour->discovery = NULL;
+
+	/* Transmit any deferred packets */
+	neighbour_tx_queue ( neighbour );
 }
 
 /**
@@ -235,6 +304,8 @@ static void neighbour_destroy ( struct neighbour *neighbour, int rc ) {
 			net_protocol->ntoa ( neighbour->net_dest ),
 			strerror ( rc ) );
 		list_del ( &iobuf->list );
+		if ( NEIGHBOUR_DELAY_MS )
+			pending_put ( &neighbour_delayed );
 		netdev_tx_err ( neighbour->netdev, iobuf, rc );
 	}
 
@@ -262,6 +333,14 @@ static void neighbour_expired ( struct retry_timer *timer, int fail ) {
 	const void *net_dest = neighbour->net_dest;
 	const void *net_source = neighbour->net_source;
 	int rc;
+
+	/* If the timer is being (ab)used for delay injection, then
+	 * transmit the deferred packet queue.
+	 */
+	if ( NEIGHBOUR_DELAY_MS && ( ! neighbour->discovery ) ) {
+		neighbour_tx_queue ( neighbour );
+		return;
+	}
 
 	/* If we have failed, destroy the cache entry */
 	if ( fail ) {
@@ -293,14 +372,15 @@ static void neighbour_expired ( struct retry_timer *timer, int fail ) {
  * @v net_protocol	Network-layer protocol
  * @v net_dest		Destination network-layer address
  * @v net_source	Source network-layer address
- * @v ll_source		Source link-layer address
  * @ret rc		Return status code
  */
 int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		   struct net_protocol *net_protocol, const void *net_dest,
 		   struct neighbour_discovery *discovery,
-		   const void *net_source, const void *ll_source ) {
+		   const void *net_source ) {
 	struct neighbour *neighbour;
+	struct neighbour_delay *delay;
+	int rc;
 
 	/* Find or create neighbour cache entry */
 	neighbour = neighbour_find ( netdev, net_protocol, net_dest );
@@ -311,19 +391,42 @@ int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 		neighbour_discover ( neighbour, discovery, net_source );
 	}
 
-	/* If a link-layer address is available then transmit
-	 * immediately, otherwise queue for later transmission.
+	/* If discovery is still in progress or if delay injection is
+	 * in use, then queue for later transmission.
 	 */
-	if ( neighbour_has_ll_dest ( neighbour ) ) {
-		return net_tx ( iobuf, netdev, net_protocol, neighbour->ll_dest,
-				ll_source );
-	} else {
+	if ( NEIGHBOUR_DELAY_MS || neighbour->discovery ) {
+
+		/* Add to deferred packet queue */
 		DBGC2 ( neighbour, "NEIGHBOUR %s %s %s deferring packet\n",
 			netdev->name, net_protocol->name,
 			net_protocol->ntoa ( net_dest ) );
 		list_add_tail ( &iobuf->list, &neighbour->tx_queue );
+
+		/* Handle delay injection, if applicable */
+		if ( NEIGHBOUR_DELAY_MS ) {
+
+			/* Record original transmission time */
+			delay = iob_push ( iobuf, sizeof ( *delay ) );
+			delay->start = currticks();
+
+			/* Add pending operation */
+			pending_get ( &neighbour_delayed );
+
+			/* Process deferred packet queue, if possible */
+			if ( ! neighbour->discovery )
+				neighbour_tx_queue ( neighbour );
+		}
+
 		return 0;
 	}
+
+	/* Otherwise, transmit immediately */
+	if ( ( rc = net_tx ( iobuf, netdev, net_protocol, neighbour->ll_dest,
+			     netdev->ll_addr ) ) != 0 ) {
+		return rc;
+	}
+
+	return 0;
 }
 
 /**

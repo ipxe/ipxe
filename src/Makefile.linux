@@ -19,12 +19,17 @@ LDFLAGS		+= -r -d
 # Source directories
 #
 SRCDIRS		+= drivers/linux
+SRCDIRS		+= drivers/net/linux
 SRCDIRS		+= interface/linux
 NON_AUTO_SRCS	+= interface/linux/linux_api.c
 
 # Media types
 #
 NON_AUTO_MEDIA = linux
+
+# Include Linux-specific drivers in all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_linux_net)
 
 # Compiler flags for building host API wrapper
 #

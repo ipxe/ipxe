@@ -322,5 +322,7 @@ struct linux_driver af_packet_nic_driver __linux_driver = {
 	.name = "af_packet",
 	.probe = af_packet_nic_probe,
 	.remove = af_packet_nic_remove,
-	.can_probe = 1,
 };
+
+/* Generate build rules */
+LINUX_ROM ( "af_packet", "AF_PACKET binding NIC" );

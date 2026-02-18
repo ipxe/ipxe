@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -894,11 +895,7 @@ static void usbblk_remove ( struct usb_function *func ) {
 
 /** Mass storage class device IDs */
 static struct usb_device_id usbblk_ids[] = {
-	{
-		.name = "usbblk",
-		.vendor = USB_ANY_ID,
-		.product = USB_ANY_ID,
-	},
+	USB_ID ( 0xffff, 0xffff, "usbblk", "USB block device", 0 ),
 };
 
 /** Mass storage driver */

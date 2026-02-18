@@ -7,6 +7,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/device.h>
 #include <ipxe/tables.h>
@@ -73,6 +74,9 @@ struct efi_driver {
 #define EFI_DRIVER_NII		03	/**< NII protocol drivers */
 #define EFI_DRIVER_SNP		04	/**< SNP protocol drivers */
 #define EFI_DRIVER_MNP		05	/**< MNP protocol drivers */
+
+/** Define build rules for an EFI driver */
+#define EFI_ROM( _name, _desc )
 
 /**
  * Set EFI driver-private data

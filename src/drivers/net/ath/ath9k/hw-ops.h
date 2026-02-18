@@ -18,6 +18,7 @@
 #define ATH9K_HW_OPS_H
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include "hw.h"
 

@@ -58,8 +58,6 @@ struct linux_driver {
 	int (*probe)(struct linux_device *device, struct linux_device_request *request);
 	/** Remove function */
 	void (*remove)(struct linux_device *device);
-	/** Can the driver probe any more devices? */
-	int can_probe;
 };
 
 /** Linux driver table */
@@ -67,6 +65,9 @@ struct linux_driver {
 
 /** Declare a Linux driver */
 #define __linux_driver __table_entry(LINUX_DRIVERS, 01)
+
+/** Define build rules for a Linux driver */
+#define LINUX_ROM( _name, _desc )
 
 /**
  * Set linux device driver-private data

@@ -14,6 +14,7 @@
 #define __ACPI_TABLE_H___
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_ACPI_TABLE_PROTOCOL_GUID \
   { 0xffe06bdd, 0x6107, 0x46a6, { 0x7b, 0xb2, 0x5a, 0x9c, 0x7e, 0xc5, 0x27, 0x5c }}

@@ -45,6 +45,7 @@
 #define _DEV_ATH_ATHVAR_H
 
 FILE_LICENCE ( BSD3 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include "ath5k.h"
 #include <ipxe/iobuf.h>

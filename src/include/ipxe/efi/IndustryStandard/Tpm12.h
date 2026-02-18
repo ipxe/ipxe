@@ -10,6 +10,7 @@
 #define _TPM12_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// The start of TPM return codes

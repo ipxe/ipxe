@@ -18,6 +18,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -158,8 +159,8 @@ static int ocsp_request ( struct ocsp_check *ocsp ) {
 	digest_final ( digest, digest_ctx, name_digest );
 	digest_init ( digest, digest_ctx );
 	digest_update ( digest, digest_ctx,
-			ocsp->issuer->subject.public_key.raw_bits.data,
-			ocsp->issuer->subject.public_key.raw_bits.len );
+			ocsp->issuer->subject.public_key.value.data,
+			ocsp->issuer->subject.public_key.value.len );
 	digest_final ( digest, digest_ctx, pubkey_digest );
 
 	/* Construct request */
@@ -422,8 +423,8 @@ static int ocsp_compare_responder_key_hash ( struct ocsp_check *ocsp,
 	/* Generate SHA1 hash of certificate's public key */
 	digest_init ( &sha1_algorithm, ctx );
 	digest_update ( &sha1_algorithm, ctx,
-			cert->subject.public_key.raw_bits.data,
-			cert->subject.public_key.raw_bits.len );
+			cert->subject.public_key.value.data,
+			cert->subject.public_key.value.len );
 	digest_final ( &sha1_algorithm, ctx, digest );
 
 	/* Compare responder key hash with hash of certificate's public key */
@@ -701,7 +702,7 @@ static int ocsp_parse_basic_response ( struct ocsp_check *ocsp,
 				       const struct asn1_cursor *raw ) {
 	struct ocsp_response *response = &ocsp->response;
 	struct asn1_algorithm **algorithm = &response->algorithm;
-	struct asn1_bit_string *signature = &response->signature;
+	struct asn1_cursor *signature = &response->signature;
 	struct asn1_cursor cursor;
 	int rc;
 
@@ -726,7 +727,8 @@ static int ocsp_parse_basic_response ( struct ocsp_check *ocsp,
 	asn1_skip_any ( &cursor );
 
 	/* Parse signature */
-	if ( ( rc = asn1_integral_bit_string ( &cursor, signature ) ) != 0 ) {
+	memcpy ( signature, &cursor, sizeof ( *signature ) );
+	if ( ( rc = asn1_enter_bits ( signature, NULL ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" cannot parse signature: %s\n",
 		       ocsp, x509_name ( ocsp->cert ), strerror ( rc ) );
 		return rc;
@@ -857,8 +859,7 @@ static int ocsp_check_signature ( struct ocsp_check *ocsp,
 
 	/* Verify digest */
 	if ( ( rc = pubkey_verify ( pubkey, key, digest, digest_out,
-				    response->signature.data,
-				    response->signature.len ) ) != 0 ) {
+				    &response->signature ) ) != 0 ) {
 		DBGC ( ocsp, "OCSP %p \"%s\" signature verification failed: "
 		       "%s\n", ocsp, x509_name ( ocsp->cert ), strerror ( rc ));
 		return rc;

@@ -1,3 +1,6 @@
+#ifndef _IPXE_EFI_IP4CONFIG_H
+#define _IPXE_EFI_IP4CONFIG_H
+
 /** @file
   This file provides a definition of the EFI IPv4 Configuration
   Protocol.
@@ -14,6 +17,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define __EFI_IP4CONFIG_PROTOCOL_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Protocol/Ip4.h>
 
@@ -176,3 +180,5 @@ struct _EFI_IP4_CONFIG_PROTOCOL {
 extern EFI_GUID  gEfiIp4ConfigProtocolGuid;
 
 #endif
+
+#endif /* _IPXE_EFI_IP4CONFIG_H */

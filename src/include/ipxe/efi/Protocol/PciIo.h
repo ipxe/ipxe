@@ -11,6 +11,7 @@
 #define __PCI_IO_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// Global ID for the PCI I/O Protocol

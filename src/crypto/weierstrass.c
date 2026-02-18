@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /** @file
  *
@@ -170,7 +171,7 @@ enum weierstrass_opcode {
  *
  * @v curve		Weierstrass curve
  */
-static void weierstrass_init ( struct weierstrass_curve *curve ) {
+static void weierstrass_init_curve ( struct weierstrass_curve *curve ) {
 	unsigned int size = curve->size;
 	bigint_t ( size ) __attribute__ (( may_alias )) *prime =
 		( ( void * ) curve->prime[0] );
@@ -658,7 +659,7 @@ static void weierstrass_add_ladder ( const bigint_element_t *operand0,
 }
 
 /**
- * Verify point is on curve
+ * Verify freshly initialised point is on curve
  *
  * @v curve		Weierstrass curve
  * @v point0		Element 0 of point (x,y,z) to be verified
@@ -667,6 +668,10 @@ static void weierstrass_add_ladder ( const bigint_element_t *operand0,
  * As with point addition, points are represented in projective
  * coordinates, with all values in Montgomery form and in the range
  * [0,4N) where N is the field prime.
+ *
+ * This verification logic is valid only for points that have been
+ * freshly constructed via weierstrass_init() (i.e. must either have
+ * z=1 or be the point at infinity (0,1,0)).
  */
 static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
 				    const bigint_element_t *point0 ) {
@@ -719,6 +724,10 @@ static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
 		 *		= 3*(x^3 + a*x + b - y^2)	    (mod 13N)
 		 */
 		WEIERSTRASS_ADD2 ( Wt, 3b ),
+		/* [Wt] check	= 3Txaxyb * z			    (mod 2N)
+		 *		= 3*(x^3 + a*x + b - y^2) * z	    (mod 2N)
+		 */
+		WEIERSTRASS_MUL2 ( Wt, z1 ),
 		/* Stop */
 		WEIERSTRASS_STOP
 	};
@@ -728,6 +737,7 @@ static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
 	regs[WEIERSTRASS_3b] = ( ( void * ) b3 );
 	regs[WEIERSTRASS_x1] = ( ( void * ) &point->x );
 	regs[WEIERSTRASS_y1] = ( ( void * ) &point->y );
+	regs[WEIERSTRASS_z1] = ( ( void * ) &point->z );
 	regs[WEIERSTRASS_Wt] = &temp.Wt;
 	regs[WEIERSTRASS_Wp] = &temp.Wp;
 
@@ -748,7 +758,7 @@ static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
 }
 
 /**
- * Verify point is on curve
+ * Verify freshly initialised point is on curve
  *
  * @v curve		Weierstrass curve
  * @v point		Point (x,y,z) to be verified
@@ -759,40 +769,35 @@ static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
 	} )
 
 /**
- * Multiply curve point by scalar
+ * Initialise curve point
  *
  * @v curve		Weierstrass curve
- * @v base		Base point (or NULL to use generator)
- * @v scalar		Scalar multiple
- * @v result		Result point to fill in
+ * @v point0		Element 0 of point (x,y,z) to be filled in
+ * @v temp0		Element 0 of temporary point buffer
+ * @v data		Raw curve point
  * @ret rc		Return status code
  */
-int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
-			   const void *scalar, void *result ) {
+static int weierstrass_init_raw ( struct weierstrass_curve *curve,
+				  bigint_element_t *point0,
+				  bigint_element_t *temp0, const void *data ) {
 	unsigned int size = curve->size;
 	size_t len = curve->len;
 	const bigint_t ( size ) __attribute__ (( may_alias )) *prime =
 		( ( const void * ) curve->prime[0] );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *prime2 =
 		( ( const void * ) curve->prime[WEIERSTRASS_2N] );
-	const bigint_t ( size ) __attribute__ (( may_alias )) *fermat =
-		( ( const void * ) curve->fermat );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *square =
 		( ( const void * ) curve->square );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *one =
 		( ( const void * ) curve->one );
-	struct {
-		union {
-			weierstrass_t ( size ) result;
-			bigint_t ( size * 2 ) product_in;
-		};
-		union {
-			weierstrass_t ( size ) multiple;
-			bigint_t ( size * 2 ) product_out;
-		};
-		bigint_t ( bigint_required_size ( len ) ) scalar;
-	} temp;
+	weierstrass_t ( size ) __attribute__ (( may_alias ))
+		*point = ( ( void * ) point0 );
+	union {
+		bigint_t ( size * 2 ) product;
+		weierstrass_t ( size ) point;
+	} __attribute__ (( may_alias ))	*temp = ( ( void * ) temp0 );
 	size_t offset;
+	int is_infinite;
 	unsigned int i;
 	int rc;
 
@@ -804,29 +809,164 @@ int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
 	 * non-zero.
 	 */
 	if ( ! prime2->element[0] )
-		weierstrass_init ( curve );
-
-	/* Use generator if applicable */
-	if ( ! base )
-		base = curve->base;
+		weierstrass_init_curve ( curve );
 
 	/* Convert input to projective coordinates in Montgomery form */
-	DBGC ( curve, "WEIERSTRASS %s base (", curve->name );
+	DBGC ( curve, "WEIERSTRASS %s point (", curve->name );
 	for ( i = 0, offset = 0 ; i < WEIERSTRASS_AXES ; i++, offset += len ) {
-		bigint_init ( &temp.multiple.axis[i], ( base + offset ), len );
+		bigint_init ( &point->axis[i], ( data + offset ), len );
 		DBGC ( curve, "%s%s", ( i ? "," : "" ),
-		       bigint_ntoa ( &temp.multiple.axis[i] ) );
-		bigint_multiply ( &temp.multiple.axis[i], square,
-				  &temp.product_in );
-		bigint_montgomery_relaxed ( prime, &temp.product_in,
-					    &temp.multiple.axis[i] );
+		       bigint_ntoa ( &point->axis[i] ) );
+		bigint_multiply ( &point->axis[i], square, &temp->product );
+		bigint_montgomery_relaxed ( prime, &temp->product,
+					    &point->axis[i] );
 	}
-	bigint_copy ( one, &temp.multiple.z );
+	memset ( &point->z, 0, sizeof ( point->z ) );
+	is_infinite = bigint_is_zero ( &point->xy );
+	bigint_copy ( one, &point->axis[ is_infinite ? 1 : 2 ] );
 	DBGC ( curve, ")\n" );
 
 	/* Verify point is on curve */
-	if ( ( rc = weierstrass_verify ( curve, &temp.multiple ) ) != 0 )
+	if ( ( rc = weierstrass_verify ( curve, point ) ) != 0 )
 		return rc;
+
+	return 0;
+}
+
+/**
+ * Initialise curve point
+ *
+ * @v curve		Weierstrass curve
+ * @v point		Point (x,y,z) to be filled in
+ * @v temp		Temporary point buffer
+ * @v data		Raw curve point
+ * @ret rc		Return status code
+ */
+#define weierstrass_init( curve, point, temp, data ) ( {		\
+	weierstrass_init_raw ( (curve), (point)->all.element,		\
+			       (temp)->all.element, (data) );		\
+	} )
+
+/**
+ * Finalise curve point
+ *
+ * @v curve		Weierstrass curve
+ * @v point0		Element 0 of point (x,y,z)
+ * @v temp0		Element 0 of temporary point buffer
+ * @v out		Output buffer
+ */
+static void weierstrass_done_raw ( struct weierstrass_curve *curve,
+				   bigint_element_t *point0,
+				   bigint_element_t *temp0, void *out ) {
+	unsigned int size = curve->size;
+	size_t len = curve->len;
+	const bigint_t ( size ) __attribute__ (( may_alias )) *prime =
+		( ( const void * ) curve->prime[0] );
+	const bigint_t ( size ) __attribute__ (( may_alias )) *fermat =
+		( ( const void * ) curve->fermat );
+	const bigint_t ( size ) __attribute__ (( may_alias )) *one =
+		( ( const void * ) curve->one );
+	weierstrass_t ( size ) __attribute__ (( may_alias ))
+		*point = ( ( void * ) point0 );
+	union {
+		bigint_t ( size * 2 ) product;
+		weierstrass_t ( size ) point;
+	} __attribute__ (( may_alias ))	*temp = ( ( void * ) temp0 );
+	size_t offset;
+	unsigned int i;
+
+	/* Invert result Z co-ordinate (via Fermat's little theorem) */
+	bigint_copy ( one, &temp->point.z );
+	bigint_ladder ( &temp->point.z, &point->z, fermat,
+			bigint_mod_exp_ladder, prime, &temp->product );
+
+	/* Convert result back to affine co-ordinates */
+	DBGC ( curve, "WEIERSTRASS %s result (", curve->name );
+	for ( i = 0, offset = 0 ; i < WEIERSTRASS_AXES ; i++, offset += len ) {
+		bigint_multiply ( &point->axis[i], &temp->point.z,
+				  &temp->product );
+		bigint_montgomery_relaxed ( prime, &temp->product,
+					    &point->axis[i] );
+		bigint_grow ( &point->axis[i], &temp->product );
+		bigint_montgomery ( prime, &temp->product, &point->axis[i] );
+		DBGC ( curve, "%s%s", ( i ? "," : "" ),
+		       bigint_ntoa ( &point->axis[i] ) );
+		bigint_done ( &point->axis[i], ( out + offset ), len );
+	}
+	DBGC ( curve, ")\n" );
+}
+
+/**
+ * Finalise curve point
+ *
+ * @v curve		Weierstrass curve
+ * @v point		Point (x,y,z)
+ * @v temp		Temporary point buffer
+ * @v out		Output buffer
+ * @ret rc		Return status code
+ */
+#define weierstrass_done( curve, point, temp, out ) ( {			\
+	weierstrass_done_raw ( (curve), (point)->all.element,		\
+			       (temp)->all.element, (out) );		\
+	} )
+
+/**
+ * Check if this is the point at infinity
+ *
+ * @v point		Curve point
+ * @ret is_infinity	This is the point at infinity
+ */
+int weierstrass_is_infinity ( struct weierstrass_curve *curve,
+			      const void *point ) {
+	unsigned int size = curve->size;
+	size_t len = curve->len;
+	struct {
+		bigint_t ( size ) axis;
+	} temp;
+	size_t offset;
+	int is_finite = 0;
+	unsigned int i;
+
+	/* We use all zeroes to represent the point at infinity */
+	DBGC ( curve, "WEIERSTRASS %s point (", curve->name );
+	for ( i = 0, offset = 0 ; i < WEIERSTRASS_AXES ; i++, offset += len ) {
+		bigint_init ( &temp.axis, ( point + offset ), len );
+		DBGC ( curve, "%s%s", ( i ? "," : "" ),
+		       bigint_ntoa ( &temp.axis ) );
+		is_finite |= ( ! bigint_is_zero ( &temp.axis ) );
+	}
+	DBGC ( curve, ") is%s infinity\n", ( is_finite ? " not" : "" ) );
+
+	return ( ! is_finite );
+}
+
+/**
+ * Multiply curve point by scalar
+ *
+ * @v curve		Weierstrass curve
+ * @v base		Base point
+ * @v scalar		Scalar multiple
+ * @v result		Result point to fill in
+ * @ret rc		Return status code
+ */
+int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
+			   const void *scalar, void *result ) {
+	unsigned int size = curve->size;
+	size_t len = curve->len;
+	const bigint_t ( size ) __attribute__ (( may_alias )) *one =
+		( ( const void * ) curve->one );
+	struct {
+		weierstrass_t ( size ) result;
+		weierstrass_t ( size ) multiple;
+		bigint_t ( bigint_required_size ( len ) ) scalar;
+	} temp;
+	int rc;
+
+	/* Convert input to projective coordinates in Montgomery form */
+	if ( ( rc = weierstrass_init ( curve, &temp.multiple, &temp.result,
+				       base ) ) != 0 ) {
+		return rc;
+	}
 
 	/* Construct identity element (the point at infinity) */
 	memset ( &temp.result, 0, sizeof ( temp.result ) );
@@ -841,26 +981,47 @@ int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
 	bigint_ladder ( &temp.result.all, &temp.multiple.all, &temp.scalar,
 			weierstrass_add_ladder, curve, NULL );
 
-	/* Invert result Z co-ordinate (via Fermat's little theorem) */
-	bigint_copy ( one, &temp.multiple.z );
-	bigint_ladder ( &temp.multiple.z, &temp.result.z, fermat,
-			bigint_mod_exp_ladder, prime, &temp.product_out );
+	/* Convert result back to affine co-ordinates */
+	weierstrass_done ( curve, &temp.result, &temp.multiple, result );
+
+	return 0;
+}
+
+/**
+ * Add curve points (as a one-off operation)
+ *
+ * @v curve		Weierstrass curve
+ * @v addend		Curve point to add
+ * @v augend		Curve point to add
+ * @v result		Curve point to hold result
+ * @ret rc		Return status code
+ */
+int weierstrass_add_once ( struct weierstrass_curve *curve,
+			   const void *addend, const void *augend,
+			   void *result ) {
+	unsigned int size = curve->size;
+	struct {
+		weierstrass_t ( size ) addend;
+		weierstrass_t ( size ) augend;
+		weierstrass_t ( size ) result;
+	} temp;
+	int rc;
+
+	/* Convert inputs to projective coordinates in Montgomery form */
+	if ( ( rc = weierstrass_init ( curve, &temp.addend, &temp.result,
+				       addend ) ) != 0 ) {
+		return rc;
+	}
+	if ( ( rc = weierstrass_init ( curve, &temp.augend, &temp.result,
+				       augend ) ) != 0 ) {
+		return rc;
+	}
+
+	/* Add curve points */
+	weierstrass_add ( curve, &temp.augend, &temp.addend, &temp.result );
 
 	/* Convert result back to affine co-ordinates */
-	DBGC ( curve, "WEIERSTRASS %s result (", curve->name );
-	for ( i = 0, offset = 0 ; i < WEIERSTRASS_AXES ; i++, offset += len ) {
-		bigint_multiply ( &temp.result.axis[i], &temp.multiple.z,
-				  &temp.product_out );
-		bigint_montgomery_relaxed ( prime, &temp.product_out,
-					    &temp.result.axis[i] );
-		bigint_grow ( &temp.result.axis[i], &temp.product_out );
-		bigint_montgomery ( prime, &temp.product_out,
-				    &temp.result.axis[i] );
-		DBGC ( curve, "%s%s", ( i ? "," : "" ),
-		       bigint_ntoa ( &temp.result.axis[i] ) );
-		bigint_done ( &temp.result.axis[i], ( result + offset ), len );
-	}
-	DBGC ( curve, ")\n" );
+	weierstrass_done ( curve, &temp.result, &temp.addend, result );
 
 	return 0;
 }

@@ -8,9 +8,11 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/api.h>
+#include <ipxe/tables.h>
 #include <ipxe/iomap.h>
 #include <config/ioapi.h>
 
@@ -61,6 +63,7 @@ struct pci_range {
 /* Include all architecture-independent I/O API headers */
 #include <ipxe/null_pci.h>
 #include <ipxe/ecam_io.h>
+#include <ipxe/pcicloud.h>
 #include <ipxe/efi/efi_pci_api.h>
 #include <ipxe/linux/linux_pci.h>
 
@@ -70,9 +73,10 @@ struct pci_range {
 /**
  * Check if PCI bus probing is allowed
  *
+ * @v pci		PCI device
  * @ret ok		Bus probing is allowed
  */
-int pci_can_probe ( void );
+int pci_can_probe ( struct pci_device *pci );
 
 /**
  * Find next PCI bus:dev.fn address range in system
@@ -161,6 +165,7 @@ void * pci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 /** A runtime selectable PCI I/O API */
 struct pci_api {
 	const char *name;
+	typeof ( pci_can_probe ) ( * pci_can_probe );
 	typeof ( pci_discover ) ( * pci_discover );
 	typeof ( pci_read_config_byte ) ( * pci_read_config_byte );
 	typeof ( pci_read_config_word ) ( * pci_read_config_word );
@@ -171,23 +176,47 @@ struct pci_api {
 	typeof ( pci_ioremap ) ( * pci_ioremap );
 };
 
+/** Runtime selectable PCI API table */
+#define PCI_APIS __table ( struct pci_api, "pci_apis" )
+
+/**
+ * Declare a runtime selectable PCI API
+ *
+ * In the common case of a non-runtime-selectable PCI I/O API, allow
+ * the runtime API code to be garbage-collected at link time to save
+ * space.
+ */
+#ifdef PCIAPI_CLOUD
+#define __pci_api( priority ) __table_entry ( PCI_APIS, priority )
+#else
+#define __pci_api( priority )
+#endif
+
+/* PCI runtime selectable API priorities */
+#define PCIAPI_PRIORITY_EFI	01	/**< EFI PCI I/O protocols */
+#define PCIAPI_PRIORITY_ECAM	02	/**< ACPI ECAM */
+#define PCIAPI_PRIORITY_PCBIOS	03	/**< PCI BIOS calls */
+#define PCIAPI_PRIORITY_DIRECT	04	/**< Direct Type 1 accesses */
+
 /** Provide a runtime selectable PCI I/O API */
-#define PCIAPI_RUNTIME( _subsys ) {					\
-	.name = #_subsys,						\
-	.pci_discover = PCIAPI_INLINE ( _subsys, pci_discover ),	\
-	.pci_read_config_byte =						\
-		PCIAPI_INLINE ( _subsys, pci_read_config_byte ),	\
-	.pci_read_config_word =						\
-		PCIAPI_INLINE ( _subsys, pci_read_config_word ),	\
-	.pci_read_config_dword =					\
-		PCIAPI_INLINE ( _subsys, pci_read_config_dword ),	\
-	.pci_write_config_byte =					\
-		PCIAPI_INLINE ( _subsys, pci_write_config_byte ),	\
-	.pci_write_config_word =					\
-		PCIAPI_INLINE ( _subsys, pci_write_config_word ),	\
-	.pci_write_config_dword =					\
-		PCIAPI_INLINE ( _subsys, pci_write_config_dword ),	\
-	.pci_ioremap = PCIAPI_INLINE ( _subsys, pci_ioremap ),		\
+#define PROVIDE_PCIAPI_RUNTIME( subsys, priority )			   \
+	struct pci_api pciapi_ ## subsys __pci_api ( priority ) = {	   \
+		.name = #subsys,					   \
+		.pci_can_probe = PCIAPI_INLINE ( subsys, pci_can_probe ),  \
+		.pci_discover = PCIAPI_INLINE ( subsys, pci_discover ),	   \
+		.pci_read_config_byte =					   \
+			PCIAPI_INLINE ( subsys, pci_read_config_byte ),	   \
+		.pci_read_config_word =					   \
+			PCIAPI_INLINE ( subsys, pci_read_config_word ),	   \
+		.pci_read_config_dword =				   \
+			PCIAPI_INLINE ( subsys, pci_read_config_dword ),   \
+		.pci_write_config_byte =				   \
+			PCIAPI_INLINE ( subsys, pci_write_config_byte ),   \
+		.pci_write_config_word =				   \
+			PCIAPI_INLINE ( subsys, pci_write_config_word ),   \
+		.pci_write_config_dword =				   \
+			PCIAPI_INLINE ( subsys, pci_write_config_dword ),  \
+		.pci_ioremap = PCIAPI_INLINE ( subsys, pci_ioremap ),	   \
 	}
 
 #endif /* _IPXE_PCI_IO_H */

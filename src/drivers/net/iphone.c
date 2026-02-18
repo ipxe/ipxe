@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <string.h>
@@ -362,7 +363,6 @@ static int icert_cert ( struct icert *icert, struct asn1_cursor *subject,
 	struct asn1_builder raw = { NULL, 0 };
 	uint8_t digest_ctx[SHA256_CTX_SIZE];
 	uint8_t digest_out[SHA256_DIGEST_SIZE];
-	int len;
 	int rc;
 
 	/* Construct subjectPublicKeyInfo */
@@ -399,20 +399,12 @@ static int icert_cert ( struct icert *icert, struct asn1_cursor *subject,
 	digest_final ( digest, digest_ctx, digest_out );
 
 	/* Construct signature using "private" key */
-	if ( ( rc = asn1_grow ( &raw,
-				pubkey_max_len ( pubkey, private ) ) ) != 0 ) {
-		DBGC ( icert, "ICERT %p could not build signature: %s\n",
-		       icert, strerror ( rc ) );
-		goto err_grow;
-	}
-	if ( ( len = pubkey_sign ( pubkey, private, digest, digest_out,
-				   raw.data ) ) < 0 ) {
-		rc = len;
+	if ( ( rc = pubkey_sign ( pubkey, private, digest, digest_out,
+				  &raw ) ) != 0 ) {
 		DBGC ( icert, "ICERT %p could not sign: %s\n",
 		       icert, strerror ( rc ) );
 		goto err_pubkey_sign;
 	}
-	assert ( ( ( size_t ) len ) == raw.len );
 
 	/* Construct raw certificate data */
 	if ( ( rc = ( asn1_prepend_raw ( &raw, icert_nul,
@@ -438,12 +430,11 @@ static int icert_cert ( struct icert *icert, struct asn1_cursor *subject,
  err_x509:
  err_raw:
  err_pubkey_sign:
-	free ( raw.data );
- err_grow:
-	free ( tbs.data );
  err_tbs:
-	free ( spki.data );
  err_spki:
+	free ( raw.data );
+	free ( tbs.data );
+	free ( spki.data );
 	return rc;
 }
 
@@ -1181,11 +1172,7 @@ static void imux_remove ( struct usb_function *func ) {
 
 /** USB multiplexer device IDs */
 static struct usb_device_id imux_ids[] = {
-	{
-		.name = "imux",
-		.vendor = 0x05ac,
-		.product = USB_ANY_ID,
-	},
+	USB_ID ( 0x05ac, 0xffff, "imux", "iPhone (multiplexer)", 0 ),
 };
 
 /** USB multiplexer driver */
@@ -2235,11 +2222,7 @@ static void iphone_remove ( struct usb_function *func ) {
 
 /** iPhone device IDs */
 static struct usb_device_id iphone_ids[] = {
-	{
-		.name = "iphone",
-		.vendor = 0x05ac,
-		.product = USB_ANY_ID,
-	},
+	USB_ROM ( 0x05ac, 0xffff, "iphone", "iPhone", 0 ),
 };
 
 /** iPhone driver */

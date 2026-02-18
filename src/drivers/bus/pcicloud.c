@@ -24,11 +24,8 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
-#include <ipxe/init.h>
+#include <string.h>
 #include <ipxe/pci.h>
-#include <ipxe/ecam.h>
-#include <ipxe/pcibios.h>
-#include <ipxe/pcidirect.h>
 #include <ipxe/pcicloud.h>
 
 /** @file
@@ -37,8 +34,62 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** Selected PCI configuration space access API */
-static struct pci_api *pcicloud = &ecam_api;
+/** Cached PCI configuration space access API */
+static struct {
+	/** PCI bus:dev.fn address range */
+	struct pci_range range;
+	/** API for this bus:dev.fn address */
+	struct pci_api *api;
+} pcicloud;
+
+/**
+ * Find PCI configuration space access API for address
+ *
+ * @v busdevfn		Starting PCI bus:dev.fn address
+ * @v range		PCI bus:dev.fn address range to fill in
+ * @ret api		Configuration space access API, or NULL
+ */
+static struct pci_api * pcicloud_find ( uint32_t busdevfn,
+					struct pci_range *range ) {
+	struct pci_range candidate;
+	struct pci_api *api;
+	uint32_t best = 0;
+	uint32_t index;
+	uint32_t first;
+	uint32_t last;
+
+	/* Return empty range on error */
+	range->count = 0;
+
+	/* Try discovery via all known APIs */
+	for_each_table_entry ( api, PCI_APIS ) {
+
+		/* Discover via this API */
+		api->pci_discover ( busdevfn, &candidate );
+
+		/* Check for a matching or new closest allocation */
+		index = ( busdevfn - candidate.start );
+		if ( ( index < candidate.count ) || ( index > best ) ) {
+			memcpy ( range, &candidate, sizeof ( *range ) );
+			best = index;
+		}
+
+		/* Stop if this range contains the target bus:dev.fn address */
+		if ( index < candidate.count ) {
+			first = range->start;
+			last = ( range->start + range->count - 1 );
+			DBGC ( &pcicloud, "PCICLOUD [" PCI_FMT "," PCI_FMT ") "
+			       "using %s API\n", PCI_SEG ( first ),
+			       PCI_BUS ( first ), PCI_SLOT ( first ),
+			       PCI_FUNC ( first ), PCI_SEG ( last ),
+			       PCI_BUS ( last ), PCI_SLOT ( last ),
+			       PCI_FUNC ( last ), api->name );
+			return api;
+		}
+	}
+
+	return NULL;
+}
 
 /**
  * Find next PCI bus:dev.fn address range in system
@@ -48,7 +99,59 @@ static struct pci_api *pcicloud = &ecam_api;
  */
 static void pcicloud_discover ( uint32_t busdevfn, struct pci_range *range ) {
 
-	pcicloud->pci_discover ( busdevfn, range );
+	/* Find new range, if any */
+	pcicloud_find ( busdevfn, range );
+}
+
+/**
+ * Find configuration space access API for PCI device
+ *
+ * @v pci		PCI device
+ * @ret api		Configuration space access API
+ */
+static struct pci_api * pcicloud_api ( struct pci_device *pci ) {
+	struct pci_range *range = &pcicloud.range;
+	struct pci_api *api;
+	uint32_t first;
+	uint32_t last;
+
+	/* Reuse cached API if applicable */
+	if ( ( pci->busdevfn - range->start ) < range->count )
+		return pcicloud.api;
+
+	/* Find highest priority API claiming this range */
+	api = pcicloud_find ( pci->busdevfn, range );
+
+	/* Fall back to lowest priority API for any unclaimed gaps in ranges */
+	if ( ! api ) {
+		api = ( table_end ( PCI_APIS ) - 1 );
+		range->count = ( range->start - pci->busdevfn );
+		range->start = pci->busdevfn;
+		first = range->start;
+		last = ( range->start + range->count - 1 );
+		DBGC ( &pcicloud, "PCICLOUD [" PCI_FMT "," PCI_FMT ") falling "
+		       "back to %s API\n", PCI_SEG ( first ),
+		       PCI_BUS ( first ), PCI_SLOT ( first ),
+		       PCI_FUNC ( first ), PCI_SEG ( last ), PCI_BUS ( last ),
+		       PCI_SLOT ( last ),  PCI_FUNC ( last ), api->name );
+	}
+
+	/* Cache API for this range */
+	pcicloud.api = api;
+
+	return api;
+}
+
+/**
+ * Check if PCI bus probing is allowed
+ *
+ * @v pci		PCI device
+ * @ret ok		Bus probing is allowed
+ */
+static int pcicloud_can_probe ( struct pci_device *pci ) {
+	struct pci_api *api = pcicloud_api ( pci );
+
+	return api->pci_can_probe ( pci );
 }
 
 /**
@@ -61,8 +164,9 @@ static void pcicloud_discover ( uint32_t busdevfn, struct pci_range *range ) {
  */
 static int pcicloud_read_config_byte ( struct pci_device *pci,
 				       unsigned int where, uint8_t *value ) {
+	struct pci_api *api = pcicloud_api ( pci );
 
-	return pcicloud->pci_read_config_byte ( pci, where, value );
+	return api->pci_read_config_byte ( pci, where, value );
 }
 
 /**
@@ -75,8 +179,9 @@ static int pcicloud_read_config_byte ( struct pci_device *pci,
  */
 static int pcicloud_read_config_word ( struct pci_device *pci,
 				       unsigned int where, uint16_t *value ) {
+	struct pci_api *api = pcicloud_api ( pci );
 
-	return pcicloud->pci_read_config_word ( pci, where, value );
+	return api->pci_read_config_word ( pci, where, value );
 }
 
 /**
@@ -89,8 +194,9 @@ static int pcicloud_read_config_word ( struct pci_device *pci,
  */
 static int pcicloud_read_config_dword ( struct pci_device *pci,
 					unsigned int where, uint32_t *value ) {
+	struct pci_api *api = pcicloud_api ( pci );
 
-	return pcicloud->pci_read_config_dword ( pci, where, value );
+	return api->pci_read_config_dword ( pci, where, value );
 }
 
 /**
@@ -103,8 +209,9 @@ static int pcicloud_read_config_dword ( struct pci_device *pci,
  */
 static int pcicloud_write_config_byte ( struct pci_device *pci,
 					unsigned int where, uint8_t value ) {
+	struct pci_api *api = pcicloud_api ( pci );
 
-	return pcicloud->pci_write_config_byte ( pci, where, value );
+	return api->pci_write_config_byte ( pci, where, value );
 }
 
 /**
@@ -117,8 +224,9 @@ static int pcicloud_write_config_byte ( struct pci_device *pci,
  */
 static int pcicloud_write_config_word ( struct pci_device *pci,
 					unsigned int where, uint16_t value ) {
+	struct pci_api *api = pcicloud_api ( pci );
 
-	return pcicloud->pci_write_config_word ( pci, where, value );
+	return api->pci_write_config_word ( pci, where, value );
 }
 
 /**
@@ -131,8 +239,9 @@ static int pcicloud_write_config_word ( struct pci_device *pci,
  */
 static int pcicloud_write_config_dword ( struct pci_device *pci,
 					 unsigned int where, uint32_t value ) {
+	struct pci_api *api = pcicloud_api ( pci );
 
-	return pcicloud->pci_write_config_dword ( pci, where, value );
+	return api->pci_write_config_dword ( pci, where, value );
 }
 
 /**
@@ -144,11 +253,12 @@ static int pcicloud_write_config_dword ( struct pci_device *pci,
  */
 static void * pcicloud_ioremap ( struct pci_device *pci,
 				 unsigned long bus_addr, size_t len ) {
+	struct pci_api *api = pcicloud_api ( pci );
 
-	return pcicloud->pci_ioremap ( pci, bus_addr, len );
+	return api->pci_ioremap ( pci, bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( cloud, pci_can_probe );
+PROVIDE_PCIAPI ( cloud, pci_can_probe, pcicloud_can_probe );
 PROVIDE_PCIAPI ( cloud, pci_discover, pcicloud_discover );
 PROVIDE_PCIAPI ( cloud, pci_read_config_byte, pcicloud_read_config_byte );
 PROVIDE_PCIAPI ( cloud, pci_read_config_word, pcicloud_read_config_word );
@@ -157,40 +267,3 @@ PROVIDE_PCIAPI ( cloud, pci_write_config_byte, pcicloud_write_config_byte );
 PROVIDE_PCIAPI ( cloud, pci_write_config_word, pcicloud_write_config_word );
 PROVIDE_PCIAPI ( cloud, pci_write_config_dword, pcicloud_write_config_dword );
 PROVIDE_PCIAPI ( cloud, pci_ioremap, pcicloud_ioremap );
-
-/**
- * Initialise cloud VM PCI configuration space access
- *
- */
-static void pcicloud_init ( void ) {
-	static struct pci_api *apis[] = {
-		&ecam_api, &pcibios_api, &pcidirect_api
-	};
-	struct pci_device pci;
-	uint32_t busdevfn;
-	unsigned int i;
-	int rc;
-
-	/* Select first API that successfully discovers a PCI device */
-	for ( i = 0 ; i < ( sizeof ( apis ) / sizeof ( apis[0] ) ) ; i++ ) {
-		pcicloud = apis[i];
-		busdevfn = 0;
-		if ( ( rc = pci_find_next ( &pci, &busdevfn ) ) == 0 ) {
-			DBGC ( pcicloud, "PCICLOUD selected %s API (found "
-			       PCI_FMT ")\n", pcicloud->name,
-			       PCI_ARGS ( &pci ) );
-			return;
-		}
-	}
-
-	/* Fall back to using final attempted API if no devices found */
-	pcicloud = apis[ i - 1 ];
-	DBGC ( pcicloud, "PCICLOUD selected %s API (nothing detected)\n",
-	       pcicloud->name );
-}
-
-/** Cloud VM PCI configuration space access initialisation function */
-struct init_fn pcicloud_init_fn __init_fn ( INIT_EARLY ) = {
-	.name = "pcicloud",
-	.initialise = pcicloud_init,
-};

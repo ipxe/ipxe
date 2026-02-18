@@ -17,6 +17,8 @@
  *
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /*
  * Register values for Atheros 5210/5211/5212 cards from OpenBSD's ar5k
  * maintained by Reyk Floeter

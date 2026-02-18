@@ -4,3 +4,7 @@
 #
 MAKEDEPS	+= arch/x86/Makefile.pcbios
 include arch/x86/Makefile.pcbios
+
+# Include ISA drivers in the all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_isa_net)

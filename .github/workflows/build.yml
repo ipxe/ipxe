@@ -1,121 +1,428 @@
 name: Build
 
-on: push
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  MAKEFLAGS: "-j4 GITVERSION=${{ github.sha }}"
 
 jobs:
 
-  cache:
-    name: Cache
-    runs-on: ubuntu-22.04
+  bios:
+    name: BIOS / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - i386
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: >-
+        ${{ matrix.arch == 'i386' && 'bin' || 'bin-x86_64-pcbios' }}
     steps:
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            apt-cache-
-      - name: Download packages
-        run: |
-          sudo apt update
-          sudo apt install -y -d -o Acquire::Retries=50 \
-                           mtools syslinux isolinux \
-                           libc6-dev-i386 valgrind \
-                           gcc-arm-none-eabi gcc-aarch64-linux-gnu
 
-  x86:
-    name: x86
-    runs-on: ubuntu-22.04
-    needs: cache
-    steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
+        run: |
+          make ${{ env.bindir }}/10ec8139.rom \
+               ${{ env.bindir }}/8086100e.mrom \
+               ${{ env.bindir }}/ipxe.dsk \
+               ${{ env.bindir }}/ipxe.iso \
+               ${{ env.bindir }}/ipxe.lkrn \
+               ${{ env.bindir }}/ipxe.pxe \
+               ${{ env.bindir }}/ipxe.usb \
+               ${{ env.bindir }}/ipxe-legacy.lkrn \
+               ${{ env.bindir }}/ipxe-legacy.pxe \
+               ${{ env.bindir }}/undionly.kpxe \
+               ${{ env.bindir }}/errors
+
+      - name: Hardware list
+        working-directory: src
+        run: |
+          ./util/niclist.pl \
+              --format dokuwiki \
+              --sort bus-,vendor_id,device_id,device_name \
+              --output ${{ env.bindir }}/niclist.txt
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
         with:
-          fetch-depth: 0
-      - name: Cache permissions
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.lkrn
+            src/${{ env.bindir }}/ipxe.pxe
+            src/${{ env.bindir }}/ipxe-legacy.lkrn
+            src/${{ env.bindir }}/ipxe-legacy.pxe
+            src/${{ env.bindir }}/undionly.kpxe
+            src/${{ env.bindir }}/errors
+            src/${{ env.bindir }}/niclist.txt
+
+  sbi:
+    name: SBI / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - riscv32
+          - riscv64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
         run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
+          make ${{ env.bindir }}/ipxe.pf32 \
+               ${{ env.bindir }}/ipxe.lkrn \
+               ${{ env.bindir }}/ipxe.sbi \
+               ${{ env.bindir }}/errors
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
         with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.lkrn
+            src/${{ env.bindir }}/ipxe.sbi
+            src/${{ env.bindir }}/errors
+
+  uefi:
+    name: UEFI / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm32
+          - arm64
+          - i386
+          - loong64
+          - riscv32
+          - riscv64
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}-efi
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux \
-                           libc6-dev-i386 valgrind \
-                           libgcc-s1:i386 libc6-dbg:i386
-      - name: Build (BIOS)
+          make ${{ env.bindir }}/ipxe.efi \
+               ${{ env.bindir }}/ipxe.iso \
+               ${{ env.bindir }}/ipxe.usb \
+               ${{ env.bindir }}/ipxe-legacy.efi \
+               ${{ env.bindir }}/snponly.efi \
+               ${{ env.bindir }}/errors
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.efi
+            src/${{ env.bindir }}/ipxe-legacy.efi
+            src/${{ env.bindir }}/snponly.efi
+            src/${{ env.bindir }}/errors
+
+  uefi-sb:
+    name: UEFI SB / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm64
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}-efi-sb
+    outputs:
+      sbsignenv: ${{ steps.sbsignenv.outputs.sbsignenv }}
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
         run: |
-          make -j 4 -C src
-      - name: Build (Everything)
+          make ${{ env.bindir }}/ipxe.efi \
+               ${{ env.bindir }}/snponly.efi
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: unsigned-${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.efi
+            src/${{ env.bindir }}/snponly.efi
+
+      - name: Select environment
+        id: sbsignenv
+        if: >-
+          github.ref == 'refs/heads/sbsign' ||
+          startsWith ( github.ref, 'refs/tags/v' )
         run: |
-          make -j 4 -C src everything
+          echo "sbsignenv=${{ vars.SBSIGN_ENVIRONMENT }}" >> $GITHUB_OUTPUT
+
+  sbsign:
+    name: SB Sign / ${{ matrix.arch }}
+    runs-on: ${{ needs.uefi-sb.outputs.sbsignenv || 'ubuntu-latest' }}
+    needs:
+      - uefi-sb
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm64
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-signer
+      volumes:
+        - run-pcscd:/run/pcscd
+    services:
+      pcscd:
+        image: ghcr.io/ipxe/ipxe-signer-pcscd
+        volumes:
+          - run-pcscd:/run/pcscd
+        options: >-
+          ${{ needs.uefi-sb.outputs.sbsignenv && '--device /dev/bus/usb' }}
+          --label OPTIONS_VALUE_CANNOT_BE_EMPTY=1
+    env:
+      binaries: >-
+        ipxe.efi
+        snponly.efi
+      bindir: bin-${{ matrix.arch }}-efi-sb
+      cacert: ${{ vars.SBSIGN_CA_CERT || 'testsign.crt' }}
+      pkcs11: ${{ secrets.SBSIGN_PASSWORD && 'true' }}
+      signcerts: ${{ vars.SBSIGN_CERTS || 'testsign.crt' }}
+      signkey: ${{ vars.SBSIGN_KEY || 'testsign.key' }}
+      signpass: ${{ secrets.SBSIGN_PASSWORD || 'testpw' }}
+    environment: ${{ needs.uefi-sb.outputs.sbsignenv }}
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          repository: ipxe/secure-boot-ca
+
+      - name: Download
+        uses: actions/download-artifact@v7
+        with:
+          name: unsigned-${{ env.bindir }}
+          path: unsigned
+
+      - name: Test certificate
+        run: |
+          COMMITID=$(echo ${{ github.sha }} | cut -c1-9)
+          SUBJECT="iPXE Test Signing (${COMMITID}, ${{ matrix.arch }})"
+          openssl req \
+              -newkey rsa:2048 -passout 'pass:testpw' -keyout testsign.key \
+              -subj "/CN=${SUBJECT}/" -x509 -out testsign.crt
+
+      - name: Certificate chain
+        run: |
+          for cert in ${{ env.signcerts }} ; do
+              openssl x509 -in ${cert} -noout -text
+              cat ${cert} >> chain.crts
+          done
+
+      - name: Sign
+        run: |
+          for binary in ${{ env.binaries }} ; do
+              osslsigncode sign \
+                  ${{ env.pkcs11 && '-pkcs11module' }} \
+                  ${{ env.pkcs11 && '/usr/lib64/opensc-pkcs11.so' }} \
+                  -certs chain.crts \
+                  -key ${{ env.signkey }} \
+                  -pass ${{ env.signpass }} \
+                  -ts http://timestamp.digicert.com \
+                  -in unsigned/${binary} \
+                  -out ${binary}
+          done
+
+      - name: Verify
+        run: |
+          for binary in ${{ env.binaries }} ; do
+              osslsigncode verify -CAfile ${{ env.cacert }} ${binary}
+          done
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            ${{ env.cacert }}
+            ipxe.efi
+            snponly.efi
+
+  linux:
+    name: Linux / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm32
+            exec: qemu-arm-static
+          - arch: arm64
+            exec: qemu-aarch64-static
+          - arch: i386
+            exec: valgrind
+          - arch: loong64
+            exec: qemu-loongarch64-static
+          - arch: riscv32
+            exec: qemu-riscv32-static
+          - arch: riscv64
+            exec: qemu-riscv64-static
+          - arch: x86_64
+            exec: valgrind
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}-linux
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
+        run: |
+          make ${{ env.bindir }}/ipxe.linux \
+               ${{ env.bindir }}/tests.linux \
+               ${{ env.bindir }}/errors
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.linux
+            src/${{ env.bindir }}/tests.linux
+            src/${{ env.bindir }}/errors
+
       - name: Test
+        working-directory: src
         run: |
-          valgrind ./src/bin-i386-linux/tests.linux
-          valgrind ./src/bin-x86_64-linux/tests.linux
+          ${{ matrix.exec }} ${{ env.bindir }}/tests.linux
 
-  arm32:
-    name: ARM32
-    runs-on: ubuntu-22.04
-    needs: cache
+  combine:
+    name: BIOS + UEFI
+    runs-on: ubuntu-latest
+    needs:
+      - bios
+      - uefi
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-utils
+    env:
+      binaries: >-
+        bin-x86_64-pcbios/${DRIVERS}.lkrn
+        bin-arm32-efi/${DRIVERS}.efi
+        bin-arm64-efi/${DRIVERS}.efi
+        bin-i386-efi/${DRIVERS}.efi
+        bin-loong64-efi/${DRIVERS}.efi
+        bin-riscv32-efi/${DRIVERS}.efi
+        bin-riscv64-efi/${DRIVERS}.efi
+        bin-x86_64-efi/${DRIVERS}.efi
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
-        with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
-        run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-arm-none-eabi
-      - name: Build
-        run: |
-          make -j 4 -C src CROSS=arm-none-eabi- \
-               bin-arm32-efi/intel.efi \
-               bin-arm32-efi/intel.usb \
-               bin-arm32-efi/intel.iso
 
-  arm64:
-    name: ARM64
-    runs-on: ubuntu-22.04
-    needs: cache
-    steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Download
+        uses: actions/download-artifact@v7
         with:
-          fetch-depth: 0
-      - name: Cache permissions
+          pattern: "{bin-x86_64-pcbios,bin-*-efi}"
+
+      - name: Combine
         run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-      - name: Cache packages
-        uses: actions/cache/restore@v4
+          # Provide an editable placeholder autoexec.ipxe for the USB image
+          cat > autoexec.ipxe <<'EOF'
+          #!ipxe
+          echo
+          prompt --key 0x02 --timeout 2000 \
+              Press Ctrl-B for the iPXE command line... \
+              && shell || autoboot
+          EOF
+          for DRIVERS in ipxe ipxe-legacy ; do
+              ./src/util/genfsimg -o ${DRIVERS}.iso ${{ env.binaries }}
+              ./src/util/genfsimg -o ${DRIVERS}.usb -s autoexec.ipxe \
+                                  ${{ env.binaries }}
+          done
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
         with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Install packages
+          name: bin-combi
+          if-no-files-found: error
+          path: |
+            ipxe.iso
+            ipxe.usb
+            ipxe-legacy.iso
+            ipxe-legacy.usb
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs:
+      - bios
+      - sbi
+      - uefi
+      - sbsign
+      - linux
+      - combine
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      vars.PAGES_REPO_NAME
+    env:
+      workflow_url: >-
+        ${{ github.server_url }}/${{ vars.PAGES_REPO_OWNER }}/${{ ''
+        }}${{ vars.PAGES_REPO_NAME }}/actions/workflows/build.yml
+    environment:
+      name: publish
+      url: ${{ env.workflow_url }}
+    steps:
+
+      - name: Get token
+        id: token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.WORKFLOW_DISPATCHER_ID }}
+          private-key: ${{ secrets.WORKFLOW_DISPATCHER_KEY }}
+          owner: ${{ vars.PAGES_REPO_OWNER }}
+          repositories: ${{ vars.PAGES_REPO_NAME }}
+
+      - name: Dispatch
+        env:
+          GH_REPO: ${{ vars.PAGES_REPO_OWNER }}/${{ vars.PAGES_REPO_NAME }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
         run: |
-          sudo apt update
-          sudo apt install -y -o Acquire::Retries=50 \
-                           mtools syslinux isolinux gcc-aarch64-linux-gnu
-      - name: Build
-        run: |
-          make -j 4 -C src CROSS=aarch64-linux-gnu- \
-               bin-arm64-efi/ipxe.efi \
-               bin-arm64-efi/ipxe.usb \
-               bin-arm64-efi/ipxe.iso
+          gh workflow run build.yml -f run_id=${{ github.run_id }}
+          echo "Results at ${{ env.workflow_url }}"

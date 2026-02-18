@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdio.h>
 #include <ipxe/neighbour.h>
@@ -50,9 +51,8 @@ void nstat ( void ) {
 		printf ( "%s %s %s is %s %s", netdev->name, net_protocol->name,
 			 net_protocol->ntoa ( neighbour->net_dest ),
 			 ll_protocol->name,
-			 ( neighbour_has_ll_dest ( neighbour ) ?
-			   ll_protocol->ntoa ( neighbour->ll_dest ) :
-			   "(incomplete)" ) );
+			 ( neighbour->discovery ? "(incomplete)" :
+			   ll_protocol->ntoa ( neighbour->ll_dest ) ) );
 		if ( neighbour->discovery )
 			printf ( " (%s)", neighbour->discovery->name );
 		printf ( "\n" );

@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/bigint.h>
@@ -85,9 +86,10 @@ extern void x25519_multiply ( const union x25519_oct258 *multiplicand,
 extern void x25519_invert ( const union x25519_oct258 *invertend,
 			    union x25519_quad257 *result );
 extern void x25519_reduce ( union x25519_quad257 *value );
-extern int x25519_key ( const struct x25519_value *base,
-			const struct x25519_value *scalar,
-			struct x25519_value *result );
+extern void x25519_key ( const struct x25519_value *base,
+			 const struct x25519_value *scalar,
+			 struct x25519_value *result );
+extern int x25519_is_zero ( const struct x25519_value *value );
 
 extern struct elliptic_curve x25519_curve;
 

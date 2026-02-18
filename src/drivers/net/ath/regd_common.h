@@ -20,6 +20,8 @@
 #ifndef REGD_COMMON_H
 #define REGD_COMMON_H
 
+FILE_SECBOOT ( FORBIDDEN );
+
 enum EnumRd {
 	NO_ENUMRD = 0x00,
 	NULL1_WORLD = 0x03,

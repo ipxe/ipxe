@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdarg.h>
 #include <time.h>
@@ -76,7 +77,7 @@ struct ocsp_response {
 	/** Signature algorithm */
 	struct asn1_algorithm *algorithm;
 	/** Signature value */
-	struct asn1_bit_string signature;
+	struct asn1_cursor signature;
 	/** Signing certificate */
 	struct x509_certificate *signer;
 };

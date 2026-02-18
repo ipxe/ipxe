@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/refcnt.h>
@@ -49,9 +50,9 @@ struct neighbour {
 	/** Link-layer destination address */
 	uint8_t ll_dest[MAX_LL_ADDR_LEN];
 
-	/** Neighbour discovery protocol (if any) */
+	/** Neighbour discovery protocol (if discovery is ongoing) */
 	struct neighbour_discovery *discovery;
-	/** Network-layer source address (if any) */
+	/** Network-layer source address (for discovery requests) */
 	uint8_t net_source[MAX_NET_ADDR_LEN];
 	/** Retransmission timer */
 	struct retry_timer timer;
@@ -60,16 +61,11 @@ struct neighbour {
 	struct list_head tx_queue;
 };
 
-/**
- * Test if neighbour cache entry has a valid link-layer address
- *
- * @v neighbour		Neighbour cache entry
- * @ret has_ll_dest	Neighbour cache entry has a valid link-layer address
- */
-static inline __attribute__ (( always_inline )) int
-neighbour_has_ll_dest ( struct neighbour *neighbour ) {
-	return ( ! timer_running ( &neighbour->timer ) );
-}
+/** A neighbour transmission delay pseudo-header */
+struct neighbour_delay {
+	/** Original transmission time (in ticks) */
+	unsigned long start;
+};
 
 extern struct list_head neighbours;
 
@@ -77,7 +73,7 @@ extern int neighbour_tx ( struct io_buffer *iobuf, struct net_device *netdev,
 			  struct net_protocol *net_protocol,
 			  const void *net_dest,
 			  struct neighbour_discovery *discovery,
-			  const void *net_source, const void *ll_source );
+			  const void *net_source );
 extern int neighbour_update ( struct net_device *netdev,
 			      struct net_protocol *net_protocol,
 			      const void *net_dest, const void *ll_dest );

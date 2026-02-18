@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /** Minimum TLS version */
 #define TLS_VERSION_MIN TLS_VERSION_TLS_1_1
@@ -23,6 +24,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 /** RSA public-key algorithm */
 #define CRYPTO_PUBKEY_RSA
+
+/** ECDSA public-key algorithm */
+#define CRYPTO_PUBKEY_ECDSA
 
 /** AES-CBC block cipher */
 #define CRYPTO_CIPHER_AES_CBC

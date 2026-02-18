@@ -9,7 +9,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #ifndef ASSEMBLY
 
 /** Unprefixed constant operand modifier */
-#define ASM_NO_PREFIX "a"
+#define ASM_NO_PREFIX ""
 
 #define __asmcall
 #define __libgcc

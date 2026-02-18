@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /** @file
  *
@@ -54,3 +55,6 @@ struct efi_driver mnp_driver __efi_driver ( EFI_DRIVER_MNP ) = {
 	.start = mnpnet_start,
 	.stop = mnpnet_stop,
 };
+
+/* Generate build rules */
+EFI_ROM ( "mnp", "Managed Network Protocol NIC" );

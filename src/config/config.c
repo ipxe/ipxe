@@ -20,6 +20,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <config/general.h>
 #include <config/console.h>
@@ -269,9 +270,6 @@ REQUIRE_OBJECT ( shell );
 #ifdef NSLOOKUP_CMD
 REQUIRE_OBJECT ( nslookup_cmd );
 #endif
-#ifdef PCI_CMD
-REQUIRE_OBJECT ( pci_cmd );
-#endif
 #ifdef PARAM_CMD
 REQUIRE_OBJECT ( param_cmd );
 #endif
@@ -304,9 +302,6 @@ REQUIRE_OBJECT ( shim_cmd );
 #endif
 #ifdef IMAGE_CRYPT_CMD
 REQUIRE_OBJECT ( image_crypt_cmd );
-#endif
-#ifdef USB_CMD
-REQUIRE_OBJECT ( usb_cmd );
 #endif
 #ifdef FDT_CMD
 REQUIRE_OBJECT ( fdt_cmd );

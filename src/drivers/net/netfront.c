@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -1044,6 +1045,9 @@ struct xen_driver netfront_driver __xen_driver = {
 	.probe = netfront_probe,
 	.remove = netfront_remove,
 };
+
+/* Generate build rules */
+XEN_ROM ( "netfront", "Xen netfront virtual NIC" );
 
 /******************************************************************************
  *

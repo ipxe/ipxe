@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <string.h>
 #include <ipxe/uuid.h>
@@ -74,6 +75,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Protocol/SimpleTextIn.h>
 #include <ipxe/efi/Protocol/SimpleTextInEx.h>
 #include <ipxe/efi/Protocol/SimpleTextOut.h>
+#include <ipxe/efi/Protocol/StorageSecurityCommand.h>
 #include <ipxe/efi/Protocol/Supplicant.h>
 #include <ipxe/efi/Protocol/TcgService.h>
 #include <ipxe/efi/Protocol/Tcg2Protocol.h>
@@ -94,6 +96,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/efi/Guid/FileSystemInfo.h>
 #include <ipxe/efi/Guid/GlobalVariable.h>
 #include <ipxe/efi/Guid/ImageAuthentication.h>
+#include <ipxe/efi/Guid/MicrosoftVendor.h>
 #include <ipxe/efi/Guid/SmBios.h>
 #include <ipxe/efi/Guid/TlsAuthentication.h>
 
@@ -107,6 +110,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define EFI_TREE_PROTOCOL_GUID						\
 	{ 0x607f766c, 0x7455, 0x42be,					\
 	  { 0x93, 0x0b, 0xe4, 0xd7, 0x6d, 0xb2, 0x72, 0x0f } }
+
+/* Unicode collation protocol GUID was deleted from EDK2 headers */
+#define EFI_UNICODE_COLLATION_PROTOCOL_GUID				\
+	{ 0x1d85cd7f, 0xf43d, 0x11d2,					\
+	  { 0x9a, 0xc, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d } }
 
 /** Absolute pointer protocol GUID */
 EFI_GUID efi_absolute_pointer_protocol_guid
@@ -348,6 +356,10 @@ EFI_GUID efi_simple_text_input_ex_protocol_guid
 EFI_GUID efi_simple_text_output_protocol_guid
 	= EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID;
 
+/** Storage security protocol GUID */
+EFI_GUID efi_storage_security_command_protocol_guid
+	= EFI_STORAGE_SECURITY_COMMAND_PROTOCOL_GUID;
+
 /** Supplicant protocol GUID */
 EFI_GUID efi_supplicant_protocol_guid
 	= EFI_SUPPLICANT_PROTOCOL_GUID;
@@ -455,6 +467,12 @@ EFI_GUID efi_file_system_info_id = EFI_FILE_SYSTEM_INFO_ID;
 
 /** Global variable GUID */
 EFI_GUID efi_global_variable = EFI_GLOBAL_VARIABLE;
+
+/** Image security database GUID */
+EFI_GUID efi_image_security_database_guid = EFI_IMAGE_SECURITY_DATABASE_GUID;
+
+/** Microsoft vendor GUID */
+EFI_GUID efi_microsoft_vendor_guid = MICROSOFT_VENDOR_GUID;
 
 /** TLS CA certificate variable GUID */
 EFI_GUID efi_tls_ca_certificate_guid = EFI_TLS_CA_CERTIFICATE_GUID;
@@ -575,6 +593,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Http" },
 	{ &efi_http_service_binding_protocol_guid,
 	  "HttpSb" },
+	{ &efi_image_security_database_guid,
+	  "ImageSecDb" },
 	{ &efi_ip4_protocol_guid,
 	  "Ip4" },
 	{ &efi_ip4_config_protocol_guid,
@@ -605,6 +625,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "ManagedNetwork" },
 	{ &efi_managed_network_service_binding_protocol_guid,
 	  "ManagedNetworkSb" },
+	{ &efi_microsoft_vendor_guid,
+	  "Microsoft" },
 	{ &efi_mtftp4_protocol_guid,
 	  "Mtftp4" },
 	{ &efi_mtftp4_service_binding_protocol_guid,
@@ -645,6 +667,8 @@ static struct efi_well_known_guid efi_well_known_guids[] = {
 	  "Smbios" },
 	{ &efi_smbios3_table_guid,
 	  "Smbios3" },
+	{ &efi_storage_security_command_protocol_guid,
+	  "StorageSecurityCommand" },
 	{ &efi_supplicant_protocol_guid,
 	  "Supplicant" },
 	{ &efi_tcg_protocol_guid,

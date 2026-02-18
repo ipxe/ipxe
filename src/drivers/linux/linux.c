@@ -63,11 +63,6 @@ static int linux_probe(struct root_device *rootdev)
 			continue;
 		}
 
-		if (! driver->can_probe) {
-			printf("Driver '%s' cannot handle any more devices\n", driver->name);
-			continue;
-		}
-
 		/* We found a matching driver so add the device to the hierarchy */
 		list_add(&device->dev.siblings, &rootdev->dev.children);
 		device->dev.parent = &rootdev->dev;

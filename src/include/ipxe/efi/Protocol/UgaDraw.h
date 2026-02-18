@@ -1,3 +1,6 @@
+#ifndef _IPXE_EFI_UGADRAW_H
+#define _IPXE_EFI_UGADRAW_H
+
 /** @file
   UGA Draw protocol from the EFI 1.10 specification.
 
@@ -12,6 +15,7 @@
 #define __UGA_DRAW_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #define EFI_UGA_DRAW_PROTOCOL_GUID \
   { \
@@ -159,3 +163,5 @@ struct _EFI_UGA_DRAW_PROTOCOL {
 extern EFI_GUID  gEfiUgaDrawProtocolGuid;
 
 #endif
+
+#endif /* _IPXE_EFI_UGADRAW_H */

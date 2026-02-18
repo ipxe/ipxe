@@ -11,10 +11,11 @@
 #define __XEN_PUBLIC_ARCH_X86_XEN_X86_32_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 /*
  * Hypercall interface:
- *  Input:  %ebx, %ecx, %edx, %esi, %edi, %ebp (arguments 1-6)
+ *  Input:  %ebx, %ecx, %edx, %esi, %edi (arguments 1-5)
  *  Output: %eax
  * Access is via hypercall page (set up by guest loader or via a Xen MSR):
  *  call hypercall_page + hypercall-number * 32
@@ -116,6 +117,10 @@ FILE_LICENCE ( MIT );
 #define __DECL_REG_LO16(name) uint32_t e ## name
 #endif
 
+#ifdef __XEN__
+#define cpu_user_regs guest_user_regs
+#endif
+
 struct cpu_user_regs {
     __DECL_REG_LO8(b);
     __DECL_REG_LO8(c);
@@ -138,8 +143,13 @@ struct cpu_user_regs {
     uint16_t fs, _pad4;
     uint16_t gs, _pad5;
 };
+
+#ifdef __XEN__
+#undef cpu_user_regs
+#else
 typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);
+#endif
 
 #undef __DECL_REG_LO8
 #undef __DECL_REG_LO16

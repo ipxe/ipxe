@@ -19,6 +19,7 @@
  */
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( FORBIDDEN );
 
 /*************************************\
 * DMA and interrupt masking functions *

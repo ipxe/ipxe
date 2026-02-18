@@ -17,6 +17,8 @@
 #ifndef INITVALS_9485_H
 #define INITVALS_9485_H
 
+FILE_SECBOOT ( FORBIDDEN );
+
 static __unused const u32 ar9485_1_1_mac_core[][2] = {
 	/*  Addr       allmodes */
 	{0x00000008, 0x00000000},

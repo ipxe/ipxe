@@ -381,6 +381,28 @@ const char * __asmcall linux_strerror ( int linux_errno ) {
 
 #ifdef HAVE_LIBSLIRP
 
+/* Allow use of fd-based polling mechanism
+ *
+ * libslirp introduced a new API for constructing polling lists, to
+ * accommodate Windows platforms where a handle descriptor may be too
+ * large for an int.
+ *
+ * Older versions of libslirp do not have the new API calls, and the
+ * older API calls were immediately marked as deprecated, with no
+ * overlap.  We would therefore need to use #ifdef and always have
+ * some code that is deliberately not compiled, depending on the
+ * version of libslirp that we find on the user's system.  This is
+ * highly undesirable.
+ *
+ * Work around this by disabling the deprecation warning (which is
+ * what libslirp itself does for the portions of its code that
+ * necessarily touch the deprecated functions).
+ */
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 /**
  * Wrap slirp_new()
  *
@@ -486,6 +508,10 @@ linux_slirp_pollfds_poll ( struct Slirp *slirp, int select_error,
 
 	slirp_pollfds_poll ( slirp, select_error, get_revents, opaque );
 }
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 #endif /* HAVE_LIBSLIRP */
 

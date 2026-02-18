@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 extern uint16_t tcpip_continue_chksum ( uint16_t partial, const void *data,
 					size_t len );

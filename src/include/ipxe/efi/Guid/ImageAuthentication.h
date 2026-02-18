@@ -12,6 +12,7 @@
 #define __IMAGE_AUTHTICATION_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/efi/Guid/GlobalVariable.h>
 #include <ipxe/efi/Protocol/Hash.h>

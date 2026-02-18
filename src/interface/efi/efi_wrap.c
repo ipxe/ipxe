@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /**
  * @file
@@ -40,6 +41,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Colour for debug messages */
 #define colour &efi_systab
 
+/** Maximum size for hex dumps */
+#define EFI_WRAP_DUMP_MAX 128
+
 /** Number of lines to prescroll when needed */
 #define EFI_WRAP_PRESCROLL 16
 
@@ -54,6 +58,12 @@ static EFI_BOOT_SERVICES *efi_bs_orig;
 
 /** Backup of original EFI boot services table */
 static EFI_BOOT_SERVICES efi_bs_copy;
+
+/** Original EFI runtime services table pointer */
+static EFI_RUNTIME_SERVICES *efi_rs_orig;
+
+/** Backup of original EFI runtime services table */
+static EFI_RUNTIME_SERVICES efi_rs_copy;
 
 /**
  * Convert EFI status code to text
@@ -183,6 +193,43 @@ static const char * efi_timer_delay ( EFI_TIMER_DELAY type ) {
 	case TimerCancel:		return "Cancel";
 	case TimerPeriodic:		return "Periodic";
 	case TimerRelative:		return "Relative";
+	default:
+		snprintf ( buf, sizeof ( buf ), "%#x", type );
+		return buf;
+	}
+}
+
+/**
+ * Convert EFI time to text
+ *
+ * @v time		Time, or NULL
+ * @ret text		Time as text
+ */
+static const char * efi_time ( EFI_TIME *time ) {
+	static char buf[ 20 /* "xxxx-xx-xx xx:xx:xx" + NUL */ ];
+
+	if ( ! time )
+		return "<NULL>";
+	snprintf ( buf, sizeof ( buf ), "%04d-%02d-%02d %02d:%02d:%02d",
+		   time->Year, time->Month, time->Day, time->Hour,
+		   time->Minute, time->Second );
+	return buf;
+}
+
+/**
+ * Convert EFI reset type to text
+ *
+ * @v type		Reset type
+ * @ret text		Reset type as text
+ */
+static const char * efi_reset_type ( EFI_RESET_TYPE type ) {
+	static char buf[ 11 /* "0xXXXXXXXX" + NUL */ ];
+
+	switch ( type ) {
+	case EfiResetCold:		return "Cold";
+	case EfiResetWarm:		return "Warm";
+	case EfiResetShutdown:		return "Shutdown";
+	case EfiResetPlatformSpecific:	return "PlatformSpecific";
 	default:
 		snprintf ( buf, sizeof ( buf ), "%#x", type );
 		return buf;
@@ -837,11 +884,11 @@ efi_stall_wrapper ( UINTN microseconds ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_STATUS efirc;
 
-	DBGC2 ( colour, "Stall ( %ld.%06lds ) ",
+	DBGCP ( colour, "Stall ( %ld.%06lds ) ",
 		( ( unsigned long ) ( microseconds / 1000000 ) ),
 		( ( unsigned long ) ( microseconds % 1000000 ) ) );
 	efirc = bs->Stall ( microseconds );
-	DBGC2 ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
+	DBGCP ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
 	return efirc;
 }
 
@@ -1082,7 +1129,7 @@ efi_install_multiple_protocol_interfaces_wrapper ( EFI_HANDLE *handle, ... ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_GUID *protocol[ MAX_WRAP_MULTI + 1 ];
 	VOID *interface[MAX_WRAP_MULTI];
-	va_list ap;
+	VA_LIST ap;
 	unsigned int i;
 	EFI_STATUS efirc;
 
@@ -1090,20 +1137,20 @@ efi_install_multiple_protocol_interfaces_wrapper ( EFI_HANDLE *handle, ... ) {
 	       efi_handle_name ( *handle ) );
 	memset ( protocol, 0, sizeof ( protocol ) );
 	memset ( interface, 0, sizeof ( interface ) );
-	va_start ( ap, handle );
-	for ( i = 0 ; ( protocol[i] = va_arg ( ap, EFI_GUID * ) ) ; i++ ) {
+	VA_START ( ap, handle );
+	for ( i = 0 ; ( protocol[i] = VA_ARG ( ap, EFI_GUID * ) ) ; i++ ) {
 		if ( i == MAX_WRAP_MULTI ) {
-			va_end ( ap );
+			VA_END ( ap );
 			efirc = EFI_OUT_OF_RESOURCES;
 			DBGC ( colour, "<FATAL: too many arguments> ) = %s "
 			       "-> %p\n", efi_status ( efirc ), retaddr );
 			return efirc;
 		}
-		interface[i] = va_arg ( ap, VOID * );
+		interface[i] = VA_ARG ( ap, VOID * );
 		DBGC ( colour, ", %s, %p",
 		       efi_guid_ntoa ( protocol[i] ), interface[i] );
 	}
-	va_end ( ap );
+	VA_END ( ap );
 	DBGC ( colour, " ) " );
 	efirc = bs->InstallMultipleProtocolInterfaces ( handle,
 		protocol[0], interface[0], protocol[1], interface[1],
@@ -1132,7 +1179,7 @@ efi_uninstall_multiple_protocol_interfaces_wrapper ( EFI_HANDLE handle, ... ) {
 	void *retaddr = __builtin_return_address ( 0 );
 	EFI_GUID *protocol[ MAX_WRAP_MULTI  + 1 ];
 	VOID *interface[MAX_WRAP_MULTI];
-	va_list ap;
+	VA_LIST ap;
 	unsigned int i;
 	EFI_STATUS efirc;
 
@@ -1140,20 +1187,20 @@ efi_uninstall_multiple_protocol_interfaces_wrapper ( EFI_HANDLE handle, ... ) {
 	       efi_handle_name ( handle ) );
 	memset ( protocol, 0, sizeof ( protocol ) );
 	memset ( interface, 0, sizeof ( interface ) );
-	va_start ( ap, handle );
-	for ( i = 0 ; ( protocol[i] = va_arg ( ap, EFI_GUID * ) ) ; i++ ) {
+	VA_START ( ap, handle );
+	for ( i = 0 ; ( protocol[i] = VA_ARG ( ap, EFI_GUID * ) ) ; i++ ) {
 		if ( i == MAX_WRAP_MULTI ) {
-			va_end ( ap );
+			VA_END ( ap );
 			efirc = EFI_OUT_OF_RESOURCES;
 			DBGC ( colour, "<FATAL: too many arguments> ) = %s "
 			       "-> %p\n", efi_status ( efirc ), retaddr );
 			return efirc;
 		}
-		interface[i] = va_arg ( ap, VOID * );
+		interface[i] = VA_ARG ( ap, VOID * );
 		DBGC ( colour, ", %s, %p",
 		       efi_guid_ntoa ( protocol[i] ), interface[i] );
 	}
-	va_end ( ap );
+	VA_END ( ap );
 	DBGC ( colour, " ) " );
 	efirc = bs->UninstallMultipleProtocolInterfaces ( handle,
 		protocol[0], interface[0], protocol[1], interface[1],
@@ -1193,6 +1240,169 @@ efi_create_event_ex_wrapper ( UINT32 type, EFI_TPL notify_tpl,
 	DBGC ( colour, "= %s ( %p ) -> %p\n",
 	       efi_status ( efirc ), *event, retaddr );
 	return efirc;
+}
+
+/**
+ * Wrap GetTime()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_get_time_wrapper ( EFI_TIME *time, EFI_TIME_CAPABILITIES *cap ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGCP ( colour, "GetTime() " );
+	efirc = rs->GetTime ( time, cap );
+	DBGCP ( colour, "= %s ( %s ) -> %p\n",
+		efi_status ( efirc ), efi_time ( time ), retaddr );
+	return efirc;
+}
+
+/**
+ * Wrap SetTime()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_set_time_wrapper ( EFI_TIME *time ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "SetTime ( %s ) ", efi_time ( time ) );
+	efirc = rs->SetTime ( time );
+	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
+	return efirc;
+}
+
+/**
+ * Wrap GetWakeupTime()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_get_wakeup_time_wrapper ( BOOLEAN *enabled, BOOLEAN *pending,
+			      EFI_TIME *time ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "GetWakeupTime() " );
+	efirc = rs->GetWakeupTime ( enabled, pending, time );
+	DBGC ( colour, "= %s ( %s, %s, %s ) -> %p\n", efi_status ( efirc ),
+	       efi_boolean ( *enabled ), efi_boolean ( *pending ),
+	       efi_time ( time ), retaddr );
+	return efirc;
+}
+
+/**
+ * Wrap SetWakeupTime()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_set_wakeup_time_wrapper ( BOOLEAN enable, EFI_TIME *time ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "SetWakeupTime ( %s, %s ) ",
+	       efi_boolean ( enable ), efi_time ( time ) );
+	efirc = rs->SetWakeupTime ( enable, time );
+	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
+	return efirc;
+}
+
+/**
+ * Wrap GetVariable()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_get_variable_wrapper ( CHAR16 *name, EFI_GUID *guid, UINT32 *attrs,
+			   UINTN *len, VOID *data ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	size_t dumplen;
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "GetVariable ( %s:%ls, %#llx ) ",
+	       efi_guid_ntoa ( guid ), name, ( ( unsigned long long ) *len ) );
+	efirc = rs->GetVariable ( name, guid, attrs, len, data );
+	DBGC ( colour, "= %s ( %#llx",
+	       efi_status ( efirc ), ( ( unsigned long long ) *len ) );
+	if ( DBG_EXTRA && ( efirc == 0 ) ) {
+		dumplen = *len;
+		if ( dumplen > EFI_WRAP_DUMP_MAX )
+			dumplen = EFI_WRAP_DUMP_MAX;
+		DBGC2 ( colour, ",\n" );
+		DBGC2_HD ( colour, data, dumplen );
+		if ( dumplen != *len )
+			DBGC2 ( colour, "... " );
+	} else {
+		DBGC ( colour, " " );
+	}
+	DBGC ( colour, ") -> %p\n", retaddr );
+	return efirc;
+}
+
+/**
+ * Wrap GetNextVariableName()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_get_next_variable_name_wrapper ( UINTN *len, CHAR16 *name,
+				     EFI_GUID *guid ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "GetNextVariableName ( %#llx, %s:%ls ) ",
+	       ( ( unsigned long long ) *len ), efi_guid_ntoa ( guid ), name );
+	efirc = rs->GetNextVariableName ( len, name, guid );
+	DBGC ( colour, "= %s ( %#llx, %s:%ls ) -> %p\n", efi_status ( efirc ),
+	       ( ( unsigned long long ) *len ), efi_guid_ntoa ( guid ), name,
+	       retaddr );
+	return efirc;
+}
+
+/**
+ * Wrap SetVariable()
+ *
+ */
+static EFI_STATUS EFIAPI
+efi_set_variable_wrapper ( CHAR16 *name, EFI_GUID *guid, UINT32 attrs,
+			   UINTN len, VOID *data ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+	EFI_STATUS efirc;
+
+	DBGC ( colour, "SetVariable ( %s:%ls, %#02x",
+	       efi_guid_ntoa ( guid ), name, attrs );
+	if ( len ) {
+		DBGC ( colour, ",\n" );
+		DBGC_HD ( colour, data, len );
+		DBGC ( colour, ") " );
+	} else {
+		DBGC ( colour, ", %#llx, %p ) ",
+		       ( ( unsigned long long ) len ), data );
+	}
+	efirc = rs->SetVariable ( name, guid, attrs, len, data );
+	DBGC ( colour, "= %s -> %p\n", efi_status ( efirc ), retaddr );
+	return efirc;
+}
+
+/**
+ * Wrap ResetSystem()
+ *
+ */
+static VOID EFIAPI
+efi_reset_system_wrapper ( EFI_RESET_TYPE type, EFI_STATUS status,
+			   UINTN len, VOID *data ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+	void *retaddr = __builtin_return_address ( 0 );
+
+	DBGC ( colour, "ResetSystem ( %s, %s, %#llx, %p ) -> %p\n",
+	       efi_reset_type ( type ), efi_status ( status ),
+	       ( ( unsigned long long ) len ), data, retaddr );
+	rs->ResetSystem ( type, status, len, data );
 }
 
 /**
@@ -1259,13 +1469,39 @@ void efi_wrap_bs ( EFI_BOOT_SERVICES *wrapper ) {
 }
 
 /**
+ * Wrap a runtime services table
+ *
+ * @v wrapper		Runtime services table to wrap
+ */
+void efi_wrap_rs ( EFI_RUNTIME_SERVICES *wrapper ) {
+	EFI_RUNTIME_SERVICES *rs = efi_systab->RuntimeServices;
+
+	/* Do nothing unless debugging is enabled */
+	if ( ! DBG_LOG )
+		return;
+
+	/* Build boot services table wrapper */
+	memcpy ( wrapper, rs, sizeof ( *wrapper ) );
+	wrapper->GetTime		= efi_get_time_wrapper;
+	wrapper->SetTime		= efi_set_time_wrapper;
+	wrapper->GetWakeupTime		= efi_get_wakeup_time_wrapper;
+	wrapper->SetWakeupTime		= efi_set_wakeup_time_wrapper;
+	wrapper->GetVariable		= efi_get_variable_wrapper;
+	wrapper->GetNextVariableName	= efi_get_next_variable_name_wrapper;
+	wrapper->SetVariable		= efi_set_variable_wrapper;
+	wrapper->ResetSystem		= efi_reset_system_wrapper;
+}
+
+/**
  * Wrap the public EFI system table
  *
  * @v global		Patch global boot services table in-place
  */
 void efi_wrap_systab ( int global ) {
-	static EFI_BOOT_SERVICES local;
-	EFI_BOOT_SERVICES *wrapper;
+	static EFI_BOOT_SERVICES local_bs;
+	static EFI_RUNTIME_SERVICES local_rs;
+	EFI_BOOT_SERVICES *bs;
+	EFI_RUNTIME_SERVICES *rs;
 
 	/* Do nothing unless debugging is enabled */
 	if ( ! DBG_LOG )
@@ -1275,7 +1511,9 @@ void efi_wrap_systab ( int global ) {
 	if ( ! efi_systab_pub ) {
 		efi_systab_pub = efi_systab;
 		efi_bs_orig = efi_systab_pub->BootServices;
+		efi_rs_orig = efi_systab_pub->RuntimeServices;
 		memcpy ( &efi_bs_copy, efi_bs_orig, sizeof ( efi_bs_copy ) );
+		memcpy ( &efi_rs_copy, efi_rs_orig, sizeof ( efi_rs_copy ) );
 	}
 
 	/* Construct and use private system table */
@@ -1283,13 +1521,17 @@ void efi_wrap_systab ( int global ) {
 		memcpy ( &efi_systab_priv, efi_systab_pub,
 			 sizeof ( efi_systab_priv ) );
 		efi_systab_priv.BootServices = &efi_bs_copy;
+		efi_systab_priv.RuntimeServices = &efi_rs_copy;
 		efi_systab = &efi_systab_priv;
 	}
 
 	/* Wrap global or local boot services table as applicable */
-	wrapper = ( global ? efi_bs_orig : &local );
-	efi_wrap_bs ( wrapper );
-	efi_systab_pub->BootServices = wrapper;
+	bs = ( global ? efi_bs_orig : &local_bs );
+	rs = ( global ? efi_rs_orig : &local_rs );
+	efi_wrap_bs ( bs );
+	efi_wrap_rs ( rs );
+	efi_systab_pub->BootServices = bs;
+	efi_systab_pub->RuntimeServices = rs;
 	DBGC ( colour, "WRAP installed %s wrappers\n",
 	       ( global ? "global" : "local" ) );
 }

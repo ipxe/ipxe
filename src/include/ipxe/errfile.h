@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <bits/errfile.h>
 
@@ -321,6 +322,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_lldp			( ERRFILE_NET | 0x004c0000 )
 #define ERRFILE_eap_md5			( ERRFILE_NET | 0x004d0000 )
 #define ERRFILE_eap_mschapv2		( ERRFILE_NET | 0x004e0000 )
+#define ERRFILE_syslogs			( ERRFILE_NET | 0x004f0000 )
 
 #define ERRFILE_image		      ( ERRFILE_IMAGE | 0x00000000 )
 #define ERRFILE_elf		      ( ERRFILE_IMAGE | 0x00010000 )
@@ -443,6 +445,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #define ERRFILE_usb_settings	      ( ERRFILE_OTHER | 0x00650000 )
 #define ERRFILE_weierstrass	      ( ERRFILE_OTHER | 0x00660000 )
 #define ERRFILE_efi_cacert	      ( ERRFILE_OTHER | 0x00670000 )
+#define ERRFILE_ecdhe		      ( ERRFILE_OTHER | 0x00680000 )
+#define ERRFILE_ecdsa		      ( ERRFILE_OTHER | 0x00690000 )
 
 /** @} */
 

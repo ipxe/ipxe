@@ -1103,9 +1103,25 @@ vc_rmode:
 	popal
 	/* popal skips %esp.  We therefore want to do "movl -20(%sp),
 	 * %esp", but -20(%sp) is not a valid 80386 expression.
-	 * Fortunately, prot_to_real() zeroes the high word of %esp, so
-	 * we can just use -20(%esp) instead.
+	 *
+	 * In theory, the high word of %esp is already zero at this
+	 * point (since prot_to_real() should set it to zero), and the
+	 * popal instruction does not load %esp from the saved
+	 * register dump.  This would allow us to just use -20(%esp)
+	 * instead.
+	 *
+	 * However, some 386 chips are observed to have an
+	 * undocumented errata that causes the popal instruction to
+	 * load the high 16 bits of %esp.  We therefore explicitly
+	 * zero-extend %sp to %esp to work around this errata.
+	 *
+	 * Inserting this instruction also happens to work around
+	 * another (known and documented) errata in the 386, in which
+	 * the CPU may malfunction if popal is followed immediately by
+	 * an instruction that uses a base address register to form an
+	 * effective address.
 	 */
+	movzwl	%sp, %esp
 	addr32 movl -20(%esp), %esp
 	popfl
 	popw	%ss /* padding */

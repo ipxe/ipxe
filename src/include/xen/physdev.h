@@ -7,6 +7,7 @@
 #define __XEN_PUBLIC_PHYSDEV_H__
 
 FILE_LICENCE ( MIT );
+FILE_SECBOOT ( PERMITTED );
 
 #include "xen.h"
 
@@ -89,6 +90,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
 /*
  * Set the current VCPU's I/O-port permissions bitmap.
  * @arg == pointer to physdev_set_iobitmap structure.
+ *
+ * When @nr_ports is non-zero, Xen, like real CPUs and the TSS IOPB, always
+ * reads 2 bytes from @bitmap, which might be one byte beyond @nr_ports.
  */
 #define PHYSDEVOP_set_iobitmap           7
 struct physdev_set_iobitmap {
@@ -298,6 +302,13 @@ DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_add_t);
  */
 #define PHYSDEVOP_prepare_msix          30
 #define PHYSDEVOP_release_msix          31
+/*
+ * Notify the hypervisor that a PCI device has been reset, so that any
+ * internally cached state is regenerated.  Should be called after any
+ * device reset performed by the hardware domain.
+ */
+#define PHYSDEVOP_pci_device_reset      32
+
 struct physdev_pci_device {
     /* IN */
     uint16_t seg;
@@ -306,6 +317,16 @@ struct physdev_pci_device {
 };
 typedef struct physdev_pci_device physdev_pci_device_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
+
+struct pci_device_reset {
+    physdev_pci_device_t dev;
+#define PCI_DEVICE_RESET_COLD 0x0
+#define PCI_DEVICE_RESET_WARM 0x1
+#define PCI_DEVICE_RESET_HOT  0x2
+#define PCI_DEVICE_RESET_FLR  0x3
+#define PCI_DEVICE_RESET_MASK 0x3
+    uint32_t flags;
+};
 
 #define PHYSDEVOP_DBGP_RESET_PREPARE    1
 #define PHYSDEVOP_DBGP_RESET_DONE       2

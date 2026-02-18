@@ -17,6 +17,8 @@
 #ifndef INITVALS_9003_2P2_H
 #define INITVALS_9003_2P2_H
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /* AR9003 2.2 */
 
 static __unused const u32 ar9300_2p2_radio_postamble[][5] = {

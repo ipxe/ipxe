@@ -11,6 +11,7 @@
 #define PROCESSOR_BIND_H_
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 //
 // Define the processor type so other code can make processor based choices

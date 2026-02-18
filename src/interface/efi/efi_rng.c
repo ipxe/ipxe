@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <errno.h>
 #include <ipxe/entropy.h>
@@ -54,6 +55,15 @@ EFI_REQUEST_PROTOCOL ( EFI_RNG_PROTOCOL, &efirng );
  */
 #define EFIRNG_LEN 32
 
+/** Maximum number of times to attempting requesting data from RNG
+ *
+ * The UEFI spec allows GetRNG() to return EFI_NOT_READY, which is not
+ * a particularly helpful error status since there is nothing that can
+ * sensibly be done except to retry immediately.  We retry failed
+ * calls to GetRNG() (for any reason) up to this number of times.
+ */
+#define EFIRNG_MAX_RETRY 16
+
 /**
  * Enable entropy gathering
  *
@@ -85,29 +95,35 @@ static int efirng_enable ( void ) {
  */
 static int efirng_get_noise ( noise_sample_t *noise ) {
 	uint8_t buf[EFIRNG_LEN];
+	unsigned int i;
 	EFI_STATUS efirc;
 	int rc;
 
 	/* Sanity check */
 	assert ( efirng != NULL );
 
-	/* Get the minimum allowed number of random bytes */
-	if ( ( efirc = efirng->GetRNG ( efirng, NULL, sizeof ( buf ),
-					buf ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( &efirng, "ENTROPY could not read from RNG: %s\n",
-		       strerror ( rc ) );
-		return rc;
+	/* Get random bytes, retrying if needed */
+	for ( i = 0 ; i < EFIRNG_MAX_RETRY ; i++ ) {
+
+		/* Get the minimum allowed number of random bytes */
+		if ( ( efirc = efirng->GetRNG ( efirng, NULL, sizeof ( buf ),
+						buf ) ) != 0 ) {
+			rc = -EEFI ( efirc );
+			continue;
+		}
+
+		/* Reduce random bytes to a single noise sample.  This
+		 * seems like overkill, but we have no way of knowing
+		 * how much entropy is actually present in the bytes
+		 * returned by the RNG protocol.
+		 */
+		*noise = crc32_le ( 0, buf, sizeof ( buf ) );
+		return 0;
 	}
 
-	/* Reduce random bytes to a single noise sample.  This seems
-	 * like overkill, but we have no way of knowing how much
-	 * entropy is actually present in the bytes returned by the
-	 * RNG protocol.
-	 */
-	*noise = crc32_le ( 0, buf, sizeof ( buf ) );
-
-	return 0;
+	DBGC ( &efirng, "ENTROPY could not read from RNG: %s\n",
+	       strerror ( rc ) );
+	return rc;
 }
 
 /** EFI random number generator protocol entropy source */

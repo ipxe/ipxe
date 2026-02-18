@@ -44,6 +44,7 @@
  */
 
 FILE_LICENCE ( BSD3 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include <stdlib.h>
 #include <ipxe/malloc.h>

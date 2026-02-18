@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <stddef.h>
@@ -301,6 +302,88 @@ int asn1_shrink_any ( struct asn1_cursor *cursor ) {
 }
 
 /**
+ * Enter ASN.1 bit string
+ *
+ * @v cursor		ASN.1 cursor
+ * @v unused		Unused bits to fill in (or NULL to require all used)
+ * @ret rc		Return status code
+ */
+int asn1_enter_bits ( struct asn1_cursor *cursor, unsigned int *unused ) {
+	const struct {
+		uint8_t unused;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *bit_string;
+	const uint8_t *last;
+	unsigned int unused_bits;
+	uint8_t unused_mask;
+	int rc;
+
+	/* Enter bit string */
+	if ( ( rc = asn1_enter ( cursor, ASN1_BIT_STRING ) ) != 0 )
+		return rc;
+
+	/* Check that bit string header exists */
+	if ( cursor->len < sizeof ( *bit_string ) ) {
+		DBGC ( cursor, "ASN1 %p invalid bit string:\n", cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		asn1_invalidate_cursor ( cursor );
+		return -EINVAL_BIT_STRING;
+	}
+	bit_string = cursor->data;
+	cursor->data = &bit_string->data;
+	cursor->len -= offsetof ( typeof ( *bit_string ), data );
+	unused_bits = bit_string->unused;
+
+	/* Check validity of unused bits */
+	unused_mask = ( 0xff >> ( 8 - unused_bits ) );
+	last = ( cursor->data + cursor->len - 1 );
+	if ( ( unused_bits >= 8 ) ||
+	     ( ( unused_bits > 0 ) && ( cursor->len == 0 ) ) ||
+	     ( ( *last & unused_mask ) != 0 ) ) {
+		DBGC ( cursor, "ASN1 %p invalid bit string:\n", cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		asn1_invalidate_cursor ( cursor );
+		return -EINVAL_BIT_STRING;
+	}
+
+	/* Record or check number of unused bits, as applicable */
+	if ( unused ) {
+		*unused = unused_bits;
+	} else if ( unused_bits ) {
+		DBGC ( cursor, "ASN1 %p invalid integral bit string:\n",
+		       cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		asn1_invalidate_cursor ( cursor );
+		return -EINVAL_BIT_STRING;
+	}
+
+	return 0;
+}
+
+/**
+ * Enter ASN.1 unsigned integer
+ *
+ * @v cursor		ASN.1 object cursor
+ * @ret rc		Return status code
+ */
+int asn1_enter_unsigned ( struct asn1_cursor *cursor ) {
+	int rc;
+
+	/* Enter integer */
+	if ( ( rc = asn1_enter ( cursor, ASN1_INTEGER ) ) != 0 )
+		return rc;
+
+	/* Skip initial positive sign byte if applicable */
+	if ( ( cursor->len > 1 ) &&
+	     ( *( ( uint8_t * ) cursor->data ) == 0x00 ) ) {
+		cursor->data++;
+		cursor->len--;
+	}
+
+	return 0;
+}
+
+/**
  * Parse value of ASN.1 boolean
  *
  * @v cursor		ASN.1 object cursor
@@ -357,87 +440,6 @@ int asn1_integer ( const struct asn1_cursor *cursor, int *value ) {
 		*value = ( ( *value << 8 ) | *( ( uint8_t * ) contents.data ) );
 		contents.data++;
 		contents.len--;
-	}
-
-	return 0;
-}
-
-/**
- * Parse ASN.1 bit string
- *
- * @v cursor		ASN.1 cursor
- * @v bits		Bit string to fill in
- * @ret rc		Return status code
- */
-int asn1_bit_string ( const struct asn1_cursor *cursor,
-		      struct asn1_bit_string *bits ) {
-	struct asn1_cursor contents;
-	const struct {
-		uint8_t unused;
-		uint8_t data[0];
-	} __attribute__ (( packed )) *bit_string;
-	size_t len;
-	unsigned int unused;
-	uint8_t unused_mask;
-	const uint8_t *last;
-	int rc;
-
-	/* Enter bit string */
-	memcpy ( &contents, cursor, sizeof ( contents ) );
-	if ( ( rc = asn1_enter ( &contents, ASN1_BIT_STRING ) ) != 0 ) {
-		DBGC ( cursor, "ASN1 %p cannot locate bit string:\n", cursor );
-		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
-		return rc;
-	}
-
-	/* Validity checks */
-	if ( contents.len < sizeof ( *bit_string ) ) {
-		DBGC ( cursor, "ASN1 %p invalid bit string:\n", cursor );
-		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
-		return -EINVAL_BIT_STRING;
-	}
-	bit_string = contents.data;
-	len = ( contents.len - offsetof ( typeof ( *bit_string ), data ) );
-	unused = bit_string->unused;
-	unused_mask = ( 0xff >> ( 8 - unused ) );
-	last = ( bit_string->data + len - 1 );
-	if ( ( unused >= 8 ) ||
-	     ( ( unused > 0 ) && ( len == 0 ) ) ||
-	     ( ( *last & unused_mask ) != 0 ) ) {
-		DBGC ( cursor, "ASN1 %p invalid bit string:\n", cursor );
-		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
-		return -EINVAL_BIT_STRING;
-	}
-
-	/* Populate bit string */
-	bits->data = &bit_string->data;
-	bits->len = len;
-	bits->unused = unused;
-
-	return 0;
-}
-
-/**
- * Parse ASN.1 bit string that must be an integral number of bytes
- *
- * @v cursor		ASN.1 cursor
- * @v bits		Bit string to fill in
- * @ret rc		Return status code
- */
-int asn1_integral_bit_string ( const struct asn1_cursor *cursor,
-			       struct asn1_bit_string *bits ) {
-	int rc;
-
-	/* Parse bit string */
-	if ( ( rc = asn1_bit_string ( cursor, bits ) ) != 0 )
-		return rc;
-
-	/* Check that there are no unused bits at end of string */
-	if ( bits->unused ) {
-		DBGC ( cursor, "ASN1 %p invalid integral bit string:\n",
-		       cursor );
-		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
-		return -EINVAL_BIT_STRING;
 	}
 
 	return 0;
@@ -647,19 +649,67 @@ int asn1_signature_algorithm ( const struct asn1_cursor *cursor,
 }
 
 /**
+ * Parse ASN.1 OID-identified elliptic curve algorithm
+ *
+ * @v cursor		ASN.1 object cursor
+ * @v wrapper		Optional wrapper algorithm, or NULL
+ * @ret algorithm	Algorithm
+ * @ret rc		Return status code
+ */
+int asn1_curve_algorithm ( const struct asn1_cursor *cursor,
+			   struct asn1_algorithm *wrapper,
+			   struct asn1_algorithm **algorithm ) {
+	struct asn1_cursor curve;
+
+	/* Elliptic curves are identified as either:
+	 *
+	 * - a wrapper algorithm "id-ecPublicKey" with the actual
+	 *   curve specified in the algorithm parameters, or
+	 *
+	 * - a standalone object identifier for the curve
+	 */
+	if ( ( wrapper == NULL ) ||
+	     ( asn1_check_algorithm ( cursor, wrapper, &curve ) != 0 ) ) {
+		memcpy ( &curve, cursor, sizeof ( curve ) );
+	}
+
+	/* Identify curve */
+	asn1_enter ( &curve, ASN1_OID );
+	*algorithm = asn1_find_algorithm ( &curve );
+	if ( ! *algorithm ) {
+		DBGC ( cursor, "ASN1 %p unrecognised EC algorithm:\n",
+		       cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTSUP_ALGORITHM;
+	}
+
+	/* Check algorithm has an elliptic curve */
+	if ( ! (*algorithm)->curve ) {
+		DBGC ( cursor, "ASN1 %p algorithm %s is not an elliptic curve "
+		       "algorithm:\n", cursor, (*algorithm)->name );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		return -ENOTTY_ALGORITHM;
+	}
+
+	return 0;
+}
+
+/**
  * Check ASN.1 OID-identified algorithm
  *
  * @v cursor		ASN.1 object cursor
  * @v expected		Expected algorithm
+ * @ret params		Algorithm parameters, or NULL
  * @ret rc		Return status code
  */
 int asn1_check_algorithm ( const struct asn1_cursor *cursor,
-			   struct asn1_algorithm *expected ) {
+			   struct asn1_algorithm *expected,
+			   struct asn1_cursor *params ) {
 	struct asn1_algorithm *actual;
 	int rc;
 
 	/* Parse algorithm */
-	if ( ( rc = asn1_algorithm ( cursor, &actual, NULL ) ) != 0 )
+	if ( ( rc = asn1_algorithm ( cursor, &actual, params ) ) != 0 )
 		return rc;
 
 	/* Check algorithm matches */

@@ -22,6 +22,7 @@
 #include <ipxe/net80211.h>
 
 FILE_LICENCE(GPL2_ONLY);
+FILE_SECBOOT(FORBIDDEN);
 
 struct rtl818x_csr {
 	u8	MAC[6];

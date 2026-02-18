@@ -118,7 +118,7 @@ static void dwusb_remove ( struct dt_device *dt ) {
 
 /** DesignWare USB3 compatible model identifiers */
 static const char * dwusb_ids[] = {
-	"snps,dwc3",
+	DT_ID ( "snps,dwc3", "DesignWare USB3" ),
 };
 
 /** DesignWare USB3 devicetree driver */

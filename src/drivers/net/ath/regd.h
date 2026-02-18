@@ -21,6 +21,7 @@
 #define REGD_H
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include "ath.h"
 

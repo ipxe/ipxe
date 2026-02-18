@@ -22,6 +22,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER );
+FILE_SECBOOT ( PERMITTED );
 
 /* EFI headers rudely redefine NULL */
 #undef NULL
@@ -233,6 +234,7 @@ extern EFI_GUID efi_simple_pointer_protocol_guid;
 extern EFI_GUID efi_simple_text_input_protocol_guid;
 extern EFI_GUID efi_simple_text_input_ex_protocol_guid;
 extern EFI_GUID efi_simple_text_output_protocol_guid;
+extern EFI_GUID efi_storage_security_command_protocol_guid;
 extern EFI_GUID efi_supplicant_protocol_guid;
 extern EFI_GUID efi_tcg_protocol_guid;
 extern EFI_GUID efi_tcg2_protocol_guid;
@@ -263,6 +265,8 @@ extern EFI_GUID efi_cert_x509_guid;
 extern EFI_GUID efi_file_info_id;
 extern EFI_GUID efi_file_system_info_id;
 extern EFI_GUID efi_global_variable;
+extern EFI_GUID efi_image_security_database_guid;
+extern EFI_GUID efi_microsoft_vendor_guid;
 extern EFI_GUID efi_tls_ca_certificate_guid;
 
 extern EFI_HANDLE efi_image_handle;

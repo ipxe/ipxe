@@ -8,6 +8,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/bigint.h>
 #include <ipxe/crypto.h>
@@ -62,6 +63,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 			bigint_t ( size ) y;				\
 			bigint_t ( size ) z;				\
 		};							\
+		bigint_t ( size * 2 ) xy;				\
 		bigint_t ( size * 3 ) all;				\
 	}
 
@@ -123,12 +125,18 @@ struct weierstrass_curve {
 	};
 };
 
+extern int weierstrass_is_infinity ( struct weierstrass_curve *curve,
+				     const void *point );
 extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 				  const void *base, const void *scalar,
 				  void *result );
+extern int weierstrass_add_once ( struct weierstrass_curve *curve,
+				  const void *addend, const void *augend,
+				  void *result );
 
 /** Define a Weierstrass curve */
-#define WEIERSTRASS_CURVE( _name, _curve, _len, _prime, _a, _b, _base )	\
+#define WEIERSTRASS_CURVE( _name, _curve, _len, _prime, _a, _b, _base,	\
+			   _order )					\
 	static bigint_t ( weierstrass_size(_len) )			\
 		_name ## _cache[WEIERSTRASS_NUM_CACHED];		\
 	static struct weierstrass_curve _name ## _weierstrass = {	\
@@ -150,17 +158,30 @@ extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 		.a = (_name ## _cache)[6].element,			\
 		.b3 = (_name ## _cache)[7].element,			\
 	};								\
+	static int _name ## _is_infinity ( const void *point) {		\
+		return weierstrass_is_infinity ( &_name ## _weierstrass,\
+						 point );		\
+	}								\
 	static int _name ## _multiply ( const void *base,		\
 					const void *scalar,		\
 					void *result ) {		\
 		return weierstrass_multiply ( &_name ## _weierstrass,	\
 					      base, scalar, result );	\
 	}								\
+	static int _name ## _add ( const void *addend,			\
+				   const void *augend, void *result) {	\
+		return weierstrass_add_once ( &_name ## _weierstrass,	\
+					      addend, augend, result );	\
+	}								\
 	struct elliptic_curve _curve = {				\
 		.name = #_name,						\
 		.pointsize = ( WEIERSTRASS_AXES * (_len) ),		\
 		.keysize = (_len),					\
+		.base = (_base),					\
+		.order = (_order),					\
+		.is_infinity = _name ## _is_infinity,			\
 		.multiply = _name ## _multiply,				\
+		.add = _name ## _add,					\
 	}
 
 #endif /* _IPXE_WEIERSTRASS_H */

@@ -10,6 +10,7 @@
 #include <ipxe/netdevice.h>
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 extern int efi_pxe_install ( EFI_HANDLE handle, struct net_device *netdev );
 extern void efi_pxe_uninstall ( EFI_HANDLE handle );

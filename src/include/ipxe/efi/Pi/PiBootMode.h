@@ -13,6 +13,7 @@
 #define __PI_BOOT_MODE_H__
 
 FILE_LICENCE ( BSD2_PATENT );
+FILE_SECBOOT ( PERMITTED );
 
 ///
 /// EFI boot mode

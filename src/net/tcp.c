@@ -28,6 +28,7 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 /** A TCP connection */
 struct tcp_connection {
@@ -166,6 +167,9 @@ struct tcp_rx_queued_header {
  * List of registered TCP connections
  */
 static LIST_HEAD ( tcp_conns );
+
+/** TCP statistics */
+struct tcp_statistics tcp_stats;
 
 /** Transmit profiler */
 static struct profiler tcp_tx_profiler __profiler = { .name = "tcp.tx" };
@@ -1216,6 +1220,9 @@ static int tcp_rx_data ( struct tcp_connection *tcp, uint32_t seq,
 	/* Acknowledge new data */
 	tcp_rx_seq ( tcp, len );
 
+	/* Update statistics */
+	tcp_stats.in_octets_good += len;
+
 	/* Deliver data to application */
 	profile_start ( &tcp_xfer_profiler );
 	if ( ( rc = xfer_deliver_iob ( &tcp->xfer, iobuf ) ) != 0 ) {
@@ -1299,6 +1306,7 @@ static void tcp_rx_enqueue ( struct tcp_connection *tcp, uint32_t seq,
 	size_t len;
 	uint32_t seq_len;
 	uint32_t nxt;
+	uint32_t gap;
 
 	/* Calculate remaining flags and sequence length.  Note that
 	 * SYN, if present, has already been processed by this point.
@@ -1317,7 +1325,7 @@ static void tcp_rx_enqueue ( struct tcp_connection *tcp, uint32_t seq,
 	 */
 	if ( ( ! ( tcp->tcp_state & TCP_STATE_RCVD ( TCP_SYN ) ) ) ||
 	     ( tcp_cmp ( seq, tcp->rcv_ack + tcp->rcv_win ) >= 0 ) ||
-	     ( tcp_cmp ( nxt, tcp->rcv_ack ) < 0 ) ||
+	     ( tcp_cmp ( nxt, tcp->rcv_ack ) <= 0 ) ||
 	     ( seq_len == 0 ) ) {
 		free_iob ( iobuf );
 		return;
@@ -1330,12 +1338,18 @@ static void tcp_rx_enqueue ( struct tcp_connection *tcp, uint32_t seq,
 	tcpqhdr->flags = flags;
 
 	/* Add to RX queue */
+	gap = tcp->rcv_ack;
 	list_for_each_entry ( queued, &tcp->rx_queue, list ) {
 		tcpqhdr = queued->data;
 		if ( tcp_cmp ( seq, tcpqhdr->seq ) < 0 )
 			break;
+		gap = tcpqhdr->nxt;
 	}
 	list_add_tail ( &iobuf->list, &queued->list );
+
+	/* Update statistics */
+	if ( seq != gap )
+		tcp_stats.in_out_of_order++;
 }
 
 /**
@@ -1459,6 +1473,10 @@ static int tcp_rx ( struct io_buffer *iobuf,
 	seq_len = ( len + ( ( flags & TCP_SYN ) ? 1 : 0 ) +
 		    ( ( flags & TCP_FIN ) ? 1 : 0 ) );
 
+	/* Update statistics */
+	tcp_stats.in_segs++;
+	tcp_stats.in_octets += len;
+
 	/* Dump header */
 	DBGC2 ( tcp, "TCP %p RX %d<-%d           %08x %08x..%08x %4zd",
 		tcp, ntohs ( tcphdr->dest ), ntohs ( tcphdr->src ),
@@ -1568,6 +1586,9 @@ static unsigned int tcp_discard ( void ) {
 			/* Remove packet from queue */
 			list_del ( &iobuf->list );
 			free_iob ( iobuf );
+
+			/* Update statistics */
+			tcp_stats.in_discards++;
 
 			/* Report discard */
 			discarded++;

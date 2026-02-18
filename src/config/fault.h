@@ -8,11 +8,15 @@
  */
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 #include <config/defaults.h>
 
 /* Drop every N transmitted or received network packets */
 #define	NETDEV_DISCARD_RATE 0
+
+/* Delay transmissions to neighbour-resolved destinations (in ms) */
+#define NEIGHBOUR_DELAY_MS 0
 
 /* Drop every N transmitted or received PeerDist discovery packets */
 #define PEERDISC_DISCARD_RATE 0
