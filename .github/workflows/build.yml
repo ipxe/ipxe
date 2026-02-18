@@ -333,12 +333,40 @@ jobs:
         run: |
           ${{ matrix.exec }} ${{ env.bindir }}/tests.linux
 
+  shim:
+    name: UEFI shim
+    runs-on: ubuntu-latest
+    env:
+      shims: >-
+        shimaa64.efi
+        shimx64.efi
+      shimurl: >-
+        https://github.com/ipxe/shim/releases/latest/download
+    steps:
+
+      - name: Download
+        run: |
+          for shim in ${{ env.shims }} ; do
+              curl -L ${{ env.shimurl }}/ipxe-${shim} -o ${shim}
+          done
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: shim
+          if-no-files-found: error
+          path: |
+            shimaa64.efi
+            shimx64.efi
+
   combine:
     name: BIOS + UEFI
     runs-on: ubuntu-latest
     needs:
       - bios
       - uefi
+      - sbsign
+      - shim
     container:
       image: ghcr.io/ipxe/ipxe-builder-utils
     env:
@@ -359,7 +387,7 @@ jobs:
       - name: Download
         uses: actions/download-artifact@v7
         with:
-          pattern: "{bin-x86_64-pcbios,bin-*-efi}"
+          pattern: "{bin-x86_64-pcbios,bin-*-efi,bin-*-efi-sb,shim}"
 
       - name: Combine
         run: |
@@ -397,6 +425,7 @@ jobs:
       - uefi
       - sbsign
       - linux
+      - shim
       - combine
     if: >-
       github.ref == 'refs/heads/master' &&
