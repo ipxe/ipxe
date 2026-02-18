@@ -416,6 +416,97 @@ jobs:
             ipxe-legacy.iso
             ipxe-legacy.usb
 
+  netboot:
+    name: Netboot
+    runs-on: ubuntu-latest
+    needs:
+      - bios
+      - uefi
+      - sbsign
+      - shim
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-utils
+    env:
+      biosarchs: >-
+        i386:bin
+        x86_64:bin-x86_64-pcbios
+      biosfiles: >-
+        ipxe.pxe
+        ipxe-legacy.pxe
+        undionly.kpxe
+      efiarchs: >-
+        arm32
+        arm64
+        i386
+        loong64
+        riscv32
+        riscv64
+        x86_64
+      efifiles: >-
+        ipxe.efi
+        ipxe-legacy.efi
+        snponly.efi
+      sbarchs: >-
+        arm64:aa64
+        x86_64:x64
+      sbfiles: >-
+        ipxe.efi
+        snponly.efi
+    steps:
+
+      - name: Download
+        uses: actions/download-artifact@v7
+        with:
+          pattern: "{bin,bin-x86_64-pcbios,bin-*-efi,bin-*-efi-sb,shim}"
+
+      - name: BIOS
+        run: |
+          for biosarch in ${{ env.biosarchs }} ; do
+              IFS=: read -r arch bindir <<< "${biosarch}"
+              mkdir -p ipxeboot/${arch}
+              for file in ${{ env.biosfiles }} ; do
+                  cp ${bindir}/${file} ipxeboot/${arch}/${file}
+                  ln -sf x86_64/${file} ipxeboot/${file}
+              done
+          done
+
+      - name: UEFI
+        run: |
+          for arch in ${{ env.efiarchs }} ; do
+              mkdir -p ipxeboot/${arch}
+              for file in ${{ env.efifiles }} ; do
+                  cp bin-${arch}-efi/${file} ipxeboot/${arch}/${file}
+                  ln -sf x86_64/${file} ipxeboot/${file}
+              done
+          done
+
+      - name: UEFI SB
+        run: |
+          for sbarch in ${{ env.sbarchs }} ; do
+              IFS=: read -r arch efiarch <<< ${sbarch}
+              mkdir -p ipxeboot/${arch}-sb
+              shimfile=shim${efiarch}.efi
+              cp shim/${shimfile} ipxeboot/${arch}-sb/${shimfile}
+              for file in ${{ env.sbfiles }} ; do
+                  shimlink=${file/.efi/-shim.efi}
+                  cp bin-${arch}-efi-sb/${file} ipxeboot/${arch}-sb/${file}
+                  ln -sf ${shimfile} ipxeboot/${arch}-sb/${shimlink}
+              done
+          done
+          ln -sf x86_64-sb ipxeboot/sb
+
+      - name: Archive
+        run: |
+          tar cvzf ipxeboot.tar.gz ipxeboot
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: netboot
+          if-no-files-found: error
+          path: |
+            ipxeboot.tar.gz
+
   publish:
     name: Publish
     runs-on: ubuntu-latest
@@ -427,6 +518,7 @@ jobs:
       - linux
       - shim
       - combine
+      - netboot
     if: >-
       github.ref == 'refs/heads/master' &&
       vars.PAGES_REPO_NAME
