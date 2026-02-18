@@ -340,7 +340,7 @@ jobs:
       - bios
       - uefi
     container:
-      image: ghcr.io/ipxe/ipxe-signer
+      image: ghcr.io/ipxe/ipxe-builder-utils
     env:
       binaries: >-
         bin-x86_64-pcbios/${DRIVERS}.lkrn
