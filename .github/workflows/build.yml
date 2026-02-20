@@ -509,6 +509,37 @@ jobs:
           path: |
             ipxeboot.tar.gz
 
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-utils
+    env:
+      bindir: bin
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
+        run: |
+          make ${{ env.bindir }}/version.txt \
+               ${{ env.bindir }}/relname.txt \
+               ${{ env.bindir }}/reltitle.txt \
+               ${{ env.bindir }}/relnotes.md
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: version
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/version.txt
+            src/${{ env.bindir }}/relname.txt
+            src/${{ env.bindir }}/reltitle.txt
+            src/${{ env.bindir }}/relnotes.md
+
   publish:
     name: Publish
     runs-on: ubuntu-latest
@@ -521,6 +552,7 @@ jobs:
       - shim
       - combine
       - netboot
+      - version
     if: >-
       github.ref == 'refs/heads/master' &&
       vars.PAGES_REPO_NAME

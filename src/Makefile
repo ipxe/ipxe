@@ -57,6 +57,8 @@ GENKEYMAP	:= ./util/genkeymap.py
 DOXYGEN		:= doxygen
 LCAB		:= lcab
 QEMUIMG		:= qemu-img
+PANDOC		:= pandoc
+ENVSUBST	:= envsubst
 
 ###############################################################################
 #

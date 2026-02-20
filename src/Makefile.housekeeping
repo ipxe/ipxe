@@ -1094,11 +1094,6 @@ $(BIN)/NIC : $(AUTO_DEPS)
 	@perl -ne 'chomp; print "$$1\n" if /\# NIC\t(.*)$$/' $^ >> $@
 CLEANUP		+= $(BIN)/NIC	# Doesn't match the $(BIN)/*.* pattern
 
-# Generate version number record
-#
-$(BIN)/version.txt : $(MAKEDEPS)
-	@$(ECHO) "$(VERSION)" > $@
-
 # Analyse a target name (e.g. "bin/dfe538--prism2_pci.rom.tmp") and
 # derive the variables:
 # 
@@ -1613,6 +1608,69 @@ ifdef BIN
 
 $(BIN)/%.bxs : $(BIN)/%.tmp
 	$(NM) $< | cut -d" " -f1,3 > $@
+
+endif # defined(BIN)
+
+###############################################################################
+#
+# Versioning
+#
+
+ifdef BIN
+
+REPOURL		:= https://github.com/ipxe/ipxe
+ifeq ($(EXTRAVERSION),)
+RELNAME		:= v$(firstword $(VERSION))
+CLMARKER	:= [$(RELNAME)]
+SRCNAME		:= ipxe-$(firstword $(VERSION))
+SRCURL		:= $(REPOURL)/archive/$(RELNAME)
+BINURL		:= $(REPOURL)/releases/download/$(RELNAME)
+else
+RELNAME		:=
+CLMARKER	:= [Unreleased]
+SRCNAME		:= ipxe
+SRCURL		:= $(REPOURL)/archive/$(GITVERSION)
+BINURL		:= https://boot.ipxe.org
+endif
+
+# Generate version number record
+#
+$(BIN)/version.txt : $(MAKEDEPS)
+	$(QM)$(ECHO) "  [VERSION] $@"
+	$(Q)$(ECHO) "$(VERSION)" > $@
+
+# Generate release name
+#
+$(BIN)/relname.txt : $(MAKEDEPS)
+	$(QM)$(ECHO) "  [RELNAME] $@"
+	$(Q)$(ECHO) "$(RELNAME)" > $@
+
+# Generate changelog section
+#
+$(BIN)/changes.md : ../CHANGELOG.md $(MAKEDEPS)
+	$(QM)$(ECHO) "  [CHANGES] $@"
+	$(Q)$(PANDOC) -f gfm -t gfm --columns 10000 $< | \
+	    awk -v RS='\n\n## ' -v marker='$(CLMARKER)' \
+		'index ( $$0, marker ) == 1 { print }' > $@
+	$(Q)if [ ! -s $@ ] ; then \
+	    echo "Missing $(CLMARKER) in $<" >&2 ; \
+	    exit 1 ; \
+	fi
+
+# Generate release title
+#
+$(BIN)/reltitle.txt : $(BIN)/changes.md $(MAKEDEPS)
+	$(QM)$(ECHO) "  [RELTITLE] $@"
+	$(Q)head -1 $< | sed -E \
+	    's/^\[(.*)\]\(.+\)\s+(.+)$$/\1 (\2)/; t; s/^\[(.*)\].*$$/\1/' > $@
+
+# Generate release notes
+#
+$(BIN)/relnotes.md : ../RELNOTES.tmpl.md $(BIN)/changes.md $(MAKEDEPS)
+	$(QM)$(ECHO) "  [RELNOTES] $@"
+	$(Q)( cat ../RELNOTES.tmpl.md ; tail -n +2 $(BIN)/changes.md ) | \
+	    SRCNAME="$(SRCNAME)" SRCURL="$(SRCURL)" BINURL="$(BINURL)" \
+	    $(ENVSUBST) '$$SRCNAME $$SRCURL $$BINURL' > $@
 
 endif # defined(BIN)
 
