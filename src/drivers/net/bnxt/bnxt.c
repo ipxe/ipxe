@@ -21,7 +21,7 @@ FILE_LICENCE ( GPL2_ONLY );
 static void bnxt_service_cq ( struct net_device *dev );
 static void bnxt_tx_complete ( struct net_device *dev, u16 hw_idx );
 static void bnxt_adv_cq_index ( struct bnxt *bp, u16 cnt );
-static void bnxt_adv_cq_index ( struct bnxt *bp, u16 cnt );
+static void bnxt_adv_nq_index ( struct bnxt *bp, u16 cnt );
 static int bnxt_rx_complete ( struct net_device *dev, struct rx_pkt_cmpl *rx );
 void bnxt_link_evt ( struct bnxt *bp, struct hwrm_async_event_cmpl *evt );
 
