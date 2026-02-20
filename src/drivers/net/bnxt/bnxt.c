@@ -1481,14 +1481,12 @@ static int bnxt_hwrm_queue_qportcfg ( struct bnxt *bp )
 	int rc;
 
 	DBGP ( "%s\n", __func__ );
-	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
-		return STATUS_SUCCESS;
 
 	req = ( struct hwrm_queue_qportcfg_input * ) REQ_DMA_ADDR ( bp );
 	resp = ( struct hwrm_queue_qportcfg_output * ) RESP_DMA_ADDR ( bp );
 	hwrm_init ( bp, ( void * )req, ( u16 )HWRM_QUEUE_QPORTCFG, cmd_len );
 	req->flags   = 0;
-	req->port_id = 0;
+	req->port_id = bp->port_idx;
 	rc = wait_resp ( bp, bp->hwrm_cmd_timeout, cmd_len, __func__ );
 	if ( rc ) {
 		DBGP ( "- %s (  ): Failed\n", __func__ );
