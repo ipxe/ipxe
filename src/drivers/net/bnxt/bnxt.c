@@ -1361,7 +1361,7 @@ static int bnxt_get_link_speed ( struct bnxt *bp )
 	u32 *ptr32 = ( u32 * ) DMA_DMA_ADDR ( bp );
 
 	DBGP ( "%s\n", __func__ );
-	if ( ! ( FLAG_TEST (bp->flags, BNXT_FLAG_IS_CHIP_P7 ) ) ) {
+	if ( ! ( FLAG_TEST (bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) ) {
 	        if ( bnxt_hwrm_nvm_get_variable_req ( bp, 4,
 		        ( u16 )LINK_SPEED_DRV_NUM,
 		        1, ( u16 )bp->port_idx ) != STATUS_SUCCESS )
