@@ -42,7 +42,6 @@ jobs:
                ${{ env.bindir }}/ipxe-legacy.lkrn \
                ${{ env.bindir }}/ipxe-legacy.pxe \
                ${{ env.bindir }}/undionly.kpxe \
-               ${{ env.bindir }}/version.txt \
                ${{ env.bindir }}/errors
 
       - name: Hardware list
@@ -64,7 +63,6 @@ jobs:
             src/${{ env.bindir }}/ipxe-legacy.lkrn
             src/${{ env.bindir }}/ipxe-legacy.pxe
             src/${{ env.bindir }}/undionly.kpxe
-            src/${{ env.bindir }}/version.txt
             src/${{ env.bindir }}/errors
             src/${{ env.bindir }}/niclist.txt
 
