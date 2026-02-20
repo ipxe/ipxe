@@ -1,5 +1,5 @@
 iPXE network bootloader
------------------------
+=======================
 
 [![Build](https://img.shields.io/github/actions/workflow/status/ipxe/ipxe/build.yml)](https://github.com/ipxe/ipxe/actions/workflows/build.yml?query=branch%3Amaster)
 [![Coverity](https://img.shields.io/coverity/scan/12130)](https://scan.coverity.com/projects/ipxe-ipxe)
