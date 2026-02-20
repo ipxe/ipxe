@@ -143,7 +143,7 @@
 #define DEFAULT_NUMBER_OF_RX_RINGS              0x01
 #define DEFAULT_NUMBER_OF_RING_GRPS             0x01
 #define DEFAULT_NUMBER_OF_STAT_CTXS             0x01
-#define NUM_RX_BUFFERS                          8
+#define NUM_RX_BUFFERS                          2
 #define MAX_RX_DESC_CNT                         16
 #define MAX_TX_DESC_CNT                         64
 #define MAX_CQ_DESC_CNT                         128
