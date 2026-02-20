@@ -13,6 +13,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <stdint.h>
 #include <ipxe/refcnt.h>
 #include <ipxe/device.h>
+#include <ipxe/dma.h>
 #include <ipxe/tables.h>
 #include <ipxe/ib_packet.h>
 #include <ipxe/ib_mad.h>
@@ -194,7 +195,8 @@ struct ib_queue_pair {
 /** Infiniband completion queue operations */
 struct ib_completion_queue_operations {
 	/**
-	 * Complete Send WQE
+	 * Complete Send WQE. Should take care of any DMA unmapping since it
+	 * takes ownership of the iobuf.
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
@@ -205,7 +207,8 @@ struct ib_completion_queue_operations {
 				   struct ib_queue_pair *qp,
 				   struct io_buffer *iobuf, int rc );
 	/**
-	 * Complete Receive WQE
+	 * Complete Receive WQE. Should take care of any DMA unmapping since it
+	 * takes ownership of the iobuf.
 	 *
 	 * @v ibdev		Infiniband device
 	 * @v qp		Queue pair
@@ -409,6 +412,8 @@ struct ib_device {
 	char name[IBDEV_NAME_LEN];
 	/** Underlying device */
 	struct device *dev;
+	/** DMA device */
+	struct dma_device *dma;
 	/** List of completion queues */
 	struct list_head cqs;
 	/** List of queue pairs */

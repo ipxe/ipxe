@@ -46,6 +46,7 @@ typedef  struct{
 	mlx_pci_gw pci_gw;
 	mlx_icmd icmd;
 	void *lock;
+	void *dma;
 #ifdef DEVICE_CX3
 	/* ACCESS to BAR0 */
 	void *config;

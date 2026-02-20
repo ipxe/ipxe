@@ -528,9 +528,9 @@ static int flexboot_nodnic_post_recv ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &wqe->data[0], 0, byte_count, iob_tailroom ( iobuf ) );
 	MLX_FILL_1 ( &wqe->data[0], 1, l_key, flexboot_nodnic->device_priv.lkey );
 	MLX_FILL_H ( &wqe->data[0], 2,
-			 local_address_h, virt_to_bus ( iobuf->data ) );
+			 local_address_h, iob_dma ( iobuf ) );
 	MLX_FILL_1 ( &wqe->data[0], 3,
-			 local_address_l, virt_to_bus ( iobuf->data ) );
+			 local_address_l, iob_dma ( iobuf ) );
 
 	wq->next_idx++;
 
@@ -1073,7 +1073,10 @@ static int flexboot_nodnic_register_netdev ( struct flexboot_nodnic *flexboot_no
 	port->netdev = netdev;
 	netdev_init ( netdev, &flexboot_nodnic_eth_operations );
 	netdev->dev = ibdev->dev;
+	netdev->dma = &flexboot_nodnic->pci->dma;
 	netdev->priv = port;
+
+	dma_set_mask_64bit ( &flexboot_nodnic->pci->dma );
 
 	status = nodnic_port_query(&port->port_priv,
 			nodnic_port_option_mac_high,
@@ -1165,6 +1168,7 @@ flexboot_nodnic_allocate_infiniband_devices( struct flexboot_nodnic *flexboot_no
 		flexboot_nodnic_priv->port[i].ibdev = ibdev;
 		ibdev->op = &flexboot_nodnic_ib_operations;
 		ibdev->dev = &pci->dev;
+		ibdev->dma = &pci->dma;
 		ibdev->port = ( FLEXBOOT_NODNIC_PORT_BASE + i);
 		ibdev->ports = device_priv->device_cap.num_ports;
 		ib_set_drvdata(ibdev, flexboot_nodnic_priv);
@@ -1415,6 +1419,7 @@ int init_mlx_utils ( mlx_utils **utils, struct pci_device *pci ) {
 		rc = -1;
 		goto err_utils_init;
 	}
+	(*utils)->dma = &pci->dma;
 	if ( mlx_pci_gw_init ( *utils ) ){
 		DBGC ( utils, "%s: mlx_pci_gw_init failed\n", __FUNCTION__ );
 		rc = -1;
