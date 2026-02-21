@@ -2189,7 +2189,7 @@ static inline void golan_bring_down(struct golan *golan)
 	DBGC(golan, "%s: end\n", __FUNCTION__);
 }
 
-static int golan_set_link_speed ( struct golan *golan ){
+static int golan_set_sdr_link_speed ( struct golan *golan ){
 	mlx_status status;
 	int i = 0;
 	int utils_inited = 0;
@@ -2239,8 +2239,12 @@ static inline int golan_bring_up(struct golan *golan)
 	if (( rc = golan_handle_pages(golan, GOLAN_INIT_PAGES, GOLAN_PAGES_GIVE) ))
 		goto pages;
 
-	if (( rc = golan_set_link_speed ( golan ) ))
-		goto pages_teardown;
+	if ( golan->pci->id->driver_data & SDR_SUPPORTED ) {
+		if (( rc = golan_set_sdr_link_speed ( golan ) ))
+			goto pages_teardown;
+	} else {
+		DBGC(golan, "%s: SDR not supported, skipping link speed set\n", __FUNCTION__);
+	}
 
 	//Reg Init?
 	if (( rc = golan_hca_init(golan) ))
@@ -2636,18 +2640,21 @@ static void golan_remove ( struct pci_device *pci ) {
 }
 
 static struct pci_device_id golan_nics[] = {
-	PCI_ROM ( 0x15b3, 0x1011, "ConnectIB", "ConnectIB HCA driver: DevID 4113", 0 ),
-	PCI_ROM ( 0x15b3, 0x1013, "ConnectX-4", "ConnectX-4 HCA driver, DevID 4115", 0 ),
-	PCI_ROM ( 0x15b3, 0x1015, "ConnectX-4Lx", "ConnectX-4Lx HCA driver, DevID 4117", 0 ),
-	PCI_ROM ( 0x15b3, 0x1017, "ConnectX-5", "ConnectX-5 HCA driver, DevID 4119", 0 ),
-	PCI_ROM ( 0x15b3, 0x1019, "ConnectX-5EX", "ConnectX-5EX HCA driver, DevID 4121", 0 ),
-	PCI_ROM ( 0x15b3, 0x101b, "ConnectX-6", "ConnectX-6 HCA driver, DevID 4123", 0 ),
-	PCI_ROM ( 0x15b3, 0x101d, "ConnectX-6DX", "ConnectX-6DX HCA driver, DevID 4125", 0 ),
-	PCI_ROM ( 0x15b3, 0x101f, "ConnectX-6Lx", "ConnectX-6LX HCA driver, DevID 4127", 0 ),
-	PCI_ROM ( 0x15b3, 0x1021, "ConnectX-7", "ConnectX-7 HCA driver, DevID 4129", 0 ),
-	PCI_ROM ( 0x15b3, 0xa2d2, "BlueField", "BlueField integrated ConnectX-5 network controller HCA driver, DevID 41682", 0 ),
-	PCI_ROM ( 0x15b3, 0xa2d6, "BlueField-2", "BlueField-2 network controller HCA driver, DevID 41686", 0 ),
-	PCI_ROM ( 0x15b3, 0xa2dc, "BlueField-3", "BlueField-3 network controller HCA driver, DevID 41692", 0 ),
+	PCI_ROM ( 0x15b3, 0x1011, "ConnectIB", "ConnectIB HCA driver: DevID 4113", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x1013, "ConnectX-4", "ConnectX-4 HCA driver, DevID 4115", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x1015, "ConnectX-4Lx", "ConnectX-4Lx HCA driver, DevID 4117", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x1017, "ConnectX-5", "ConnectX-5 HCA driver, DevID 4119", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x1019, "ConnectX-5EX", "ConnectX-5EX HCA driver, DevID 4121", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x101b, "ConnectX-6", "ConnectX-6 HCA driver, DevID 4123", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x101d, "ConnectX-6DX", "ConnectX-6DX HCA driver, DevID 4125", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x101f, "ConnectX-6Lx", "ConnectX-6LX HCA driver, DevID 4127", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x1021, "ConnectX-7", "ConnectX-7 HCA driver, DevID 4129", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x1023, "ConnectX-8", "ConnectX-8 HCA driver, DevID 4131", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0x1025, "ConnectX-9", "ConnectX-9 HCA driver, DevID 4133", 0 ),
+	PCI_ROM ( 0x15b3, 0xa2d2, "BlueField", "BlueField integrated ConnectX-5 network controller HCA driver, DevID 41682", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0xa2d6, "BlueField-2", "BlueField-2 network controller HCA driver, DevID 41686", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0xa2dc, "BlueField-3", "BlueField-3 network controller HCA driver, DevID 41692", SDR_SUPPORTED ),
+	PCI_ROM ( 0x15b3, 0xa2df, "BlueField-4", "BlueField-4 network controller HCA driver, DevID 41695", 0 ),
 };
 
 struct pci_driver golan_driver __pci_driver = {
