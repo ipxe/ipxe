@@ -296,10 +296,12 @@ int show_menu ( struct dynamic_ui *dynui, unsigned long timeout,
 	erase();
 
 	/* Draw initial content */
+	color_set ( CPAIR_TITLE, NULL );
 	attron ( A_BOLD );
 	snprintf ( buf, sizeof ( buf ), "%s", ui.dynui->title );
 	mvprintw ( TITLE_ROW, ( ( COLS - strlen ( buf ) ) / 2 ), "%s", buf );
 	attroff ( A_BOLD );
+	color_set ( CPAIR_NORMAL, NULL );
 	jump_scroll ( &ui.scroll );
 	draw_menu_items ( &ui );
 	draw_menu_item ( &ui, ui.scroll.current );
