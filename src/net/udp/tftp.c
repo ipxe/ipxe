@@ -1204,6 +1204,18 @@ struct uri_opener mtftp_uri_opener __uri_opener = {
  ******************************************************************************
  */
 
+/** TFTP server URI host name */
+static char tftp_uri_host[ 16 /* "xxx.xxx.xxx.xxx" + NUL */ ];
+
+/** TFTP server URI */
+static struct uri tftp_uri = {
+	.refcnt = REF_INIT ( ref_no_free ),
+	.scheme = "tftp",
+	.host = tftp_uri_host,
+	.path = "/",
+	.epath = "/",
+};
+
 /**
  * Apply TFTP configuration settings
  *
@@ -1212,32 +1224,29 @@ struct uri_opener mtftp_uri_opener __uri_opener = {
 static int tftp_apply_settings ( void ) {
 	static struct in_addr tftp_server = { 0 };
 	struct in_addr new_tftp_server;
-	char uri_string[32];
-	struct uri *uri;
 
 	/* Retrieve TFTP server setting */
 	fetch_ipv4_setting ( NULL, &next_server_setting, &new_tftp_server );
 
-	/* If TFTP server setting has changed, set the current working
-	 * URI to match.  Do it only when the TFTP server has changed
-	 * to try to minimise surprises to the user, who probably
-	 * won't expect the CWURI to change just because they updated
-	 * an unrelated setting and triggered all the settings
-	 * applicators.
+	/* If TFTP server setting has changed, update the TFTP server
+	 * URI to match.
 	 */
-	if ( new_tftp_server.s_addr &&
-	     ( new_tftp_server.s_addr != tftp_server.s_addr ) ) {
+	if ( new_tftp_server.s_addr != tftp_server.s_addr ) {
 		DBGC ( &tftp_server, "TFTP server changed %s => ",
 		       inet_ntoa ( tftp_server ) );
 		DBGC ( &tftp_server, "%s\n", inet_ntoa ( new_tftp_server ) );
-		snprintf ( uri_string, sizeof ( uri_string ),
-			   "tftp://%s/", inet_ntoa ( new_tftp_server ) );
-		uri = parse_uri ( uri_string );
-		if ( ! uri )
-			return -ENOMEM;
-		churi ( uri );
-		uri_put ( uri );
+		snprintf ( tftp_uri_host, sizeof ( tftp_uri_host ), "%s",
+			   inet_ntoa ( new_tftp_server ) );
 		tftp_server = new_tftp_server;
+	}
+
+	/* Use TFTP server URI as fallback current working URI */
+	if ( new_tftp_server.s_addr && ( cwuri == NULL ) ) {
+		DBGC ( &tftp_server, "TFTP server setting working URI\n" );
+		churi ( &tftp_uri );
+	} else if ( ( ! new_tftp_server.s_addr ) && ( cwuri == &tftp_uri ) ) {
+		DBGC ( &tftp_server, "TFTP server clearing working URI\n" );
+		churi ( NULL );
 	}
 
 	return 0;
