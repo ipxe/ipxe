@@ -12,6 +12,7 @@ help() {
     echo
     echo "where OPTIONS are:"
     echo " -h         show this help"
+    echo " -e SHIM    specify an EFI shim helper"
     echo " -o FILE    save image to file"
     echo " -p PAD     pad filesystem (in kB)"
     echo " -s SCRIPT  use executable script"
@@ -45,9 +46,9 @@ get_word() {
     echo "${MSB}${LSB}"
 }
 
-# Get appropriate EFI boot filename for CPU architecture
+# Get appropriate EFI boot filename portion for CPU architecture
 #
-efi_boot_name() {
+efi_boot_arch() {
     local FILENAME
     local MZSIG
     local PEOFF
@@ -70,25 +71,25 @@ efi_boot_name() {
     ARCH=$(get_word "${FILENAME}" $(( 0x${PEOFF} + 4 )) )
     case "${ARCH}" in
 	"014c" )
-	    echo "BOOTIA32.EFI"
+	    echo "IA32"
 	    ;;
 	"8664" )
-	    echo "BOOTX64.EFI"
+	    echo "X64"
 	    ;;
 	"01c2" )
-	    echo "BOOTARM.EFI"
+	    echo "ARM"
 	    ;;
 	"6264" )
-	    echo "BOOTLOONGARCH64.EFI"
+	    echo "LOONGARCH64"
 	    ;;
 	"aa64" )
-	    echo "BOOTAA64.EFI"
+	    echo "AA64"
 	    ;;
 	"5064" )
-	    echo "BOOTRISCV64.EFI"
+	    echo "RISCV64"
 	    ;;
 	"5032" )
-	    echo "BOOTRISCV32.EFI"
+	    echo "RISCV32"
 	    ;;
 	* )
 	    echo "${FILENAME}: unrecognised EFI architecture ${ARCH}" >&2
@@ -134,11 +135,28 @@ copy_syslinux_file() {
 OUTFILE=
 PAD=0
 SCRIPT=
-while getopts "hlo:p:s:" OPTION ; do
+SHIMAA64=
+SHIMX64=
+while getopts "he:o:p:s:" OPTION ; do
     case "${OPTION}" in
 	h)
 	    help
 	    exit 0
+	    ;;
+	e)
+	    SHIM="${OPTARG}"
+	    SHIMARCH=$(efi_boot_arch "${SHIM}")
+	    case "${SHIMARCH}" in
+		"AA64" )
+		    SHIMAA64="${SHIM}"
+		    ;;
+		"X64" )
+		    SHIMX64="${SHIM}"
+		    ;;
+		* )
+		    echo "${SHIM}: unsupported shim architecture" >&2
+		    exit 1
+	    esac
 	    ;;
 	o)
 	    OUTFILE="${OPTARG}"
@@ -217,11 +235,33 @@ for FILENAME ; do
 	    ;;
 	*.efi)
 	    DESTDIR="${FATDIR}/EFI/BOOT"
-	    DESTFILE=$(efi_boot_name "${FILENAME}")
+	    DESTARCH=$(efi_boot_arch "${FILENAME}")
+	    case "${DESTARCH}" in
+		"AA64" )
+		    DESTSHIM="${SHIMAA64}"
+		    ;;
+		"X64" )
+		    DESTSHIM="${SHIMX64}"
+		    ;;
+		* )
+		    DESTSHIM=
+		    ;;
+	    esac
+	    if [ -n "${DESTSHIM}" ] ; then
+		DESTFILE="IPXE.EFI"
+	    else
+		DESTFILE="BOOT${DESTARCH}.EFI"
+	    fi
 	    if [ -z "${EFI}" ] ; then
 		mkdir -p "${DESTDIR}"
 		if [ -n "${SCRIPT}" ] ; then
 		    cp "${SCRIPT}" "${FATDIR}/autoexec.ipxe"
+		fi
+		if [ -n "${SHIMAA64}" ] ; then
+		    cp "${SHIMAA64}" "${DESTDIR}/BOOTAA64.EFI"
+		fi
+		if [ -n "${SHIMX64}" ] ; then
+		    cp "${SHIMX64}" "${DESTDIR}/BOOTX64.EFI"
 		fi
 	    fi
 	    EFI=1

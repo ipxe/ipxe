@@ -382,6 +382,11 @@ jobs:
         bin-riscv32-efi/${DRIVERS}.efi
         bin-riscv64-efi/${DRIVERS}.efi
         bin-x86_64-efi/${DRIVERS}.efi
+      sbarchs: >-
+        arm64
+        x86_64
+      sbbinaries: >-
+        bin-${ARCH}-efi-sb/ipxe.efi
       srvbinaries: >-
         bin/ipxe.pxe
         bin/ipxe-legacy.pxe
@@ -424,7 +429,7 @@ jobs:
         with:
           pattern: "{bin,bin-x86_64-pcbios,bin-*-efi,bin-*-efi-sb,shim}"
 
-      - name: ISO + USB
+      - name: Autoexec
         run: |
           # Provide an editable placeholder autoexec.ipxe for the USB image
           cat > autoexec.ipxe <<'EOF'
@@ -434,10 +439,22 @@ jobs:
               Press Ctrl-B for the iPXE command line... \
               && shell || autoboot
           EOF
+
+      - name: ISO + USB
+        run: |
           for DRIVERS in ipxe ipxe-legacy ; do
               ./src/util/genfsimg -o ${DRIVERS}.iso ${{ env.fsbinaries }}
               ./src/util/genfsimg -o ${DRIVERS}.usb -s autoexec.ipxe \
                                   ${{ env.fsbinaries }}
+          done
+
+      - name: ISO + USB (SB)
+        run: |
+          for ARCH in ${{ env.sbarchs }} ; do
+            ./src/util/genfsimg -o ipxe-${ARCH}-sb.iso \
+                                ${{ env.efishims }} ${{ env.sbbinaries }}
+            ./src/util/genfsimg -o ipxe-${ARCH}-sb.usb -s autoexec.ipxe \
+                                ${{ env.efishims }} ${{ env.sbbinaries }}
           done
 
       - name: Server
@@ -455,6 +472,10 @@ jobs:
             ipxe.usb
             ipxe-legacy.iso
             ipxe-legacy.usb
+            ipxe-arm64-sb.iso
+            ipxe-arm64-sb.usb
+            ipxe-x86_64-sb.iso
+            ipxe-x86_64-sb.usb
             ipxeboot.tar.gz
 
   version:
