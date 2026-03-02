@@ -1120,6 +1120,9 @@ static int efi_path_net_probe ( struct net_device *netdev, void *priv ) {
 		return 0;
 	}
 
+	/* Mark network device to be opened automatically */
+	netdev->state |= NETDEV_AUTO_OPEN;
+
 	/* Never override a real DHCP settings block */
 	if ( find_child_settings ( netdev_settings ( netdev ),
 				   DHCP_SETTINGS_NAME ) ) {
