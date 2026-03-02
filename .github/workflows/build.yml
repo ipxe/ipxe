@@ -588,4 +588,7 @@ jobs:
           gh release create "${{ github.ref_name }}" --verify-tag --draft \
               --title "$(cat version/relname.txt)" \
               --notes-file version/relnotes.md \
-              bin-combi/ipxe.iso bin-combi/ipxe.usb bin-combi/ipxeboot.tar.gz
+              bin-combi/ipxe.iso bin-combi/ipxe.usb \
+              bin-combi/ipxe-arm64-sb.iso bin-combi/ipxe-arm64-sb.usb \
+              bin-combi/ipxe-x86_64-sb.iso bin-combi/ipxe-x86_64-sb.usb \
+              bin-combi/ipxeboot.tar.gz
