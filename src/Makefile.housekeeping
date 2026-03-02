@@ -1664,13 +1664,19 @@ $(BIN)/reltitle.txt : $(BIN)/changes.md $(MAKEDEPS)
 	$(Q)head -1 $< | sed -E \
 	    's/^\[(.*)\]\(.+\)\s+(.+)$$/\1 (\2)/; t; s/^\[(.*)\].*$$/\1/' > $@
 
+# Generate release description
+#
+$(BIN)/reldesc.md : ../RELNOTES.tmpl.md $(MAKEDEPS)
+	$(QM)$(ECHO) "  [RELDESC] $@"
+	$(Q)SRCNAME="$(SRCNAME)" SRCURL="$(SRCURL)" BINURL="$(BINURL)" \
+	    $(ENVSUBST) '$$SRCNAME $$SRCURL $$BINURL' < $< | \
+	    $(PANDOC) -f gfm -t gfm --columns 10000 > $@
+
 # Generate release notes
 #
-$(BIN)/relnotes.md : ../RELNOTES.tmpl.md $(BIN)/changes.md $(MAKEDEPS)
+$(BIN)/relnotes.md : $(BIN)/reldesc.md $(BIN)/changes.md $(MAKEDEPS)
 	$(QM)$(ECHO) "  [RELNOTES] $@"
-	$(Q)( cat ../RELNOTES.tmpl.md ; tail -n +2 $(BIN)/changes.md ) | \
-	    SRCNAME="$(SRCNAME)" SRCURL="$(SRCURL)" BINURL="$(BINURL)" \
-	    $(ENVSUBST) '$$SRCNAME $$SRCURL $$BINURL' > $@
+	$(Q)( cat $(BIN)/reldesc.md ; tail -n +2 $(BIN)/changes.md ) > $@
 
 endif # defined(BIN)
 
