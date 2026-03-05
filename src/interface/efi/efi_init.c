@@ -392,7 +392,7 @@ void efi_raise_tpl ( struct efi_saved_tpl *tpl ) {
 }
 
 /**
- * Restore task priority level
+ * Restore saved task priority level
  *
  * @v tpl		Saved TPL
  */
@@ -404,4 +404,32 @@ void efi_restore_tpl ( struct efi_saved_tpl *tpl ) {
 
 	/* Restore TPL */
 	bs->RestoreTPL ( tpl->current );
+}
+
+/**
+ * Drop task priority level temporarily to external level
+ *
+ * @v tpl		Dropped TPL
+ */
+void efi_drop_tpl ( struct efi_dropped_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Raise TPL temporarily to discover current TPL */
+	tpl->current = bs->RaiseTPL ( TPL_HIGH_LEVEL );
+	bs->RestoreTPL ( tpl->current );
+
+	/* Drop to external TPL */
+	bs->RestoreTPL ( efi_external_tpl );
+}
+
+/**
+ * Restore dropped task priority level
+ *
+ * @v tpl		Dropped TPL
+ */
+void efi_undrop_tpl ( struct efi_dropped_tpl *tpl ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+
+	/* Raise back to original TPL */
+	bs->RaiseTPL ( tpl->current );
 }

@@ -59,6 +59,7 @@ int efi_connect ( EFI_HANDLE device, EFI_HANDLE driver ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE driverlist[2] = { driver, NULL };
 	EFI_HANDLE *drivers = ( driver ? driverlist : NULL );
+	struct efi_dropped_tpl tpl;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -67,9 +68,9 @@ int efi_connect ( EFI_HANDLE device, EFI_HANDLE driver ) {
 	DBGC ( device, "%s driver at %s TPL\n",
 	       ( driver ? efi_handle_name ( driver ) : "any" ),
 	       efi_tpl_name ( efi_external_tpl ) );
-	bs->RestoreTPL ( efi_external_tpl );
+	efi_drop_tpl ( &tpl );
 	efirc = bs->ConnectController ( device, drivers, NULL, TRUE );
-	bs->RaiseTPL ( efi_internal_tpl );
+	efi_undrop_tpl ( &tpl );
 	if ( efirc != 0 ) {
 		rc = -EEFI_CONNECT ( efirc );
 		DBGC ( device, "EFI %s could not connect: %s\n",
@@ -89,6 +90,7 @@ int efi_connect ( EFI_HANDLE device, EFI_HANDLE driver ) {
  */
 int efi_disconnect ( EFI_HANDLE device, EFI_HANDLE driver ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_dropped_tpl tpl;
 	EFI_STATUS efirc;
 	int rc;
 
@@ -97,9 +99,9 @@ int efi_disconnect ( EFI_HANDLE device, EFI_HANDLE driver ) {
 	DBGC ( device, "%s driver at %s TPL\n",
 	       ( driver ? efi_handle_name ( driver ) : "any" ),
 	       efi_tpl_name ( efi_external_tpl ) );
-	bs->RestoreTPL ( efi_external_tpl );
+	efi_drop_tpl ( &tpl );
 	efirc = bs->DisconnectController ( device, driver, NULL );
-	bs->RaiseTPL ( efi_internal_tpl );
+	efi_undrop_tpl ( &tpl );
 	if ( ( efirc != 0 ) && ( efirc != EFI_NOT_FOUND ) ) {
 		rc = -EEFI ( efirc );
 		DBGC ( device, "EFI %s could not disconnect: %s\n",

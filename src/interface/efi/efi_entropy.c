@@ -50,6 +50,9 @@ struct entropy_source efitick_entropy __entropy_source ( ENTROPY_FALLBACK );
 /** Event used to wait for timer tick */
 static EFI_EVENT tick;
 
+/** Dropped TPL */
+static struct efi_dropped_tpl efi_entropy_tpl;
+
 /**
  * Enable entropy gathering
  *
@@ -61,7 +64,7 @@ static int efi_entropy_enable ( void ) {
 	int rc;
 
 	/* Drop to external TPL to allow timer tick event to take place */
-	bs->RestoreTPL ( efi_external_tpl );
+	efi_drop_tpl ( &efi_entropy_tpl );
 
 	/* Create timer tick event */
 	if ( ( efirc = bs->CreateEvent ( EVT_TIMER, TPL_NOTIFY, NULL, NULL,
@@ -92,7 +95,7 @@ static void efi_entropy_disable ( void ) {
 	bs->CloseEvent ( tick );
 
 	/* Return to internal TPL */
-	bs->RaiseTPL ( efi_internal_tpl );
+	efi_undrop_tpl ( &efi_entropy_tpl );
 }
 
 /**

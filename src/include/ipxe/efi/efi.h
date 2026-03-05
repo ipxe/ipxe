@@ -84,6 +84,12 @@ struct efi_saved_tpl {
 	EFI_TPL previous;
 };
 
+/** An EFI dropped task priority level */
+struct efi_dropped_tpl {
+	/** Current TPL */
+	EFI_TPL current;
+};
+
 /** An EFI protocol used by iPXE */
 struct efi_protocol {
 	/** GUID */
@@ -408,6 +414,8 @@ extern EFI_STATUS efi_init ( EFI_HANDLE image_handle,
 			     EFI_SYSTEM_TABLE *systab );
 extern void efi_raise_tpl ( struct efi_saved_tpl *tpl );
 extern void efi_restore_tpl ( struct efi_saved_tpl *tpl );
+extern void efi_drop_tpl ( struct efi_dropped_tpl *tpl );
+extern void efi_undrop_tpl ( struct efi_dropped_tpl *tpl );
 extern int efi_open_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,
 			      void **interface );
 extern int efi_open_unsafe_untyped ( EFI_HANDLE handle, EFI_GUID *protocol,

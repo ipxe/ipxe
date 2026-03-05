@@ -77,7 +77,7 @@ static void efi_udelay ( unsigned long usecs ) {
  * @ret ticks		Current time, in ticks
  */
 static unsigned long efi_currticks ( void ) {
-	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	struct efi_dropped_tpl tpl;
 
 	/* UEFI manages to ingeniously combine the worst aspects of
 	 * both polling and interrupt-driven designs.  There is no way
@@ -137,8 +137,8 @@ static unsigned long efi_currticks ( void ) {
 	if ( efi_shutdown_in_progress ) {
 		efi_jiffies++;
 	} else {
-		bs->RestoreTPL ( efi_external_tpl );
-		bs->RaiseTPL ( efi_internal_tpl );
+		efi_drop_tpl ( &tpl );
+		efi_undrop_tpl ( &tpl );
 	}
 
 	return ( efi_jiffies * ( TICKS_PER_SEC / EFI_JIFFIES_PER_SEC ) );
