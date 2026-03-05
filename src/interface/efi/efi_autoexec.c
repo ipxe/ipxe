@@ -198,7 +198,7 @@ int efi_autoexec_load ( void ) {
 
 		/* Try loading */
 		if ( ( rc = loader->load ( handle, &image ) ) != 0 )
-			return rc;
+			continue;
 
 		/* Discard zero-length images */
 		if ( ! image->len ) {
