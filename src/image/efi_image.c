@@ -153,7 +153,9 @@ __weak int efi_fdt_uninstall ( void ) {
 static int efi_image_exec ( struct image *image ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	struct efi_snp_device *snpdev;
-	EFI_DEVICE_PATH_PROTOCOL *path;
+	struct net_device *netdev;
+	EFI_DEVICE_PATH_PROTOCOL *devpath;
+	EFI_DEVICE_PATH_PROTOCOL *imgpath;
 	EFI_LOADED_IMAGE_PROTOCOL *loaded;
 	struct image *shim;
 	struct image *exec;
@@ -167,13 +169,23 @@ static int efi_image_exec ( struct image *image ) {
 
 	/* Find an appropriate device handle to use */
 	snpdev = last_opened_snpdev();
-	if ( ! snpdev ) {
-		DBGC ( image, "EFIIMAGE %s could not identify SNP device\n",
-		       image->name );
-		rc = -ENODEV;
-		goto err_no_snpdev;
+	if ( snpdev ) {
+		/* We have a netX: use this as the base device */
+		device = snpdev->handle;
+		devpath = snpdev->path;
+		netdev = netdev_get ( snpdev->netdev );
+		DBGC ( image, "EFIIMAGE %s using %s %s\n", image->name,
+		       netdev->name, efi_devpath_text ( devpath ) );
+	} else {
+		/* We have no netX: fall back to using our own loaded
+		 * image's device.
+		 */
+		device = efi_loaded_image->DeviceHandle;
+		devpath = efi_loaded_image_path;
+		netdev = NULL;
+		DBGC ( image, "EFIIMAGE %s using %s\n",
+		       image->name, efi_devpath_text ( devpath ) );
 	}
-	device = snpdev->handle;
 
 	/* Use shim instead of directly executing image if applicable */
 	shim = ( efi_can_load ( image ) ?
@@ -198,7 +210,8 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Install PXE base code protocol */
-	if ( ( rc = efi_pxe_install ( device, snpdev->netdev ) ) != 0 ){
+	if ( ( netdev != NULL ) &&
+	     ( rc = efi_pxe_install ( device, netdev ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %s could not install PXE protocol: "
 		       "%s\n", image->name, strerror ( rc ) );
 		goto err_pxe_install;
@@ -219,8 +232,8 @@ static int efi_image_exec ( struct image *image ) {
 	}
 
 	/* Create device path for image */
-	path = efi_image_path ( exec, snpdev->path );
-	if ( ! path ) {
+	imgpath = efi_image_path ( exec, devpath );
+	if ( ! imgpath ) {
 		DBGC ( image, "EFIIMAGE %s could not create device path\n",
 		       image->name );
 		rc = -ENOMEM;
@@ -251,7 +264,7 @@ static int efi_image_exec ( struct image *image ) {
 	 * therefore use the .rwdata field rather than .data.
 	 */
 	handle = NULL;
-	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, path,
+	if ( ( efirc = bs->LoadImage ( FALSE, efi_image_handle, imgpath,
 				       exec->rwdata, exec->len,
 				       &handle ) ) != 0 ) {
 		/* Not an EFI image */
@@ -302,9 +315,6 @@ static int efi_image_exec ( struct image *image ) {
 	/* Reset console since image will probably use it */
 	console_reset();
 
-	/* Assume that image may cause SNP device to be removed */
-	snpdev = NULL;
-
 	/* Start the image */
 	if ( ( efirc = bs->StartImage ( handle, NULL, NULL ) ) != 0 ) {
 		rc = -EEFI_START ( efirc );
@@ -349,20 +359,21 @@ static int efi_image_exec ( struct image *image ) {
  err_shim_install:
 	free ( cmdline );
  err_cmdline:
-	free ( path );
+	free ( imgpath );
  err_image_path:
 	efi_fdt_uninstall();
  err_fdt_install:
 	efi_download_uninstall ( device );
  err_download_install:
-	efi_pxe_uninstall ( device );
+	if ( netdev )
+		efi_pxe_uninstall ( device );
  err_pxe_install:
 	efi_file_uninstall ( device );
  err_file_install:
 	unregister_image ( image );
  err_register_image:
 	image->flags ^= toggle;
- err_no_snpdev:
+	netdev_put ( netdev );
 	return rc;
 }
 
