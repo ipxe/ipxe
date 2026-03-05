@@ -230,8 +230,11 @@ static int efi_image_exec ( struct image *image ) {
 		parent = efi_loaded_image->DeviceHandle;
 		basepath = efi_loaded_image_path;
 		netdev = NULL;
-		DBGC ( image, "EFIIMAGE %s using %s\n",
-		       image->name, efi_devpath_text ( basepath ) );
+		if ( efi_test ( parent, &efi_device_path_protocol_guid ) != 0 )
+			parent = NULL;
+		DBGC ( image, "EFIIMAGE %s using %s%s\n",
+		       image->name, efi_devpath_text ( basepath ),
+		       ( parent ? "" : " (removed)" ) );
 	}
 
 	/* Construct URI device path */
@@ -259,7 +262,8 @@ static int efi_image_exec ( struct image *image ) {
 	       image->name, efi_handle_name ( device ) );
 
 	/* Add as a child of the parent device */
-	if ( ( rc = efi_child_add ( parent, device ) ) != 0 ) {
+	if ( ( parent != NULL ) &&
+	     ( rc = efi_child_add ( parent, device ) ) != 0 ) {
 		DBGC ( image, "EFIIMAGE %s could not become child of %s: %s\n",
 		       image->name, efi_handle_name ( parent ),
 		       strerror ( rc ) );
@@ -454,7 +458,8 @@ static int efi_image_exec ( struct image *image ) {
 	unregister_image ( image );
  err_register_image:
 	image->flags ^= toggle;
-	efi_child_del ( parent, device );
+	if ( parent )
+		efi_child_del ( parent, device );
  err_child_add:
 	bs->UninstallMultipleProtocolInterfaces (
 			device,
