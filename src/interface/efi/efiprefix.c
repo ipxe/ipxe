@@ -85,15 +85,11 @@ static void efi_init_application ( void ) {
 	EFI_DEVICE_PATH_PROTOCOL *bootpath;
 	struct uri *uri;
 
-	/* Set current working URI from device path, if present */
+	/* Set current working URI from boot option path, if present */
 	bootpath = efi_current_boot_path();
-	DBGC ( device, "EFI has loaded image device path %s\n",
-	       efi_devpath_text ( devpath ) );
 	DBGC ( device, "EFI has boot option device path %s\n",
 	       efi_devpath_text ( bootpath ) );
-	uri = efi_path_uri ( devpath );
-	if ( bootpath && ( ! uri ) )
-		uri = efi_path_uri ( bootpath );
+	uri = efi_path_uri ( bootpath );
 	if ( uri )
 		churi ( uri );
 	uri_put ( uri );
@@ -104,6 +100,14 @@ static void efi_init_application ( void ) {
 
 	/* Store cached DHCP packet, if any */
 	efi_cachedhcp_record ( device, devpath );
+
+	/* Set current working URI from device path, if present */
+	DBGC ( device, "EFI has loaded image device path %s\n",
+	       efi_devpath_text ( devpath ) );
+	uri = efi_path_uri ( devpath );
+	if ( uri )
+		churi ( uri );
+	uri_put ( uri );
 }
 
 /** EFI application initialisation function */
