@@ -215,7 +215,7 @@ install :
 VERSION_MAJOR	:= 2
 VERSION_MINOR	:= 0
 VERSION_PATCH	:= 0
-EXTRAVERSION	:=
+EXTRAVERSION	:= +
 ifneq ($(wildcard ../.git/HEAD),)
 GITVERSION	:= $(shell cat ../.git/HEAD)
 ifeq ($(firstword $(GITVERSION)),ref:)
