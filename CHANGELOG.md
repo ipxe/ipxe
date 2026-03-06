@@ -3,6 +3,8 @@ Changelog
 
 ## [Unreleased]
 
+## [v2.0.0] 2026-03-06
+
 - Add support for [UEFI Secure Boot][secboot] via a dedicated [iPXE
   shim][ipxeshim].
 
@@ -104,6 +106,7 @@ Changelog
 
 
 [unreleased]: https://github.com/ipxe/ipxe/commits
+[v2.0.0]: https://github.com/ipxe/ipxe/releases/tag/v2.0.0
 [v1.21.1]: https://github.com/ipxe/ipxe/releases/tag/v1.21.1
 [v1.20.1]: https://github.com/ipxe/ipxe/releases/tag/v1.20.1
 [v1.0.0]: https://github.com/ipxe/ipxe/releases/tag/v1.0.0
