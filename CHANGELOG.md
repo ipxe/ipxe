@@ -3,7 +3,8 @@ Changelog
 
 ## [Unreleased]
 
-- Add support for UEFI Secure Boot via a dedicated iPXE shim.
+- Add support for [UEFI Secure Boot][secboot] via a dedicated [iPXE
+  shim][ipxeshim].
 
 - Add support for LoongArch64 and RISC-V CPU architectures.
 
@@ -13,7 +14,13 @@ Changelog
 
 - Construct initrd-style CPIO archive for UEFI kernels.
 
-- Support loading a UEFI executable via a shim.
+- Support loading a UEFI executable via a [shim][shimcmd].
+
+- Add the [`${cwuri}`](https://ipxe.org/cfg/cwuri) and
+  [`${cwduri}`](https://ipxe.org/cfg/cwduri) settings to expose the
+  current working URI.
+
+- Automatically open the boot network device after chainloading.
 
 - Support EAPoL and port authentication.
 
@@ -22,6 +29,8 @@ Changelog
 - Support DHE and ECDHE key exchange mechanisms, GCM cipher mode of
   operation, X25519, P-256, and P-384 elliptic curves, and ECDSA
   certificates.
+
+- Close TLS connections gracefully via closure alerts.
 
 - Remove support for TLS v1.0.
 
@@ -64,6 +73,12 @@ Changelog
 - Publish official images for AWS and Google Cloud.
 
 - Switch from Travis CI to GitHub Actions.
+
+- Automate UEFI Secure Boot signing and the release process.
+
+[ipxeshim]: https://github.com/ipxe/shim
+[secboot]: https://ipxe.org/secboot
+[shimcmd]: https://ipxe.org/cmd/shim
 
 ## [v1.21.1] 2020-12-31
 
