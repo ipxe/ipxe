@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from hashlib import sha256
 from itertools import count
+import os.path
 import subprocess
 
 import boto3
@@ -113,6 +114,11 @@ def import_image(region, name, family, architecture, image, public, overwrite,
     return image_id
 
 
+def upload_file(filename, bucket):
+    client = boto3.client('s3')
+    client.upload_file(filename, bucket, os.path.basename(filename))
+
+
 def launch_link(region, image_id):
     """Construct a web console launch link"""
     return ("https://console.aws.amazon.com/ec2/v2/home?"
@@ -135,6 +141,8 @@ parser.add_argument('--region', '-r', action='append',
                     help="AWS region(s)")
 parser.add_argument('--wiki', '-w', metavar='FILE',
                     help="Generate Dokuwiki table")
+parser.add_argument('--bucket', '-b',
+                    help="Upload generated outputs to S3 bucket")
 parser.add_argument('image', nargs='+', help="iPXE disk image")
 args = parser.parse_args()
 
@@ -181,6 +189,8 @@ wikitab = ["^ AWS region  ^ CPU architecture  ^ AMI ID  ^\n"] + list(
 if args.wiki:
     with open(args.wiki, 'wt') as fh:
         fh.writelines(wikitab)
+    if args.bucket:
+        upload_file(args.wiki, args.bucket)
 
 # Show created images
 for region, image in imports:
