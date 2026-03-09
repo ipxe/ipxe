@@ -60,8 +60,12 @@ jobs:
         bin-arm64-efi/ipxe.usb
         bin-x86_64-pcbios/ipxe.usb
       bucket: ${{ vars.AWS_BUCKET }}
-      family: ${{ github.ref == 'refs/heads/awstest' && '--family ipxetest' }}
-      retain: ${{ github.ref == 'refs/heads/awstest' && '0' || '3' }}
+      family: >-
+        ${{ github.ref == 'refs/heads/awstest' &&
+            '--family ipxetest' || '' }}
+      retain: >-
+        ${{ github.ref == 'refs/heads/awstest' &&
+            '0' || '3' }}
     environment: aws-import
     permissions:
       id-token: write
