@@ -26,6 +26,8 @@ struct testnet {
 	struct net_device *netdev;
 	/** Dummy physical device */
 	struct device dev;
+	/** MAC address */
+	const char *hwaddr;
 	/** Initial settings */
 	struct testnet_setting *testset;
 	/** Number of initial settings */
@@ -36,9 +38,10 @@ struct testnet {
  * Declare a test network device
  *
  * @v NAME		Network device name
+ * @v HWADDR		MAC address
  * @v ...		Initial network device settings
  */
-#define TESTNET( NAME, ... )						\
+#define TESTNET( NAME, HWADDR, ... )					\
 	static struct testnet_setting NAME ## _setting[] = {		\
 		__VA_ARGS__						\
 	};								\
@@ -51,6 +54,7 @@ struct testnet {
 			.children =					\
 				LIST_HEAD_INIT ( NAME.dev.children ),	\
 		},							\
+		.hwaddr= HWADDR,					\
 		.testset = NAME ## _setting,				\
 		.count = ( sizeof ( NAME ## _setting ) /		\
 			   sizeof ( NAME ## _setting[0] ) ),		\

@@ -36,6 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdio.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/ethernet.h>
+#include <ipxe/if_ether.h>
+#include <ipxe/base16.h>
 #include <ipxe/test.h>
 #include "netdev_test.h"
 
@@ -113,6 +115,8 @@ void testnet_okx ( struct testnet *testnet, const char *file,
 	testnet->netdev->dev = &testnet->dev;
 	snprintf ( testnet->netdev->name, sizeof ( testnet->netdev->name ),
 		   "%s", testnet->dev.name );
+	okx ( hex_decode ( ':', testnet->hwaddr, testnet->netdev->hw_addr,
+			   ETH_ALEN ) == ETH_ALEN, file, line );
 
 	/* Register device */
 	okx ( register_netdev ( testnet->netdev ) == 0, file, line );

@@ -186,36 +186,36 @@ static void ipv4_route_okx ( const char *dest, struct testnet *scope,
 			 __FILE__, __LINE__ )
 
 /** net0: Single address and gateway (DHCP assignment) */
-TESTNET ( net0,
+TESTNET ( net0, "52:54:00:59:ba:c9",
 	  { "dhcp/ip", "192.168.0.1" },
 	  { "dhcp/netmask", "255.255.255.0" },
 	  { "dhcp/gateway", "192.168.0.254" } );
 
 /** net1: Single address and gateway (DHCP assignment) */
-TESTNET ( net1,
+TESTNET ( net1, "52:54:00:1a:db:95",
 	  { "dhcp/ip", "192.168.0.2" },
 	  { "dhcp/netmask", "255.255.255.0" },
 	  { "dhcp/gateway", "192.168.0.254" } );
 
 /** net2: Small /31 subnet mask */
-TESTNET ( net2,
+TESTNET ( net2, "52:54:00:f9:ee:21",
 	  { "ip", "10.31.31.0" },
 	  { "netmask", "255.255.255.254" },
 	  { "gateway", "10.31.31.1" } );
 
 /** net3: Small /32 subnet mask */
-TESTNET ( net3,
+TESTNET ( net3, "52:54:00:4a:88:ec",
 	  { "ip", "10.32.32.32" },
 	  { "netmask", "255.255.255.255" },
 	  { "gateway", "192.168.32.254" } );
 
 /** net4: Local subnet with no gateway */
-TESTNET ( net4,
+TESTNET ( net4, "52:54:00:68:ad:cd",
 	  { "ip", "192.168.86.1" },
 	  { "netmask", "255.255.240.0" } );
 
 /** net5: Static routes */
-TESTNET ( net5,
+TESTNET ( net5, "52:54:00:b0:d5:07",
 	  { "ip", "10.42.0.1" },
 	  { "netmask", "255.255.0.0" },
 	  { "gateway", "10.42.0.254" /* should be ignored */ },
