@@ -32,9 +32,9 @@ def delete_temp_bucket(bucket):
     if not list(bucket.list_blobs()):
         bucket.delete()
 
-def create_temp_bucket(location):
+def create_temp_bucket(project, location):
     """Create temporary bucket (and remove any stale temporary buckets)"""
-    client = storage.Client()
+    client = storage.Client(project=project)
     for bucket in client.list_buckets(prefix=IPXE_STORAGE_PREFIX):
         delete_temp_bucket(bucket)
     name = '%s%s' % (IPXE_STORAGE_PREFIX, uuid4())
@@ -142,7 +142,7 @@ if not args.name:
     args.name = '%s-%s' % (args.family, date.today().strftime('%Y%m%d'))
 
 # Create temporary upload bucket
-bucket = create_temp_bucket(args.location)
+bucket = create_temp_bucket(args.project, args.location)
 
 # Use one thread per image to maximise parallelism
 with ThreadPoolExecutor(max_workers=len(args.image)) as executor:
