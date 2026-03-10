@@ -60,6 +60,12 @@ size_t line_putchar ( struct line_console *line, int character ) {
 	if ( character == CR )
 		return 0;
 
+	/* Handle unit separator (to print without resetting) */
+	if ( character == US ) {
+		line->buffer[line->index] = 0;
+		return 1;
+	}
+
 	/* Treat newline as a terminator */
 	if ( character == LF )
 		character = 0;
