@@ -33,6 +33,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <stdint.h>
 #include <stddef.h>
 #include <ipxe/ansiesc.h>
+#include <ipxe/keys.h>
 #include <ipxe/lineconsole.h>
 
 /**
@@ -49,18 +50,18 @@ size_t line_putchar ( struct line_console *line, int character ) {
 		return 0;
 
 	/* Handle backspace characters */
-	if ( character == '\b' ) {
+	if ( character == BACKSPACE ) {
 		if ( line->index )
 			line->index--;
 		return 0;
 	}
 
 	/* Ignore carriage return */
-	if ( character == '\r' )
+	if ( character == CR )
 		return 0;
 
 	/* Treat newline as a terminator */
-	if ( character == '\n' )
+	if ( character == LF )
 		character = 0;
 
 	/* Add character to buffer */
