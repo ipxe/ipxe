@@ -10,9 +10,27 @@ env:
 
 jobs:
 
+  sourcedate:
+    name: Source Date
+    runs-on: ubuntu-latest
+    outputs:
+      source_date_epoch: ${{ steps.sourcedate.outputs.source_date_epoch }}
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Source date
+        id: sourcedate
+        run: |
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          echo "source_date_epoch=${SOURCE_DATE_EPOCH}" | tee -a $GITHUB_OUTPUT
+
   bios:
     name: BIOS / ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    needs:
+      - sourcedate
     strategy:
       fail-fast: false
       matrix:
@@ -24,6 +42,7 @@ jobs:
     env:
       bindir: >-
         ${{ matrix.arch == 'i386' && 'bin' || 'bin-x86_64-pcbios' }}
+      SOURCE_DATE_EPOCH: ${{ needs.sourcedate.outputs.source_date_epoch }}
     steps:
 
       - name: Check out code
@@ -69,6 +88,8 @@ jobs:
   sbi:
     name: SBI / ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    needs:
+      - sourcedate
     strategy:
       fail-fast: false
       matrix:
@@ -79,6 +100,7 @@ jobs:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
     env:
       bindir: bin-${{ matrix.arch }}
+      SOURCE_DATE_EPOCH: ${{ needs.sourcedate.outputs.source_date_epoch }}
     steps:
 
       - name: Check out code
@@ -105,6 +127,8 @@ jobs:
   uefi:
     name: UEFI / ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    needs:
+      - sourcedate
     strategy:
       fail-fast: false
       matrix:
@@ -120,6 +144,7 @@ jobs:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
     env:
       bindir: bin-${{ matrix.arch }}-efi
+      SOURCE_DATE_EPOCH: ${{ needs.sourcedate.outputs.source_date_epoch }}
     steps:
 
       - name: Check out code
@@ -149,6 +174,8 @@ jobs:
   uefi-sb:
     name: UEFI SB / ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    needs:
+      - sourcedate
     strategy:
       fail-fast: false
       matrix:
@@ -159,6 +186,7 @@ jobs:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
     env:
       bindir: bin-${{ matrix.arch }}-efi-sb
+      SOURCE_DATE_EPOCH: ${{ needs.sourcedate.outputs.source_date_epoch }}
     outputs:
       sbsignenv: ${{ steps.sbsignenv.outputs.sbsignenv }}
     steps:
@@ -284,6 +312,8 @@ jobs:
   linux:
     name: Linux / ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    needs:
+      - sourcedate
     strategy:
       fail-fast: false
       matrix:
@@ -306,6 +336,7 @@ jobs:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
     env:
       bindir: bin-${{ matrix.arch }}-linux
+      SOURCE_DATE_EPOCH: ${{ needs.sourcedate.outputs.source_date_epoch }}
     steps:
 
       - name: Check out code
@@ -367,6 +398,7 @@ jobs:
       - uefi
       - sbsign
       - shim
+      - sourcedate
     container:
       image: ghcr.io/ipxe/ipxe-builder-utils
     env:
@@ -419,6 +451,7 @@ jobs:
         bin-x86_64-pcbios/ipxe.pxe
         bin-x86_64-pcbios/ipxe-legacy.pxe
         bin-x86_64-pcbios/undionly.kpxe
+      SOURCE_DATE_EPOCH: ${{ needs.sourcedate.outputs.source_date_epoch }}
     steps:
 
       - name: Check out code
