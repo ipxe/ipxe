@@ -18,11 +18,44 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
+#include <stdint.h>
+
 #ifdef IOAPI_X86
 #define IOAPI_PREFIX_x86
 #else
 #define IOAPI_PREFIX_x86 __x86_
 #endif
+
+/** Threshold for port I/O-mapped addresses
+ *
+ * On x86, port I/O instructions (inb/outb/etc) can take only an 8-bit
+ * or 16-bit address (in %dx).  All I/O ports must therefore have a
+ * value in the first 64kB of the address space.
+ *
+ * Virtual addresses below 64kB can never be MMIO addresses:
+ *
+ * - In the UEFI memory model and x86_64 BIOS memory model, virtual
+ *   addresses below 64kB are identity-mapped to the corresponding
+ *   physical address.  Since the first 64kB of address space is
+ *   always RAM, no MMIO device can exist within this region.
+ *
+ * - In the i386 BIOS memory model, virtual addresses below 64kB cover
+ *   the iPXE binary itself (which starts at address zero).  Since the
+ *   size of .textdata can never realistically be below 64kB (not
+ *   least since the heap alone is 512kB), and since iPXE is placed
+ *   into RAM as a contiguous block, no MMIO device can exist within
+ *   this region.
+ *
+ * We therefore know that any (virtual) address returned by ioremap()
+ * must be outside the first 64kB of the address space.  We can
+ * therefore use this as a threshold to determine whether a given
+ * address is a port I/O address or an MMIO address.
+ */
+#define PIO_THRESHOLD 0x10000
+
+static inline __always_inline int x86_pio_addr( intptr_t addr ) {
+	return addr < PIO_THRESHOLD;
+}
 
 /*
  * Memory space mappings

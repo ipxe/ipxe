@@ -82,6 +82,9 @@ REQUIRE_OBJECT ( debugcon );
 #ifdef CONSOLE_SBI
 REQUIRE_OBJECT ( sbi_console );
 #endif
+#ifdef SERIAL_SPCR
+REQUIRE_OBJECT ( spcr );
+#endif
 
 /*
  * Drag in all requested network protocols
