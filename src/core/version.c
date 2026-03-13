@@ -34,6 +34,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/features.h>
 #include <ipxe/version.h>
 #include <ipxe/sbat.h>
+#include <ipxe/sbom.h>
 #include <config/general.h>
 #include <config/branding.h>
 
@@ -123,3 +124,9 @@ const char build_name_prefix[] __attribute__ (( section ( ".prefix.name" ) ))
 
 /** SBAT data (without any NUL terminator) */
 const char sbat[ sizeof ( SBAT_DATA ) - 1 ] __sbat = SBAT_DATA;
+
+/** SBOM data */
+#define SBOM_DATA SBOM_MANIFEST ( PRODUCT_SHORT_NAME, PRODUCT_VENDOR, VERSION )
+
+/** SBOM data (without any NUL terminator) */
+const char sbom[ sizeof ( SBOM_DATA ) - 1 ] __sbom = SBOM_DATA;

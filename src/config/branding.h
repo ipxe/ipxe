@@ -171,6 +171,14 @@ FILE_SECBOOT ( PERMITTED );
 #define PRODUCT_SETTING_URI "https://ipxe.org/cfg/%s"
 
 /*
+ * Product vendor name
+ *
+ * Vendors creating signed iPXE binaries must set this to the name
+ * present in their EV code signing certificate.
+ */
+#define PRODUCT_VENDOR ""
+
+/*
  * Product security name suffix
  *
  * Vendors creating signed iPXE binaries must set this to a non-empty

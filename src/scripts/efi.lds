@@ -94,6 +94,19 @@ SECTIONS {
     }
 
     /*
+     * The SBOM section
+     *
+     */
+
+    . = ALIGN ( _page_align );
+    .sbom : {
+	_sbom = .;
+	KEEP(*(.sbom))
+	KEEP(*(.sbom.*))
+	_esbom = .;
+    }
+
+    /*
      * Weak symbols that need zero values if not otherwise defined
      *
      */
