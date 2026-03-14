@@ -47,6 +47,7 @@ static struct ansicol_pair ansicol_pairs[] = {
 	[CPAIR_ALERT] = { COLOR_ALERT_FG, COLOR_ALERT_BG },
 	[CPAIR_URL] = { COLOR_URL_FG, COLOR_URL_BG },
 	[CPAIR_PXE] = { COLOR_PXE_FG, COLOR_PXE_BG },
+	[CPAIR_TITLE] = { COLOR_TITLE_FG, COLOR_TITLE_BG },
 };
 
 /**
