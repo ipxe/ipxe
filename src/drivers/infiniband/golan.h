@@ -63,6 +63,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #define MAX_PASE_MBOX	((GOLAN_CMD_PAS_CNT) - 2)
 
+#define SDR_SUPPORTED					0x0001
 #define CMD_STATUS( golan , idx )		((struct golan_outbox_hdr *)(get_cmd( (golan) , (idx) )->out))->status
 #define CMD_SYND( golan , idx )		((struct golan_outbox_hdr *)(get_cmd( (golan) , (idx) )->out))->syndrome
 #define QRY_PAGES_OUT( golan, idx )		((struct golan_query_pages_outbox *)(get_cmd( (golan) , (idx) )->out))
