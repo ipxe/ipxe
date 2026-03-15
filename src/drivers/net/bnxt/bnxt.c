@@ -676,18 +676,20 @@ static void hwrm_write_req ( struct bnxt *bp, void *req, u32 cnt )
 	writel ( 0x1, ( bp->bar0 + GRC_COM_CHAN_BASE + GRC_COM_CHAN_TRIG ) );
 }
 
-static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len )
+static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len, u16 req_type )
 {
 	struct hwrm_short_input sreq;
 
 	memset ( &sreq, 0, sizeof ( struct hwrm_short_input ) );
-	sreq.req_type  = ( u16 ) ( ( struct input * ) REQ_DMA_ADDR (bp ) )->req_type;
+	sreq.req_type  = req_type;
 	sreq.signature = SHORT_REQ_SIGNATURE_SHORT_CMD;
 	sreq.size      = len;
 	sreq.req_addr  = REQ_DMA_ADDR ( bp );
-	mdelay ( 100 );
-	dbg_short_cmd ( ( u8 * )&sreq, __func__,
+
+	dbg_short_cmd ( ( u8 * ) &sreq, __func__,
 			sizeof ( struct hwrm_short_input ) );
+	/* Ensure request buffer is flushed before writing short command */
+	wmb();
 	hwrm_write_req ( bp, &sreq, sizeof ( struct hwrm_short_input ) / 4 );
 }
 
@@ -701,8 +703,9 @@ static int wait_resp ( struct bnxt *bp, u32 tmo, u16 len, const char *func )
 	u16 resp_len = 0;
 	u16 ret = STATUS_TIMEOUT;
 
-	if ( len > bp->hwrm_max_req_len )
-		short_hwrm_cmd_req ( bp, len );
+	if ( ( len > bp->hwrm_max_req_len ) ||
+	     ( FLAG_TEST ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_REQ ) ) )
+		short_hwrm_cmd_req ( bp, len, req->req_type );
 	else
 		hwrm_write_req ( bp, req, ( u32 ) ( len / 4 ) );
 
@@ -750,9 +753,10 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 	bp->chip_id = resp->chip_rev << 24 | resp->chip_metal << 16 |
 		      resp->chip_bond_id << 8 | resp->chip_platform_type;
 	bp->chip_num = resp->chip_num;
-	if ( ( resp->dev_caps_cfg & SHORT_CMD_SUPPORTED ) &&
-		 ( resp->dev_caps_cfg & SHORT_CMD_REQUIRED ) )
+	if ( resp->dev_caps_cfg & SHORT_CMD_SUPPORTED )
 		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_SUPP );
+	if ( resp->dev_caps_cfg & SHORT_CMD_REQUIRED )
+		FLAG_SET ( bp->flags, BNXT_FLAG_HWRM_SHORT_CMD_REQ );
 	bp->hwrm_max_ext_req_len = resp->max_ext_req_len;
 	if ( ( bp->chip_num == CHIP_NUM_57508 ) ||
 	     ( bp->chip_num == CHIP_NUM_57504 ) ||
