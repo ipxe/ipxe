@@ -573,7 +573,7 @@ static int gve_describe ( struct gve_nic *gve ) {
 		gve->mode = 0;
 	} else {
 		/* No options matched: assume the original GQI-QPL mode */
-		gve->mode = ( GVE_MODE_DQO | GVE_MODE_QPL );
+		gve->mode = GVE_MODE_QPL;
 	}
 	DBGC ( gve, "GVE %p using %s mode\n",
 	       gve, gve_mode_name ( gve->mode ) );
