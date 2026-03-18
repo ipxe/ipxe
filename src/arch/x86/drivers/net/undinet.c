@@ -1126,3 +1126,21 @@ void undinet_remove ( struct undi_device *undi ) {
 
 	DBGC ( undinic, "UNDINIC %p removed\n", undinic );
 }
+
+/* Drag in objects via undinet_probe() */
+REQUIRING_SYMBOL ( undinet_probe );
+
+/* Drag in PCI configuration
+ *
+ * We don't need the full PCI bus support.  However, the overwhelming
+ * majority of UNDI devices are PCI-based and we already end up
+ * dragging in PCI configuration space support in order to be able to
+ * test for devices with broken interrupts.
+ *
+ * Dragging in the PCI configuration allows the PCI settings mechanism
+ * to also be present, which is often useful for end users.  The total
+ * cost is around 200 bytes in the final binary, which is acceptable
+ * for a generally very useful feature.  Users wanting to minimise the
+ * binary size can choose to explicitly disable PCI_SETTINGS.
+ */
+REQUIRE_OBJECT ( config_pci );
