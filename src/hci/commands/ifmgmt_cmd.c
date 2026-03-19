@@ -198,6 +198,8 @@ struct ifconf_options {
 	unsigned long timeout;
 	/** Configurator */
 	struct net_device_configurator *configurator;
+	/** Skip closed interfaces */
+	int open_only;
 };
 
 /** "ifconf" option list */
@@ -208,6 +210,9 @@ static struct option_descriptor ifconf_opts[] = {
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct ifconf_options, timeout,
 		      parse_timeout ),
+	OPTION_DESC ( "open-only", 'o', no_argument,
+		      struct ifconf_options, open_only,
+		      parse_flag ),
 };
 
 /**
@@ -220,6 +225,10 @@ static struct option_descriptor ifconf_opts[] = {
 static int ifconf_payload ( struct net_device *netdev,
 			    struct ifconf_options *opts ) {
 	int rc;
+
+	/* Skip closed interfaces if --open-only */
+	if ( opts->open_only && ! netdev_is_open ( netdev ) )
+		return -ENODEV;
 
 	/* Attempt configuration */
 	if ( ( rc = ifconf ( netdev, opts->configurator,
