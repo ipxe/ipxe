@@ -97,15 +97,13 @@ efi_boot_arch() {
     esac
 }
 
-# Copy syslinux file
+# Find syslinux file
 #
-copy_syslinux_file() {
+find_syslinux_file() {
     local FILENAME
-    local DESTDIR
     local SRCDIR
 
     FILENAME="${1}"
-    DESTDIR="${2}"
 
     for SRCDIR in \
 	/usr/lib/syslinux \
@@ -122,12 +120,26 @@ copy_syslinux_file() {
 	/usr/lib/ISOLINUX \
 	; do
 	if [ -e "${SRCDIR}/${FILENAME}" ] ; then
-	    install -m 644 "${SRCDIR}/${FILENAME}" "${DESTDIR}/"
+	    echo "${SRCDIR}/${FILENAME}"
 	    return 0
 	fi
     done
     echo "${0}: could not find ${FILENAME}" >&2
     return 1
+}
+
+# Copy syslinux file
+#
+copy_syslinux_file() {
+    local FILENAME
+    local DESTDIR
+    local SRCFILE
+
+    FILENAME="${1}"
+    DESTDIR="${2}"
+
+    SRCFILE=$(find_syslinux_file "${FILENAME}")
+    install -m 644 "${SRCFILE}" "${DESTDIR}/"
 }
 
 # Parse command-line options
@@ -190,6 +202,7 @@ fi
 WORKDIR=$(mktemp -d "${OUTFILE}.XXXXXX")
 ISODIR="${WORKDIR}/iso"
 FATDIR="${WORKDIR}/fat"
+MTOOLSRC="${WORKDIR}/mtoolsrc"
 mkdir -p "${ISODIR}" "${FATDIR}"
 
 # Configure output
@@ -200,14 +213,32 @@ case "${OUTFILE}" in
 	FATIMG="${ISODIR}/esp.img"
 	BIOSDIR="${ISODIR}"
 	SYSLINUXCFG="${ISODIR}/isolinux.cfg"
+	FATPART=
+	;;
+    *.sdsk)
+	ISOIMG=
+	FATIMG="${OUTFILE}"
+	BIOSDIR="${FATDIR}"
+	SYSLINUXCFG="${FATDIR}/syslinux.cfg"
+	FATPART=
 	;;
     *)
 	ISOIMG=
 	FATIMG="${OUTFILE}"
 	BIOSDIR="${FATDIR}"
 	SYSLINUXCFG="${FATDIR}/syslinux.cfg"
+	FATPART="4"
 	;;
 esac
+
+# Configure mtools
+#
+cat >"${MTOOLSRC}" <<EOF
+drive F:
+  file="${FATIMG}"
+  ${FATPART:+partition=}${FATPART}
+EOF
+export MTOOLSRC
 
 # Copy files to temporary working directory
 #
@@ -312,13 +343,22 @@ fi
 if [ -n "${FATIMG}" ] ; then
     FATSIZE=$(du -s -k "${FATDIR}" | cut -f1)
     FATSIZE=$(( FATSIZE + PAD + 256 ))
-    if [ "${FATSIZE}" -le "1440" ] ; then
-	FATSIZE=1440
-	FATARGS="-f 1440"
+    if [ -n "${FATPART}" -o "${FATSIZE}" -gt "1440" ] ; then
+	FATHEADS=64
+	FATSECTS=32
+	FATALIGN=$(( ( FATHEADS * FATSECTS ) / 2 ))
+	FATCYLS=$(( ( FATSIZE + FATALIGN - 1 ) / FATALIGN ))
+	FATSIZE=$(( FATCYLS * FATALIGN ))
+	FATARGS="-t ${FATCYLS} -h ${FATHEADS} -s ${FATSECTS}"
     else
-	FATCYLS=$(( ( FATSIZE + 503 ) / 504 ))
-	FATSIZE=$(( FATCYLS * 504 ))
-	FATARGS="-s 63 -h 16 -t ${FATCYLS}"
+	FATSIZE=1440
+	FATARGS="-f ${FATSIZE}"
+    fi
+    if [ -n "${FATPART}" ] ; then
+	FATOFFS="${FATSECTS}"
+	FATMBR=$(find_syslinux_file "mbr.bin")
+    else
+	FATOFFS=0
     fi
     if [ -n "${SOURCE_DATE_EPOCH:-}" ] ; then
 	FATSERIAL=$(( SOURCE_DATE_EPOCH % 100000000 ))
@@ -327,10 +367,16 @@ if [ -n "${FATIMG}" ] ; then
     touch "${FATIMG}"
     truncate -s 0 "${FATIMG}"
     truncate -s "${FATSIZE}K" "${FATIMG}"
-    mformat -v iPXE -i "${FATIMG}" ${FATARGS} ::
-    mcopy -i "${FATIMG}" -s "${FATDIR}"/* ::
+    if [ -n "${FATPART}" ] ; then
+	dd if="${FATMBR}" of="${FATIMG}" conv=notrunc status=none
+	mpartition -c -I -t "${FATCYLS}" -h "${FATHEADS}" -s "${FATSECTS}" \
+		   -b "${FATOFFS}" F:
+	mpartition -a F:
+    fi
+    mformat -v iPXE ${FATARGS} F:
+    mcopy -s "${FATDIR}"/* F:
     if [ "${BIOSDIR}" = "${FATDIR}" ] ; then
-	syslinux "${FATIMG}"
+	syslinux --offset "$(( FATOFFS * 512 ))" "${FATIMG}"
     fi
 fi
 
