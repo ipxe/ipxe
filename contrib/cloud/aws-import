@@ -12,6 +12,7 @@ import subprocess
 import boto3
 
 BLOCKSIZE = 512 * 1024
+EMPTY_CHECKSUM = b64encode(sha256(b'\0' * BLOCKSIZE).digest()).decode()
 
 
 def detect_architecture(image):
@@ -30,6 +31,7 @@ def create_snapshot(region, description, image, tags):
                                      Description=description,
                                      Tags=tags)
     snapshot_id = snapshot['SnapshotId']
+    changed = 0
     with open(image, 'rb') as fh:
         for block in count():
             data = fh.read(BLOCKSIZE)
@@ -37,14 +39,17 @@ def create_snapshot(region, description, image, tags):
                 break
             data = data.ljust(BLOCKSIZE, b'\0')
             checksum = b64encode(sha256(data).digest()).decode()
+            if checksum == EMPTY_CHECKSUM:
+                continue
             client.put_snapshot_block(SnapshotId=snapshot_id,
                                       BlockIndex=block,
                                       BlockData=data,
                                       DataLength=BLOCKSIZE,
                                       Checksum=checksum,
                                       ChecksumAlgorithm='SHA256')
+            changed += 1
     client.complete_snapshot(SnapshotId=snapshot_id,
-                             ChangedBlocksCount=block)
+                             ChangedBlocksCount=changed)
     return snapshot_id
 
 
