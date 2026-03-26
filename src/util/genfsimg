@@ -349,7 +349,14 @@ if [ -n "${FATIMG}" ] ; then
 	FATALIGN=$(( FATHEADS * FATSECTS ))
 	FATCYLS=$(( ( FATSIZE + FATALIGN - 1 ) / FATALIGN ))
 	FATSIZE=$(( FATCYLS * FATALIGN ))
-	FATARGS="-t ${FATCYLS} -h ${FATHEADS} -s ${FATSECTS}"
+	FATCLUST=8
+	if [ "${FATSIZE}" -eq $(( FATCLUST * 4096 )) -o \
+	     "${FATSIZE}" -eq $(( FATCLUST * 65536 )) ] ; then
+	    # Avoid cluster counts close to the FAT12/FAT16 limits to
+	    # work around syslinux bugs
+	    FATCLUST=$(( FATCLUST * 2 ))
+	fi
+	FATARGS="-t ${FATCYLS} -h ${FATHEADS} -s ${FATSECTS} -c ${FATCLUST}"
     else
 	FATSIZE=2880
 	FATARGS="-f 1440"
