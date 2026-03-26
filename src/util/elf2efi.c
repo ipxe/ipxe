@@ -56,6 +56,7 @@
 #define Elf_Ehdr   Elf32_Ehdr
 #define Elf_Phdr   Elf32_Phdr
 #define Elf_Shdr   Elf32_Shdr
+#define Elf_Nhdr   Elf32_Nhdr
 #define Elf_Sym    Elf32_Sym
 #define Elf_Addr   Elf32_Addr
 #define Elf_Rel    Elf32_Rel
@@ -72,6 +73,7 @@
 #define Elf_Ehdr   Elf64_Ehdr
 #define Elf_Phdr   Elf64_Phdr
 #define Elf_Shdr   Elf64_Shdr
+#define Elf_Nhdr   Elf64_Nhdr
 #define Elf_Sym    Elf64_Sym
 #define Elf_Addr   Elf64_Addr
 #define Elf_Rel    Elf64_Rel
@@ -243,6 +245,15 @@
 /** Number of data directory entries */
 #define NUMBER_OF_DIRECTORY_ENTRIES 8
 
+/** Build requested a console log partition */
+#define IPXE_NOTE_DISKLOG 0x18aed109
+
+/** OEM identifier used for iPXE */
+#define IPXE_OEM_ID 0x18ae
+
+/** OEM information: console log partition requested */
+#define IPXE_OEM_INFO_DISKLOG 0x0001
+
 struct elf_file {
 	void *data;
 	size_t len;
@@ -272,6 +283,7 @@ struct pe_header {
 static struct pe_header efi_pe_header = {
 	.dos = {
 		.e_magic = EFI_IMAGE_DOS_SIGNATURE,
+		.e_oemid = IPXE_OEM_ID,
 		.e_lfanew = offsetof ( typeof ( efi_pe_header ), nt ),
 	},
 	.nt = {
@@ -315,6 +327,8 @@ struct options {
 	unsigned int subsystem;
 	/** Create hybrid BIOS/UEFI binary */
 	int hybrid;
+	/** Use disk-based console log */
+	int disklog;
 };
 
 /**
@@ -999,6 +1013,53 @@ static void process_relocs ( struct elf_file *elf, const Elf_Shdr *shdr,
 }
 
 /**
+ * Process note records
+ *
+ * @v elf		ELF file
+ * @v shdr		ELF section header
+ * @v opts		Options
+ */
+static void process_notes ( struct elf_file *elf, const Elf_Shdr *shdr,
+			    struct options *opts ) {
+	const struct {
+		Elf_Nhdr hdr;
+		char name[4];
+	} __attribute__ (( packed )) *note;
+	static const char name[4] = { 'i', 'P', 'X', 'E' };
+	size_t remaining;
+
+	/* Process each note */
+	note = ( elf->data + shdr->sh_offset );
+	remaining = shdr->sh_size;
+	while ( remaining ) {
+
+		/* Sanity check */
+		if ( ( remaining < sizeof ( *note ) ) ||
+		     ( note->hdr.n_namesz != sizeof ( name ) ) ||
+		     ( note->hdr.n_descsz != 0 ) ||
+		     ( memcmp ( note->name, name, sizeof ( name ) ) != 0 ) ) {
+			eprintf ( "Invalid iPXE note\n" );
+			exit ( 1 );
+		}
+
+		/* Handle note type */
+		switch ( note->hdr.n_type ) {
+		case IPXE_NOTE_DISKLOG:
+			opts->disklog = 1;
+			break;
+		default:
+			eprintf ( "Unrecognised iPXE note type %#x\n",
+				  note->hdr.n_type );
+			exit ( 1 );
+		}
+
+		/* Move to next note */
+		note = ( ( ( void * ) note ) + sizeof ( *note ) );
+		remaining -= sizeof ( *note );
+	}
+}
+
+/**
  * Create relocations section
  *
  * @v pe_header		PE file header
@@ -1273,11 +1334,20 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 			/* Process .rela relocations */
 			process_relocs ( &elf, shdr, sizeof ( Elf_Rela ),
 					 &pe_reltab, opts );
+
+		} else if ( shdr->sh_type == SHT_NOTE ) {
+
+			/* Process .note records */
+			process_notes ( &elf, shdr, opts );
 		}
 	}
 
 	/* Update image base address */
 	update_image_base ( &pe_header, pe_sections, pe_reltab );
+
+	/* Update OEM information */
+	if ( opts->disklog )
+		pe_header.dos.e_oeminfo |= IPXE_OEM_INFO_DISKLOG;
 
 	/* Create the .reloc section */
 	*(next_pe_section) = create_reloc_section ( &pe_header, pe_reltab );

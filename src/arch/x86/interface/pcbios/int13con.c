@@ -298,3 +298,7 @@ struct console_driver int13con __console_driver = {
 	.disabled = CONSOLE_DISABLED,
 	.usage = CONSOLE_INT13,
 };
+
+/* Request a log partition from genfsimg */
+__asm__ ( ".globl ipxe_oem_info_disklog\n\t"
+	  ".equ ipxe_oem_info_disklog, 0x0001\n\t" );

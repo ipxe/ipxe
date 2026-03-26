@@ -120,6 +120,16 @@ SECTIONS {
     _assert = ASSERT ( ( _weak == _eweak ), ".weak is non-zero length" );
 
     /*
+     * iPXE-specific note sections
+     *
+     */
+
+    .note : {
+	*(.note.ipxe)
+	*(.note.ipxe.*)
+    }
+
+    /*
      * Dispose of the comment and note sections to make the link map
      * easier to read
      *

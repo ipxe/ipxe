@@ -97,6 +97,22 @@ efi_boot_arch() {
     esac
 }
 
+# Check if binary wants a log partition
+#
+wants_disklog() {
+    local FILENAME
+    local OEMID
+    local OEMINFO
+    local FLAG
+
+    FILENAME="${1}"
+
+    OEMID=$(get_word "${FILENAME}" 0x24)
+    OEMINFO=$(get_word "${FILENAME}" 0x26)
+    FLAG=$(( OEMINFO & 0x0001 ))
+    [ "${OEMID}" = "18ae" -a "${FLAG}" -ne "0" ]
+}
+
 # Find syslinux file
 #
 find_syslinux_file() {
@@ -214,6 +230,7 @@ case "${OUTFILE}" in
 	BIOSDIR="${ISODIR}"
 	SYSLINUXCFG="${ISODIR}/isolinux.cfg"
 	FATPART=
+	LOGPART=
 	;;
     *.sdsk)
 	ISOIMG=
@@ -221,6 +238,7 @@ case "${OUTFILE}" in
 	BIOSDIR="${FATDIR}"
 	SYSLINUXCFG="${FATDIR}/syslinux.cfg"
 	FATPART=
+	LOGPART=
 	;;
     *)
 	ISOIMG=
@@ -228,6 +246,7 @@ case "${OUTFILE}" in
 	BIOSDIR="${FATDIR}"
 	SYSLINUXCFG="${FATDIR}/syslinux.cfg"
 	FATPART="4"
+	LOGPART="3"
 	;;
 esac
 
@@ -237,6 +256,9 @@ cat >"${MTOOLSRC}" <<EOF
 drive F:
   file="${FATIMG}"
   ${FATPART:+partition=}${FATPART}
+drive L:
+  file="${FATIMG}"
+  ${LOGPART:+partition=}${LOGPART}
 EOF
 export MTOOLSRC
 
@@ -244,6 +266,7 @@ export MTOOLSRC
 #
 LKRN=
 EFI=
+DISKLOG=
 for FILENAME ; do
     case "${FILENAME}" in
 	*.lkrn)
@@ -308,6 +331,9 @@ for FILENAME ; do
 	exit 1
     fi
     cp "${FILENAME}" "${DESTDIR}/${DESTFILE}"
+    if wants_disklog "${FILENAME}" ; then
+	DISKLOG=1
+    fi
 done
 
 # Configure ISO image, if applicable
@@ -371,6 +397,14 @@ if [ -n "${FATIMG}" ] ; then
 	FATSERIAL=$(( SOURCE_DATE_EPOCH % 100000000 ))
 	FATARGS="${FATARGS} -N ${FATSERIAL}"
     fi
+    if [ -n "${DISKLOG}" -a -n "${LOGPART}" ] ; then
+	LOGTYPE=0xe0
+	LOGCYLS=1
+	LOGSIZE=$(( LOGCYLS * FATALIGN ))
+	FATSIZE=$(( LOGSIZE + FATSIZE ))
+	LOGOFFS="${FATOFFS}"
+	FATOFFS="${LOGSIZE}"
+    fi
     touch "${FATIMG}"
     truncate -s 0 "${FATIMG}"
     truncate -s $(( FATSIZE * 512 )) "${FATIMG}"
@@ -379,6 +413,12 @@ if [ -n "${FATIMG}" ] ; then
 	mpartition -c -I -t "${FATCYLS}" -h "${FATHEADS}" -s "${FATSECTS}" \
 		   -b "${FATOFFS}" F:
 	mpartition -a F:
+    fi
+    if [ -n "${DISKLOG}" -a -n "${LOGPART}" ] ; then
+	mpartition -c -t "${LOGCYLS}" -h "${FATHEADS}" -s "${FATSECTS}" \
+		   -b "${LOGOFFS}" -T "${LOGTYPE}" L:
+	printf "iPXE LOG\n\n" |
+	    dd of="${FATIMG}" seek="${LOGOFFS}" conv=notrunc status=none
     fi
     mformat -v iPXE ${FATARGS} F:
     mcopy -s "${FATDIR}"/* F:

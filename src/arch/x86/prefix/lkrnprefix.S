@@ -13,6 +13,37 @@ _lkrn_start:
 
 /*****************************************************************************
  *
+ * OEM information
+ *
+ * For UEFI, we (ab)use the PE format OEM information field to
+ * communicate information to external processing utilities such as
+ * genfsimg.
+ *
+ * Since these fields lie in an unused location in a bzImage kernel
+ * header (and since hybrid PE/bzImage is already a well-known file
+ * format used for dual-mode BIOS/UEFI kernels), we choose to use the
+ * same field locations for BIOS.
+ *
+ */
+
+	.org	0x24
+oem_id:
+	.word	0x18ae
+oem_info:
+	.word	0
+
+#if __x86_64__
+#define R_X86_16 R_X86_64_16
+#else
+#define R_X86_16 R_386_16
+#endif
+
+	/* Allow linked-in objects to request a log partition from genfsimg */
+	.weak	ipxe_oem_info_disklog
+	.reloc	oem_info, R_X86_16, ipxe_oem_info_disklog
+
+/*****************************************************************************
+ *
  * Kernel header
  *
  * We place our prefix (i.e. our .prefix and .text16.early sections)
