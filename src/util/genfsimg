@@ -341,18 +341,18 @@ fi
 # Create FAT filesystem image, if applicable
 #
 if [ -n "${FATIMG}" ] ; then
-    FATSIZE=$(du -s -k "${FATDIR}" | cut -f1)
-    FATSIZE=$(( FATSIZE + PAD + 256 ))
-    if [ -n "${FATPART}" -o "${FATSIZE}" -gt "1440" ] ; then
+    FATUSED=$(du -s -k "${FATDIR}" | cut -f1)
+    FATSIZE=$(( ( FATUSED + PAD + 256 ) * 2 ))
+    if [ -n "${FATPART}" -o "${FATSIZE}" -gt "2880" ] ; then
 	FATHEADS=64
 	FATSECTS=32
-	FATALIGN=$(( ( FATHEADS * FATSECTS ) / 2 ))
+	FATALIGN=$(( FATHEADS * FATSECTS ))
 	FATCYLS=$(( ( FATSIZE + FATALIGN - 1 ) / FATALIGN ))
 	FATSIZE=$(( FATCYLS * FATALIGN ))
 	FATARGS="-t ${FATCYLS} -h ${FATHEADS} -s ${FATSECTS}"
     else
-	FATSIZE=1440
-	FATARGS="-f ${FATSIZE}"
+	FATSIZE=2880
+	FATARGS="-f 1440"
     fi
     if [ -n "${FATPART}" ] ; then
 	FATOFFS="${FATSECTS}"
@@ -366,7 +366,7 @@ if [ -n "${FATIMG}" ] ; then
     fi
     touch "${FATIMG}"
     truncate -s 0 "${FATIMG}"
-    truncate -s "${FATSIZE}K" "${FATIMG}"
+    truncate -s $(( FATSIZE * 512 )) "${FATIMG}"
     if [ -n "${FATPART}" ] ; then
 	dd if="${FATMBR}" of="${FATIMG}" conv=notrunc status=none
 	mpartition -c -I -t "${FATCYLS}" -h "${FATHEADS}" -s "${FATSECTS}" \
