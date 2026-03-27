@@ -124,14 +124,17 @@ find_syslinux_file() {
     for SRCDIR in \
 	/usr/lib/syslinux \
 	/usr/lib/syslinux/bios \
+	/usr/lib/syslinux/mbr \
 	/usr/lib/syslinux/modules/bios \
 	/usr/share/syslinux \
 	/usr/share/syslinux/bios \
+	/usr/share/syslinux/mbr \
 	/usr/share/syslinux/modules/bios \
 	/usr/local/share/syslinux \
 	/usr/local/share/syslinux/bios \
 	/usr/local/share/syslinux/bios/core \
 	/usr/local/share/syslinux/bios/com32/elflink/ldlinux \
+	/usr/local/share/syslinux/mbr \
 	/usr/local/share/syslinux/modules/bios \
 	/usr/lib/ISOLINUX \
 	; do
