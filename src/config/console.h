@@ -25,6 +25,7 @@ FILE_SECBOOT ( PERMITTED );
 #define CONSOLE_FRAMEBUFFER	/* Graphical framebuffer console */
 #define CONSOLE_SYSLOG		/* Syslog console */
 #define CONSOLE_SYSLOGS		/* Encrypted syslog console */
+//#define CONSOLE_DISKLOG	/* Disk log console */
 
 /* Console types supported only on systems with serial ports */
 #if ! defined ( SERIAL_NULL )
@@ -33,7 +34,6 @@ FILE_SECBOOT ( PERMITTED );
 
 /* Console types supported only on BIOS platforms */
 #if defined ( PLATFORM_pcbios )
-  //#define CONSOLE_INT13	/* INT13 disk log console */
   #define CONSOLE_PCBIOS	/* Default BIOS console */
 #endif
 

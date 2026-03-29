@@ -15,6 +15,11 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define SECTORS 32
 #define CYLADDR(cyl) ((((cyl) * HEADS + (((cyl) == 0) & 1)) * SECTORS) * 512)
 
+/* Accept CONSOLE_DISKLOG as a synonym for CONSOLE_INT13 */
+#if ( defined ( CONSOLE_DISKLOG ) && ! defined ( CONSOLE_INT13 ) )
+#define CONSOLE_INT13 CONSOLE_DISKLOG
+#endif
+
 #ifdef CONSOLE_INT13
 #define LOGPART 1
 #define LOGSTART 0

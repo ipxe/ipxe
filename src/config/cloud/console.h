@@ -33,4 +33,4 @@
  * the same cloud, allowing the log to be retrieved from the log
  * partition.
  */
-#define CONSOLE_INT13
+#define CONSOLE_DISKLOG

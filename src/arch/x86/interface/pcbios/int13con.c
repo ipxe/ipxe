@@ -38,7 +38,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/* Set default console usage if applicable */
+/* Set default console usage if applicable
+ *
+ * We accept either CONSOLE_DISKLOG or CONSOLE_INT13.
+ */
+#if ( defined ( CONSOLE_DISKLOG ) && ! defined ( CONSOLE_INT13 ) )
+#define CONSOLE_INT13 CONSOLE_DISKLOG
+#endif
 #if ! ( defined ( CONSOLE_INT13 ) && CONSOLE_EXPLICIT ( CONSOLE_INT13 ) )
 #undef CONSOLE_INT13
 #define CONSOLE_INT13 ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_LOG )

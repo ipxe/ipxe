@@ -49,6 +49,9 @@ REQUIRE_OBJECT ( vesafb );
 #ifdef CONSOLE_INT13
 REQUIRE_OBJECT ( int13con );
 #endif
+#ifdef CONSOLE_DISKLOG
+REQUIRE_OBJECT ( int13con );
+#endif
 
 /*
  * Drag in all requested image types
