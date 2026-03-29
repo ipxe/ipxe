@@ -228,6 +228,7 @@ extern EFI_GUID efi_mtftp6_protocol_guid;
 extern EFI_GUID efi_mtftp6_service_binding_protocol_guid;
 extern EFI_GUID efi_nii_protocol_guid;
 extern EFI_GUID efi_nii31_protocol_guid;
+extern EFI_GUID efi_partition_info_protocol_guid;
 extern EFI_GUID efi_pci_io_protocol_guid;
 extern EFI_GUID efi_pci_root_bridge_io_protocol_guid;
 extern EFI_GUID efi_pxe_base_code_protocol_guid;
