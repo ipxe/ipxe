@@ -11,8 +11,7 @@
 
 **/
 
-#ifndef _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
-#define _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -65,5 +64,3 @@ struct _EFI_BUS_SPECIFIC_DRIVER_OVERRIDE_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiBusSpecificDriverOverrideProtocolGuid;
-
-#endif

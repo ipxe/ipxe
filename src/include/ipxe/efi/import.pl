@@ -78,9 +78,13 @@ sub try_import_file {
 	# Write out line
 	print $outfh "$_\n";
 	# Apply FILE_LICENCE()/FILE_SECBOOT() immediately after include guard
-	if ( defined $maybe_guard && ! defined $guard ) {
-	  if ( /^\#define\s+${maybe_guard}$/ ) {
+	if ( ! defined $guard ) {
+	  if ( /^\#pragma\s+once$/ ) {
+	    $guard = $_;
+	  } elsif ( defined $maybe_guard && /^\#define\s+${maybe_guard}$/ ) {
 	    $guard = $maybe_guard;
+	  }
+	  if ( defined $guard ) {
 	    print $outfh "\n";
 	    print $outfh "FILE_LICENCE ( $licence );\n" if $licence;
 	    print $outfh "FILE_SECBOOT ( PERMITTED );\n";

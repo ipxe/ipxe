@@ -7,8 +7,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __PI_DXE_H__
-#define __PI_DXE_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -17,5 +16,3 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/efi/Uefi/UefiSpec.h>
 
 #include <ipxe/efi/Pi/PiDxeCis.h>
-
-#endif

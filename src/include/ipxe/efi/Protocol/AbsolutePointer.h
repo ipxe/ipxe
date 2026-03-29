@@ -10,8 +10,7 @@
 
 **/
 
-#ifndef __ABSOLUTE_POINTER_H__
-#define __ABSOLUTE_POINTER_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -191,5 +190,3 @@ struct _EFI_ABSOLUTE_POINTER_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiAbsolutePointerProtocolGuid;
-
-#endif

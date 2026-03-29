@@ -10,8 +10,7 @@
 
 **/
 
-#ifndef __STORAGE_SECURITY_COMMAND_H__
-#define __STORAGE_SECURITY_COMMAND_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -209,5 +208,3 @@ struct _EFI_STORAGE_SECURITY_COMMAND_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiStorageSecurityCommandProtocolGuid;
-
-#endif

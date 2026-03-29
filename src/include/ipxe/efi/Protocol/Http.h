@@ -13,8 +13,7 @@
 
 **/
 
-#ifndef __EFI_HTTP_PROTOCOL_H__
-#define __EFI_HTTP_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -529,5 +528,3 @@ struct _EFI_HTTP_PROTOCOL {
 
 extern EFI_GUID  gEfiHttpServiceBindingProtocolGuid;
 extern EFI_GUID  gEfiHttpProtocolGuid;
-
-#endif

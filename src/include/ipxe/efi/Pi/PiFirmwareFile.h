@@ -9,13 +9,15 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __PI_FIRMWARE_FILE_H__
-#define __PI_FIRMWARE_FILE_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
 
-#pragma pack(1)
+#ifndef __PI_FIRMWARE_FILE_H__
+#define __PI_FIRMWARE_FILE_H__
+
+  #pragma pack(1)
 ///
 /// Used to verify the integrity of the file.
 ///
@@ -504,6 +506,6 @@ typedef struct {
 #define SECTION2_SIZE(SectionHeaderPtr) \
     (((EFI_COMMON_SECTION_HEADER2 *) (UINTN) SectionHeaderPtr)->ExtendedSize)
 
-#pragma pack()
+  #pragma pack()
 
 #endif

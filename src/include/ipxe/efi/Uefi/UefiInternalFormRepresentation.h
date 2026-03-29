@@ -12,13 +12,15 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __UEFI_INTERNAL_FORMREPRESENTATION_H__
-#define __UEFI_INTERNAL_FORMREPRESENTATION_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
 
-#include <ipxe/efi/Guid/HiiFormMapMethodGuid.h>
+#ifndef __UEFI_INTERNAL_FORMREPRESENTATION_H__
+#define __UEFI_INTERNAL_FORMREPRESENTATION_H__
+
+  #include <ipxe/efi/Guid/HiiFormMapMethodGuid.h>
 
 ///
 /// The following types are currently defined:
@@ -36,7 +38,7 @@ typedef UINT16 EFI_DEFAULT_ID;
 
 typedef UINT32 EFI_HII_FONT_STYLE;
 
-#pragma pack(1)
+  #pragma pack(1)
 
 //
 // Definitions for Package Lists and Package Headers
@@ -2118,7 +2120,7 @@ typedef struct _EFI_HII_AIBT_SKIP2_BLOCK {
   UINT16    SkipCount;
 } EFI_HII_AIBT_SKIP2_BLOCK;
 
-#pragma pack()
+  #pragma pack()
 
 ///
 /// References to string tokens must use this macro to enable scanning for

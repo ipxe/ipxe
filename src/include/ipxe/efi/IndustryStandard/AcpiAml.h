@@ -3,12 +3,12 @@
 
   Copyright (c) 2011, Intel Corporation. All rights reserved.<BR>
   Copyright (c) 2019 - 2021, Arm Limited. All rights reserved.<BR>
+  Copyright (C) 2026, Advanced Micro Devices, Inc. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef _ACPI_AML_H_
-#define _ACPI_AML_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -184,4 +184,7 @@ FILE_SECBOOT ( PERMITTED );
 //
 #define AML_NAME_SEG_SIZE  4
 
-#endif
+//
+// AML Method maximum number of arguments definitions
+//
+#define AML_METHOD_MAX_NUM_ARGS  7

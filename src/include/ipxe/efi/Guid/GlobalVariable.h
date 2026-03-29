@@ -8,8 +8,7 @@
   GUID defined in UEFI 2.1
 **/
 
-#ifndef __GLOBAL_VARIABLE_GUID_H__
-#define __GLOBAL_VARIABLE_GUID_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -191,5 +190,3 @@ extern EFI_GUID  gEfiGlobalVariableGuid;
 /// The content is UINT8.
 ///
 #define EFI_DEVICE_AUTH_BOOT_MODE_NAME  L"devAuthBoot"
-
-#endif

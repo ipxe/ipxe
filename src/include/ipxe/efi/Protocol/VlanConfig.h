@@ -9,8 +9,7 @@
 
 **/
 
-#ifndef __EFI_VLANCONFIG_PROTOCOL_H__
-#define __EFI_VLANCONFIG_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -133,5 +132,3 @@ struct _EFI_VLAN_CONFIG_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiVlanConfigProtocolGuid;
-
-#endif

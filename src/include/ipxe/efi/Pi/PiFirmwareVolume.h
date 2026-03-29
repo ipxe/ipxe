@@ -9,11 +9,13 @@
 
 **/
 
-#ifndef __PI_FIRMWAREVOLUME_H__
-#define __PI_FIRMWAREVOLUME_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
+
+#ifndef __PI_FIRMWAREVOLUME_H__
+#define __PI_FIRMWAREVOLUME_H__
 
 ///
 /// EFI_FV_FILE_ATTRIBUTES

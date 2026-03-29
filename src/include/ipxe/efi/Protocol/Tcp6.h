@@ -12,8 +12,7 @@
 
 **/
 
-#ifndef __EFI_TCP6_PROTOCOL_H__
-#define __EFI_TCP6_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -855,5 +854,3 @@ struct _EFI_TCP6_PROTOCOL {
 
 extern EFI_GUID  gEfiTcp6ServiceBindingProtocolGuid;
 extern EFI_GUID  gEfiTcp6ProtocolGuid;
-
-#endif

@@ -7,8 +7,7 @@
 
 **/
 
-#ifndef __DEVICE_PATH_TO_TEXT_PROTOCOL_H__
-#define __DEVICE_PATH_TO_TEXT_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -76,5 +75,3 @@ typedef struct {
 } EFI_DEVICE_PATH_TO_TEXT_PROTOCOL;
 
 extern EFI_GUID  gEfiDevicePathToTextProtocolGuid;
-
-#endif

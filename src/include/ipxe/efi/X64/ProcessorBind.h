@@ -6,8 +6,7 @@
 
 **/
 
-#ifndef __PROCESSOR_BIND_H__
-#define __PROCESSOR_BIND_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -317,6 +316,4 @@ typedef INT64 INTN;
 
 #ifndef __USER_LABEL_PREFIX__
 #define __USER_LABEL_PREFIX__
-#endif
-
 #endif

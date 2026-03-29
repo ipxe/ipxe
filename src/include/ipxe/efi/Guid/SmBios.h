@@ -13,8 +13,7 @@
 
 **/
 
-#ifndef __SMBIOS_GUID_H__
-#define __SMBIOS_GUID_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -31,5 +30,3 @@ FILE_SECBOOT ( PERMITTED );
 
 extern EFI_GUID  gEfiSmbiosTableGuid;
 extern EFI_GUID  gEfiSmbios3TableGuid;
-
-#endif

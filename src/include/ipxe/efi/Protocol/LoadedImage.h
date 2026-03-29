@@ -9,8 +9,7 @@
 
 **/
 
-#ifndef __LOADED_IMAGE_PROTOCOL_H__
-#define __LOADED_IMAGE_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -81,5 +80,3 @@ typedef EFI_LOADED_IMAGE_PROTOCOL EFI_LOADED_IMAGE;
 
 extern EFI_GUID  gEfiLoadedImageProtocolGuid;
 extern EFI_GUID  gEfiLoadedImageDevicePathProtocolGuid;
-
-#endif

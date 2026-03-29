@@ -13,8 +13,7 @@
 
 **/
 
-#ifndef _PCI22_H_
-#define _PCI22_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -877,5 +876,3 @@ typedef union {
 } EFI_PCI_ROM_HEADER;
 
 #pragma pack()
-
-#endif

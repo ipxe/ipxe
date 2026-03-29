@@ -6,8 +6,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __MDEMODULE_HII_H__
-#define __MDEMODULE_HII_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -230,5 +229,3 @@ typedef struct _EFI_IFR_GUID_VAREQNAME {
 extern EFI_GUID  gEfiIfrTianoGuid;
 extern EFI_GUID  gEfiIfrFrameworkGuid;
 extern EFI_GUID  gEdkiiIfrBitVarstoreGuid;
-
-#endif

@@ -10,8 +10,7 @@
 
 **/
 
-#ifndef __ACPI_TABLE_H___
-#define __ACPI_TABLE_H___
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -120,5 +119,3 @@ struct _EFI_ACPI_TABLE_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiAcpiTableProtocolGuid;
-
-#endif

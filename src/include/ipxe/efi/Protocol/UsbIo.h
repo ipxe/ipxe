@@ -10,8 +10,7 @@
 
 **/
 
-#ifndef __USB_IO_H__
-#define __USB_IO_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -504,5 +503,3 @@ struct _EFI_USB_IO_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiUsbIoProtocolGuid;
-
-#endif

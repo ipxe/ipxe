@@ -16,8 +16,7 @@
     <https://msdn.microsoft.com/en-us/ie/dn932805(v=vs.94)>.
 **/
 
-#ifndef MICROSOFT_VENDOR_H_
-#define MICROSOFT_VENDOR_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -54,5 +53,3 @@ FILE_SECBOOT ( PERMITTED );
   }
 
 extern EFI_GUID  gMicrosoftVendorGuid;
-
-#endif /* MICROSOFT_VENDOR_H_ */

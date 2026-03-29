@@ -10,8 +10,7 @@ This Protocol is introduced in UEFI Specification 2.5
 
 **/
 
-#ifndef __EFI_IP4CONFIG2_PROTOCOL_H__
-#define __EFI_IP4CONFIG2_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -315,5 +314,3 @@ struct _EFI_IP4_CONFIG2_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiIp4Config2ProtocolGuid;
-
-#endif

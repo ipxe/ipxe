@@ -12,8 +12,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __BASE_H__
-#define __BASE_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -1394,5 +1393,3 @@ _ReturnAddress (
 
 **/
 #define ARRAY_SIZE(Array)  (sizeof (Array) / sizeof ((Array)[0]))
-
-#endif

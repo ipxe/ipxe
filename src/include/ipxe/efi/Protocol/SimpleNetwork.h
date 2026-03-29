@@ -17,8 +17,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __SIMPLE_NETWORK_H__
-#define __SIMPLE_NETWORK_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -674,5 +673,3 @@ struct _EFI_SIMPLE_NETWORK_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiSimpleNetworkProtocolGuid;
-
-#endif

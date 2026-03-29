@@ -10,8 +10,7 @@
 
 **/
 
-#ifndef __EFI_SERVICE_BINDING_H__
-#define __EFI_SERVICE_BINDING_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -87,5 +86,3 @@ struct _EFI_SERVICE_BINDING_PROTOCOL {
   EFI_SERVICE_BINDING_CREATE_CHILD     CreateChild;
   EFI_SERVICE_BINDING_DESTROY_CHILD    DestroyChild;
 };
-
-#endif

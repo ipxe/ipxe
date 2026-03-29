@@ -9,8 +9,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __EFI_MTFTP4_PROTOCOL_H__
-#define __EFI_MTFTP4_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -575,5 +574,3 @@ struct _EFI_MTFTP4_TOKEN {
 
 extern EFI_GUID  gEfiMtftp4ServiceBindingProtocolGuid;
 extern EFI_GUID  gEfiMtftp4ProtocolGuid;
-
-#endif

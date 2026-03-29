@@ -10,8 +10,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __EFI_HASH_PROTOCOL_H__
-#define __EFI_HASH_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -168,5 +167,3 @@ extern EFI_GUID  gEfiHashAlgorithmSha512Guid;
 extern EFI_GUID  gEfiHashAlgorithmMD5Guid;
 extern EFI_GUID  gEfiHashAlgorithmSha1NoPadGuid;
 extern EFI_GUID  gEfiHashAlgorithmSha256NoPadGuid;
-
-#endif

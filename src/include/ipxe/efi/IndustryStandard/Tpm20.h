@@ -10,8 +10,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef _TPM20_H_
-#define _TPM20_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -1812,5 +1811,3 @@ typedef struct {
 #define HASH_ALG_SHA384   0x00000004
 #define HASH_ALG_SHA512   0x00000008
 #define HASH_ALG_SM3_256  0x00000010
-
-#endif

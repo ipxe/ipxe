@@ -12,8 +12,7 @@
 
 **/
 
-#ifndef __EFI_DNS6_PROTOCOL_H__
-#define __EFI_DNS6_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -532,5 +531,3 @@ struct _EFI_DNS6_PROTOCOL {
 
 extern EFI_GUID  gEfiDns6ServiceBindingProtocolGuid;
 extern EFI_GUID  gEfiDns6ProtocolGuid;
-
-#endif

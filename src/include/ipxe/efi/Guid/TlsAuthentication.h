@@ -6,8 +6,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __TLS_AUTHENTICATION_H__
-#define __TLS_AUTHENTICATION_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -22,5 +21,3 @@ FILE_SECBOOT ( PERMITTED );
 #define EFI_TLS_CA_CERTIFICATE_VARIABLE  L"TlsCaCertificate"
 
 extern EFI_GUID  gEfiTlsCaCertificateGuid;
-
-#endif

@@ -7,8 +7,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef _TCG_SERVICE_PROTOCOL_H_
-#define _TCG_SERVICE_PROTOCOL_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -194,5 +193,3 @@ struct _EFI_TCG_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiTcgProtocolGuid;
-
-#endif

@@ -13,8 +13,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __PXE_BASE_CODE_PROTOCOL_H__
-#define __PXE_BASE_CODE_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -930,5 +929,3 @@ struct _EFI_PXE_BASE_CODE_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiPxeBaseCodeProtocolGuid;
-
-#endif

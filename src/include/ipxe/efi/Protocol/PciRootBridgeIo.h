@@ -10,8 +10,7 @@
 
 **/
 
-#ifndef __PCI_ROOT_BRIDGE_IO_H__
-#define __PCI_ROOT_BRIDGE_IO_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -435,5 +434,3 @@ struct _EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiPciRootBridgeIoProtocolGuid;
-
-#endif

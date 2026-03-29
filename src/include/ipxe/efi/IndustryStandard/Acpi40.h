@@ -6,8 +6,7 @@
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
-#ifndef _ACPI_4_0_H_
-#define _ACPI_4_0_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -1319,5 +1318,3 @@ typedef struct {
 #define EFI_ACPI_4_0_WATCHDOG_RESOURCE_TABLE_SIGNATURE  SIGNATURE_32('W', 'D', 'R', 'T')
 
 #pragma pack()
-
-#endif

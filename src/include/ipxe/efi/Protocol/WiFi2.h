@@ -9,8 +9,7 @@
 
 **/
 
-#ifndef __EFI_WIFI2_PROTOCOL_H__
-#define __EFI_WIFI2_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -406,5 +405,3 @@ struct _EFI_WIRELESS_MAC_CONNECTION_II_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiWiFi2ProtocolGuid;
-
-#endif

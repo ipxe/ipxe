@@ -6,8 +6,7 @@
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
-#ifndef _TPM12_H_
-#define _TPM12_H_
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -2164,5 +2163,3 @@ typedef struct tdTPM_RSP_COMMAND_HDR {
 } TPM_RSP_COMMAND_HDR;
 
 #pragma pack ()
-
-#endif

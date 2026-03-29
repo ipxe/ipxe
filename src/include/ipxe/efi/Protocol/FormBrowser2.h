@@ -9,8 +9,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __EFI_FORM_BROWSER2_H__
-#define __EFI_FORM_BROWSER2_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -171,5 +170,3 @@ struct _EFI_FORM_BROWSER2_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiFormBrowser2ProtocolGuid;
-
-#endif

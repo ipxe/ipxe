@@ -9,8 +9,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __PI_MULTIPHASE_H__
-#define __PI_MULTIPHASE_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -268,5 +267,3 @@ EFI_STATUS
   );
 
 extern EFI_GUID  gEfiMmCommunicateHeaderV3Guid;
-
-#endif

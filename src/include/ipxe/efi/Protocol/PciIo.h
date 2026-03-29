@@ -7,8 +7,7 @@
 
 **/
 
-#ifndef __PCI_IO_H__
-#define __PCI_IO_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -550,5 +549,3 @@ struct _EFI_PCI_IO_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiPciIoProtocolGuid;
-
-#endif

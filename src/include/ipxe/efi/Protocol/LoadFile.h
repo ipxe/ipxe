@@ -12,8 +12,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
-#ifndef __EFI_LOAD_FILE_PROTOCOL_H__
-#define __EFI_LOAD_FILE_PROTOCOL_H__
+#pragma once
 
 FILE_LICENCE ( BSD2_PATENT );
 FILE_SECBOOT ( PERMITTED );
@@ -81,5 +80,3 @@ struct _EFI_LOAD_FILE_PROTOCOL {
 };
 
 extern EFI_GUID  gEfiLoadFileProtocolGuid;
-
-#endif
