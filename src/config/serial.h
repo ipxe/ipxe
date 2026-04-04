@@ -30,6 +30,11 @@ FILE_LICENCE ( GPL2_OR_LATER );
 //#undef SERIAL_SPCR
 //#define SERIAL_FIXED
 
+/* Uncomment to suppress ANSI escape sequences on the serial console.
+ * Useful for environments (e.g. LAVA) that cannot handle escape sequences.
+ */
+//#define SERIAL_DUMB
+
 /* Early UART configuration (for bare metal prefix debugging only) */
 //#define EARLY_UART_MODEL	8250
 //#define EARLY_UART_REG_BASE	0x10000000

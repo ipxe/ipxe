@@ -24,6 +24,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <config/general.h>
 #include <config/console.h>
+#include <config/serial.h>
 #include <config/sideband.h>
 #include <config/settings.h>
 
@@ -54,6 +55,9 @@ PROVIDE_REQUIRING_SYMBOL();
 
 #ifdef CONSOLE_SERIAL
 REQUIRE_OBJECT ( serial );
+#ifdef SERIAL_DUMB
+REQUIRE_OBJECT ( serial_dumb );
+#endif
 #endif
 #ifdef CONSOLE_DIRECT_VGA
 REQUIRE_OBJECT ( video_subr );
