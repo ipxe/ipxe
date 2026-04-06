@@ -79,11 +79,15 @@ static int efi_veto_unload ( struct efi_veto *veto ) {
 	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
 	EFI_HANDLE driver = veto->driver;
 	EFI_HANDLE image = veto->image;
+	struct efi_dropped_tpl tpl;
 	EFI_STATUS efirc;
 	int rc;
 
-	/* Unload the driver */
-	if ( ( efirc = bs->UnloadImage ( image ) ) != 0 ) {
+	/* Unload the driver at external TPL */
+	efi_drop_tpl ( &tpl );
+	efirc = bs->UnloadImage ( image );
+	efi_undrop_tpl ( &tpl );
+	if ( efirc != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( driver, "EFIVETO %s could not unload",
 		       efi_handle_name ( driver ) );
