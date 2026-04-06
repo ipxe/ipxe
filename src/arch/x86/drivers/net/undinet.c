@@ -493,6 +493,12 @@ static int undinet_transmit ( struct net_device *netdev,
 	 * transmit the next packet.
 	 */
 
+	/* Pad to minimum Ethernet length, to work around underlying
+	 * drivers that do not correctly handle frame padding
+	 * themselves.
+	 */
+	iob_pad ( iobuf, ETH_ZLEN );
+
 	/* Some PXE stacks are unable to cope with P_UNKNOWN, and will
 	 * always try to prepend a link-layer header.  Work around
 	 * these stacks by stripping the existing link-layer header
