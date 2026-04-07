@@ -91,6 +91,7 @@ FILE_SECBOOT ( PERMITTED );
 #define ERRFILE_gpio		       ( ERRFILE_CORE | 0x00320000 )
 #define ERRFILE_spcr		       ( ERRFILE_CORE | 0x00330000 )
 #define ERRFILE_disklog		       ( ERRFILE_CORE | 0x00340000 )
+#define ERRFILE_efi_disklog	       ( ERRFILE_CORE | 0x00350000 )
 
 #define ERRFILE_eisa		     ( ERRFILE_DRIVER | 0x00000000 )
 #define ERRFILE_isa		     ( ERRFILE_DRIVER | 0x00010000 )
