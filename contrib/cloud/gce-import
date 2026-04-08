@@ -6,6 +6,7 @@ from datetime import date
 import io
 import subprocess
 import tarfile
+import tempfile
 from uuid import uuid4
 
 from google.cloud import compute
@@ -58,9 +59,15 @@ def upload_blob(bucket, image):
 
 def detect_uefi(image):
     """Identify UEFI CPU architecture(s)"""
-    mdir = subprocess.run(['mdir', '-b', '-i', image, '::/EFI/BOOT'],
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          check=False)
+    with tempfile.NamedTemporaryFile(mode='w+t') as mtoolsrc:
+        mtoolsrc.writelines([
+            'drive D:', f'file="{image}"',
+            'drive P:', f'file="{image}"', 'partition=4',
+        ])
+        mtoolsrc.flush()
+        mdir = subprocess.run(['mdir', '-b', 'D:/EFI/BOOT', 'P:/EFI/BOOT'],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              check=False, env={'MTOOLSRC': mtoolsrc.name})
     mapping = {
         b'BOOTX64.EFI': 'x86_64',
         b'BOOTAA64.EFI': 'arm64',

@@ -8,6 +8,7 @@ from hashlib import sha256
 from itertools import count
 import os.path
 import subprocess
+import tempfile
 
 import boto3
 
@@ -17,8 +18,15 @@ EMPTY_CHECKSUM = b64encode(sha256(b'\0' * BLOCKSIZE).digest()).decode()
 
 def detect_architecture(image):
     """Detect CPU architecture"""
-    mdir = subprocess.run(['mdir', '-b', '-i', image, '::/EFI/BOOT'],
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with tempfile.NamedTemporaryFile(mode='w+t') as mtoolsrc:
+        mtoolsrc.writelines([
+            'drive D:', f'file="{image}"',
+            'drive P:', f'file="{image}"', 'partition=4',
+        ])
+        mtoolsrc.flush()
+        mdir = subprocess.run(['mdir', '-b', 'D:/EFI/BOOT', 'P:/EFI/BOOT'],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              check=False, env={'MTOOLSRC': mtoolsrc.name})
     if any(b'BOOTAA64.EFI' in x for x in mdir.stdout.splitlines()):
         return 'arm64'
     return 'x86_64'

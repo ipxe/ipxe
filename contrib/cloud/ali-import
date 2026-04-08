@@ -10,6 +10,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 import time
 from uuid import uuid4
 import zipfile
@@ -105,13 +106,19 @@ Image = namedtuple('Image', ['path', 'family', 'name', 'arch', 'mode'])
 
 def image(filename, basefamily, basename):
     """Construct image description"""
+    with tempfile.NamedTemporaryFile(mode='w+t') as mtoolsrc:
+        mtoolsrc.writelines([
+            'drive D:', f'file="{filename}"',
+            'drive P:', f'file="{filename}"', 'partition=4',
+        ])
+        mtoolsrc.flush()
+        mdir = subprocess.run(['mdir', '-b', 'D:/EFI/BOOT', 'P:/EFI/BOOT'],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              check=False, env={'MTOOLSRC': mtoolsrc.name})
     mapping = {
         b'BOOTX64.EFI': 'x86_64',
         b'BOOTAA64.EFI': 'arm64',
     }
-    mdir = subprocess.run(['mdir', '-b', '-i', filename, '::/EFI/BOOT'],
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                          check=False)
     uefi = [v for k, v in mapping.items() if k in mdir.stdout]
     suffix = ('-uefi-%s' % uefi[0].replace('_', '-') if len(uefi) == 1 else
               '-uefi-multi' if uefi else '')
