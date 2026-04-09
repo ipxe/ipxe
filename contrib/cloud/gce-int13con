@@ -94,7 +94,9 @@ def get_log_output(instances, project, zone, name):
 
 # Parse command-line arguments
 #
-parser = argparse.ArgumentParser(description="Import Google Cloud image")
+parser = argparse.ArgumentParser(
+    description="Get Google Cloud disk console output"
+)
 parser.add_argument('--project', '-j', default="ipxe-images",
                     help="Google Cloud project")
 parser.add_argument('--zone', '-z', required=True,

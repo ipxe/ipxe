@@ -226,7 +226,9 @@ def force_power_off(clients, instance):
     rsp = clients.ecs.run_command(req)
 
 # Parse command-line arguments
-parser = argparse.ArgumentParser(description="Import Google Cloud image")
+parser = argparse.ArgumentParser(
+    description="Get Alibaba Cloud disk console output"
+)
 parser.add_argument('--region', '-r', required=True,
                     help="AliCloud region")
 parser.add_argument('--family', '-f',

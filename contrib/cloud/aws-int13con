@@ -44,8 +44,8 @@ def get_block0_content(region, instance_id):
     return block
 
 
-def get_int13con_output(region, instance_id):
-    """Get INT13 console output"""
+def get_disklog_output(region, instance_id):
+    """Get disk log console output"""
     block = get_block0_content(region, instance_id)
     logpart = block[IPXELOG_OFFSET:]
     magic = logpart[:len(IPXELOG_MAGIC)]
@@ -56,13 +56,13 @@ def get_int13con_output(region, instance_id):
 
 
 # Parse command-line arguments
-parser = argparse.ArgumentParser(description="Get AWS INT13 console output")
+parser = argparse.ArgumentParser(description="Get AWS EC2 disk console output")
 parser.add_argument('--region', '-r', help="AWS region")
 parser.add_argument('id', help="Instance ID")
 args = parser.parse_args()
 
-# Get console output from INT13CON partition
-output = get_int13con_output(args.region, args.id)
+# Get console output from disk log partition
+output = get_disklog_output(args.region, args.id)
 
 # Print console output
 print(output)
