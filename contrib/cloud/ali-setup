@@ -5,6 +5,7 @@ from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import ipaddress
 from itertools import islice
+import json
 import time
 
 import alibabacloud_credentials as credentials
@@ -13,6 +14,9 @@ import alibabacloud_credentials.models
 import alibabacloud_ecs20140526 as ecs
 import alibabacloud_ecs20140526.client
 import alibabacloud_ecs20140526.models
+import alibabacloud_ram20150501 as ram
+import alibabacloud_ram20150501.client
+import alibabacloud_ram20150501.models
 import alibabacloud_tea_openapi as openapi
 import alibabacloud_tea_openapi.client
 import alibabacloud_tea_openapi.models
@@ -24,10 +28,21 @@ import alibabacloud_vpc20160428.client
 import alibabacloud_vpc20160428.models
 
 ECS_ENDPOINT = 'ecs.aliyuncs.com'
+RAM_ENDPOINT = 'ram.aliyuncs.com'
 
 IPXE_VPC_TAG = 'ipxe-default-vpc'
 IPXE_VSWITCH_TAG = 'ipxe-default-vswitch'
 IPXE_SG_TAG = 'ipxe-default-sg'
+
+IPXE_CENSORSHIP_BYPASS_ROLE_NAME = 'iPXECensorshipBypassRole'
+IPXE_CENSORSHIP_BYPASS_ROLE_ASSUME_POLICY = {
+    'Statement': [{
+        'Action': 'sts:AssumeRole',
+        'Effect': 'Allow',
+        'Principal': {'Service': ['ecs.aliyuncs.com']},
+    }],
+    'Version': '1',
+}
 
 Clients = namedtuple('Clients', ['region', 'ecs', 'vpc'])
 
@@ -51,6 +66,50 @@ def all_clients(region):
         vpc=vpc.client.Client(conf),
     )
     return clients
+
+def ram_client():
+    """Construct resource access management client"""
+    cred = credentials.client.Client()
+    conf = openapi.models.Config(credential=cred, endpoint=RAM_ENDPOINT)
+    client = ram.client.Client(conf)
+    return client
+
+def setup_censorship_bypass_role(client):
+    """Set up censorship bypass role (required for importing images)"""
+    role_name = IPXE_CENSORSHIP_BYPASS_ROLE_NAME
+    assume_policy = json.dumps(IPXE_CENSORSHIP_BYPASS_ROLE_ASSUME_POLICY)
+    req = ram.models.GetRoleRequest(
+        role_name=role_name,
+    )
+    try:
+        rsp = client.get_role(req)
+        arn = rsp.body.role.arn
+    except openapi.exceptions.ClientException as exc:
+        if exc.code != 'EntityNotExist.Role':
+            raise
+        req = ram.models.CreateRoleRequest(
+            role_name=role_name,
+            assume_role_policy_document=assume_policy,
+        )
+        rsp = client.create_role(req)
+        arn = rsp.body.role.arn
+    req = ram.models.UpdateRoleRequest(
+        role_name=role_name,
+        new_assume_role_policy_document=assume_policy,
+        new_description="iPXE role to help bypass OSS censorship restrictions",
+    )
+    rsp = client.update_role(req)
+    req = ram.models.AttachPolicyToRoleRequest(
+        role_name=role_name,
+        policy_type='System',
+        policy_name='AliyunOSSFullAccess',
+    )
+    try:
+        rsp = client.attach_policy_to_role(req)
+    except openapi.exceptions.ClientException as exc:
+        if exc.code != 'EntityAlreadyExists.Role.Policy':
+            raise
+    return arn
 
 def setup_vpc(clients):
     """Set up VPC"""
@@ -254,7 +313,13 @@ def setup_region(clients):
 parser = argparse.ArgumentParser(description="Set up Alibaba Cloud defaults")
 parser.add_argument('--region', '-r', action='append',
                     help="AliCloud region(s)")
+parser.add_argument('--create-role', action=argparse.BooleanOptionalAction,
+                    default=True, help="Create censorship bypass role")
 args = parser.parse_args()
+
+# Set up censorship bypass role
+if args.create_role:
+    arn = setup_censorship_bypass_role(ram_client())
 
 # Use all regions if none specified
 if not args.region:
@@ -271,6 +336,8 @@ with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
     results = {futures[x]: x.result() for x in as_completed(futures)}
 
 # Show created resources
+if args.create_role:
+    print("%s" % arn)
 for region in args.region:
     (sg_id, vpc_id, vswitch_ids) = results[region]
     print("%s %s %s %s" % (region, sg_id, vpc_id, " ".join(vswitch_ids)))
