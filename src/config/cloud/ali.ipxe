@@ -1,0 +1,9 @@
+#!ipxe
+
+echo Alibaba Cloud ECS - iPXE boot via metadata
+echo CPU: ${cpuvendor} ${cpumodel}
+ifstat ||
+dhcp ||
+route ||
+chain -ar http://100.100.100.200/latest/user-data ||
+ifstat ||
