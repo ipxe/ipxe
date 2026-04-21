@@ -48,6 +48,7 @@ FILE_SECBOOT ( PERMITTED );
 #define LF		CTRL_J
 #define CR		CTRL_M
 #define ESC		0x1b
+#define US		0x1f
 #define DEL		0x7f
 
 /*
