@@ -559,18 +559,18 @@ static int gve_describe ( struct gve_nic *gve ) {
 	DBGC ( gve, "GVE %p supports options %#08x\n", gve, gve->options );
 
 	/* Select preferred operating mode */
-	if ( gve->options & ( 1 << GVE_OPT_GQI_QPL ) ) {
-		/* GQI-QPL: in-order queues, queue page list addressing */
-		gve->mode = GVE_MODE_QPL;
-	} else if ( gve->options & ( 1 << GVE_OPT_GQI_RDA ) ) {
-		/* GQI-RDA: in-order queues, raw DMA addressing */
-		gve->mode = 0;
-	} else if ( gve->options & ( 1 << GVE_OPT_DQO_QPL ) ) {
+	if ( gve->options & ( 1 << GVE_OPT_DQO_QPL ) ) {
 		/* DQO-QPL: out-of-order queues, queue page list addressing */
 		gve->mode = ( GVE_MODE_DQO | GVE_MODE_QPL );
 	} else if ( gve->options & ( 1 << GVE_OPT_DQO_RDA ) ) {
 		/* DQO-RDA: out-of-order queues, raw DMA addressing */
 		gve->mode = GVE_MODE_DQO;
+	} else if ( gve->options & ( 1 << GVE_OPT_GQI_QPL ) ) {
+		/* GQI-QPL: in-order queues, queue page list addressing */
+		gve->mode = GVE_MODE_QPL;
+	} else if ( gve->options & ( 1 << GVE_OPT_GQI_RDA ) ) {
+		/* GQI-RDA: in-order queues, raw DMA addressing */
+		gve->mode = 0;
 	} else {
 		/* No options matched: assume the original GQI-QPL mode */
 		gve->mode = GVE_MODE_QPL;
