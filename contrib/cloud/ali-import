@@ -82,6 +82,7 @@ OSS_FORBIDDEN_REGION_CODE = 'ForbidCreateNewBucket'
 OSS_BUCKET_NAME_LEN = 63
 
 IPXE_STORAGE_PREFIX = 'ipxe-upload-temp-'
+IPXE_SNAPSHOT_DELETE_TAG = 'ipxe-snapshot-delete'
 
 POLL_INTERVAL_SEC = 5
 POLL_MAX_RETRIES = 100
@@ -389,6 +390,21 @@ def delete_image(clients, name):
     for image in rsp.body.images.image or ():
         logger.info("delete image %s %s (%s)" %
                     (clients.region, image.image_name, image.image_id))
+        # Tag associated snapshots for deletion
+        for disk in image.disk_device_mappings.disk_device_mapping or ():
+            snapshot_id = disk.snapshot_id
+            tag = ecs.models.TagResourcesRequestTag(
+                key=IPXE_SNAPSHOT_DELETE_TAG,
+                value=IPXE_SNAPSHOT_DELETE_TAG,
+            )
+            req = ecs.models.TagResourcesRequest(
+                region_id=clients.region,
+                resource_type='snapshot',
+                resource_id=[snapshot_id],
+                tag=[tag],
+            )
+            rsp = clients.ecs.tag_resources_with_options(req, RUNTIME_OPTS)
+        # Unpublish image
         if image.is_public:
             req = ecs.models.ModifyImageSharePermissionRequest(
                 region_id=clients.region,
@@ -398,11 +414,31 @@ def delete_image(clients, name):
             rsp = clients.ecs.modify_image_share_permission_with_options(
                 req, RUNTIME_OPTS
             )
+        # Delete image
         req = ecs.models.DeleteImageRequest(
             region_id=clients.region,
             image_id=image.image_id
         )
         rsp = clients.ecs.delete_image_with_options(req, RUNTIME_OPTS)
+    # Delete any snapshots tagged for deletion
+    tag = ecs.models.ListTagResourcesRequestTag(
+        key=IPXE_SNAPSHOT_DELETE_TAG,
+        value=IPXE_SNAPSHOT_DELETE_TAG,
+    )
+    req = ecs.models.ListTagResourcesRequest(
+        region_id=clients.region,
+        resource_type='snapshot',
+        tag=[tag],
+    )
+    rsp = clients.ecs.list_tag_resources_with_options(req, RUNTIME_OPTS)
+    for snapshot in rsp.body.tag_resources.tag_resource or ():
+        logger.info("delete snapshot %s %s" %
+                    (clients.region, snapshot.resource_id))
+        req = ecs.models.DeleteSnapshotRequest(
+            snapshot_id=snapshot.resource_id,
+            force=True,
+        )
+        rsp = clients.ecs.delete_snapshot_with_options(req, RUNTIME_OPTS)
 
 def wait_for_task(clients, task_id):
     """Wait for task to complete"""
