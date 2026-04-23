@@ -338,10 +338,11 @@ static void virtnet_close ( struct net_device *netdev ) {
 	virtnet_free_virtqueues ( netdev );
 
 	/* Free rx iobufs */
-	list_for_each_entry_safe ( iobuf, next_iobuf, &virtnet->rx_iobufs, list ) {
+	list_for_each_entry_safe ( iobuf, next_iobuf, &virtnet->rx_iobufs,
+				   list ) {
+		list_del ( &iobuf->list );
 		free_rx_iob ( iobuf );
 	}
-	INIT_LIST_HEAD ( &virtnet->rx_iobufs );
 	virtnet->rx_num_iobufs = 0;
 }
 
