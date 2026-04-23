@@ -684,11 +684,12 @@ static void virtnet_remove ( struct pci_device *pci ) {
 	struct net_device *netdev = pci_get_drvdata ( pci );
 	struct virtnet_nic *virtnet = netdev->priv;
 
+	unregister_netdev ( netdev );
+
 	virtio_pci_unmap_capability ( &virtnet->vdev.device );
 	virtio_pci_unmap_capability ( &virtnet->vdev.isr );
 	virtio_pci_unmap_capability ( &virtnet->vdev.common );
 
-	unregister_netdev ( netdev );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
 }
