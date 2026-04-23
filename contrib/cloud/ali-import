@@ -492,12 +492,17 @@ def import_image(clients, image, bucket):
         ossbucket = bucket,
         ossobject = image.key,
     )
+    features = ecs.models.ImportImageRequestFeatures(
+        imds_support='v1',
+        nvme_support='supported',
+    )
     req = ecs.models.ImportImageRequest(
         region_id=clients.region,
         image_name=image.name,
         architecture=image.arch,
         boot_mode=image.mode,
         disk_device_mapping=[disk],
+        features=features,
         client_token=str(uuid4()),
     )
     rsp = clients.ecs.import_image_with_options(req, RUNTIME_OPTS)
