@@ -390,6 +390,16 @@ def delete_image(clients, name):
     for image in rsp.body.images.image or ():
         logger.info("delete image %s %s (%s)" %
                     (clients.region, image.image_name, image.image_id))
+        # Unpublish image
+        if image.is_public:
+            req = ecs.models.ModifyImageSharePermissionRequest(
+                region_id=clients.region,
+                image_id=image.image_id,
+                is_public=False,
+            )
+            rsp = clients.ecs.modify_image_share_permission_with_options(
+                req, RUNTIME_OPTS
+            )
         # Tag associated snapshots for deletion
         for disk in image.disk_device_mappings.disk_device_mapping or ():
             snapshot_id = disk.snapshot_id
@@ -404,23 +414,15 @@ def delete_image(clients, name):
                 tag=[tag],
             )
             rsp = clients.ecs.tag_resources_with_options(req, RUNTIME_OPTS)
-        # Unpublish image
-        if image.is_public:
-            req = ecs.models.ModifyImageSharePermissionRequest(
-                region_id=clients.region,
-                image_id=image.image_id,
-                is_public=False,
-            )
-            rsp = clients.ecs.modify_image_share_permission_with_options(
-                req, RUNTIME_OPTS
-            )
         # Delete image
         req = ecs.models.DeleteImageRequest(
             region_id=clients.region,
             image_id=image.image_id
         )
         rsp = clients.ecs.delete_image_with_options(req, RUNTIME_OPTS)
-    # Delete any snapshots tagged for deletion
+
+def delete_snapshots(clients):
+    """Remove stale snapshots left behind by deleted images"""
     tag = ecs.models.ListTagResourcesRequestTag(
         key=IPXE_SNAPSHOT_DELETE_TAG,
         value=IPXE_SNAPSHOT_DELETE_TAG,
@@ -602,6 +604,13 @@ if args.overwrite:
                                    name=image.name): (region, image)
                    for region, image in imports}
         done = {futures[x]: x.result() for x in as_completed(futures)}
+
+# Delete any stale snapshots from all regions
+with ThreadPoolExecutor(max_workers=workers) as executor:
+    futures = {executor.submit(delete_snapshots,
+                               clients=clients[region]): region
+               for region in regions}
+    done = {futures[x]: x.result() for x in as_completed(futures)}
 
 # Create temporary function in each censored region with usable FC
 with ThreadPoolExecutor(max_workers=workers) as executor:
