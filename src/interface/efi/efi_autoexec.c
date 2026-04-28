@@ -132,10 +132,10 @@ static int efi_autoexec_network ( EFI_HANDLE handle, struct image **image ) {
 	}
 
 	/* Attempt download from current working URI, then from root */
-	if ( ( rc = imgacquire ( EFI_AUTOEXEC_NAME, EFI_AUTOEXEC_TIMEOUT,
-				 image ) != 0 ) &&
-	     ( rc = imgacquire ( "/" EFI_AUTOEXEC_NAME, EFI_AUTOEXEC_TIMEOUT,
-				 image ) != 0 ) ) {
+	if ( ( ( rc = imgacquire ( EFI_AUTOEXEC_NAME, EFI_AUTOEXEC_TIMEOUT,
+				   image ) ) != 0 ) &&
+	     ( ( rc = imgacquire ( "/" EFI_AUTOEXEC_NAME, EFI_AUTOEXEC_TIMEOUT,
+				   image ) ) != 0 ) ) {
 		DBGC ( device, "EFI %s could not download [/]%s: %s\n",
 		       efi_handle_name ( device ), EFI_AUTOEXEC_NAME,
 		       strerror ( rc ) );
