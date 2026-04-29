@@ -85,6 +85,9 @@ int nfs_uri_next_mountpoint ( struct nfs_uri *uri ) {
 
 int nfs_uri_symlink ( struct nfs_uri *uri, const char *symlink ) {
 	size_t len;
+	size_t symlink_len;
+	size_t lookup_pos_len;
+	size_t mountpoint_len;
 	char *new_path;
 
 	if ( ! uri->path )
@@ -96,22 +99,46 @@ int nfs_uri_symlink ( struct nfs_uri *uri, const char *symlink ) {
 			       strlen ( uri->mountpoint ) ) != 0 )
 			return -EINVAL;
 
-		len = strlen ( uri->lookup_pos ) + strlen ( symlink ) - \
-		      strlen ( uri->mountpoint );
-		if ( ! ( new_path = malloc ( len * sizeof ( char ) ) ) )
+		mountpoint_len = strlen ( uri->mountpoint );
+		symlink_len = strlen ( symlink );
+		lookup_pos_len = strlen ( uri->lookup_pos );
+
+		/* Security: Calculate exact length needed and verify no overflow */
+		if ( symlink_len < mountpoint_len )
+			return -EINVAL;
+
+		len = lookup_pos_len + ( symlink_len - mountpoint_len );
+		if ( len >= symlink_len || len >= lookup_pos_len )
+			return -EINVAL;
+
+		new_path = malloc ( ( len + 1 ) * sizeof ( char ) );
+		if ( ! new_path )
 			return -ENOMEM;
 
-		strcpy ( new_path, symlink + strlen ( uri->mountpoint ) );
-		strcpy ( new_path + strlen ( new_path ), uri->lookup_pos );
+		/* Security: Use memcpy with explicit lengths instead of strcpy */
+		memcpy ( new_path, symlink + mountpoint_len, symlink_len - mountpoint_len );
+		new_path[symlink_len - mountpoint_len] = '\0';
+		memcpy ( new_path + ( symlink_len - mountpoint_len ), uri->lookup_pos, lookup_pos_len );
+		new_path[len] = '\0';
 
 	} else {
-		len = strlen ( uri->lookup_pos ) + strlen ( symlink );
-		if ( ! ( new_path = malloc ( len * sizeof ( char ) ) ) )
+		symlink_len = strlen ( symlink );
+		lookup_pos_len = strlen ( uri->lookup_pos );
+
+		/* Security: Calculate exact length needed and verify no overflow */
+		len = lookup_pos_len + symlink_len;
+		if ( len < symlink_len || len < lookup_pos_len )
+			return -EINVAL;
+
+		new_path = malloc ( ( len + 1 ) * sizeof ( char ) );
+		if ( ! new_path )
 			return -ENOMEM;
 
-
-		strcpy ( new_path, symlink );
-		strcpy ( new_path + strlen ( new_path ), uri->lookup_pos );
+		/* Security: Use memcpy with explicit lengths instead of strcpy */
+		memcpy ( new_path, symlink, symlink_len );
+		new_path[symlink_len] = '\0';
+		memcpy ( new_path + symlink_len, uri->lookup_pos, lookup_pos_len );
+		new_path[len] = '\0';
 	}
 
 	free ( uri->path );
