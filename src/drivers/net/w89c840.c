@@ -785,7 +785,7 @@ static int eeprom_read(long addr, int location)
 #define mdio_delay(mdio_addr) readl(mdio_addr)
 
 /* Set iff a MII transceiver on any interface requires mdio preamble.
-   This only set with older tranceivers, so the extra
+   This only set with older transceivers, so the extra
    code size of a per-interface flag is not worthwhile. */
 static char mii_preamble_required = 1;
 
