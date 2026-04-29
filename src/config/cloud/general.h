@@ -11,3 +11,8 @@
  * incurring unnecessary costs.
  */
 #define POWEROFF_CMD
+
+/* Allow scripts to fetch a URI and store the response body in a
+ * named setting for use in subsequent commands.
+ */
+#define FETCHVAR_CMD
