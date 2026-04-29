@@ -33,7 +33,7 @@ static struct pci_device_id bnxt_nics[] = {
 	PCI_ROM( 0x14e4, 0x1608, "bcm957454-1608", "Broadcom BCM957454 RDMA HV VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1609, "14e4-1609", "Broadcom BCM957454 VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x1614, "14e4-1614", "Broadcom BCM957454", 0 ),
-	PCI_ROM( 0x14e4, 0x16bd, "bcm95741x-16bd", "Broadcom BCM95741x RDMA_HV_VF", BNXT_FLAG_PCI_VF ),
+	PCI_ROM( 0x14e4, 0x16bd, "bcm95741x-16bd", "Broadcom BCM95741x RDMA HV VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x16c0, "14e4-16c0", "Broadcom BCM957417", 0 ),
 	PCI_ROM( 0x14e4, 0x16c1, "14e4-16c1", "Broadcom BCM95741x VF", BNXT_FLAG_PCI_VF ),
 	PCI_ROM( 0x14e4, 0x16c5, "bcm95741x-16c5", "Broadcom BCM95741x HV VF", BNXT_FLAG_PCI_VF ),
@@ -1895,6 +1895,7 @@ static int bnxt_hwrm_ring_alloc ( struct bnxt *bp, u8 type )
 		FLAG_SET ( bp->flag_hwrm, VALID_RING_NQ );
 		bp->nq_ring_id = resp->ring_id;
 	}
+	DBGP ( "- %s (  ): , type = %x, ring_id = %x\n", __func__, type, resp->ring_id );
 	return STATUS_SUCCESS;
 }
 
@@ -2599,7 +2600,8 @@ static void bnxt_service_cq ( struct net_device *dev )
 		case CMPL_BASE_TYPE_TX_L2:
 			tx = ( struct tx_cmpl * ) cmp;
 			bnxt_tx_complete ( dev, ( u16 ) tx->opaque );
-		/* Fall through */
+			bnxt_adv_cq_index ( bp, 1 );
+			break;
 		case CMPL_BASE_TYPE_STAT_EJECT:
 			bnxt_adv_cq_index ( bp, 1 );
 			break;
