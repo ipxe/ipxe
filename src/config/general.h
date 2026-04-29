@@ -108,6 +108,7 @@ FILE_SECBOOT ( PERMITTED );
 //#define LOTEST_CMD		/* Loopback testing commands */
 #define MENU_CMD		/* Menu commands */
 //#define NEIGHBOUR_CMD		/* Neighbour management commands */
+//#define FETCHVAR_CMD		/* Fetch URI to setting command */
 //#define NSLOOKUP_CMD		/* DNS resolving command */
 #define NTP_CMD			/* NTP commands */
 #define NVO_CMD			/* Non-volatile option storage commands */
