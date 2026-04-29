@@ -270,6 +270,9 @@ REQUIRE_OBJECT ( shell );
 #ifdef NSLOOKUP_CMD
 REQUIRE_OBJECT ( nslookup_cmd );
 #endif
+#ifdef FETCHVAR_CMD
+REQUIRE_OBJECT ( fetchvar_cmd );
+#endif
 #ifdef PARAM_CMD
 REQUIRE_OBJECT ( param_cmd );
 #endif
