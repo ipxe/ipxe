@@ -58,6 +58,7 @@ FILE_SECBOOT ( PERMITTED );
 #define HTTP_AUTH_NTLM		/* NTLM authentication */
 //#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
 //#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
+//#define HTTP_HACK_EC2		/* Amazon EC2 hacks */
 
 /* Disable protocols not historically included in BIOS builds */
 #if defined ( PLATFORM_pcbios )

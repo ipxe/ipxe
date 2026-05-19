@@ -7,6 +7,11 @@
  */
 #define HTTP_HACK_GCE
 
+/* Allow retrieval of metadata from Amazon EC2 Instance Metadata
+ * Service using IMDSv2 session tokens.
+ */
+#define HTTP_HACK_EC2
+
 /* Allow scripts to handle errors by powering down the VM to avoid
  * incurring unnecessary costs.
  */
