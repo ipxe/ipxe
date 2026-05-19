@@ -24,10 +24,16 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include <ipxe/serial.h>
+#include <ipxe/settings.h>
 #include <ipxe/pci.h>
 #include <ipxe/ns16550.h>
 #include <ipxe/spcr.h>
+#if defined ( __i386__ ) || defined ( __x86_64__ )
+#include <ipxe/x86_io.h>
+#endif
 
 /** @file
  *
@@ -64,6 +70,54 @@ static const uint8_t spcr_baud_divisor[SPCR_BAUD_MAX] = {
 	[SPCR_BAUD_38400] = ( SPCR_BAUD_BASE / 38400 ),
 	[SPCR_BAUD_57600] = ( SPCR_BAUD_BASE / 57600 ),
 	[SPCR_BAUD_115200] = ( SPCR_BAUD_BASE / 115200 ),
+};
+
+/**
+* Fetch SPCR setting.
+*
+* @v data             Buffer to fill with setting data
+* @v len              Length of buffer
+* @ret len            Length of setting data, or negative error
+*/
+static int spcr_fetch ( void *data, size_t len ) {
+	if ( ! spcr_uart.priv )
+		return -ENOENT;
+
+	int written;
+#if defined ( __i386__ ) || defined ( __x86_64__ )
+	const char *iotype = x86_pio_addr( ( intptr_t ) spcr_ns16550.base ) ? "io" : "mmio";
+#else
+	const char *iotype = "mmio";
+#endif
+	char buf[32];
+
+	if ( ! spcr_uart.baud )
+		written = snprintf( buf, sizeof( buf ), "uart,%s,%p", iotype, spcr_ns16550.base  );
+	else
+		written = snprintf( buf, sizeof( buf ), "uart,%s,%p,%dn8", iotype, spcr_ns16550.base , ( int ) spcr_uart.baud );
+
+	if ( written < 0 )
+		return -EINVAL;
+
+	if ( ( size_t ) written > len )
+		return written;
+
+	memcpy(data, buf, written);
+	return written;
+}
+
+/** SPCR setting */
+const struct setting spcr_setting __setting ( SETTING_MISC, spcr ) = {
+	.name = "spcr",
+	.description = "Linux compatible SPCR console configuration",
+	.type = &setting_type_string,
+	.scope = &builtin_scope,
+};
+
+/** SPCR built-in setting */
+struct builtin_setting spcr_builtin_setting __builtin_setting = {
+	.setting = &spcr_setting,
+	.fetch = spcr_fetch
 };
 
 /**
