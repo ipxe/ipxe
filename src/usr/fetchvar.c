@@ -31,6 +31,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/uri.h>
 #include <ipxe/monojob.h>
 #include <ipxe/settings.h>
+#include <ipxe/http.h>
 #include <usr/fetchvar.h>
 
 /** @file
@@ -212,13 +213,19 @@ static struct interface_descriptor fetchvar_job_desc =
  *
  * @v uri_string	URI string
  * @v setting_name	Setting name
+ * @v method		HTTP method (or NULL for GET)
  * @ret rc		Return status code
  */
-int fetchvar ( const char *uri_string, const char *setting_name ) {
+int fetchvar ( const char *uri_string, const char *setting_name,
+	       struct http_method *method ) {
 	struct fetchvar_request *fetchvar_req;
 	struct uri *raw_uri;
 	struct uri *uri;
 	int rc;
+
+	/* Default to GET */
+	if ( ! method )
+		method = &http_get;
 
 	/* Parse URI */
 	raw_uri = parse_uri ( uri_string );
@@ -250,8 +257,9 @@ int fetchvar ( const char *uri_string, const char *setting_name ) {
 	fetchvar_req->setting_name = ( ( void * ) ( fetchvar_req + 1 ) );
 	strcpy ( fetchvar_req->setting_name, setting_name );
 
-	/* Open URI */
-	if ( ( rc = xfer_open_uri ( &fetchvar_req->xfer, uri ) ) != 0 )
+	/* Open HTTP transaction (method selection requires HTTP) */
+	if ( ( rc = http_open ( &fetchvar_req->xfer, method,
+				uri, NULL, NULL ) ) != 0 )
 		goto err_open;
 
 	/* Attach parent interface, mortalise self, and return */

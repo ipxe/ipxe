@@ -21,9 +21,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 FILE_SECBOOT ( PERMITTED );
 
 #include <stdio.h>
+#include <strings.h>
+#include <errno.h>
 #include <getopt.h>
 #include <ipxe/command.h>
 #include <ipxe/parseopt.h>
+#include <ipxe/http.h>
 #include <usr/fetchvar.h>
 
 /** @file
@@ -33,15 +36,40 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 /** "fetchvar" options */
-struct fetchvar_options {};
+struct fetchvar_options {
+	/** HTTP method name */
+	char *method;
+};
 
 /** "fetchvar" option list */
-static struct option_descriptor fetchvar_opts[] = {};
+static struct option_descriptor fetchvar_opts[] = {
+	OPTION_DESC ( "method", 'm', required_argument,
+		      struct fetchvar_options, method, parse_string ),
+};
 
 /** "fetchvar" command descriptor */
 static struct command_descriptor fetchvar_cmd =
 	COMMAND_DESC ( struct fetchvar_options, fetchvar_opts, 2, 2,
-		       "<setting> <uri>" );
+		       "[--method <method>] <setting> <uri>" );
+
+/**
+ * Parse HTTP method name
+ *
+ * @v name		Method name (e.g. "GET", "PUT")
+ * @ret method		HTTP method, or NULL if not recognised
+ */
+static struct http_method * fetchvar_method ( const char *name ) {
+
+	if ( strcasecmp ( name, "GET" ) == 0 )
+		return &http_get;
+	if ( strcasecmp ( name, "POST" ) == 0 )
+		return &http_post;
+	if ( strcasecmp ( name, "PUT" ) == 0 )
+		return &http_put;
+	if ( strcasecmp ( name, "HEAD" ) == 0 )
+		return &http_head;
+	return NULL;
+}
 
 /**
  * The "fetchvar" command
@@ -52,6 +80,7 @@ static struct command_descriptor fetchvar_cmd =
  */
 static int fetchvar_exec ( int argc, char **argv ) {
 	struct fetchvar_options opts;
+	struct http_method *method = NULL;
 	const char *setting_name;
 	const char *uri_string;
 	int rc;
@@ -60,6 +89,16 @@ static int fetchvar_exec ( int argc, char **argv ) {
 	if ( ( rc = parse_options ( argc, argv, &fetchvar_cmd, &opts ) ) != 0 )
 		return rc;
 
+	/* Parse method (if specified) */
+	if ( opts.method ) {
+		method = fetchvar_method ( opts.method );
+		if ( ! method ) {
+			printf ( "Unsupported HTTP method \"%s\"\n",
+				 opts.method );
+			return -ENOTSUP;
+		}
+	}
+
 	/* Parse setting name */
 	setting_name = argv[optind];
 
@@ -67,7 +106,7 @@ static int fetchvar_exec ( int argc, char **argv ) {
 	uri_string = argv[ optind + 1 ];
 
 	/* Fetch URI and store in setting */
-	if ( ( rc = fetchvar ( uri_string, setting_name ) ) != 0 )
+	if ( ( rc = fetchvar ( uri_string, setting_name, method ) ) != 0 )
 		return rc;
 
 	return 0;
