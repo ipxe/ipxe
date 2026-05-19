@@ -523,6 +523,16 @@ CFLAGS		+= $(FS_FLAGS) $(DS_FLAGS)
 endif
 LDFLAGS		+= --gc-sections
 
+# Use -ffile-prefix-map if supported by the compiler, to make build
+# output more reproducible. This option is supported by not only
+# gcc but also clang.
+
+FFPM_TEST	= $(CC) -ffile-prefix-map=/test=. -c -x c /dev/null \
+		  -o /dev/null 2>/dev/null
+FFPM_FLAGS	:= $(shell $(FFPM_TEST) && $(ECHO) \
+		  '-ffile-prefix-map=$(abspath $(CURDIR)/..)=.')
+CFLAGS		+= $(FFPM_FLAGS)
+
 # Force creation of static binaries (required for OpenBSD, does no
 # harm on other platforms).
 #
