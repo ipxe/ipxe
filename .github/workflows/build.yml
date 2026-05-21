@@ -550,9 +550,9 @@ jobs:
 
       - name: Get token
         id: token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.WORKFLOW_DISPATCHER_ID }}
+          client-id: ${{ vars.WORKFLOW_DISPATCHER_ID }}
           private-key: ${{ secrets.WORKFLOW_DISPATCHER_KEY }}
           owner: ${{ vars.PAGES_REPO_OWNER }}
           repositories: ${{ vars.PAGES_REPO_NAME }}
