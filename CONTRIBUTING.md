@@ -102,6 +102,19 @@ To discuss funding an iPXE development, please send an email to
 <vendor-support@ipxe.org>, or create an [issue][issues] and mention
 that you would be interested in providing funding.
 
+(Ab)use of AI
+-------------
+
+Please do not send any AI-generated issue reports or pull requests.
+You are very welcome to use AI to help you understand the issue that
+you are experiencing but do not, under any circumstances, submit text
+or code that an AI has generated.
+
+Any AI-generated submissions will result in the submitting user being
+instantly and permanently banned from interacting with this or any
+related projects.  There will be no additional warnings, and there is
+no way to appeal against this ban.
+
 
 [crypto]: https://ipxe.org/crypto
 [discussions]: https://github.com/ipxe/ipxe/discussions
