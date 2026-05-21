@@ -255,6 +255,36 @@ static void neighbour_tx_queue ( struct neighbour *neighbour ) {
 }
 
 /**
+ * Drop a deferred packet
+ *
+ * @v neighbour		Neighbour cache entry
+ * @v rc		Reason for drop
+ * @ret dropped		Number of deferred packets dropped
+ */
+static unsigned int neighbour_drop ( struct neighbour *neighbour, int rc ) {
+	struct net_device *netdev = neighbour->netdev;
+	struct net_protocol *net_protocol = neighbour->net_protocol;
+	struct io_buffer *iobuf;
+
+	/* Get oldest deferred packet, if any */
+	iobuf = list_first_entry ( &neighbour->tx_queue, struct io_buffer,
+				   list );
+	if ( ! iobuf )
+		return 0;
+
+	/* Drop deferred packet */
+	DBGC2 ( neighbour, "NEIGHBOUR %s %s %s dropping deferred packet: %s\n",
+		netdev->name, net_protocol->name,
+		net_protocol->ntoa ( neighbour->net_dest ), strerror ( rc ) );
+	list_del ( &iobuf->list );
+	if ( NEIGHBOUR_DELAY_MS )
+		pending_put ( &neighbour_delayed );
+	netdev_tx_err ( neighbour->netdev, iobuf, rc );
+
+	return 1;
+}
+
+/**
  * Complete neighbour discovery
  *
  * @v neighbour		Neighbour cache entry
@@ -288,7 +318,6 @@ static void neighbour_discovered ( struct neighbour *neighbour,
 static void neighbour_destroy ( struct neighbour *neighbour, int rc ) {
 	struct net_device *netdev = neighbour->netdev;
 	struct net_protocol *net_protocol = neighbour->net_protocol;
-	struct io_buffer *iobuf;
 
 	/* Take ownership from cache */
 	list_del ( &neighbour->list );
@@ -296,24 +325,14 @@ static void neighbour_destroy ( struct neighbour *neighbour, int rc ) {
 	/* Stop timer */
 	stop_timer ( &neighbour->timer );
 
-	/* Discard any outstanding I/O buffers */
-	while ( ( iobuf = list_first_entry ( &neighbour->tx_queue,
-					     struct io_buffer, list )) != NULL){
-		DBGC2 ( neighbour, "NEIGHBOUR %s %s %s discarding deferred "
-			"packet: %s\n", netdev->name, net_protocol->name,
-			net_protocol->ntoa ( neighbour->net_dest ),
-			strerror ( rc ) );
-		list_del ( &iobuf->list );
-		if ( NEIGHBOUR_DELAY_MS )
-			pending_put ( &neighbour_delayed );
-		netdev_tx_err ( neighbour->netdev, iobuf, rc );
-	}
+	/* Drop any deferred packets */
+	while ( neighbour_drop ( neighbour, rc ) ) {}
+	assert ( list_empty ( &neighbour->tx_queue ) );
 
+	/* Drop remaining reference */
 	DBGC ( neighbour, "NEIGHBOUR %s %s %s destroyed: %s\n", netdev->name,
 	       net_protocol->name, net_protocol->ntoa ( neighbour->net_dest ),
 	       strerror ( rc ) );
-
-	/* Drop remaining reference */
 	ref_put ( &neighbour->refcnt );
 }
 
@@ -507,21 +526,47 @@ struct net_driver neighbour_net_driver __net_driver = {
 };
 
 /**
- * Discard some cached neighbour entries
+ * Discard some deferred packets from neighbour cache entries
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int neighbour_queue_discard ( void ) {
+	struct neighbour *neighbour;
+	unsigned int discarded = 0;
+
+	/* Try to discard one deferred packet from each cache entry */
+	list_for_each_entry ( neighbour, &neighbours, list )
+		discarded += neighbour_drop ( neighbour, -ENOBUFS );
+
+	return discarded;
+}
+
+/** Neighbour cache deferred packet discarder */
+struct cache_discarder
+neighbour_queue_discarder __cache_discarder ( CACHE_NORMAL ) = {
+	.discard = neighbour_queue_discard,
+};
+
+/**
+ * Discard some complete neighbour cache entries
  *
  * @ret discarded	Number of cached items discarded
  */
 static unsigned int neighbour_discard ( void ) {
 	struct neighbour *neighbour;
 
-	/* Drop oldest cache entry, if any */
+	/* Identify oldest cache entry, if any */
 	neighbour = list_last_entry ( &neighbours, struct neighbour, list );
-	if ( neighbour ) {
-		neighbour_destroy ( neighbour, -ENOBUFS );
-		return 1;
-	} else {
+	if ( ! neighbour )
 		return 0;
-	}
+
+	/* Sanity check: all deferred packets must already have been dropped */
+	assert ( list_empty ( &neighbour->tx_queue ) );
+
+	/* Destroy the cache entry */
+	neighbour_destroy ( neighbour, -ENOBUFS );
+
+	return 1;
 }
 
 /**
