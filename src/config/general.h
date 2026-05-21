@@ -58,6 +58,7 @@ FILE_SECBOOT ( PERMITTED );
 #define HTTP_AUTH_NTLM		/* NTLM authentication */
 //#define HTTP_ENC_PEERDIST	/* PeerDist content encoding */
 //#define HTTP_HACK_GCE		/* Google Compute Engine hacks */
+//#define HTTP_HACK_EC2		/* Amazon EC2 hacks */
 
 /* Disable protocols not historically included in BIOS builds */
 #if defined ( PLATFORM_pcbios )
@@ -108,6 +109,7 @@ FILE_SECBOOT ( PERMITTED );
 //#define LOTEST_CMD		/* Loopback testing commands */
 #define MENU_CMD		/* Menu commands */
 //#define NEIGHBOUR_CMD		/* Neighbour management commands */
+//#define FETCHVAR_CMD		/* Fetch URI to setting command */
 //#define NSLOOKUP_CMD		/* DNS resolving command */
 #define NTP_CMD			/* NTP commands */
 #define NVO_CMD			/* Non-volatile option storage commands */

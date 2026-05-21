@@ -150,6 +150,11 @@ struct http_method http_post = {
 	.name = "POST",
 };
 
+/** HTTP PUT method */
+struct http_method http_put = {
+	.name = "PUT",
+};
+
 /******************************************************************************
  *
  * Utility functions
