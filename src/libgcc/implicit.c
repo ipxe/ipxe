@@ -9,6 +9,9 @@
  *
  */
 
+FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
+
 #include <string.h>
 
 void * gcc_implicit_memcpy ( void *dest, const void *src,

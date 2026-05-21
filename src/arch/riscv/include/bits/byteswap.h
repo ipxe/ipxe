@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
+FILE_SECBOOT ( PERMITTED );
 
 extern __asmcall uint64_t riscv_swap_word ( uint64_t x );
 extern __asmcall unsigned long riscv_swap_half ( unsigned long x );
