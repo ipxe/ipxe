@@ -154,6 +154,8 @@ jobs:
       matrix:
         arch:
           - arm64
+          - loong64
+          - riscv64
           - x86_64
     container:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
@@ -199,6 +201,8 @@ jobs:
       matrix:
         arch:
           - arm64
+          - loong64
+          - riscv64
           - x86_64
     container:
       image: ghcr.io/ipxe/ipxe-signer
@@ -384,6 +388,8 @@ jobs:
         bin-x86_64-efi/${DRIVERS}.efi
       sbarchs: >-
         arm64
+        loong64
+        riscv64
         x86_64
       sbbinaries: >-
         bin-${ARCH}-efi-sb/ipxe.efi
@@ -405,12 +411,16 @@ jobs:
         bin-loong64-efi/ipxe.efi
         bin-loong64-efi/ipxe-legacy.efi
         bin-loong64-efi/snponly.efi
+        bin-loong64-efi-sb/ipxe.efi
+        bin-loong64-efi-sb/snponly.efi
         bin-riscv32-efi/ipxe.efi
         bin-riscv32-efi/ipxe-legacy.efi
         bin-riscv32-efi/snponly.efi
         bin-riscv64-efi/ipxe.efi
         bin-riscv64-efi/ipxe-legacy.efi
         bin-riscv64-efi/snponly.efi
+        bin-riscv64-efi-sb/ipxe.efi
+        bin-riscv64-efi-sb/snponly.efi
         bin-x86_64-efi/ipxe.efi
         bin-x86_64-efi/ipxe-legacy.efi
         bin-x86_64-efi/snponly.efi
@@ -474,6 +484,10 @@ jobs:
             ipxe-legacy.usb
             ipxe-arm64-sb.iso
             ipxe-arm64-sb.usb
+            ipxe-loong64-sb.iso
+            ipxe-loong64-sb.usb
+            ipxe-riscv64-sb.iso
+            ipxe-riscv64-sb.usb
             ipxe-x86_64-sb.iso
             ipxe-x86_64-sb.usb
             ipxeboot.tar.gz
@@ -590,5 +604,7 @@ jobs:
               --notes-file version/relnotes.md \
               bin-combi/ipxe.iso bin-combi/ipxe.usb \
               bin-combi/ipxe-arm64-sb.iso bin-combi/ipxe-arm64-sb.usb \
+              bin-combi/ipxe-loong64-sb.iso bin-combi/ipxe-loong64-sb.usb \
+              bin-combi/ipxe-riscv64-sb.iso bin-combi/ipxe-riscv64-sb.usb \
               bin-combi/ipxe-x86_64-sb.iso bin-combi/ipxe-x86_64-sb.usb \
               bin-combi/ipxeboot.tar.gz
