@@ -155,6 +155,7 @@ jobs:
         arch:
           - arm64
           - x86_64
+          - loong64
     container:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
     env:
@@ -199,6 +200,7 @@ jobs:
       matrix:
         arch:
           - arm64
+          - loong64
           - x86_64
     container:
       image: ghcr.io/ipxe/ipxe-signer
