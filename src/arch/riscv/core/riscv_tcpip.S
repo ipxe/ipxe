@@ -56,7 +56,7 @@ tcpip_continue_chksum:
 	 * a1: data pointer
 	 * a2: end of data pointer
 	 * a3: end of data pointer minus a constant offset of interest
-	 * a4: checksum high bits (guaranteed to never carry) / constant 0xffff
+	 * a4: checksum high bits (guaranteed to never carry)
 	 * a5: temporary register
 	 */
 	not	a0, a0
@@ -100,40 +100,30 @@ post_aligned:
 	lbu	a5, (a1)
 	add	a4, a4, a5
 1:
-	/* Fold down to xlen+1 bits */
+	/* Fold down to xlen bits */
 	add	a0, a0, a4
 	sltu	a4, a0, a4
-
-	/* Fold down to (xlen/2)+2 bits */
-	slli	a5, a0, ( __riscv_xlen / 2 )
-	srli	a0, a0, ( __riscv_xlen / 2 )
-	srli	a5, a5, ( __riscv_xlen / 2 )
 	add	a0, a0, a4
-	add	a0, a0, a5
 
-	/* Load constant 0xffff for use in subsequent folding */
-	li	a4, 0xffff
+	/* Fold down to (high) xlen/2 bits */
+	slli	a4, a0, ( __riscv_xlen / 2 )
+	add	a0, a0, a4
+	sltu	a4, a0, a4
+	slli	a4, a4, ( __riscv_xlen / 2 )
+	add	a0, a0, a4
 
 #if __riscv_xlen >= 64
-	/* Fold down to (xlen/4)+3 bits (if xlen >= 64) */
-	and	a5, a0, a4
-	srli	a0, a0, ( __riscv_xlen / 4 )
-	add	a0, a0, a5
+	/* Fold down to (high) xlen/4 bits (if xlen >= 64) */
+	srli	a4, a0, ( __riscv_xlen / 2 )
+	slli	a4, a4, ( __riscv_xlen * 3 / 4 )
+	add	a0, a0, a4
+	sltu	a4, a0, a4
+	slli	a4, a4, ( __riscv_xlen * 3 / 4 )
+	add	a0, a0, a4
 #endif
 
-	/* Fold down to 16+1 bits */
-	and	a5, a0, a4
-	srli	a0, a0, 16
-	add	a0, a0, a5
-
-	/* Fold down to 16 bits */
-	srli	a5, a0, 16
-	add	a0, a0, a5
-	srli	a5, a0, 17
-	add	a0, a0, a5
-	and	a0, a0, a4
-
-	/* Negate and return */
-	xor	a0, a0, a4
+	/* Negate, move to low bits, and return */
+	not	a0, a0
+	srli	a0, a0, ( __riscv_xlen - 16 )
 	ret
 	.size	tcpip_continue_chksum, . - tcpip_continue_chksum
