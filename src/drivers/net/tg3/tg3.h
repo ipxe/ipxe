@@ -2809,8 +2809,6 @@ struct tg3_hw_stats {
 	u8				__reserved4[0xb00-0x9c8];
 };
 
-typedef unsigned long dma_addr_t;
-
 /* 'mapping' is superfluous as the chip does not write into
  * the tx/rx post rings so we could just fetch it from there.
  * But the cache behavior is better how we are doing it now.
@@ -2954,7 +2952,7 @@ struct tg3_rx_prodring_set {
 	u32				rx_std_iob_cnt;
 	struct tg3_rx_buffer_desc	*rx_std;
 	struct io_buffer		*rx_iobufs[TG3_DEF_RX_RING_PENDING];
-	dma_addr_t			rx_std_mapping;
+	struct dma_mapping		rx_std_map;
 };
 
 #define TG3_IRQ_MAX_VECS_RSS		5
@@ -3090,6 +3088,7 @@ struct tg3 {
 	void				*regs;
 	struct net_device		*dev;
 	struct pci_device		*pdev;
+	struct dma_device		*dma;
 
 	u32				msg_enable;
 
@@ -3125,9 +3124,9 @@ struct tg3 {
 	struct tg3_tx_buffer_desc	*tx_ring;
 	struct ring_info		*tx_buffers;
 
-	dma_addr_t			status_mapping;
-	dma_addr_t			rx_rcb_mapping;
-	dma_addr_t			tx_desc_mapping;
+	struct dma_mapping		status_map;
+	struct dma_mapping		rx_rcb_map;
+	struct dma_mapping		tx_desc_map;
 	/* end tg3_napi */
 
 	/* begin "everything else" cacheline(s) section */
@@ -3371,7 +3370,7 @@ static inline void _tg3_flag_clear(enum TG3_FLAGS flag, unsigned long *bits)
 
 /* tg3_main.c forward declarations */
 int tg3_init_rings(struct tg3 *tp);
-void tg3_rx_prodring_fini(struct tg3_rx_prodring_set *tpr);
+void tg3_rx_prodring_fini(struct tg3 *tp, struct tg3_rx_prodring_set *tpr);
 ///int tg3_rx_prodring_init(struct tg3 *tp, struct tg3_rx_prodring_set *tpr);
 
 /* tg3_phy.c forward declarations */
@@ -3390,7 +3389,7 @@ int tg3_get_invariants(struct tg3 *tp);
 void tg3_init_bufmgr_config(struct tg3 *tp);
 int tg3_get_device_address(struct tg3 *tp);
 int tg3_halt(struct tg3 *tp);
-void tg3_set_txd(struct tg3 *tp, int entry, dma_addr_t mapping, int len, u32 flags);
+void tg3_set_txd(struct tg3 *tp, int entry, physaddr_t mapping, int len, u32 flags);
 void tg3_set_power_state_0(struct tg3 *tp);
 int tg3_alloc_consistent(struct tg3 *tp);
 int tg3_init_hw(struct tg3 *tp, int reset_phy);

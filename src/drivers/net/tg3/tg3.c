@@ -39,11 +39,13 @@ static void tg3_refill_prod_ring(struct tg3 *tp);
 #define TG3_RX_STD_RING_BYTES(tp) \
 	(sizeof(struct tg3_rx_buffer_desc) * TG3_RX_STD_MAX_SIZE_5700)
 
-void tg3_rx_prodring_fini(struct tg3_rx_prodring_set *tpr)
+void tg3_rx_prodring_fini(struct tg3 __unused *tp,
+			  struct tg3_rx_prodring_set *tpr)
 {	DBGP("%s\n", __func__);
 
 	if (tpr->rx_std) {
-		free_phys(tpr->rx_std, TG3_RX_STD_RING_BYTES(tp));
+		dma_free(&tpr->rx_std_map, tpr->rx_std,
+			 TG3_RX_STD_RING_BYTES(tp));
 		tpr->rx_std = NULL;
 	}
 }
@@ -56,7 +58,7 @@ static void tg3_free_consistent(struct tg3 *tp)
 {	DBGP("%s\n", __func__);
 
 	if (tp->tx_ring) {
-		free_phys(tp->tx_ring, TG3_TX_RING_BYTES);
+		dma_free(&tp->tx_desc_map, tp->tx_ring, TG3_TX_RING_BYTES);
 		tp->tx_ring = NULL;
 	}
 
@@ -64,16 +66,15 @@ static void tg3_free_consistent(struct tg3 *tp)
 	tp->tx_buffers = NULL;
 
 	if (tp->rx_rcb) {
-		free_phys(tp->rx_rcb, TG3_RX_RCB_RING_BYTES(tp));
-		tp->rx_rcb_mapping = 0;
+		dma_free(&tp->rx_rcb_map, tp->rx_rcb,
+			 TG3_RX_RCB_RING_BYTES(tp));
 		tp->rx_rcb = NULL;
 	}
 
-	tg3_rx_prodring_fini(&tp->prodring);
+	tg3_rx_prodring_fini(tp, &tp->prodring);
 
 	if (tp->hw_status) {
-		free_phys(tp->hw_status, TG3_HW_STATUS_SIZE);
-		tp->status_mapping = 0;
+		dma_free(&tp->status_map, tp->hw_status, TG3_HW_STATUS_SIZE);
 		tp->hw_status = NULL;
 	}
 }
@@ -88,32 +89,32 @@ int tg3_alloc_consistent(struct tg3 *tp)
 	struct tg3_hw_status *sblk;
 	struct tg3_rx_prodring_set *tpr = &tp->prodring;
 
-	tp->hw_status = malloc_phys(TG3_HW_STATUS_SIZE, TG3_DMA_ALIGNMENT);
+	tp->hw_status = dma_alloc(tp->dma, &tp->status_map,
+				  TG3_HW_STATUS_SIZE, TG3_DMA_ALIGNMENT);
 	if (!tp->hw_status) {
 		DBGC(tp->dev, "hw_status alloc failed\n");
 		goto err_out;
 	}
-	tp->status_mapping = virt_to_bus(tp->hw_status);
 
 	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
 	sblk = tp->hw_status;
 
-	tpr->rx_std = malloc_phys(TG3_RX_STD_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
+	tpr->rx_std = dma_alloc(tp->dma, &tpr->rx_std_map,
+				TG3_RX_STD_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
 	if (!tpr->rx_std) {
 		DBGC(tp->dev, "rx prodring alloc failed\n");
 		goto err_out;
 	}
-	tpr->rx_std_mapping = virt_to_bus(tpr->rx_std);
 	memset(tpr->rx_std, 0, TG3_RX_STD_RING_BYTES(tp));
 
 	tp->tx_buffers = zalloc(sizeof(struct ring_info) * TG3_TX_RING_SIZE);
 	if (!tp->tx_buffers)
 		goto err_out;
 
-	tp->tx_ring = malloc_phys(TG3_TX_RING_BYTES, TG3_DMA_ALIGNMENT);
+	tp->tx_ring = dma_alloc(tp->dma, &tp->tx_desc_map,
+				TG3_TX_RING_BYTES, TG3_DMA_ALIGNMENT);
 	if (!tp->tx_ring)
 		goto err_out;
-	tp->tx_desc_mapping = virt_to_bus(tp->tx_ring);
 
 	/*
 	 * When RSS is enabled, the status block format changes
@@ -124,10 +125,10 @@ int tg3_alloc_consistent(struct tg3 *tp)
 
 	tp->rx_rcb_prod_idx = &sblk->idx[0].rx_producer;
 
-	tp->rx_rcb = malloc_phys(TG3_RX_RCB_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
+	tp->rx_rcb = dma_alloc(tp->dma, &tp->rx_rcb_map,
+			       TG3_RX_RCB_RING_BYTES(tp), TG3_DMA_ALIGNMENT);
 	if (!tp->rx_rcb)
 		goto err_out;
-	tp->rx_rcb_mapping = virt_to_bus(tp->rx_rcb);
 
 	memset(tp->rx_rcb, 0, TG3_RX_RCB_RING_BYTES(tp));
 
@@ -182,7 +183,11 @@ static void tg3_rx_iob_free(struct io_buffer *iobs[], int i)
 	if (iobs[i] == NULL)
 		return;
 
-	free_iob(iobs[i]);
+	/* RX iobufs were allocated via alloc_rx_iob() and are therefore
+	 * DMA-mapped through the platform DMA API; they must be released
+	 * via free_rx_iob() so the mapping is torn down.
+	 */
+	free_rx_iob(iobs[i]);
 	iobs[i] = NULL;
 }
 
@@ -302,7 +307,7 @@ static int tg3_transmit(struct net_device *dev, struct io_buffer *iob)
 
 	struct tg3 *tp = dev->priv;
 	u32 len, entry;
-	dma_addr_t mapping;
+	physaddr_t mapping;
 
 	if (tg3_tx_avail(tp) < 1) {
 		DBGC(dev, "Transmit ring full\n");
@@ -312,7 +317,11 @@ static int tg3_transmit(struct net_device *dev, struct io_buffer *iob)
 	entry = tp->tx_prod;
 
 	iob_pad(iob, ETH_ZLEN);
-	mapping = virt_to_bus(iob->data);
+	/* The netdevice core has already called iob_map_tx() for this
+	 * iobuf (because netdev->dma is set), so iob_dma() returns the
+	 * platform-translated bus address suitable for the device.
+	 */
+	mapping = iob_dma(iob);
 	len = iob_len(iob);
 
 	tp->tx_buffers[entry].iob = iob;
@@ -366,12 +375,13 @@ static void tg3_tx_complete(struct net_device *dev)
  * buffers the cpu only reads the last cacheline of the RX descriptor
  * (to fetch the error flags, vlan tag, checksum, and opaque cookie).
  */
-static int tg3_alloc_rx_iob(struct tg3_rx_prodring_set *tpr, u32 dest_idx_unmasked)
+static int tg3_alloc_rx_iob(struct tg3 *tp, struct tg3_rx_prodring_set *tpr,
+			    u32 dest_idx_unmasked)
 {	DBGP("%s\n", __func__);
 
 	struct tg3_rx_buffer_desc *desc;
 	struct io_buffer *iob;
-	dma_addr_t mapping;
+	physaddr_t mapping;
 	int dest_idx, iob_idx;
 
 	dest_idx = dest_idx_unmasked & (TG3_RX_STD_MAX_SIZE_5700 - 1);
@@ -382,15 +392,19 @@ static int tg3_alloc_rx_iob(struct tg3_rx_prodring_set *tpr, u32 dest_idx_unmask
 	 *
 	 * Callers depend upon this behavior and assume that
 	 * we leave everything unchanged if we fail.
+	 *
+	 * Allocate the receive iobuf already DMA-mapped through the
+	 * platform DMA API so the device may write into it under
+	 * preboot DMA protection (IOMMU).
 	 */
-	iob = alloc_iob(TG3_RX_STD_DMA_SZ);
+	iob = alloc_rx_iob(TG3_RX_STD_DMA_SZ, tp->dma);
 	if (iob == NULL)
 		return -ENOMEM;
 
 	iob_idx = dest_idx % TG3_DEF_RX_RING_PENDING;
 	tpr->rx_iobufs[iob_idx] = iob;
 
-	mapping = virt_to_bus(iob->data);
+	mapping = iob_dma(iob);
 
 	desc->addr_hi = ((u64)mapping >> 32);
 	desc->addr_lo = ((u64)mapping & 0xffffffff);
@@ -408,7 +422,7 @@ static void tg3_refill_prod_ring(struct tg3 *tp)
 
 	while (tpr->rx_std_iob_cnt < TG3_DEF_RX_RING_PENDING) {
 		if (tpr->rx_iobufs[idx % TG3_DEF_RX_RING_PENDING] == NULL) {
-			if (tg3_alloc_rx_iob(tpr, idx) < 0) {
+			if (tg3_alloc_rx_iob(tp, tpr, idx) < 0) {
 				DBGC(tp->dev, "alloc_iob() failed for descriptor %d\n", idx);
 				break;
 			}
@@ -532,22 +546,24 @@ static struct net_device_operations tg3_netdev_ops = {
 
 #define TEST_BUFFER_SIZE	0x2000
 
-int tg3_do_test_dma(struct tg3 *tp, u32 __unused *buf, dma_addr_t buf_dma, int size, int to_device);
+int tg3_do_test_dma(struct tg3 *tp, u32 __unused *buf, physaddr_t buf_dma, int size, int to_device);
 void tg3_read_mem(struct tg3 *tp, u32 off, u32 *val);
 
 static int tg3_test_dma(struct tg3 *tp)
 {	DBGP("%s\n", __func__);
 
-	dma_addr_t buf_dma;
+	struct dma_mapping buf_map;
+	physaddr_t buf_dma;
 	u32 *buf;
 	int ret = 0;
 
-	buf = malloc_phys(TEST_BUFFER_SIZE, TG3_DMA_ALIGNMENT);
+	memset(&buf_map, 0, sizeof(buf_map));
+	buf = dma_alloc(tp->dma, &buf_map, TEST_BUFFER_SIZE, TG3_DMA_ALIGNMENT);
 	if (!buf) {
 		ret = -ENOMEM;
 		goto out_nofree;
 	}
-	buf_dma = virt_to_bus(buf);
+	buf_dma = dma(&buf_map, buf);
 	DBGC2(tp->dev, "dma test buffer, virt: %p phys: %#016lx\n", buf, buf_dma);
 
 	if (tg3_flag(tp, 57765_PLUS)) {
@@ -709,7 +725,7 @@ static int tg3_test_dma(struct tg3 *tp)
 	}
 
 out:
-	free_phys(buf, TEST_BUFFER_SIZE);
+	dma_free(&buf_map, buf, TEST_BUFFER_SIZE);
 out_nofree:
 	return ret;
 }
@@ -741,6 +757,16 @@ static int tg3_init_one(struct pci_device *pdev)
 	tp->dev = dev;
 	tp->rx_mode = TG3_DEF_RX_MODE;
 	tp->tx_mode = TG3_DEF_TX_MODE;
+
+	/* Configure DMA.  This must be done before any DMA allocation
+	 * (including the self-test buffer in tg3_test_dma) so that
+	 * buffers are mapped through the platform DMA implementation,
+	 * which is required when preboot DMA protection (IOMMU) is
+	 * active.
+	 */
+	tp->dma = &pdev->dma;
+	dev->dma = tp->dma;
+	dma_set_mask_64bit ( tp->dma );
 
 	/* Subsystem IDs are required later */
 	pci_read_config_word(tp->pdev, PCI_SUBSYSTEM_VENDOR_ID, &tp->subsystem_vendor);

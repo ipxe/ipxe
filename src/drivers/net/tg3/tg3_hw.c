@@ -1765,7 +1765,7 @@ static void __tg3_set_coalesce(struct tg3 *tp)
 }
 
 static void tg3_set_bdinfo(struct tg3 *tp, u32 bdinfo_addr,
-			   dma_addr_t mapping, u32 maxlen_flags,
+			   physaddr_t mapping, u32 maxlen_flags,
 			   u32 nic_addr)
 {	DBGP("%s\n", __func__);
 
@@ -1790,6 +1790,7 @@ static void tg3_rings_reset(struct tg3 *tp)
 
 	int i;
 	u32 txrcb, rxrcb, limit;
+	physaddr_t status_dma;
 
 	/* Disable all transmit rings but the first. */
 	if (!tg3_flag(tp, 5705_PLUS))
@@ -1844,14 +1845,20 @@ static void tg3_rings_reset(struct tg3 *tp)
 	/* Clear status block in ram. */
 	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
 
-	/* Set status block DMA address */
+	/* Set status block DMA address.  Use dma() so the platform DMA
+	 * implementation (e.g. EFI PCI_IO Map) can translate the host
+	 * virtual address into the bus address the device must use.
+	 */
+	status_dma = dma(&tp->status_map, tp->hw_status);
+
 	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
-	     ((u64) tp->status_mapping >> 32));
+	     ((u64) status_dma >> 32));
 	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
-	     ((u64) tp->status_mapping & 0xffffffff));
+	     ((u64) status_dma & 0xffffffff));
 
 	if (tp->tx_ring) {
-		tg3_set_bdinfo(tp, txrcb, tp->tx_desc_mapping,
+		tg3_set_bdinfo(tp, txrcb,
+			       dma(&tp->tx_desc_map, tp->tx_ring),
 			       (TG3_TX_RING_SIZE <<
 				BDINFO_FLAGS_MAXLEN_SHIFT),
 			       NIC_SRAM_TX_BUFFER_DESC);
@@ -1860,7 +1867,8 @@ static void tg3_rings_reset(struct tg3 *tp)
 
 	/* FIXME: will TG3_RX_RET_MAX_SIZE_5705 work on all cards? */
 	if (tp->rx_rcb) {
-		tg3_set_bdinfo(tp, rxrcb, tp->rx_rcb_mapping,
+		tg3_set_bdinfo(tp, rxrcb,
+			       dma(&tp->rx_rcb_map, tp->rx_rcb),
 			        TG3_RX_RET_MAX_SIZE_5705 <<
 				BDINFO_FLAGS_MAXLEN_SHIFT, 0);
 		rxrcb += TG3_BDINFO_SIZE;
@@ -1900,6 +1908,7 @@ static int tg3_reset_hw(struct tg3 *tp, int reset_phy)
 	u32 val, rdmac_mode;
 	int i, err, limit;
 	struct tg3_rx_prodring_set *tpr = &tp->prodring;
+	physaddr_t rx_std_dma;
 
 	tg3_stop_fw(tp);
 
@@ -2123,10 +2132,13 @@ static int tg3_reset_hw(struct tg3 *tp, int reset_phy)
 	 * The size of each ring is fixed in the firmware, but the location is
 	 * configurable.
 	 */
+	rx_std_dma = dma(&tpr->rx_std_map, tpr->rx_std);
+
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
-	     ((u64) tpr->rx_std_mapping >> 32));
+	     ((u64) rx_std_dma >> 32));
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
-	     ((u64) tpr->rx_std_mapping & 0xffffffff));
+	     ((u64) rx_std_dma & 0xffffffff));
+
 	if (!tg3_flag(tp, 5717_PLUS))
 		tw32(RCVDBDI_STD_BD + TG3_BDINFO_NIC_ADDR,
 		     NIC_SRAM_RX_BUFFER_DESC);
@@ -2581,7 +2593,7 @@ int tg3_init_hw(struct tg3 *tp, int reset_phy)
 }
 
 void tg3_set_txd(struct tg3 *tp, int entry,
-			dma_addr_t mapping, int len, u32 flags)
+			physaddr_t mapping, int len, u32 flags)
 {	DBGP("%s\n", __func__);
 
 	struct tg3_tx_buffer_desc *txd = &tp->tx_ring[entry];
@@ -2592,7 +2604,7 @@ void tg3_set_txd(struct tg3 *tp, int entry,
 	txd->vlan_tag = 0;
 }
 
-int tg3_do_test_dma(struct tg3 *tp, u32 __unused *buf, dma_addr_t buf_dma, int size, int to_device)
+int tg3_do_test_dma(struct tg3 *tp, u32 __unused *buf, physaddr_t buf_dma, int size, int to_device)
 {	DBGP("%s\n", __func__);
 
 	struct tg3_internal_buffer_desc test_desc;
