@@ -467,12 +467,15 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 		       struct rx_pkt_cmpl *rx_cmp,
 		       struct rx_pkt_cmpl_hi *rx_cmp_hi )
 {
-	u32 desc_idx = rx_cmp->opaque;
+	u32 desc_idx = rx_cmp->opaque & ( NUM_RX_BUFFERS - 1 );
 	struct io_buffer *iob = bp->rx.iob[desc_idx];
 	u8 drop;
 
 	dump_rx_bd ( rx_cmp, rx_cmp_hi, desc_idx );
-	assert ( iob );
+	if ( !iob ) {
+		bnxt_adv_cq_index ( bp, 2 );
+		return;
+	}
 	drop = bnxt_rx_drop ( bp, iob, rx_cmp, rx_cmp_hi, rx_cmp->len );
 	dbg_rxp ( iob->data, rx_cmp->len, drop );
 	if ( drop )
@@ -711,12 +714,15 @@ static int wait_resp ( struct bnxt *bp, u32 tmo, u16 len, const char *func )
 
 	for ( idx = 0; idx < wait_cnt; idx++ ) {
 		resp_len = resp->resp_len;
-		if ( resp->seq_id == req->seq_id &&
-			resp->req_type == req->req_type &&
-			ptr[resp_len - 1] == 1 ) {
-			bp->last_resp_code = resp->error_code;
-			ret = resp->error_code;
-			break;
+
+		if ( resp_len != 0 && resp_len <= ( u16 ) RESP_BUFFER_SIZE ) {
+			if ( resp->seq_id == req->seq_id &&
+			     resp->req_type == req->req_type &&
+			     ptr[resp_len - 1] == 1 ) {
+				bp->last_resp_code = resp->error_code;
+				ret = resp->error_code;
+				break;
+			}
 		}
 		udelay ( HWRM_CMD_POLL_WAIT_TIME );
 	}
