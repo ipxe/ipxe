@@ -42,6 +42,13 @@ ifneq ($(NO_WERROR),1)
 LINUX_CFLAGS	+= -Werror
 endif
 
+# Check for implicit libatomic
+#
+LIBATOMIC_TEST = $(CC) $(LINUX_CFLAGS) -x c /dev/null -nostartfiles \
+		      -fno-link-libatomic -o /dev/null >/dev/null 2>&1
+LIBATOMIC_FLAGS	:= $(shell $(LIBATOMIC_TEST) && $(ECHO) '-fno-link-libatomic')
+LINUX_CFLAGS	+= $(LIBATOMIC_FLAGS)
+
 # Check for libslirp
 #
 LIBSLIRP_TEST = $(CC) $(LINUX_CFLAGS) -x c /dev/null -nostartfiles \
