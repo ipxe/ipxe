@@ -16,5 +16,6 @@ FILE_SECBOOT ( PERMITTED );
 #define P384_LEN ( 384 / 8 )
 
 extern struct elliptic_curve p384_curve;
+extern struct exchange_algorithm p384_algorithm;
 
 #endif /* _IPXE_P384_H */

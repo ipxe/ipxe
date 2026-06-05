@@ -16,5 +16,6 @@ FILE_SECBOOT ( PERMITTED );
 #define P256_LEN ( 256 / 8 )
 
 extern struct elliptic_curve p256_curve;
+extern struct exchange_algorithm p256_algorithm;
 
 #endif /* _IPXE_P256_H */
