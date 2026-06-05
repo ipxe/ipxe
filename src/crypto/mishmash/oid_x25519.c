@@ -33,7 +33,7 @@ FILE_SECBOOT ( PERMITTED );
 static uint8_t oid_x25519[] = { ASN1_OID_X25519 };
 
 /** "x25519" OID-identified algorithm */
-struct asn1_algorithm x25519_algorithm __asn1_algorithm = {
+struct asn1_algorithm oid_x25519_algorithm __asn1_algorithm = {
 	.name = "x25519",
 	.curve = &x25519_curve,
 	.oid = ASN1_CURSOR ( oid_x25519 ),

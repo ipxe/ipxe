@@ -882,3 +882,46 @@ struct elliptic_curve x25519_curve = {
 	.multiply = x25519_curve_multiply,
 	.add = x25519_curve_add,
 };
+
+/**
+ * Calculate public key
+ *
+ * @v private		Private key
+ * @v public		Public key to fill in
+ */
+static void x25519_public ( const void *private, void *public ) {
+
+	/* Calculate public key */
+	x25519_key ( &x25519_generator, private, public );
+}
+
+/**
+ * Calculate shared secret
+ *
+ * @v private		Private key
+ * @v partner		Partner public key
+ * @v shared		Shared secret to fill in
+ * @ret rc		Return status code
+ */
+static int x25519_shared ( const void *private, const void *partner,
+			   void *shared ) {
+
+	/* Calculate shared secret */
+	x25519_key ( partner, private, shared );
+
+	/* Check for point at infinity (all zeros as per RFC8422) */
+	if ( x25519_is_zero ( shared ) )
+		return -EPERM;
+
+	return 0;
+}
+
+/** X25519 key exchange algorithm */
+struct exchange_algorithm x25519_algorithm = {
+	.name = "x25519",
+	.privsize = sizeof ( struct x25519_value ),
+	.pubsize = sizeof ( struct x25519_value ),
+	.sharedsize = sizeof ( struct x25519_value ),
+	.public = x25519_public,
+	.shared = x25519_shared,
+};
