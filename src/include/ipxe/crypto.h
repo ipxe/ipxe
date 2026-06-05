@@ -174,6 +174,35 @@ struct pubkey_algorithm {
 			  const struct asn1_cursor *public_key );
 };
 
+/** A key exchange algorithm */
+struct exchange_algorithm {
+	/** Algorithm name */
+	const char *name;
+	/** Private key size */
+	size_t privsize;
+	/** Public key size */
+	size_t pubsize;
+	/** Shared secret size */
+	size_t sharedsize;
+	/**
+	 * Calculate public key
+	 *
+	 * @v private		Private key
+	 * @v public		Public key to fill in
+	 */
+	void ( * public ) ( const void *private, void *public );
+	/**
+	 * Calculate shared secret
+	 *
+	 * @v private		Private key
+	 * @v partner		Partner public key
+	 * @v shared		Shared secret to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * shared ) ( const void *private, const void *partner,
+			   void *shared );
+};
+
 /** An elliptic curve */
 struct elliptic_curve {
 	/** Curve name */
@@ -316,6 +345,18 @@ pubkey_match ( struct pubkey_algorithm *pubkey,
 	       const struct asn1_cursor *private_key,
 	       const struct asn1_cursor *public_key ) {
 	return pubkey->match ( private_key, public_key );
+}
+
+static inline __attribute__ (( always_inline )) void
+exchange_public ( struct exchange_algorithm *exchange, const void *private,
+		  void *public ) {
+	exchange->public ( private, public );
+}
+
+static inline __attribute__ (( always_inline )) int
+exchange_shared ( struct exchange_algorithm *exchange, const void *private,
+		  const void *partner, void *shared ) {
+	return exchange->shared ( private, partner, shared );
 }
 
 static inline __attribute__ (( always_inline )) int
