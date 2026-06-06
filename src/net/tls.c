@@ -1634,6 +1634,7 @@ struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
  */
 static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 	struct tls_named_curve *curve;
+	struct exchange_algorithm *exchange;
 	const struct {
 		uint8_t curve_type;
 		uint16_t named_curve;
@@ -1641,9 +1642,9 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 		uint8_t public[0];
 	} __attribute__ (( packed )) *ecdh;
 	size_t param_len;
-	size_t pointsize;
-	size_t keysize;
-	size_t offset;
+	size_t privsize;
+	size_t pubsize;
+	size_t sharedsize;
 	int rc;
 
 	/* Parse ServerKeyExchange record */
@@ -1679,24 +1680,15 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			   tls->server.exchange_len );
 		return -ENOTSUP_CURVE;
 	}
-	DBGC ( tls, "TLS %p using named curve %s\n", tls, curve->curve->name );
-	pointsize = curve->curve->pointsize;
-	keysize = curve->curve->keysize;
-	offset = ( curve->format ? 1 : 0 );
+	exchange = curve->exchange;
+	privsize = exchange->privsize;
+	pubsize = exchange->pubsize;
+	sharedsize = exchange->sharedsize;
+	DBGC ( tls, "TLS %p using named curve %s\n", tls, exchange->name );
 
 	/* Check key length */
-	if ( ecdh->public_len != ( offset + pointsize ) ) {
-		DBGC ( tls, "TLS %p invalid %s key\n",
-		       tls, curve->curve->name );
-		DBGC_HDA ( tls, 0, tls->server.exchange,
-			   tls->server.exchange_len );
-		return -EINVAL_KEY_EXCHANGE;
-	}
-
-	/* Check curve point format byte (if present) */
-	if ( curve->format && ( ecdh->public[0] != curve->format ) ) {
-		DBGC ( tls, "TLS %p invalid %s curve point format\n",
-		       tls, curve->curve->name );
+	if ( ecdh->public_len != pubsize ) {
+		DBGC ( tls, "TLS %p invalid %s key\n", tls, exchange->name );
 		DBGC_HDA ( tls, 0, tls->server.exchange,
 			   tls->server.exchange_len );
 		return -EINVAL_KEY_EXCHANGE;
@@ -1704,26 +1696,17 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 
 	/* Construct pre-master secret and ClientKeyExchange record */
 	{
-		uint8_t private[keysize];
-		uint8_t pre_master_secret[pointsize];
+		uint8_t private[privsize];
+		uint8_t pre_master_secret[sharedsize];
 		struct {
 			uint32_t type_length;
 			uint8_t public_len;
-			uint8_t public[ecdh->public_len];
+			uint8_t public[pubsize];
 		} __attribute__ (( packed )) key_xchg;
 
 		/* Generate ephemeral private key */
 		if ( ( rc = tls_generate_random ( tls, private,
 						  sizeof ( private ) ) ) != 0){
-			return rc;
-		}
-
-		/* Exchange keys */
-		if ( ( rc = ecdhe_key ( curve->curve, ( ecdh->public + offset ),
-					private, ( key_xchg.public + offset ),
-					pre_master_secret ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not exchange ECDHE key: %s\n",
-			       tls, strerror ( rc ) );
 			return rc;
 		}
 
@@ -1733,8 +1716,7 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			  htonl ( sizeof ( key_xchg ) -
 				  sizeof ( key_xchg.type_length ) ) );
 		key_xchg.public_len = sizeof ( key_xchg.public );
-		if ( curve->format )
-			key_xchg.public[0] = curve->format;
+		exchange_public ( exchange, private, key_xchg.public );
 
 		/* Transmit Client Key Exchange record */
 		if ( ( rc = tls_send_handshake ( tls, &key_xchg,
@@ -1742,9 +1724,17 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			return rc;
 		}
 
+		/* Generate pre-master secret */
+		if ( ( rc = exchange_shared ( exchange, private, ecdh->public,
+					      pre_master_secret ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not exchange keys: %s\n",
+			       tls, strerror ( rc ) );
+			return rc;
+		}
+
 		/* Generate master secret */
 		tls_generate_master_secret ( tls, pre_master_secret,
-					     curve->pre_master_secret_len );
+					     sizeof ( pre_master_secret ) );
 	}
 
 	return 0;

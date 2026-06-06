@@ -41,8 +41,6 @@ struct asn1_algorithm secp384r1_algorithm __asn1_algorithm = {
 
 /** P-384 named curve */
 struct tls_named_curve tls_secp384r1_named_curve __tls_named_curve ( 01 ) = {
-	.curve = &p384_curve,
+	.exchange = &p384_algorithm,
 	.code = htons ( TLS_NAMED_CURVE_SECP384R1 ),
-	.format = TLS_POINT_FORMAT_UNCOMPRESSED,
-	.pre_master_secret_len = P384_LEN,
 };
