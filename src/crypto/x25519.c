@@ -831,59 +831,6 @@ void x25519_key ( const struct x25519_value *base,
 }
 
 /**
- * Check if this is the point at infinity
- *
- * @v point		Curve point
- * @ret is_infinity	This is the point at infinity
- */
-static int x25519_curve_is_infinity ( const void *point ) {
-
-	/* We use all zeroes for the point at infinity (as per RFC8422) */
-	return x25519_is_zero ( point );
-}
-
-/**
- * Multiply scalar by curve point
- *
- * @v base		Base point
- * @v scalar		Scalar multiple
- * @v result		Result point to fill in
- * @ret rc		Return status code
- */
-static int x25519_curve_multiply ( const void *base, const void *scalar,
-				   void *result ) {
-
-	x25519_key ( base, scalar, result );
-	return 0;
-}
-
-/**
- * Add curve points (as a one-off operation)
- *
- * @v addend		Curve point to add
- * @v augend		Curve point to add
- * @v result		Curve point to hold result
- * @ret rc		Return status code
- */
-static int x25519_curve_add ( const void *addend __unused,
-			      const void *augend __unused,
-			      void *result __unused ) {
-
-	return -ENOTTY;
-}
-
-/** X25519 elliptic curve */
-struct elliptic_curve x25519_curve = {
-	.name = "x25519",
-	.pointsize = sizeof ( struct x25519_value ),
-	.keysize = sizeof ( struct x25519_value ),
-	.base = x25519_generator.raw,
-	.is_infinity = x25519_curve_is_infinity,
-	.multiply = x25519_curve_multiply,
-	.add = x25519_curve_add,
-};
-
-/**
  * Calculate public key
  *
  * @v private		Private key

@@ -91,7 +91,6 @@ extern void x25519_key ( const struct x25519_value *base,
 			 struct x25519_value *result );
 extern int x25519_is_zero ( const struct x25519_value *value );
 
-extern struct elliptic_curve x25519_curve;
 extern struct exchange_algorithm x25519_algorithm;
 
 #endif /* _IPXE_X25519_H */
