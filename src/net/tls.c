@@ -51,7 +51,6 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
 #include <ipxe/dhe.h>
-#include <ipxe/ecdhe.h>
 #include <ipxe/tls.h>
 #include <config/crypto.h>
 
