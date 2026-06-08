@@ -19,6 +19,7 @@ exit
 
 :dhcp_ok
 route ||
+fetchvar --method PUT ec2token http://169.254.169.254/latest/api/token ||
 chain -ar http://169.254.169.254/latest/user-data ||
 ifstat ||
 exit
