@@ -443,7 +443,7 @@ static int iscsi_rx_scsi_response ( struct iscsi_session *iscsi,
 		rsp.overrun = -(residual_count);
 	}
 	data_len = ISCSI_DATA_LEN ( response->lengths );
-	if ( data_len ) {
+	if ( data_len >= 2 ) {
 		scsi_parse_sense ( ( iscsi->rx_buffer + 2 ), ( data_len - 2 ),
 				   &rsp.sense );
 	}
