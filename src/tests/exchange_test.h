@@ -13,12 +13,20 @@ struct exchange_test {
 	struct exchange_algorithm *exchange;
 	/** Private key */
 	const void *private;
+	/** Length of private key */
+	size_t private_len;
 	/** Partner public key */
 	const void *partner;
+	/** Length of partner key */
+	size_t partner_len;
 	/** Expected public key */
 	const void *public;
-	/** Expected shared secret, or NULL to expect failure */
+	/** Length of expected public key */
+	size_t public_len;
+	/** Expected shared secret */
 	const void *shared;
+	/** Length of expected shared secret, or 0 to expect failure */
+	size_t shared_len;
 };
 
 /** Define inline private key */
@@ -56,10 +64,13 @@ struct exchange_test {
 	static struct exchange_test name = {				\
 		.exchange = EXCHANGE,					\
 		.private = name ## _private,				\
+		.private_len = sizeof ( name ## _private ),		\
 		.partner = name ## _partner,				\
+		.partner_len = sizeof ( name ## _partner ),		\
 		.public = name ## _public,				\
-		.shared = ( sizeof ( name ## _shared ) ?		\
-			    name ## _shared : NULL ),			\
+		.public_len = sizeof ( name ## _public ),		\
+		.shared = name ## _shared,				\
+		.shared_len = sizeof ( name ## _shared ),		\
 	};
 
 /**
