@@ -358,11 +358,8 @@ FILE_SECBOOT ( PERMITTED );
  * @v modulus		Big integer modulus
  * @ret len		Length of temporary working space
  */
-#define bigint_mod_exp_tmp_len( modulus ) ( {				\
-	unsigned int size = bigint_size (modulus);			\
-	sizeof ( struct {						\
-		bigint_t ( size ) temp[4];				\
-	} ); } )
+#define bigint_mod_exp_tmp_len( modulus )				\
+	sizeof ( struct { typeof ( *(modulus) ) temp[4]; } )
 
 #include <bits/bigint.h>
 
