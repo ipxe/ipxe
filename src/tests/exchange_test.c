@@ -47,8 +47,10 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 void exchange_okx ( struct exchange_test *test, const char *file,
 		    unsigned int line ) {
 	struct exchange_algorithm *exchange = test->exchange;
-	uint8_t public[ exchange->pubsize ];
-	uint8_t shared[ exchange->sharedsize ];
+	struct {
+		uint8_t public[ exchange->pubsize ];
+		uint8_t shared[ exchange->sharedsize ];
+	} *actual;
 	int rc;
 
 	/* Sanity checks */
@@ -58,28 +60,36 @@ void exchange_okx ( struct exchange_test *test, const char *file,
 	okx ( ( ( test->shared_len == 0 ) ||
 		( test->shared_len == exchange->sharedsize ) ), file, line );
 
+	/* Allocate result buffer */
+	actual = malloc ( sizeof ( *actual ) );
+	okx ( actual != NULL, file, line );
+
 	/* Verify calculation of public key */
 	DBGC ( test, "KEX %s private key:\n", exchange->name );
 	DBGC_HDA ( test, 0, test->private, exchange->privsize );
-	exchange_public ( exchange, test->private, public );
+	exchange_public ( exchange, test->private, actual->public );
 	DBGC ( test, "KEX %s public key:\n", exchange->name );
-	DBGC_HDA ( test, 0, public, exchange->pubsize );
-	okx ( memcmp ( public, test->public, exchange->pubsize ) == 0,
+	DBGC_HDA ( test, 0, actual->public, exchange->pubsize );
+	okx ( memcmp ( actual->public, test->public, exchange->pubsize ) == 0,
 	      file, line );
 
 	/* Verify calculation of shared secret */
 	DBGC ( test, "KEX %s partner key:\n", exchange->name );
 	DBGC_HDA ( test, 0, test->partner, exchange->pubsize );
-	rc = exchange_shared ( exchange, test->private, test->partner, shared );
+	rc = exchange_shared ( exchange, test->private, test->partner,
+			       actual->shared );
 	if ( test->shared_len ) {
 		/* Verify successful calculation */
 		okx ( rc == 0, file, line );
 		DBGC ( test, "KEX %s shared secret:\n", exchange->name );
-		DBGC_HDA ( test, 0, shared, exchange->sharedsize );
-		okx ( memcmp ( shared, test->shared,
+		DBGC_HDA ( test, 0, actual->shared, exchange->sharedsize );
+		okx ( memcmp ( actual->shared, test->shared,
 			       exchange->sharedsize ) == 0, file, line );
 	} else {
 		/* Verify failure */
 		okx ( rc != 0, file, line );
 	}
+
+	/* Free result buffer */
+	free ( actual );
 }
