@@ -74,15 +74,15 @@ static int efisig_find ( const void *data, size_t len, size_t *start,
 		*lhdr = ( data + offset );
 
 		/* Get length of this signature list */
-		if ( remaining < (*lhdr)->SignatureListSize ) {
+		if ( remaining < le32_to_cpu ( (*lhdr)->SignatureListSize ) ) {
 			DBGC ( data, "EFISIG [%#zx,%#zx) truncated list at "
 			       "+%#zx\n", *start, len, offset );
 			return -EINVAL;
 		}
-		remaining = (*lhdr)->SignatureListSize;
+		remaining = le32_to_cpu ( (*lhdr)->SignatureListSize );
 
 		/* Get length of each signature in list */
-		dlen = (*lhdr)->SignatureSize;
+		dlen = le32_to_cpu ( (*lhdr)->SignatureSize );
 		if ( dlen < sizeof ( **dhdr ) ) {
 			DBGC ( data, "EFISIG [%#zx,%#zx) underlength "
 			       "signatures at +%#zx\n", *start, len, offset );
@@ -92,12 +92,13 @@ static int efisig_find ( const void *data, size_t len, size_t *start,
 		/* Strip list header (including variable portion) */
 		if ( ( remaining < sizeof ( **lhdr ) ) ||
 		     ( ( remaining - sizeof ( **lhdr ) ) <
-		       (*lhdr)->SignatureHeaderSize ) ) {
+		       le32_to_cpu ( (*lhdr)->SignatureHeaderSize ) ) ) {
 			DBGC ( data, "EFISIG [%#zx,%#zx) malformed header at "
 			       "+%#zx\n", *start, len, offset );
 			return -EINVAL;
 		}
-		skip = ( sizeof ( **lhdr ) + (*lhdr)->SignatureHeaderSize );
+		skip = ( sizeof ( **lhdr ) +
+			 le32_to_cpu ( (*lhdr)->SignatureHeaderSize ) );
 		offset += skip;
 		remaining -= skip;
 
@@ -153,7 +154,7 @@ int efisig_asn1 ( const void *data, size_t len, size_t offset,
 	/* Locate signature list entry */
 	if ( ( rc = efisig_find ( data, len, &offset, &lhdr, &dhdr ) ) != 0 )
 		goto err_entry;
-	len = ( offset + lhdr->SignatureSize );
+	len = ( offset + le32_to_cpu ( lhdr->SignatureSize ) );
 
 	/* Parse as PEM or DER based on first character */
 	asn1 = ( ( dhdr->SignatureData[0] == ASN1_SEQUENCE ) ?
@@ -208,7 +209,7 @@ static int efisig_image_probe ( struct image *image ) {
 		}
 
 		/* Skip this entry */
-		offset += lhdr->SignatureSize;
+		offset += le32_to_cpu ( lhdr->SignatureSize );
 		count++;
 
 		/* Check if we have reached end of the image */
