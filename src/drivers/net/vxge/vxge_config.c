@@ -739,17 +739,16 @@ __vxge_hw_legacy_swapper_set(struct vxge_hw_legacy_reg __iomem *legacy_reg)
 enum vxge_hw_status
 __vxge_hw_vpath_swapper_set(struct vxge_hw_vpath_reg __iomem *vpath_reg)
 {
+	u64 val64;
 	vxge_trace();
 
-#if (__BYTE_ORDER != __BIG_ENDIAN)
-	u64 val64;
-
-	val64 = readq(&vpath_reg->vpath_general_cfg1);
-	wmb();
-	val64 |= VXGE_HW_VPATH_GENERAL_CFG1_CTL_BYTE_SWAPEN;
-	writeq(val64, &vpath_reg->vpath_general_cfg1);
-	wmb();
-#endif
+	if (__BYTE_ORDER != __BIG_ENDIAN) {
+		val64 = readq(&vpath_reg->vpath_general_cfg1);
+		wmb();
+		val64 |= VXGE_HW_VPATH_GENERAL_CFG1_CTL_BYTE_SWAPEN;
+		writeq(val64, &vpath_reg->vpath_general_cfg1);
+		wmb();
+	}
 	return VXGE_HW_OK;
 }
 
@@ -1372,10 +1371,9 @@ __vxge_hw_vpath_kdfc_configure(struct __vxge_hw_device *hldev, u32 vp_id)
 
 	val64 |= VXGE_HW_KDFC_TRPL_FIFO_0_CTRL_MODE(
 		 VXGE_HW_KDFC_TRPL_FIFO_0_CTRL_MODE_NON_OFFLOAD_ONLY) |
-#if (__BYTE_ORDER != __BIG_ENDIAN)
-		 VXGE_HW_KDFC_TRPL_FIFO_0_CTRL_SWAP_EN |
-#endif
 		 VXGE_HW_KDFC_TRPL_FIFO_0_CTRL_SELECT(0);
+	if (__BYTE_ORDER != __BIG_ENDIAN)
+		val64 |= VXGE_HW_KDFC_TRPL_FIFO_0_CTRL_SWAP_EN;
 
 	writeq(val64, &vp_reg->kdfc_trpl_fifo_0_ctrl);
 	writeq((u64)0, &vp_reg->kdfc_trpl_fifo_0_wb_address);

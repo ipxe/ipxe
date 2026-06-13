@@ -82,7 +82,7 @@ static int pcibridge_probe ( struct pci_device *pci ) {
 
 	/* Read bus configuration */
 	pci_read_config_dword ( pci, PCI_PRIMARY, &bridge->buses );
-	cpu_to_le32s ( &buses );
+	cpu_to_le32s ( &bridge->buses );
 
 	/* Read memory base and limit */
 	pci_read_config_word ( pci, PCI_MEM_BASE, &base );

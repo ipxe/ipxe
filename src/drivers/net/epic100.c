@@ -380,7 +380,7 @@ epic100_poll(struct nic *nic, int retrieve)
     unsigned long status;
     entry = cur_rx % RX_RING_SIZE;
 
-    if ((rx_ring[entry].status & cpu_to_le32(RRING_OWN)) == RRING_OWN)
+    if (rx_ring[entry].status & cpu_to_le32(RRING_OWN))
 	return (0);
 
     if ( ! retrieve ) return 1;

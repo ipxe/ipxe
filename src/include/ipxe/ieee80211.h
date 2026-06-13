@@ -849,7 +849,7 @@ static inline size_t ieee80211_rsn_size ( int npair, int nauth, int npmkid,
 /** Make OUI plus type byte into 32-bit integer for easy comparison */
 #if __BYTE_ORDER == __BIG_ENDIAN
 #define _MKOUI( a, b, c, t )	\
-		( ( ( a ) << 24 ) | ( ( b ) << 16 ) | ( ( c ) << 8 ) | ( d ) )
+		( ( ( a ) << 24 ) | ( ( b ) << 16 ) | ( ( c ) << 8 ) | ( t ) )
 #define  OUI_ORG_MASK		0xFFFFFF00
 #define  OUI_TYPE_MASK		0x000000FF
 #else
