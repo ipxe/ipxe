@@ -140,8 +140,12 @@ TCPIP_RANDOM_TEST ( partial, 0xcafebabe, 121, 5 );
  * negative zero (0xffff) if the input data is zero length (or all
  * zeros) but positive zero (0x0000) for any other data which sums to
  * zero.
+ *
+ * A shift is applied to the trailing byte to ensure that the correct
+ * result is calculated on a big-endian system.
  */
 static uint16_t rfc_tcpip_chksum ( const void *data, size_t len ) {
+	unsigned int shift = ( ( __BYTE_ORDER == __BIG_ENDIAN ) ? 8 : 0 );
 	unsigned long sum = 0xffff;
 
         while ( len > 1 )  {
@@ -151,7 +155,7 @@ static uint16_t rfc_tcpip_chksum ( const void *data, size_t len ) {
 	}
 
 	if ( len > 0 )
-		sum += *( ( uint8_t * ) data );
+		sum += ( *( ( uint8_t * ) data ) << shift );
 
 	while ( sum >> 16 )
 		sum = ( ( sum & 0xffff ) + ( sum >> 16 ) );
