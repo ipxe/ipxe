@@ -1,0 +1,6 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Include generic Linux Makefile
+#
+MAKEDEPS	+= Makefile.linux
+include Makefile.linux
