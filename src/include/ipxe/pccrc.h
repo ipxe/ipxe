@@ -388,7 +388,9 @@ struct peerdist_info_segment {
  * ASCII string.  The terminating wNUL *is* included within the
  * constant.
  */
-#define PEERDIST_SEGMENT_ID_MAGIC L"MS_P2P_CACHING"
+#define PEERDIST_SEGMENT_ID_MAGIC					\
+	{ 'M', 0, 'S', 0, '_', 0, 'P', 0, '2', 0, 'P', 0, '_', 0,	\
+	  'C', 0, 'A', 0, 'C', 0, 'H', 0, 'I', 0, 'N', 0, 'G', 0, 0, 0 }
 
 /** A content information block */
 struct peerdist_info_block {

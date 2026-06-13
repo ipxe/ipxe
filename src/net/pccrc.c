@@ -106,7 +106,7 @@ static void peerdist_info_segment_hash ( struct peerdist_info_segment *segment,
 	struct digest_algorithm *digest = info->digest;
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	size_t digestsize = info->digestsize;
-	static const uint16_t magic[] = PEERDIST_SEGMENT_ID_MAGIC;
+	static const uint8_t magic[] = PEERDIST_SEGMENT_ID_MAGIC;
 
 	/* Sanity check */
 	assert ( digestsize <= sizeof ( segment->hash ) );
