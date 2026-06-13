@@ -45,6 +45,7 @@ FILE_SECBOOT ( PERMITTED );
  * implementation of the big integer operations.
  */
 
+#include <string.h>
 #include <errno.h>
 #include <ipxe/weierstrass.h>
 

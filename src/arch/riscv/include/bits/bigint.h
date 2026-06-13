@@ -11,32 +11,9 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <string.h>
-#include <strings.h>
 
 /** Element of a big integer */
 typedef unsigned long bigint_element_t;
-
-/**
- * Initialise big integer
- *
- * @v value0		Element 0 of big integer to initialise
- * @v size		Number of elements
- * @v data		Raw data
- * @v len		Length of raw data
- */
-static inline __attribute__ (( always_inline )) void
-bigint_init_raw ( unsigned long *value0, unsigned int size,
-		  const void *data, size_t len ) {
-	size_t pad_len = ( sizeof ( bigint_t ( size ) ) - len );
-	uint8_t *value_byte = ( ( void * ) value0 );
-	const uint8_t *data_byte = ( data + len );
-
-	/* Copy raw data in reverse order, padding with zeros */
-	while ( len-- )
-		*(value_byte++) = *(--data_byte);
-	while ( pad_len-- )
-		*(value_byte++) = 0;
-}
 
 /**
  * Add big integers
@@ -222,76 +199,6 @@ bigint_shr_raw ( unsigned long *value0, unsigned int size ) {
 }
 
 /**
- * Test if big integer is equal to zero
- *
- * @v value0		Element 0 of big integer
- * @v size		Number of elements
- * @ret is_zero		Big integer is equal to zero
- */
-static inline __attribute__ (( always_inline, pure )) int
-bigint_is_zero_raw ( const unsigned long *value0, unsigned int size ) {
-	const unsigned long *value = value0;
-	unsigned long value_i;
-
-	do {
-		value_i = *(value++);
-		if ( value_i )
-			break;
-	} while ( --size );
-
-	return ( value_i == 0 );
-}
-
-/**
- * Compare big integers
- *
- * @v value0		Element 0 of big integer
- * @v reference0	Element 0 of reference big integer
- * @v size		Number of elements
- * @ret geq		Big integer is greater than or equal to the reference
- */
-static inline __attribute__ (( always_inline, pure )) int
-bigint_is_geq_raw ( const unsigned long *value0,
-		    const unsigned long *reference0, unsigned int size ) {
-	const unsigned long *value = ( value0 + size );
-	const unsigned long *reference = ( reference0 + size );
-	unsigned long value_i;
-	unsigned long reference_i;
-
-	do {
-		value_i = *(--value);
-		reference_i = *(--reference);
-		if ( value_i != reference_i )
-			break;
-	} while ( --size );
-
-	return ( value_i >= reference_i );
-}
-
-/**
- * Find highest bit set in big integer
- *
- * @v value0		Element 0 of big integer
- * @v size		Number of elements
- * @ret max_bit		Highest bit set + 1 (or 0 if no bits set)
- */
-static inline __attribute__ (( always_inline )) int
-bigint_max_set_bit_raw ( const unsigned long *value0, unsigned int size ) {
-	const unsigned long *value = ( value0 + size );
-	int max_bit = ( 8 * sizeof ( bigint_t ( size ) ) );
-	unsigned long value_i;
-
-	do {
-		value_i = *(--value);
-		max_bit -= ( ( 8 * sizeof ( *value0 ) ) - fls ( value_i ) );
-		if ( value_i )
-			break;
-	} while ( --size );
-
-	return max_bit;
-}
-
-/**
  * Grow big integer
  *
  * @v source0		Element 0 of source big integer
@@ -322,25 +229,6 @@ bigint_shrink_raw ( const unsigned long *source0,
 		    unsigned long *dest0, unsigned int dest_size ) {
 
 	memcpy ( dest0, source0, sizeof ( bigint_t ( dest_size ) ) );
-}
-
-/**
- * Finalise big integer
- *
- * @v value0		Element 0 of big integer to finalise
- * @v size		Number of elements
- * @v out		Output buffer
- * @v len		Length of output buffer
- */
-static inline __attribute__ (( always_inline )) void
-bigint_done_raw ( const unsigned long *value0, unsigned int size __unused,
-		  void *out, size_t len ) {
-	const uint8_t *value_byte = ( ( const void * ) value0 );
-	uint8_t *out_byte = ( out + len );
-
-	/* Copy raw data in reverse order */
-	while ( len-- )
-		*(--out_byte) = *(value_byte++);
 }
 
 /**

@@ -42,6 +42,7 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 #include <ipxe/ffdhe.h>
 

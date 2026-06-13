@@ -26,7 +26,9 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
 #include <assert.h>
+#include <byteswap.h>
 #include <stdio.h>
 #include <ipxe/bigint.h>
 
@@ -79,6 +81,138 @@ const char * bigint_ntoa_raw ( const bigint_element_t *value0,
 	assert ( tmp < ( buf + sizeof ( buf ) ) );
 
 	return buf;
+}
+
+/**
+ * Initialise big integer
+ *
+ * @v value0		Element 0 of big integer to initialise
+ * @v size		Number of elements
+ * @v data		Raw data
+ * @v len		Length of raw data
+ */
+void bigint_init_raw ( bigint_element_t *value0, unsigned int size,
+		       const void *data, size_t len ) {
+	bigint_t ( size ) __attribute__ (( may_alias ))
+		*value = ( ( void * ) value0 );
+	uint8_t *value_byte = ( ( void * ) value0 );
+	const uint8_t *data_byte = data;
+	unsigned int toggle;
+	unsigned int i;
+
+	/* Zero big integer */
+	memset ( value, 0, sizeof ( *value ) );
+
+	/* Copy data, byte-swapping as needed */
+	toggle = ( ( __BYTE_ORDER == __LITTLE_ENDIAN ) ? 0 :
+		   ( sizeof ( value->element[0] ) - 1 ) );
+	for ( i = 0 ; len-- ; i++ )
+		value_byte[ i ^ toggle ] = data_byte[len];
+}
+
+/**
+ * Finalise big integer
+ *
+ * @v value0		Element 0 of big integer to finalise
+ * @v size		Number of elements
+ * @v out		Output buffer
+ * @v len		Length of output buffer
+ */
+void bigint_done_raw ( const bigint_element_t *value0, unsigned int size,
+		       void *out, size_t len ) {
+	const bigint_t ( size ) __attribute__ (( may_alias ))
+		*value = ( ( const void * ) value0 );
+	const uint8_t *value_byte = ( ( const void * ) value0 );
+	uint8_t *out_byte = out;
+	unsigned int toggle;
+	unsigned int i;
+
+	/* Zero output buffer */
+	memset ( out, 0, len );
+
+	/* Copy data, byte-swapping as needed */
+	toggle = ( ( __BYTE_ORDER == __LITTLE_ENDIAN ) ? 0 :
+		   ( sizeof ( value->element[0] ) - 1 ) );
+	for ( i = 0 ; len-- ; i++ )
+		out_byte[len] = value_byte[ i ^ toggle ];
+}
+
+/**
+ * Test if big integer is equal to zero
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @ret is_zero		Big integer is equal to zero
+ */
+int bigint_is_zero_raw ( const bigint_element_t *value0, unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( const void * ) value0 );
+	bigint_element_t or;
+	unsigned int i;
+
+	/* Construct binary OR of all elements */
+	for ( i = 0, or = 0 ; i < size ; i++ )
+		or |= value->element[i];
+
+	return ( or == 0 );
+}
+
+/**
+ * Compare big integers
+ *
+ * @v value0		Element 0 of big integer
+ * @v reference0	Element 0 of reference big integer
+ * @v size		Number of elements
+ * @ret geq		Big integer is greater than or equal to the reference
+ */
+int bigint_is_geq_raw ( const bigint_element_t *value0,
+			const bigint_element_t *reference0,
+			unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( const void * ) value0 );
+	const bigint_t ( size ) __attribute__ (( may_alias )) *reference =
+		( ( const void * ) reference0 );
+	bigint_element_t value_element;
+	bigint_element_t reference_element;
+
+	/* Find highest differing element */
+	do {
+		value_element = value->element[ size - 1 ];
+		reference_element = reference->element[ size - 1 ];
+		if ( value_element != reference_element )
+			break;
+	} while ( --size );
+
+	return ( value_element >= reference_element );
+}
+
+/**
+ * Find highest bit set in big integer
+ *
+ * @v value0		Element 0 of big integer
+ * @v size		Number of elements
+ * @ret max_bit		Highest bit set + 1 (or 0 if no bits set)
+ */
+int bigint_max_set_bit_raw ( const bigint_element_t *value0,
+			     unsigned int size ) {
+	const bigint_t ( size ) __attribute__ (( may_alias )) *value =
+		( ( const void * ) value0 );
+	bigint_element_t element;
+	unsigned int max_bit;
+	unsigned int i;
+
+	/* Find highest set bit in highest non-zero element */
+	max_bit = ( sizeof ( *value ) * 8 );
+	for ( i = 0 ; i < size ; i++ ) {
+		element = value->element[ size - i - 1 ];
+		max_bit -= ( sizeof ( element) * 8 );
+		if ( element ) {
+			max_bit += flsll ( element );
+			break;
+		}
+	}
+
+	return max_bit;
 }
 
 /**
