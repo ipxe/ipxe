@@ -43,8 +43,10 @@ FILE_LICENCE(GPL2_OR_LATER);
 
 static void linux_console_putchar(int c)
 {
+	char ch = c;
+
 	/* write to stdout */
-	if (linux_write(1, &c, 1) != 1)
+	if (linux_write(1, &ch, sizeof (ch)) != 1)
 		DBG("linux_console write failed (%s)\n", linux_strerror(linux_errno));
 }
 
