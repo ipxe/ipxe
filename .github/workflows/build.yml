@@ -304,6 +304,8 @@ jobs:
             exec: qemu-riscv32-static
           - arch: riscv64
             exec: qemu-riscv64-static
+          - arch: s390x
+            exec: qemu-s390x-static
           - arch: x86_64
             exec: valgrind
     container:
