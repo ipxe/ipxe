@@ -2630,11 +2630,40 @@ static int unixtime_fetch ( void *data, size_t len ) {
 	uint32_t content;
 
 	/* Return current time */
-	content = htonl ( time(NULL) );
+	content = htonl ( time ( NULL ) );
 	if ( len > sizeof ( content ) )
 		len = sizeof ( content );
 	memcpy ( data, &content, len );
 	return sizeof ( content );
+}
+
+/**
+ * Store current time setting
+ *
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int unixtime_store ( const void *data, size_t len ) {
+	unsigned long value;
+	int check_len;
+	int rc;
+
+	/* Get intended current time */
+	check_len = numeric_setting_value ( 0, data, len, &value );
+	if ( check_len < 0 ) {
+		rc = check_len;
+		return rc;
+	}
+
+	/* Adjust or restore system clock, as applicable */
+	if ( len ) {
+		time_adjust ( value - time ( NULL ) );
+	} else {
+		time_restore();
+	}
+
+	return 0;
 }
 
 /** Current time setting */
@@ -2648,6 +2677,7 @@ const struct setting unixtime_setting __setting ( SETTING_MISC, unixtime ) = {
 /** Current time built-in setting */
 struct builtin_setting unixtime_builtin_setting __builtin_setting = {
 	.setting = &unixtime_setting,
+	.store = unixtime_store,
 	.fetch = unixtime_fetch,
 };
 

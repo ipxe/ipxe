@@ -71,4 +71,13 @@ time_adjust ( signed long delta ) {
 	time_offset += delta;
 }
 
+/**
+ * Clear system clock adjustment
+ *
+ */
+static inline __attribute__ (( always_inline )) void time_restore ( void ) {
+
+	time_offset = 0;
+}
+
 #endif /* _IPXE_TIME_H */
