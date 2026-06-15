@@ -422,6 +422,8 @@ static int scsicmd_command ( struct scsi_command *scsicmd ) {
 	/* Construct command */
 	memset ( &command, 0, sizeof ( command ) );
 	memcpy ( &command.lun, &scsidev->lun, sizeof ( command.lun ) );
+	xferbuf_void_init ( &command.data_in );
+	xferbuf_void_init ( &command.data_out );
 	scsicmd->type->cmd ( scsicmd, &command );
 
 	/* Issue command */
@@ -517,8 +519,8 @@ static void scsicmd_read_cmd ( struct scsi_command *scsicmd,
 		command->cdb.read10.lba = cpu_to_be32 ( scsicmd->lba );
 		command->cdb.read10.len = cpu_to_be16 ( scsicmd->count );
 	}
-	command->data_in = scsicmd->buffer;
-	command->data_in_len = scsicmd->len;
+	xferbuf_fixed_init ( &command->data_in, scsicmd->buffer,
+			     scsicmd->len );
 }
 
 /** SCSI READ command type */
@@ -548,8 +550,8 @@ static void scsicmd_write_cmd ( struct scsi_command *scsicmd,
 		command->cdb.write10.lba = cpu_to_be32 ( scsicmd->lba );
 		command->cdb.write10.len = cpu_to_be16 ( scsicmd->count );
 	}
-	command->data_out = scsicmd->buffer;
-	command->data_out_len = scsicmd->len;
+	xferbuf_fixed_init ( &command->data_out, scsicmd->buffer,
+			     scsicmd->len );
 }
 
 /** SCSI WRITE command type */
@@ -592,13 +594,13 @@ static void scsicmd_read_capacity_cmd ( struct scsi_command *scsicmd,
 		readcap16->service_action =
 			SCSI_SERVICE_ACTION_READ_CAPACITY_16;
 		readcap16->len = cpu_to_be32 ( sizeof ( *capacity16 ) );
-		command->data_in = capacity16;
-		command->data_in_len = sizeof ( *capacity16 );
+		xferbuf_fixed_init ( &command->data_in, capacity16,
+				     sizeof ( *capacity16 ) );
 	} else {
 		/* Use READ CAPACITY (10) */
 		readcap10->opcode = SCSI_OPCODE_READ_CAPACITY_10;
-		command->data_in = capacity10;
-		command->data_in_len = sizeof ( *capacity10 );
+		xferbuf_fixed_init ( &command->data_in, capacity10,
+				     sizeof ( *capacity10 ) );
 	}
 }
 

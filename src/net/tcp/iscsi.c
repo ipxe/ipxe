@@ -377,32 +377,32 @@ static void iscsi_scsi_done ( struct iscsi_session *iscsi, int rc,
 static void iscsi_start_command ( struct iscsi_session *iscsi ) {
 	struct iscsi_bhs_scsi_command *command = &iscsi->tx_bhs.scsi_command;
 
-	assert ( ! ( iscsi->command->data_in && iscsi->command->data_out ) );
+	assert ( ! ( iscsi->command->data_in.len &&
+		     iscsi->command->data_out.len ) );
 
 	/* Construct BHS and initiate transmission */
 	iscsi_start_tx ( iscsi );
 	command->opcode = ISCSI_OPCODE_SCSI_COMMAND;
 	command->flags = ( ISCSI_FLAG_FINAL |
 			   ISCSI_COMMAND_ATTR_SIMPLE );
-	if ( iscsi->command->data_in )
+	if ( iscsi->command->data_in.len )
 		command->flags |= ISCSI_COMMAND_FLAG_READ;
-	if ( iscsi->command->data_out )
+	if ( iscsi->command->data_out.len )
 		command->flags |= ISCSI_COMMAND_FLAG_WRITE;
 	/* lengths left as zero */
 	memcpy ( &command->lun, &iscsi->command->lun,
 		 sizeof ( command->lun ) );
 	command->itt = htonl ( iscsi->itt );
-	command->exp_len = htonl ( iscsi->command->data_in_len |
-				   iscsi->command->data_out_len );
+	command->exp_len = htonl ( iscsi->command->data_in.len |
+				   iscsi->command->data_out.len );
 	command->cmdsn = htonl ( iscsi->cmdsn );
 	command->expstatsn = htonl ( iscsi->statsn + 1 );
 	memcpy ( &command->cdb, &iscsi->command->cdb, sizeof ( command->cdb ));
 	DBGC2 ( iscsi, "iSCSI %p start " SCSI_CDB_FORMAT " %s %#zx\n",
 		iscsi, SCSI_CDB_DATA ( command->cdb ),
-		( iscsi->command->data_in ? "in" : "out" ),
-		( iscsi->command->data_in ?
-		  iscsi->command->data_in_len :
-		  iscsi->command->data_out_len ) );
+		( iscsi->command->data_in.len ? "in" : "out" ),
+		( iscsi->command->data_in.len +
+		  iscsi->command->data_out.len ) );
 }
 
 /**
@@ -472,13 +472,14 @@ static int iscsi_rx_data_in ( struct iscsi_session *iscsi,
 			      size_t remaining ) {
 	struct iscsi_bhs_data_in *data_in = &iscsi->rx_bhs.data_in;
 	unsigned long offset;
+	int rc;
 
 	/* Copy data to data-in buffer */
 	offset = ntohl ( data_in->offset ) + iscsi->rx_offset;
 	assert ( iscsi->command != NULL );
-	assert ( iscsi->command->data_in );
-	assert ( ( offset + len ) <= iscsi->command->data_in_len );
-	memcpy ( ( iscsi->command->data_in + offset ), data, len );
+	if ( ( rc = xferbuf_write ( &iscsi->command->data_in, offset,
+				    data, len ) ) != 0 )
+		return rc;
 
 	/* Wait for whole SCSI response to arrive */
 	if ( remaining )
@@ -486,7 +487,7 @@ static int iscsi_rx_data_in ( struct iscsi_session *iscsi,
 
 	/* Mark as completed if status is present */
 	if ( data_in->flags & ISCSI_DATA_FLAG_STATUS ) {
-		assert ( ( offset + len ) == iscsi->command->data_in_len );
+		assert ( ( offset + len ) == iscsi->command->data_in.len );
 		assert ( data_in->flags & ISCSI_FLAG_FINAL );
 		/* iSCSI cannot return an error status via a data-in */
 		iscsi_scsi_done ( iscsi, 0, NULL );
@@ -585,24 +586,41 @@ static int iscsi_tx_data_out ( struct iscsi_session *iscsi ) {
 	unsigned long offset;
 	size_t len;
 	size_t pad_len;
+	int rc;
 
+	/* Calculate offset and lengths */
 	offset = ntohl ( data_out->offset );
 	len = ISCSI_DATA_LEN ( data_out->lengths );
 	pad_len = ISCSI_DATA_PAD_LEN ( data_out->lengths );
 
-	assert ( iscsi->command != NULL );
-	assert ( iscsi->command->data_out );
-	assert ( ( offset + len ) <= iscsi->command->data_out_len );
-
+	/* Allocate I/O buffer */
 	iobuf = xfer_alloc_iob ( &iscsi->socket, ( len + pad_len ) );
-	if ( ! iobuf )
-		return -ENOMEM;
-	
-	memcpy ( iob_put ( iobuf, len ),
-		 ( iscsi->command->data_out + offset ), len );
+	if ( ! iobuf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Copy data to I/O buffer */
+	assert ( iscsi->command != NULL );
+	if ( ( rc = xferbuf_read ( &iscsi->command->data_out, offset,
+				   iob_put ( iobuf, len ), len ) ) != 0 ) {
+		goto err_read;
+	}
 	memset ( iob_put ( iobuf, pad_len ), 0, pad_len );
 
-	return xfer_deliver_iob ( &iscsi->socket, iobuf );
+	/* Deliver I/O buffer */
+	if ( ( rc = xfer_deliver_iob ( &iscsi->socket,
+				       iob_disown ( iobuf ) ) ) != 0 ) {
+		goto err_deliver;
+	}
+
+	return 0;
+
+ err_deliver:
+ err_read:
+	free_iob ( iobuf );
+ err_alloc:
+	return rc;
 }
 
 /**

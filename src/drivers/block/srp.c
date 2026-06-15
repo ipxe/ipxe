@@ -424,23 +424,23 @@ static int srp_cmd ( struct srp_device *srpdev,
 	memcpy ( &cmd->cdb, &command->cdb, sizeof ( cmd->cdb ) );
 
 	/* Construct data-out descriptor, if present */
-	if ( command->data_out ) {
+	if ( command->data_out.len ) {
 		cmd->data_buffer_formats |= SRP_CMD_DO_FMT_DIRECT;
 		data_out = iob_put ( iobuf, sizeof ( *data_out ) );
 		data_out->address =
-		    cpu_to_be64 ( virt_to_phys ( command->data_out ) );
+		    cpu_to_be64 ( virt_to_phys ( command->data_out.data ) );
 		data_out->handle = ntohl ( srpdev->memory_handle );
-		data_out->len = ntohl ( command->data_out_len );
+		data_out->len = ntohl ( command->data_out.len );
 	}
 
 	/* Construct data-in descriptor, if present */
-	if ( command->data_in ) {
+	if ( command->data_in.len ) {
 		cmd->data_buffer_formats |= SRP_CMD_DI_FMT_DIRECT;
 		data_in = iob_put ( iobuf, sizeof ( *data_in ) );
 		data_in->address =
-		     cpu_to_be64 ( virt_to_phys ( command->data_in ) );
+		     cpu_to_be64 ( virt_to_phys ( command->data_in.data ) );
 		data_in->handle = ntohl ( srpdev->memory_handle );
-		data_in->len = ntohl ( command->data_in_len );
+		data_in->len = ntohl ( command->data_in.len );
 	}
 
 	DBGC2 ( srpdev, "SRP %p tag %08x CMD " SCSI_CDB_FORMAT "\n",

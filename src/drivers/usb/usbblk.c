@@ -154,7 +154,7 @@ static int usbblk_out_command ( struct usbblk_device *usbblk ) {
 
 	/* Sanity checks */
 	assert ( cmd->tag );
-	assert ( ! ( cmd->scsi.data_in_len && cmd->scsi.data_out_len ) );
+	assert ( ! ( cmd->scsi.data_in.len && cmd->scsi.data_out.len ) );
 
 	/* Allocate I/O buffer */
 	iobuf = alloc_iob ( sizeof ( *wrapper ) );
@@ -168,10 +168,10 @@ static int usbblk_out_command ( struct usbblk_device *usbblk ) {
 	memset ( wrapper, 0, sizeof ( *wrapper ) );
 	wrapper->signature = cpu_to_le32 ( USBBLK_COMMAND_SIGNATURE );
 	wrapper->tag = cmd->tag; /* non-endian */
-	if ( cmd->scsi.data_out_len ) {
-		wrapper->len = cpu_to_le32 ( cmd->scsi.data_out_len );
+	if ( cmd->scsi.data_out.len ) {
+		wrapper->len = cpu_to_le32 ( cmd->scsi.data_out.len );
 	} else {
-		wrapper->len = cpu_to_le32 ( cmd->scsi.data_in_len );
+		wrapper->len = cpu_to_le32 ( cmd->scsi.data_in.len );
 		wrapper->flags = USB_DIR_IN;
 	}
 	wrapper->lun = ntohs ( cmd->scsi.lun.u16[0] );
@@ -207,9 +207,9 @@ static int usbblk_out_data ( struct usbblk_device *usbblk ) {
 
 	/* Calculate length */
 	assert ( cmd->tag );
-	assert ( cmd->scsi.data_out != NULL );
-	assert ( cmd->offset < cmd->scsi.data_out_len );
-	len = ( cmd->scsi.data_out_len - cmd->offset );
+	assert ( cmd->scsi.data_out.len != 0 );
+	assert ( cmd->offset < cmd->scsi.data_out.len );
+	len = ( cmd->scsi.data_out.len - cmd->offset );
 	if ( len > USBBLK_MAX_LEN )
 		len = USBBLK_MAX_LEN;
 	assert ( ( len % usbblk->out.mtu ) == 0 );
@@ -222,8 +222,9 @@ static int usbblk_out_data ( struct usbblk_device *usbblk ) {
 	}
 
 	/* Populate I/O buffer */
-	memcpy ( iob_put ( iobuf, len ),
-		 ( cmd->scsi.data_out + cmd->offset ), len );
+	if ( ( rc = xferbuf_read ( &cmd->scsi.data_out, cmd->offset,
+				   iob_put ( iobuf, len ), len ) ) != 0 )
+		goto err_read;
 
 	/* Send data */
 	if ( ( rc = usb_stream ( &usbblk->out, iobuf, 0 ) ) != 0 ) {
@@ -238,6 +239,7 @@ static int usbblk_out_data ( struct usbblk_device *usbblk ) {
 	return 0;
 
  err_stream:
+ err_read:
 	free_iob ( iobuf );
  err_alloc:
 	return rc;
@@ -257,7 +259,7 @@ static int usbblk_out_refill ( struct usbblk_device *usbblk ) {
 	assert ( cmd->tag );
 
 	/* Refill endpoint */
-	while ( ( cmd->offset < cmd->scsi.data_out_len ) &&
+	while ( ( cmd->offset < cmd->scsi.data_out.len ) &&
 		( usbblk->out.fill < USBBLK_MAX_FILL ) ) {
 		if ( ( rc = usbblk_out_data ( usbblk ) ) != 0 )
 			return rc;
@@ -294,7 +296,7 @@ static void usbblk_out_complete ( struct usb_endpoint *ep,
 	}
 
 	/* Trigger refill process, if applicable */
-	if ( cmd->offset < cmd->scsi.data_out_len )
+	if ( cmd->offset < cmd->scsi.data_out.len )
 		process_add ( &usbblk->process );
 
  drop:
@@ -331,15 +333,18 @@ static struct usb_endpoint_driver_operations usbblk_out_operations = {
 static int usbblk_in_data ( struct usbblk_device *usbblk, const void *data,
 			    size_t len ) {
 	struct usbblk_command *cmd = &usbblk->cmd;
+	int rc;
 
 	/* Sanity checks */
 	assert ( cmd->tag );
-	assert ( cmd->scsi.data_in != NULL );
-	assert ( cmd->offset <= cmd->scsi.data_in_len );
-	assert ( len <= ( cmd->scsi.data_in_len - cmd->offset ) );
+	assert ( cmd->scsi.data_in.len != 0 );
+	assert ( cmd->offset <= cmd->scsi.data_in.len );
+	assert ( len <= ( cmd->scsi.data_in.len - cmd->offset ) );
 
 	/* Store data */
-	memcpy ( ( cmd->scsi.data_in + cmd->offset ), data, len );
+	if ( ( rc = xferbuf_write ( &cmd->scsi.data_in, cmd->offset,
+				    data, len ) ) != 0 )
+		return rc;
 	cmd->offset += len;
 
 	return 0;
@@ -426,9 +431,9 @@ static int usbblk_in_refill ( struct usbblk_device *usbblk ) {
 
 	/* Calculate maximum required refill */
 	remaining = sizeof ( *stat );
-	if ( cmd->scsi.data_in_len ) {
-		assert ( cmd->offset <= cmd->scsi.data_in_len );
-		remaining += ( cmd->scsi.data_in_len - cmd->offset );
+	if ( cmd->scsi.data_in.len ) {
+		assert ( cmd->offset <= cmd->scsi.data_in.len );
+		remaining += ( cmd->scsi.data_in.len - cmd->offset );
 	}
 	max = ( ( remaining + USBBLK_MAX_LEN - 1 ) / USBBLK_MAX_LEN );
 
@@ -472,9 +477,9 @@ static void usbblk_in_complete ( struct usb_endpoint *ep,
 	process_add ( &usbblk->process );
 
 	/* Handle data portion, if any */
-	if ( cmd->scsi.data_in_len ) {
-		assert ( cmd->offset <= cmd->scsi.data_in_len );
-		remaining = ( cmd->scsi.data_in_len - cmd->offset );
+	if ( cmd->scsi.data_in.len ) {
+		assert ( cmd->offset <= cmd->scsi.data_in.len );
+		remaining = ( cmd->scsi.data_in.len - cmd->offset );
 		len = iob_len ( iobuf );
 		if ( len > remaining )
 			len = remaining;
@@ -591,7 +596,7 @@ static int usbblk_start ( struct usbblk_device *usbblk,
 	}
 
 	/* Refuse bidirectional commands */
-	if ( scsicmd->data_in_len && scsicmd->data_out_len ) {
+	if ( scsicmd->data_in.len && scsicmd->data_out.len ) {
 		rc = -EOPNOTSUPP;
 		DBGC ( usbblk, "USBBLK %s cannot support bidirectional "
 		       "commands\n", usbblk->func->name );
