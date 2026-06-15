@@ -2759,6 +2759,30 @@ struct builtin_setting cwduri_builtin_setting __builtin_setting = {
 };
 
 /**
+ * Store built-in setting
+ *
+ * @v settings		Settings block
+ * @v setting		Setting to store
+ * @v data		Setting data, or NULL to clear setting
+ * @v len		Length of setting data
+ * @ret rc		Return status code
+ */
+static int builtin_store ( struct settings *settings __unused,
+			   const struct setting *setting,
+			   const void *data, size_t len ) {
+	struct builtin_setting *builtin;
+
+	for_each_table_entry ( builtin, BUILTIN_SETTINGS ) {
+		if ( setting_cmp ( setting, builtin->setting ) == 0 ) {
+			if ( ! builtin->store )
+				return -ENOTSUP;
+			return builtin->store ( data, len );
+		}
+	}
+	return -ENOENT;
+}
+
+/**
  * Fetch built-in setting
  *
  * @v settings		Settings block
@@ -2795,6 +2819,7 @@ static int builtin_applies ( struct settings *settings __unused,
 /** Built-in settings operations */
 static struct settings_operations builtin_settings_operations = {
 	.applies = builtin_applies,
+	.store = builtin_store,
 	.fetch = builtin_fetch,
 };
 

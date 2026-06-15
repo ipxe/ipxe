@@ -268,6 +268,14 @@ struct settings_applicator {
 struct builtin_setting {
 	/** Setting */
 	const struct setting *setting;
+	/**
+	 * Store setting value
+	 *
+	 * @v data		Setting data, or NULL to clear setting
+	 * @v len		Length of setting data
+	 * @ret rc		Return status code
+	 */
+	int ( * store ) ( const void *data, size_t len );
 	/** Fetch setting value
 	 *
 	 * @v data		Buffer to fill with setting data
