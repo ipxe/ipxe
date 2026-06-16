@@ -409,6 +409,13 @@ static int virtio_pci_cap ( struct virtio_device *virtio,
 		if ( reg > PCI_BASE_ADDRESS_5 )
 			continue;
 
+		/* Check BAR accessibility */
+		if ( ! pci_bar_start ( pci, reg ) ) {
+			DBGC ( virtio, "VIRTIO %s capability type %d BAR%d is "
+			       "not usable\n", virtio->name, type, cap->bar );
+			continue;
+		}
+
 		/* Success */
 		cap->pos = pos;
 		return 0;
