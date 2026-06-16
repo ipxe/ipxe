@@ -159,10 +159,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_ENOTSUP_VERSION						\
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x04,				\
 			  "Unsupported protocol version" )
-#define ENOTSUP_CURVE __einfo_error ( EINFO_ENOTSUP_CURVE )
-#define EINFO_ENOTSUP_CURVE						\
+#define ENOTSUP_GROUP __einfo_error ( EINFO_ENOTSUP_GROUP )
+#define EINFO_ENOTSUP_GROUP						\
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x05,				\
-			  "Unsupported elliptic curve" )
+			  "Unsupported key exchange group" )
 #define EPERM_ALERT __einfo_error ( EINFO_EPERM_ALERT )
 #define EINFO_EPERM_ALERT						\
 	__einfo_uniqify ( EINFO_EPERM, 0x01,				\
@@ -988,28 +988,28 @@ tls_find_signature_hash ( unsigned int code ) {
 
 /******************************************************************************
  *
- * Ephemeral Elliptic Curve Diffie-Hellman key exchange
+ * Ephemeral key exchange
  *
  ******************************************************************************
  */
 
-/** Number of supported named curves */
-#define TLS_NUM_NAMED_CURVES table_num_entries ( TLS_NAMED_CURVES )
+/** Number of supported named key exchange groups */
+#define TLS_NUM_NAMED_GROUPS table_num_entries ( TLS_NAMED_GROUPS )
 
 /**
- * Identify named curve
+ * Identify named key exchange group
  *
- * @v named_curve	Named curve specification
- * @ret curve		Named curve, or NULL
+ * @v named_group	Named group specification
+ * @ret group		Named group, or NULL
  */
-static struct tls_named_curve *
-tls_find_named_curve ( unsigned int named_curve ) {
-	struct tls_named_curve *curve;
+static struct tls_named_group *
+tls_find_named_group ( unsigned int named_group ) {
+	struct tls_named_group *group;
 
-	/* Identify named curve */
-	for_each_table_entry ( curve, TLS_NAMED_CURVES ) {
-		if ( curve->code == named_curve )
-			return curve;
+	/* Identify named group */
+	for_each_table_entry ( group, TLS_NAMED_GROUPS ) {
+		if ( group->code == named_group )
+			return group;
 	}
 
 	return NULL;
@@ -1139,9 +1139,9 @@ static int tls_client_hello ( struct tls_connection *tls,
 		uint16_t len;
 		struct {
 			uint16_t len;
-			uint16_t code[TLS_NUM_NAMED_CURVES];
+			uint16_t code[TLS_NUM_NAMED_GROUPS];
 		} __attribute__ (( packed )) data;
-	} __attribute__ (( packed )) *named_curve_ext;
+	} __attribute__ (( packed )) *named_group_ext;
 	struct {
 		uint16_t type;
 		uint16_t len;
@@ -1153,8 +1153,8 @@ static int tls_client_hello ( struct tls_connection *tls,
 		typeof ( *renegotiation_info_ext ) renegotiation_info;
 		typeof ( *session_ticket_ext ) session_ticket;
 		typeof ( *extended_master_secret_ext ) extended_master_secret;
-		typeof ( *named_curve_ext )
-			named_curve[TLS_NUM_NAMED_CURVES ? 1 : 0];
+		typeof ( *named_group_ext )
+			named_group[TLS_NUM_NAMED_GROUPS ? 1 : 0];
 	} __attribute__ (( packed )) *extensions;
 	struct {
 		uint32_t type_length;
@@ -1171,7 +1171,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	} __attribute__ (( packed )) hello;
 	struct tls_cipher_suite *suite;
 	struct tls_signature_hash_algorithm *sighash;
-	struct tls_named_curve *curve;
+	struct tls_named_group *group;
 	unsigned int i;
 
 	/* Construct record */
@@ -1244,16 +1244,16 @@ static int tls_client_hello ( struct tls_connection *tls,
 		= htons ( TLS_EXTENDED_MASTER_SECRET );
 	extended_master_secret_ext->len = 0;
 
-	/* Construct named curves extension, if applicable */
-	if ( sizeof ( extensions->named_curve ) ) {
-		named_curve_ext = &extensions->named_curve[0];
-		named_curve_ext->type = htons ( TLS_NAMED_CURVE );
-		named_curve_ext->len
-			= htons ( sizeof ( named_curve_ext->data ) );
-		named_curve_ext->data.len
-			= htons ( sizeof ( named_curve_ext->data.code ) );
-		i = 0 ; for_each_table_entry ( curve, TLS_NAMED_CURVES )
-			named_curve_ext->data.code[i++] = curve->code;
+	/* Construct named groups extension, if applicable */
+	if ( sizeof ( extensions->named_group ) ) {
+		named_group_ext = &extensions->named_group[0];
+		named_group_ext->type = htons ( TLS_NAMED_GROUP );
+		named_group_ext->len
+			= htons ( sizeof ( named_group_ext->data ) );
+		named_group_ext->data.len
+			= htons ( sizeof ( named_group_ext->data.code ) );
+		i = 0 ; for_each_table_entry ( group, TLS_NAMED_GROUPS )
+			named_group_ext->data.code[i++] = group->code;
 	}
 
 	return action ( tls, &hello, sizeof ( hello ) );
@@ -1632,11 +1632,11 @@ struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
  * @ret rc		Return status code
  */
 static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
-	struct tls_named_curve *curve;
+	struct tls_named_group *group;
 	struct exchange_algorithm *exchange;
 	const struct {
 		uint8_t curve_type;
-		uint16_t named_curve;
+		uint16_t named_group;
 		uint8_t public_len;
 		uint8_t public[0];
 	} __attribute__ (( packed )) *ecdh;
@@ -1663,27 +1663,27 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 	if ( ( rc = tls_verify_dh_params ( tls, param_len ) ) != 0 )
 		return rc;
 
-	/* Identify named curve */
+	/* Identify named group */
 	if ( ecdh->curve_type != TLS_NAMED_CURVE_TYPE ) {
 		DBGC ( tls, "TLS %p unsupported curve type %d\n",
 		       tls, ecdh->curve_type );
 		DBGC_HDA ( tls, 0, tls->server.exchange,
 			   tls->server.exchange_len );
-		return -ENOTSUP_CURVE;
+		return -ENOTSUP_GROUP;
 	}
-	curve = tls_find_named_curve ( ecdh->named_curve );
-	if ( ! curve ) {
-		DBGC ( tls, "TLS %p unsupported named curve %d\n",
-		       tls, ntohs ( ecdh->named_curve ) );
+	group = tls_find_named_group ( ecdh->named_group );
+	if ( ! group ) {
+		DBGC ( tls, "TLS %p unsupported named group %d\n",
+		       tls, ntohs ( ecdh->named_group ) );
 		DBGC_HDA ( tls, 0, tls->server.exchange,
 			   tls->server.exchange_len );
-		return -ENOTSUP_CURVE;
+		return -ENOTSUP_GROUP;
 	}
-	exchange = curve->exchange;
+	exchange = group->exchange;
 	privsize = exchange->privsize;
 	pubsize = exchange->pubsize;
 	sharedsize = exchange->sharedsize;
-	DBGC ( tls, "TLS %p using named curve %s\n", tls, exchange->name );
+	DBGC ( tls, "TLS %p using named group %s\n", tls, exchange->name );
 
 	/* Check key length */
 	if ( ecdh->public_len != pubsize ) {

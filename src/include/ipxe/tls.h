@@ -141,11 +141,11 @@ struct tls_header {
 #define TLS_MAX_FRAGMENT_LENGTH_2048 3
 #define TLS_MAX_FRAGMENT_LENGTH_4096 4
 
-/* TLS named curve extension */
-#define TLS_NAMED_CURVE 10
-#define TLS_NAMED_CURVE_SECP256R1 23
-#define TLS_NAMED_CURVE_SECP384R1 24
-#define TLS_NAMED_CURVE_X25519 29
+/* TLS named key exchange group extension */
+#define TLS_NAMED_GROUP 10
+#define TLS_NAMED_GROUP_SECP256R1 23
+#define TLS_NAMED_GROUP_SECP384R1 24
+#define TLS_NAMED_GROUP_X25519 29
 
 /* TLS signature algorithms extension */
 #define TLS_SIGNATURE_ALGORITHMS 13
@@ -236,27 +236,24 @@ struct tls_cipher_suite {
 #define __tls_cipher_suite( pref )					\
 	__table_entry ( TLS_CIPHER_SUITES, pref )
 
-/** TLS named curved type */
+/** TLS named curve type */
 #define TLS_NAMED_CURVE_TYPE 3
 
-/** TLS uncompressed curve point format */
-#define TLS_POINT_FORMAT_UNCOMPRESSED 4
-
-/** A TLS named curve */
-struct tls_named_curve {
+/** A TLS named group */
+struct tls_named_group {
 	/** Key exchange algorithm */
 	struct exchange_algorithm *exchange;
 	/** Numeric code (in network-endian order) */
 	uint16_t code;
 };
 
-/** TLS named curve table */
-#define TLS_NAMED_CURVES						\
-	__table ( struct tls_named_curve, "tls_named_curves" )
+/** TLS named group table */
+#define TLS_NAMED_GROUPS						\
+	__table ( struct tls_named_group, "tls_named_groups" )
 
-/** Declare a TLS named curve */
-#define __tls_named_curve( pref )					\
-	__table_entry ( TLS_NAMED_CURVES, pref )
+/** Declare a TLS named group */
+#define __tls_named_group( pref )					\
+	__table_entry ( TLS_NAMED_GROUPS, pref )
 
 /** A TLS cipher specification */
 struct tls_cipherspec {

@@ -38,8 +38,8 @@ struct asn1_algorithm oid_x25519_algorithm __asn1_algorithm = {
 	.oid = ASN1_CURSOR ( oid_x25519 ),
 };
 
-/** X25519 named curve */
-struct tls_named_curve tls_x25519_named_curve __tls_named_curve ( 01 ) = {
+/** X25519 named group */
+struct tls_named_group tls_x25519_named_group __tls_named_group ( 01 ) = {
 	.exchange = &x25519_algorithm,
-	.code = htons ( TLS_NAMED_CURVE_X25519 ),
+	.code = htons ( TLS_NAMED_GROUP_X25519 ),
 };

@@ -39,8 +39,8 @@ struct asn1_algorithm prime256v1_algorithm __asn1_algorithm = {
 	.oid = ASN1_CURSOR ( oid_prime256v1 ),
 };
 
-/** P-256 named curve */
-struct tls_named_curve tls_secp256r1_named_curve __tls_named_curve ( 01 ) = {
+/** P-256 named group */
+struct tls_named_group tls_secp256r1_named_group __tls_named_group ( 01 ) = {
 	.exchange = &p256_algorithm,
-	.code = htons ( TLS_NAMED_CURVE_SECP256R1 ),
+	.code = htons ( TLS_NAMED_GROUP_SECP256R1 ),
 };
