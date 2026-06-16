@@ -9,9 +9,6 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
-#include <stdint.h>
-#include <string.h>
-
 /** Element of a big integer */
 typedef unsigned long bigint_element_t;
 
@@ -209,10 +206,38 @@ bigint_shr_raw ( unsigned long *value0, unsigned int size ) {
 static inline __attribute__ (( always_inline )) void
 bigint_grow_raw ( const unsigned long *source0, unsigned int source_size,
 		  unsigned long *dest0, unsigned int dest_size ) {
-	unsigned int pad_size = ( dest_size - source_size );
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
+	const unsigned long *sourceN = ( source0 + source_size );
+	unsigned long *destN = ( dest0 + dest_size );
+	unsigned long *discard_source;
+	unsigned long *discard_dest;
+	unsigned long discard_source_i;
 
-	memcpy ( dest0, source0, sizeof ( bigint_t ( source_size ) ) );
-	memset ( ( dest0 + source_size ), 0, sizeof ( bigint_t ( pad_size ) ) );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Copy dest[i] */
+			       LOADN " %2, (%0)\n\t"
+			       STOREN " %2, (%1)\n\t"
+			       /* Loop */
+			       "addi %0, %0, %6\n\t"
+			       "addi %1, %1, %6\n\t"
+			       "bne %0, %4, 1b\n\t"
+			       "j 3f\n\t"
+			       "\n2:\n\t"
+			       /* Zero dest[i] */
+			       STOREN " zero, (%1)\n\t"
+			       /* Loop */
+			       "addi %1, %1, %6\n\t"
+			       "\n3:\n\t"
+			       "bne %1, %5, 2b\n\t"
+			       : "=&r" ( discard_source ),
+				 "=&r" ( discard_dest ),
+				 "=&r" ( discard_source_i ),
+				 "=m" ( *dest )
+			       : "r" ( sourceN ),
+				 "r" ( destN ),
+				 "i" ( sizeof ( unsigned long ) ),
+				 "0" ( source0 ), "1" ( dest0 ) );
 }
 
 /**
@@ -227,8 +252,28 @@ static inline __attribute__ (( always_inline )) void
 bigint_shrink_raw ( const unsigned long *source0,
 		    unsigned int source_size __unused,
 		    unsigned long *dest0, unsigned int dest_size ) {
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
+	unsigned long *destN = ( dest0 + dest_size );
+	unsigned long *discard_source;
+	unsigned long *discard_dest;
+	unsigned long discard_source_i;
 
-	memcpy ( dest0, source0, sizeof ( bigint_t ( dest_size ) ) );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Copy dest[i] */
+			       LOADN " %2, (%0)\n\t"
+			       STOREN " %2, (%1)\n\t"
+			       /* Loop */
+			       "addi %0, %0, %5\n\t"
+			       "addi %1, %1, %5\n\t"
+			       "bne %1, %4, 1b\n\t"
+			       : "=&r" ( discard_source ),
+				 "=&r" ( discard_dest ),
+				 "=&r" ( discard_source_i ),
+				 "=m" ( *dest )
+			       : "r" ( destN ),
+				 "i" ( sizeof ( unsigned long ) ),
+				 "0" ( source0 ), "1" ( dest0 ) );
 }
 
 /**

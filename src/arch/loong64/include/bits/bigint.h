@@ -214,10 +214,36 @@ bigint_shr_raw ( uint64_t *value0, unsigned int size ) {
 static inline __attribute__ (( always_inline )) void
 bigint_grow_raw ( const uint64_t *source0, unsigned int source_size,
 		  uint64_t *dest0, unsigned int dest_size ) {
-	unsigned int pad_size = ( dest_size - source_size );
+	const bigint_t ( source_size ) __attribute__ (( may_alias )) *source =
+		( ( const void * ) source0 );
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
+	uint64_t discard_source_i;
+	uint64_t discard_offset;
 
-	memcpy ( dest0, source0, sizeof ( bigint_t ( source_size ) ) );
-	memset ( ( dest0 + source_size ), 0, sizeof ( bigint_t ( pad_size ) ) );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Copy dest[i] */
+			       "ldx.d %0, %3, %1\n\t"
+			       "stx.d %0, %4, %1\n\t"
+			       /* Loop */
+			       "addi.w %1, %1, 8\n\t"
+			       "bne %1, %5, 1b\n\t"
+			       "b 3f\n\t"
+			       "\n2:\n\t"
+			       /* Zero dest[i] */
+			       "stx.d $zero, %4, %1\n\t"
+			       /* Loop */
+			       "addi.w %1, %1, 8\n\t"
+			       "\n3:\n\t"
+			       "bne %1, %6, 2b\n\t"
+			       : "=&r" ( discard_source_i ),
+				 "=&r" ( discard_offset ),
+				 "=m" ( *dest )
+			       : "r" ( source0 ),
+				 "r" ( dest0 ),
+				 "r" ( sizeof ( *source ) ),
+				 "r" ( sizeof ( *dest ) ),
+				 "1" ( 0 ) );
 }
 
 /**
@@ -231,8 +257,25 @@ bigint_grow_raw ( const uint64_t *source0, unsigned int source_size,
 static inline __attribute__ (( always_inline )) void
 bigint_shrink_raw ( const uint64_t *source0, unsigned int source_size __unused,
 		    uint64_t *dest0, unsigned int dest_size ) {
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
+	uint64_t discard_source_i;
+	uint64_t discard_offset;
 
-	memcpy ( dest0, source0, sizeof ( bigint_t ( dest_size ) ) );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       /* Copy dest[i] */
+			       "ldx.d %0, %3, %1\n\t"
+			       "stx.d %0, %4, %1\n\t"
+			       /* Loop */
+			       "addi.w %1, %1, 8\n\t"
+			       "bne %1, %5, 1b\n\t"
+			       : "=&r" ( discard_source_i ),
+				 "=&r" ( discard_offset ),
+				 "=m" ( *dest )
+			       : "r" ( source0 ),
+				 "r" ( dest0 ),
+				 "r" ( sizeof ( *dest ) ),
+				 "1" ( 0 ) );
 }
 
 /**

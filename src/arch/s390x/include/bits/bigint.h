@@ -8,8 +8,6 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
-#include <stdint.h>
-
 /** Element of a big integer */
 typedef unsigned long bigint_element_t;
 

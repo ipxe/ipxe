@@ -171,10 +171,34 @@ bigint_shr_raw ( uint64_t *value0, unsigned int size ) {
 static inline __attribute__ (( always_inline )) void
 bigint_grow_raw ( const uint64_t *source0, unsigned int source_size,
 		  uint64_t *dest0, unsigned int dest_size ) {
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
 	unsigned int pad_size = ( dest_size - source_size );
+	uint64_t *discard_source;
+	uint64_t *discard_dest;
+	uint64_t discard_source_i;
+	unsigned int discard_source_size;
+	unsigned int discard_pad_size;
 
-	memcpy ( dest0, source0, sizeof ( bigint_t ( source_size ) ) );
-	memset ( ( dest0 + source_size ), 0, sizeof ( bigint_t ( pad_size ) ) );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "ldr %2, [%0], #8\n\t"
+			       "str %2, [%1], #8\n\t"
+			       "sub %w3, %w3, #1\n\t"
+			       "cbnz %w3, 1b\n\t"
+			       "b 3f\n\t"
+			       "\n2:\n\t"
+			       "str xzr, [%1], #8\n\t"
+			       "sub %w4, %w4, #1\n\t"
+			       "\n3:\n\t"
+			       "cbnz %w4, 2b\n\t"
+			       : "=&r" ( discard_source ),
+				 "=&r" ( discard_dest ),
+				 "=&r" ( discard_source_i ),
+				 "=&r" ( discard_source_size ),
+				 "=&r" ( discard_pad_size ),
+				 "=m" ( *dest )
+			       : "0" ( source0 ), "1" ( dest0 ),
+				 "3" ( source_size ), "4" ( pad_size ) );
 }
 
 /**
@@ -188,8 +212,25 @@ bigint_grow_raw ( const uint64_t *source0, unsigned int source_size,
 static inline __attribute__ (( always_inline )) void
 bigint_shrink_raw ( const uint64_t *source0, unsigned int source_size __unused,
 		    uint64_t *dest0, unsigned int dest_size ) {
+	bigint_t ( dest_size ) __attribute__ (( may_alias )) *dest =
+		( ( void * ) dest0 );
+	uint64_t *discard_source;
+	uint64_t *discard_dest;
+	uint64_t discard_source_i;
+	unsigned int discard_dest_size;
 
-	memcpy ( dest0, source0, sizeof ( bigint_t ( dest_size ) ) );
+	__asm__ __volatile__ ( "\n1:\n\t"
+			       "ldr %2, [%0], #8\n\t"
+			       "str %2, [%1], #8\n\t"
+			       "sub %w3, %w3, #1\n\t"
+			       "cbnz %w3, 1b\n\t"
+			       : "=&r" ( discard_source ),
+				 "=&r" ( discard_dest ),
+				 "=&r" ( discard_source_i ),
+				 "=&r" ( discard_dest_size ),
+				 "=m" ( *dest )
+			       : "0" ( source0 ), "1" ( dest0 ),
+				 "3" ( dest_size ) );
 }
 
 /**
