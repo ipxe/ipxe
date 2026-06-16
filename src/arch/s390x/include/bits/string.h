@@ -27,15 +27,23 @@ memset ( void *dest, int character, size_t len ) {
 	struct s390x_pointer_pair dpair = { dest, len };
 	char ( * dmem ) [ len ] = dest;
 
-	if ( __builtin_constant_p ( character ) ) {
-		/* Constant fill character: use an immediate */
+	if ( __builtin_constant_p ( len ) && ( len == 0 ) ) {
+		/* Constant zero length: do nothing */
+	} else if ( __builtin_constant_p ( character ) && ( character == 0 ) &&
+		    __builtin_constant_p ( len ) && ( len <= 256 ) ) {
+		/* Constant small length, zeroing: use XOR-in-place */
+		__asm__ ( "xc %O0(%1, %R0), %0"
+			  : "=Q" ( *dmem )
+			  : "i" ( len ) );
+	} else if ( __builtin_constant_p ( character ) ) {
+		/* Constant fill character: use "mvcle" with an immediate */
 		__asm__ ( "\n1:\n\t"
 			  "mvcle %0, %2, %3\n\t"
 			  "jo 1b\n\t"
 			  : "+r" ( dpair ), "=m" ( *dmem )
 			  : "r" ( spair ), "i" ( character ) );
 	} else {
-		/* Variable fill character: use a register */
+		/* Variable fill character: use "mvcle" with a register */
 		__asm__ ( "\n1:\n\t"
 			  "mvcle %0, %2, 0(%3)\n\t"
 			  "jo 1b\n\t"
