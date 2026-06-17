@@ -38,6 +38,21 @@ extern void ffdhe_public ( struct exchange_algorithm *exchange,
 extern int ffdhe_shared ( struct exchange_algorithm *exchange,
 			  const void *private, const void *partner,
 			  void *shared );
+extern int ffdhe_has_params ( struct exchange_algorithm *exchange,
+			      const void *modulus, size_t len,
+			      const void *generator, size_t generator_len );
+
+/**
+ * Check if key exchange algorithm is a finite field DHE group
+ *
+ * @v exchange		Key exchange algorithm
+ * @ret is_ffdhe	Key exchange algorithm is a finite field DHE group
+ */
+static inline __attribute__ (( always_inline )) int
+is_ffdhe ( struct exchange_algorithm *exchange ) {
+
+	return ( exchange->public == ffdhe_public );
+}
 
 /** Define a finite field DHE group */
 #define FFDHE_GROUP( _name, _exchange, _constant, _bits, _expbits, _lsb ) \

@@ -45,6 +45,7 @@ FILE_SECBOOT ( PERMITTED );
  * servers.
  */
 
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
@@ -281,6 +282,55 @@ int ffdhe_shared ( struct exchange_algorithm *exchange, const void *private,
 	struct ffdhe_group *group = exchange->priv;
 
 	return ffdhe ( group, partner, private, shared );
+}
+
+/**
+ * Check group parameters
+ *
+ * @v exchange		Key exchange algorithm
+ * @v dh_p		Prime modulus
+ * @v dh_p_len		Length of prime modulus
+ * @v dh_g		Generator
+ * @v dh_g_len		Length of generator
+ * @ret match		Field parameters are correct for this group
+ *
+ * Leading zeros in the modulus and generator will be tolerated.
+ */
+int ffdhe_has_params ( struct exchange_algorithm *exchange,
+		       const void *dh_p, size_t dh_p_len,
+		       const void *dh_g, size_t dh_g_len ) {
+	struct ffdhe_group *group = exchange->priv;
+	const ffdhe_modulus_t ( group->len ) *modulus;
+	const uint8_t *generator;
+
+	/* Sanity check */
+	assert ( is_ffdhe ( exchange ) );
+
+	/* Strip leading zeros from modulus and check length */
+	while ( dh_p_len && ( ! *( ( uint8_t * ) dh_p ) ) ) {
+		dh_p++;
+		dh_p_len--;
+	}
+	if ( dh_p_len != sizeof ( *modulus ) )
+		return 0;
+	modulus = dh_p;
+
+	/* Strip leading zeros from generator and check length */
+	while ( dh_g_len && ( ! *( ( uint8_t * ) dh_g ) ) ) {
+		dh_g++;
+		dh_g_len--;
+	}
+	if ( dh_g_len != sizeof ( *generator ) )
+		return 0;
+	generator = dh_g;
+
+	/* Check values */
+	return ( ( modulus->high == ~( ( uint64_t ) 0 ) ) &&
+		 ( memcmp ( modulus->constant, group->constant,
+			    sizeof ( modulus->constant ) ) == 0 ) &&
+		 ( modulus->lsb32 == group->lsb32 ) &&
+		 ( modulus->low == ~( ( uint64_t ) 0 ) ) &&
+		 ( *generator == 2 ) );
 }
 
 /* Supported groups */
