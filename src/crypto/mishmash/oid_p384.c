@@ -40,7 +40,7 @@ struct asn1_algorithm secp384r1_algorithm __asn1_algorithm = {
 };
 
 /** P-384 named group */
-struct tls_named_group tls_secp384r1_named_group __tls_named_group ( 01 ) = {
+struct tls_named_group tls_secp384r1_named_group __tls_named_group ( 02 ) = {
 	.exchange = &p384_algorithm,
 	.code = htons ( TLS_NAMED_GROUP_SECP384R1 ),
 };
