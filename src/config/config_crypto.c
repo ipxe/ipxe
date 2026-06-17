@@ -99,6 +99,36 @@ REQUIRE_OBJECT ( oid_p256 );
 REQUIRE_OBJECT ( oid_p384 );
 #endif
 
+/* FFDHE2048 */
+#if defined ( CRYPTO_GROUP_FFDHE2048 )
+REQUIRE_OBJECT ( kex_ffdhe2048 );
+#endif
+
+/* FFDHE3072 */
+#if defined ( CRYPTO_GROUP_FFDHE3072 )
+REQUIRE_OBJECT ( kex_ffdhe3072 );
+#endif
+
+/* FFDHE4096 */
+#if defined ( CRYPTO_GROUP_FFDHE4096 )
+REQUIRE_OBJECT ( kex_ffdhe4096 );
+#endif
+
+/* MODP2048 */
+#if defined ( CRYPTO_GROUP_MODP2048 )
+REQUIRE_OBJECT ( kex_modp2048 );
+#endif
+
+/* MODP3072 */
+#if defined ( CRYPTO_GROUP_MODP3072 )
+REQUIRE_OBJECT ( kex_modp3072 );
+#endif
+
+/* MODP4096 */
+#if defined ( CRYPTO_GROUP_MODP4096 )
+REQUIRE_OBJECT ( kex_modp4096 );
+#endif
+
 /* AES-CBC */
 #if defined ( CRYPTO_CIPHER_AES_CBC )
 REQUIRE_OBJECT ( oid_aes_cbc );

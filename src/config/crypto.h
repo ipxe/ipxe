@@ -70,6 +70,24 @@ FILE_SECBOOT ( PERMITTED );
 /** P-384 elliptic curve */
 #define CRYPTO_CURVE_P384
 
+/** FFDHE2048 finite field */
+#define CRYPTO_GROUP_FFDHE2048
+
+/** FFDHE3072 finite field */
+#define CRYPTO_GROUP_FFDHE3072
+
+/** FFDHE4096 finite field */
+#define CRYPTO_GROUP_FFDHE4096
+
+/** MODP2048 finite field */
+#define CRYPTO_GROUP_MODP2048
+
+/** MODP3072 finite field */
+#define CRYPTO_GROUP_MODP3072
+
+/** MODP4096 finite field */
+#define CRYPTO_GROUP_MODP4096
+
 /** Margin of error (in seconds) allowed in signed timestamps
  *
  * We default to allowing a reasonable margin of error: 12 hours to
