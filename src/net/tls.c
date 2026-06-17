@@ -51,6 +51,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
 #include <ipxe/dhe.h>
+#include <ipxe/ffdhe.h>
 #include <ipxe/tls.h>
 #include <config/crypto.h>
 
@@ -1012,6 +1013,32 @@ tls_find_named_group ( unsigned int named_group ) {
 	return NULL;
 }
 
+/**
+ * Identify named key exchange group by Diffie-Hellman parameters
+ *
+ * @v dh_p		Prime modulus
+ * @v dh_p_len		Length of prime modulus
+ * @v dh_g		Generator
+ * @v dh_g_len		Length of generator
+ * @ret group		Named group, or NULL
+ */
+static struct tls_named_group *
+tls_find_param_group ( const void *dh_p, size_t dh_p_len, const void *dh_g,
+		       size_t dh_g_len ) {
+	struct tls_named_group *group;
+
+	/* Identify named group by parameters */
+	for_each_table_entry ( group, TLS_NAMED_GROUPS ) {
+		if ( is_ffdhe ( group->exchange ) &&
+		     ffdhe_has_params ( group->exchange, dh_p, dh_p_len,
+					dh_g, dh_g_len ) ) {
+			return group;
+		}
+	}
+
+	return NULL;
+}
+
 /******************************************************************************
  *
  * Record handling
@@ -1507,11 +1534,16 @@ static int tls_verify_dh_params ( struct tls_connection *tls,
  * @ret rc		Return status code
  */
 static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
+	struct tls_named_group *group;
+	struct exchange_algorithm *exchange;
 	uint8_t private[ sizeof ( tls->client.random.random ) ];
 	const struct {
 		uint16_t len;
 		uint8_t data[0];
 	} __attribute__ (( packed )) *dh_val[3];
+	typeof ( dh_val[0] ) dh_p;
+	typeof ( dh_val[1] ) dh_g;
+	typeof ( dh_val[2] ) dh_ys;
 	const void *data;
 	size_t remaining;
 	size_t frag_len;
@@ -1544,6 +1576,23 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 	if ( ( rc = tls_verify_dh_params ( tls, param_len ) ) != 0 )
 		goto err_verify;
 
+	/* Identify named group */
+	dh_p = dh_val[0];
+	dh_g = dh_val[1];
+	dh_ys = dh_val[2];
+	group = tls_find_param_group ( dh_p->data, ntohs ( dh_p->len ),
+				       dh_g->data, ntohs ( dh_g->len ) );
+	if ( ! group ) {
+		DBGC ( tls, "TLS %p unsupported %d-bit group:\n",
+		       tls, ( 8 * ntohs ( dh_p->len ) ) );
+		DBGC_HDA ( tls, 0, tls->server.exchange,
+			   tls->server.exchange_len );
+		rc = -ENOTSUP_GROUP;
+		goto err_group;
+	}
+	exchange = group->exchange;
+	DBGC ( tls, "TLS %p using named group %s\n", tls, exchange->name );
+
 	/* Generate Diffie-Hellman private key */
 	if ( ( rc = tls_generate_random ( tls, private,
 					  sizeof ( private ) ) ) != 0 ) {
@@ -1552,9 +1601,6 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 
 	/* Construct pre-master secret and ClientKeyExchange record */
 	{
-		typeof ( dh_val[0] ) dh_p = dh_val[0];
-		typeof ( dh_val[1] ) dh_g = dh_val[1];
-		typeof ( dh_val[2] ) dh_ys = dh_val[2];
 		size_t len = ntohs ( dh_p->len );
 		struct {
 			uint32_t type_length;
@@ -1614,6 +1660,7 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 	}
  err_alloc:
  err_random:
+ err_group:
  err_verify:
  err_header:
 	return rc;
