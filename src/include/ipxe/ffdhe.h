@@ -19,6 +19,8 @@ FILE_SECBOOT ( PERMITTED );
 struct ffdhe_group {
 	/** Group name */
 	const char *name;
+	/** Group constant */
+	const uint8_t *constant;
 	/** Length of raw scalar values */
 	size_t len;
 	/** Number of elements in scalar values */
@@ -35,9 +37,10 @@ extern int ffdhe ( struct ffdhe_group *group, const void *public,
 		   const void *private, void *shared );
 
 /** Define a finite field DHE group */
-#define FFDHE_GROUP( _name, _exchange, _bits, _expbits, _lsb )		  \
+#define FFDHE_GROUP( _name, _exchange, _constant, _bits, _expbits, _lsb ) \
 	static struct ffdhe_group _name ## _group = {			  \
 		.name = #_name,					  	  \
+		.constant = (_constant),				  \
 		.len = ( _bits / 8 ),					  \
 		.size = bigint_required_size ( _bits / 8 ),		  \
 		.explen = ( ( _expbits + 7 ) / 8 ),			  \
@@ -66,5 +69,8 @@ extern int ffdhe ( struct ffdhe_group *group, const void *public,
 extern struct exchange_algorithm ffdhe2048_algorithm;
 extern struct exchange_algorithm ffdhe3072_algorithm;
 extern struct exchange_algorithm ffdhe4096_algorithm;
+extern struct exchange_algorithm modp2048_algorithm;
+extern struct exchange_algorithm modp3072_algorithm;
+extern struct exchange_algorithm modp4096_algorithm;
 
 #endif /* _IPXE_FFDHE_H */
