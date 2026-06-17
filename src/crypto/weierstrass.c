@@ -1030,12 +1030,13 @@ int weierstrass_add_once ( struct weierstrass_curve *curve,
 /**
  * Calculate public key
  *
- * @v curve		Weierstrass curve
+ * @v exchange		Key exchange algorithm
  * @v private		Private key
  * @v public		Public key to fill in
  */
-void weierstrass_public ( struct weierstrass_curve *curve, const void *private,
-			  void *public ) {
+void weierstrass_public ( struct exchange_algorithm *exchange,
+			  const void *private, void *public ) {
+	struct weierstrass_curve *curve = exchange->priv;
 	size_t len = curve->len;
 	weierstrass_uncompressed_t ( len ) *uncompressed = public;
 	int rc;
@@ -1052,14 +1053,16 @@ void weierstrass_public ( struct weierstrass_curve *curve, const void *private,
 /**
  * Calculate shared secret
  *
- * @v curve		Weierstrass curve
+ * @v exchange		Key exchange algorithm
  * @v private		Private key
  * @v partner		Partner public key
  * @v shared		Shared secret to fill in
  * @ret rc		Return status code
  */
-int weierstrass_shared ( struct weierstrass_curve *curve, const void *private,
-			 const void *partner, void *shared ) {
+int weierstrass_shared ( struct exchange_algorithm *exchange,
+			 const void *private, const void *partner,
+			 void *shared ) {
+	struct weierstrass_curve *curve = exchange->priv;
 	size_t len = curve->len;
 	const weierstrass_uncompressed_t ( len ) *uncompressed = partner;
 	weierstrass_raw_t ( len ) point;

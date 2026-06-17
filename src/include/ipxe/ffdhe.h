@@ -33,8 +33,11 @@ struct ffdhe_group {
 	uint32_t lsb32;
 };
 
-extern int ffdhe ( struct ffdhe_group *group, const void *public,
-		   const void *private, void *shared );
+extern void ffdhe_public ( struct exchange_algorithm *exchange,
+			   const void *private, void *public );
+extern int ffdhe_shared ( struct exchange_algorithm *exchange,
+			  const void *private, const void *partner,
+			  void *shared );
 
 /** Define a finite field DHE group */
 #define FFDHE_GROUP( _name, _exchange, _constant, _bits, _expbits, _lsb ) \
@@ -47,23 +50,14 @@ extern int ffdhe ( struct ffdhe_group *group, const void *public,
 		.expsize = bigint_required_size ( ( _expbits + 7 ) / 8 ), \
 		.lsb32 = cpu_to_be32 ( _lsb ),				  \
 	};								  \
-	static void _name ## _public ( const void *private,		  \
-				       void *public ) {			  \
-		ffdhe ( &_name ## _group, NULL, private, public );	  \
-	}								  \
-	static int _name ## _shared ( const void *private,		  \
-				      const void *partner,		  \
-				      void *shared ) {			  \
-		return ffdhe ( &_name ## _group, partner, private,	  \
-			       shared );				  \
-	}								  \
 	struct exchange_algorithm _exchange = {				  \
 		.name = #_name,						  \
 		.privsize = ( ( _expbits + 7 ) / 8 ),			  \
 		.pubsize = ( _bits / 8 ),				  \
 		.sharedsize = ( _bits / 8 ),				  \
-		.public = _name ## _public,				  \
-		.shared = _name ## _shared,				  \
+		.public = ffdhe_public,					  \
+		.shared = ffdhe_shared,					  \
+		.priv = &_name ## _group,				  \
 	}
 
 extern struct exchange_algorithm ffdhe2048_algorithm;

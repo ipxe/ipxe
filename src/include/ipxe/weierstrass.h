@@ -164,9 +164,9 @@ extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 extern int weierstrass_add_once ( struct weierstrass_curve *curve,
 				  const void *addend, const void *augend,
 				  void *result );
-extern void weierstrass_public ( struct weierstrass_curve *curve,
+extern void weierstrass_public ( struct exchange_algorithm *exchange,
 				 const void *private, void *public );
-extern int weierstrass_shared ( struct weierstrass_curve *curve,
+extern int weierstrass_shared ( struct exchange_algorithm *exchange,
 				const void *private, const void *partner,
 				void *shared );
 
@@ -209,17 +209,6 @@ extern int weierstrass_shared ( struct weierstrass_curve *curve,
 		return weierstrass_add_once ( &_name ## _weierstrass,	\
 					      addend, augend, result );	\
 	}								\
-	static void _name ## _public ( const void *private,		\
-				       void *public ) {			\
-		weierstrass_public ( &_name ## _weierstrass,		\
-				     private, public );			\
-	}								\
-	static int _name ## _shared ( const void *private,		\
-				      const void *partner,		\
-				      void *shared ) {			\
-		return weierstrass_shared ( &_name ## _weierstrass,	\
-					    private, partner, shared );	\
-	}								\
 	struct elliptic_curve _curve = {				\
 		.name = #_name,						\
 		.pointsize = sizeof ( weierstrass_raw_t(_len) ),	\
@@ -235,8 +224,9 @@ extern int weierstrass_shared ( struct weierstrass_curve *curve,
 		.privsize = (_len),					\
 		.pubsize = sizeof ( weierstrass_uncompressed_t(_len) ), \
 		.sharedsize = (_len),					\
-		.public = _name ## _public,				\
-		.shared = _name ## _shared,				\
+		.public = weierstrass_public,				\
+		.shared = weierstrass_shared,				\
+		.priv = &_name ## _weierstrass,				\
 	}
 
 #endif /* _IPXE_WEIERSTRASS_H */

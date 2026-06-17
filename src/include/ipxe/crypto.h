@@ -187,20 +187,26 @@ struct exchange_algorithm {
 	/**
 	 * Calculate public key
 	 *
+	 * @v exchange		Key exchange algorithm
 	 * @v private		Private key
 	 * @v public		Public key to fill in
 	 */
-	void ( * public ) ( const void *private, void *public );
+	void ( * public ) ( struct exchange_algorithm *exchange,
+			    const void *private, void *public );
 	/**
 	 * Calculate shared secret
 	 *
+	 * @v exchange		Key exchange algorithm
 	 * @v private		Private key
 	 * @v partner		Partner public key
 	 * @v shared		Shared secret to fill in
 	 * @ret rc		Return status code
 	 */
-	int ( * shared ) ( const void *private, const void *partner,
+	int ( * shared ) ( struct exchange_algorithm *exchange,
+			   const void *private, const void *partner,
 			   void *shared );
+	/** Algorithm private data */
+	void *priv;
 };
 
 /** An elliptic curve */
@@ -350,13 +356,13 @@ pubkey_match ( struct pubkey_algorithm *pubkey,
 static inline __attribute__ (( always_inline )) void
 exchange_public ( struct exchange_algorithm *exchange, const void *private,
 		  void *public ) {
-	exchange->public ( private, public );
+	exchange->public ( exchange, private, public );
 }
 
 static inline __attribute__ (( always_inline )) int
 exchange_shared ( struct exchange_algorithm *exchange, const void *private,
 		  const void *partner, void *shared ) {
-	return exchange->shared ( private, partner, shared );
+	return exchange->shared ( exchange, private, partner, shared );
 }
 
 static inline __attribute__ (( always_inline )) int

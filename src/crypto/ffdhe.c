@@ -194,8 +194,8 @@ static struct {
  * @v shared		Shared result to fill in
  * @ret rc		Return status code
  */
-int ffdhe ( struct ffdhe_group *group, const void *public, const void *private,
-	    void *shared ) {
+static int ffdhe ( struct ffdhe_group *group, const void *public,
+		   const void *private, void *shared ) {
 	unsigned int expsize = group->expsize;
 	unsigned int size = group->size;
 	size_t explen = group->explen;
@@ -251,6 +251,36 @@ int ffdhe ( struct ffdhe_group *group, const void *public, const void *private,
 	}
 
 	return 0;
+}
+
+/**
+ * Calculate public key
+ *
+ * @v exchange		Key exchange algorithm
+ * @v private		Private key
+ * @v public		Public key to fill in
+ */
+void ffdhe_public ( struct exchange_algorithm *exchange, const void *private,
+		    void *public ) {
+	struct ffdhe_group *group = exchange->priv;
+
+	ffdhe ( group, NULL, private, public );
+}
+
+/**
+ * Calculate shared secret
+ *
+ * @v exchange		Key exchange algorithm
+ * @v private		Private key
+ * @v partner		Partner public key
+ * @v shared		Shared secret to fill in
+ * @ret rc		Return status code
+ */
+int ffdhe_shared ( struct exchange_algorithm *exchange, const void *private,
+		   const void *partner, void *shared ) {
+	struct ffdhe_group *group = exchange->priv;
+
+	return ffdhe ( group, partner, private, shared );
 }
 
 /* Supported groups */
