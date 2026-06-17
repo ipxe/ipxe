@@ -993,9 +993,6 @@ tls_find_signature_hash ( unsigned int code ) {
  ******************************************************************************
  */
 
-/** Number of supported named key exchange groups */
-#define TLS_NUM_NAMED_GROUPS table_num_entries ( TLS_NAMED_GROUPS )
-
 /**
  * Identify named key exchange group
  *
@@ -1008,7 +1005,7 @@ tls_find_named_group ( unsigned int named_group ) {
 
 	/* Identify named group */
 	for_each_table_entry ( group, TLS_NAMED_GROUPS ) {
-		if ( group->code == named_group )
+		if ( group->code && ( group->code == named_group ) )
 			return group;
 	}
 
@@ -1252,8 +1249,11 @@ static int tls_client_hello ( struct tls_connection *tls,
 			= htons ( sizeof ( named_group_ext->data ) );
 		named_group_ext->data.len
 			= htons ( sizeof ( named_group_ext->data.code ) );
-		i = 0 ; for_each_table_entry ( group, TLS_NAMED_GROUPS )
-			named_group_ext->data.code[i++] = group->code;
+		i = 0 ; for_each_table_entry ( group, TLS_NAMED_GROUPS ) {
+			if ( group->code )
+				named_group_ext->data.code[i++] = group->code;
+		}
+		assert ( i == TLS_NUM_NAMED_GROUPS );
 	}
 
 	return action ( tls, &hello, sizeof ( hello ) );

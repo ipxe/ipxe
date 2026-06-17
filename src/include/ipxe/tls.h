@@ -255,6 +255,15 @@ struct tls_named_group {
 #define __tls_named_group( pref )					\
 	__table_entry ( TLS_NAMED_GROUPS, pref )
 
+/** Declare a TLS anonymous named group */
+#define __tls_anon_named_group __tls_named_group ( 98 )
+
+/** Number of non-anonymous TLS named groups */
+#define TLS_NUM_NAMED_GROUPS						\
+	( ( unsigned int )						\
+	  ( __table_entries ( TLS_NAMED_GROUPS, 97 )			\
+	    - table_start ( TLS_NAMED_GROUPS ) ) )
+
 /** A TLS cipher specification */
 struct tls_cipherspec {
 	/** Cipher suite */
