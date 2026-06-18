@@ -62,11 +62,15 @@ union sha256_digest_data_dwords {
 struct sha256_context {
 	/** Amount of accumulated data */
 	size_t len;
-	/** Digest size */
-	size_t digestsize;
 	/** Digest and accumulated data */
 	union sha256_digest_data_dwords ddd;
 } __attribute__ (( packed ));
+
+/** A SHA-256 family algorithm */
+struct sha256_algorithm {
+	/** Initial digest values */
+	const struct sha256_digest *init;
+};
 
 /** SHA-256 context size */
 #define SHA256_CTX_SIZE sizeof ( struct sha256_context )
@@ -80,11 +84,27 @@ struct sha256_context {
 /** SHA-224 digest size */
 #define SHA224_DIGEST_SIZE ( SHA256_DIGEST_SIZE * 224 / 256 )
 
-extern void sha256_family_init ( struct sha256_context *context,
-				 const struct sha256_digest *init,
-				 size_t digestsize );
-extern void sha256_update ( void *ctx, const void *data, size_t len );
-extern void sha256_final ( void *ctx, void *out );
+extern void sha256_init ( struct digest_algorithm *digest, void *ctx );
+extern void sha256_update ( struct digest_algorithm *digest, void *ctx,
+			    const void *data, size_t len );
+extern void sha256_final ( struct digest_algorithm *digest, void *ctx,
+			   void *out );
+
+/** Define a SHA-256 family digest algorithm */
+#define SHA256_ALGORITHM( _name, _digest, _digestsize, _init )		\
+	static struct sha256_algorithm _name ## _sha256 = {		\
+		.init		= (_init),				\
+	};								\
+	struct digest_algorithm _digest = {				\
+		.name		= #_name,				\
+		.ctxsize	= sizeof ( struct sha256_context ),	\
+		.blocksize	= sizeof ( union sha256_block ),	\
+		.digestsize	= (_digestsize),			\
+		.init		= sha256_init,				\
+		.update		= sha256_update,			\
+		.final		= sha256_final,				\
+		.priv		= &_name ## _sha256,			\
+	}
 
 extern struct digest_algorithm sha256_algorithm;
 extern struct digest_algorithm sha224_algorithm;

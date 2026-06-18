@@ -143,9 +143,10 @@ static struct md5_step md5_steps[4] = {
 /**
  * Initialise MD5 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		MD5 context
  */
-static void md5_init ( void *ctx ) {
+static void md5_init ( struct digest_algorithm *digest __unused, void *ctx ) {
 	struct md5_context *context = ctx;
 
 	context->ddd.dd.digest.h[0] = cpu_to_le32 ( 0x67452301 );
@@ -231,11 +232,13 @@ static void md5_digest ( struct md5_context *context ) {
 /**
  * Accumulate data with MD5 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		MD5 context
  * @v data		Data
  * @v len		Length of data
  */
-static void md5_update ( void *ctx, const void *data, size_t len ) {
+static void md5_update ( struct digest_algorithm *digest __unused, void *ctx,
+			 const void *data, size_t len ) {
 	struct md5_context *context = ctx;
 	const uint8_t *byte = data;
 	size_t offset;
@@ -255,10 +258,12 @@ static void md5_update ( void *ctx, const void *data, size_t len ) {
 /**
  * Generate MD5 digest
  *
+ * @v digest		Digest algorithm
  * @v ctx		MD5 context
  * @v out		Output buffer
  */
-static void md5_final ( void *ctx, void *out ) {
+static void md5_final ( struct digest_algorithm *digest, void *ctx,
+			void *out ) {
 	struct md5_context *context = ctx;
 	uint64_t len_bits;
 	uint8_t pad;
@@ -269,13 +274,13 @@ static void md5_final ( void *ctx, void *out ) {
 	/* Pad with a single "1" bit followed by as many "0" bits as required */
 	pad = 0x80;
 	do {
-		md5_update ( ctx, &pad, sizeof ( pad ) );
+		md5_update ( digest, ctx, &pad, sizeof ( pad ) );
 		pad = 0x00;
 	} while ( ( context->len % sizeof ( context->ddd.dd.data ) ) !=
 		  offsetof ( typeof ( context->ddd.dd.data ), final.len ) );
 
 	/* Append length (in bits) */
-	md5_update ( ctx, &len_bits, sizeof ( len_bits ) );
+	md5_update ( digest, ctx, &len_bits, sizeof ( len_bits ) );
 	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
 
 	/* Copy out final digest */

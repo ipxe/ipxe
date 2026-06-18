@@ -64,11 +64,15 @@ union sha512_digest_data_qwords {
 struct sha512_context {
 	/** Amount of accumulated data */
 	size_t len;
-	/** Digest size */
-	size_t digestsize;
 	/** Digest and accumulated data */
 	union sha512_digest_data_qwords ddq;
 } __attribute__ (( packed ));
+
+/** A SHA-512 family algorithm */
+struct sha512_algorithm {
+	/** Initial digest values */
+	const struct sha512_digest *init;
+};
 
 /** SHA-512 context size */
 #define SHA512_CTX_SIZE sizeof ( struct sha512_context )
@@ -88,11 +92,27 @@ struct sha512_context {
 /** SHA-512/224 digest size */
 #define SHA512_224_DIGEST_SIZE ( SHA512_DIGEST_SIZE * 224 / 512 )
 
-extern void sha512_family_init ( struct sha512_context *context,
-				 const struct sha512_digest *init,
-				 size_t digestsize );
-extern void sha512_update ( void *ctx, const void *data, size_t len );
-extern void sha512_final ( void *ctx, void *out );
+extern void sha512_init ( struct digest_algorithm *digest, void *ctx );
+extern void sha512_update ( struct digest_algorithm *digest, void *ctx,
+			    const void *data, size_t len );
+extern void sha512_final ( struct digest_algorithm *digest, void *ctx,
+			   void *out );
+
+/** Define a SHA-512 family digest algorithm */
+#define SHA512_ALGORITHM( _name, _digest, _digestsize, _init )		\
+	static struct sha512_algorithm _name ## _sha512 = {		\
+		.init		= (_init),				\
+	};								\
+	struct digest_algorithm _digest = {				\
+		.name		= #_name,				\
+		.ctxsize	= sizeof ( struct sha512_context ),	\
+		.blocksize	= sizeof ( union sha512_block ),	\
+		.digestsize	= (_digestsize),			\
+		.init		= sha512_init,				\
+		.update		= sha512_update,			\
+		.final		= sha512_final,				\
+		.priv		= &_name ## _sha512,			\
+	}
 
 extern struct digest_algorithm sha512_algorithm;
 extern struct digest_algorithm sha384_algorithm;

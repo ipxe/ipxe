@@ -109,9 +109,10 @@ static struct sha1_step sha1_steps[4] = {
 /**
  * Initialise SHA-1 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-1 context
  */
-static void sha1_init ( void *ctx ) {
+static void sha1_init ( struct digest_algorithm *digest __unused, void *ctx ) {
 	struct sha1_context *context = ctx;
 
 	context->ddd.dd.digest.h[0] = cpu_to_be32 ( 0x67452301 );
@@ -202,11 +203,13 @@ static void sha1_digest ( struct sha1_context *context ) {
 /**
  * Accumulate data with SHA-1 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-1 context
  * @v data		Data
  * @v len		Length of data
  */
-static void sha1_update ( void *ctx, const void *data, size_t len ) {
+static void sha1_update ( struct digest_algorithm *digest __unused,
+			  void *ctx, const void *data, size_t len ) {
 	struct sha1_context *context = ctx;
 	const uint8_t *byte = data;
 	size_t offset;
@@ -226,10 +229,12 @@ static void sha1_update ( void *ctx, const void *data, size_t len ) {
 /**
  * Generate SHA-1 digest
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-1 context
  * @v out		Output buffer
  */
-static void sha1_final ( void *ctx, void *out ) {
+static void sha1_final ( struct digest_algorithm *digest, void *ctx,
+			 void *out ) {
 	struct sha1_context *context = ctx;
 	uint64_t len_bits;
 	uint8_t pad;
@@ -240,13 +245,13 @@ static void sha1_final ( void *ctx, void *out ) {
 	/* Pad with a single "1" bit followed by as many "0" bits as required */
 	pad = 0x80;
 	do {
-		sha1_update ( ctx, &pad, sizeof ( pad ) );
+		sha1_update ( digest, ctx, &pad, sizeof ( pad ) );
 		pad = 0x00;
 	} while ( ( context->len % sizeof ( context->ddd.dd.data ) ) !=
 		  offsetof ( typeof ( context->ddd.dd.data ), final.len ) );
 
 	/* Append length (in bits) */
-	sha1_update ( ctx, &len_bits, sizeof ( len_bits ) );
+	sha1_update ( digest, ctx, &len_bits, sizeof ( len_bits ) );
 	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
 
 	/* Copy out final digest */

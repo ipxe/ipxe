@@ -36,9 +36,11 @@ FILE_SECBOOT ( PERMITTED );
 /**
  * Initialise MD5+SHA1 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		MD5+SHA1 context
  */
-static void md5_sha1_init ( void *ctx ) {
+static void md5_sha1_init ( struct digest_algorithm *digest __unused,
+			    void *ctx ) {
 	struct md5_sha1_context *context = ctx;
 
 	digest_init ( &md5_algorithm, context->md5 );
@@ -48,11 +50,13 @@ static void md5_sha1_init ( void *ctx ) {
 /**
  * Accumulate data with MD5+SHA1 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		MD5+SHA1 context
  * @v data		Data
  * @v len		Length of data
  */
-static void md5_sha1_update ( void *ctx, const void *data, size_t len ) {
+static void md5_sha1_update ( struct digest_algorithm *digest __unused,
+			      void *ctx, const void *data, size_t len ) {
 	struct md5_sha1_context *context = ctx;
 
 	digest_update ( &md5_algorithm, context->md5, data, len );
@@ -62,15 +66,17 @@ static void md5_sha1_update ( void *ctx, const void *data, size_t len ) {
 /**
  * Generate MD5+SHA1 digest
  *
+ * @v digest		Digest algorithm
  * @v ctx		MD5+SHA1 context
  * @v out		Output buffer
  */
-static void md5_sha1_final ( void *ctx, void *out ) {
+static void md5_sha1_final ( struct digest_algorithm *digest __unused,
+			     void *ctx, void *out ) {
 	struct md5_sha1_context *context = ctx;
-	struct md5_sha1_digest *digest = out;
+	struct md5_sha1_digest *output = out;
 
-	digest_final ( &md5_algorithm, context->md5, digest->md5 );
-	digest_final ( &sha1_algorithm, context->sha1, digest->sha1 );
+	digest_final ( &md5_algorithm, context->md5, output->md5 );
+	digest_final ( &sha1_algorithm, context->sha1, output->sha1 );
 }
 
 /** Hybrid MD5+SHA1 digest algorithm */

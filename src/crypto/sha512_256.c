@@ -49,25 +49,6 @@ static const struct sha512_digest sha512_256_init_digest = {
 	},
 };
 
-/**
- * Initialise SHA-512/256 algorithm
- *
- * @v ctx		SHA-512/256 context
- */
-static void sha512_256_init ( void *ctx ) {
-	struct sha512_context *context = ctx;
-
-	sha512_family_init ( context, &sha512_256_init_digest,
-			     SHA512_256_DIGEST_SIZE );
-}
-
 /** SHA-512/256 algorithm */
-struct digest_algorithm sha512_256_algorithm = {
-	.name		= "sha512/256",
-	.ctxsize	= sizeof ( struct sha512_context ),
-	.blocksize	= sizeof ( union sha512_block ),
-	.digestsize	= SHA512_256_DIGEST_SIZE,
-	.init		= sha512_256_init,
-	.update		= sha512_update,
-	.final		= sha512_final,
-};
+SHA512_ALGORITHM ( sha512_256, sha512_256_algorithm, SHA512_256_DIGEST_SIZE,
+		   &sha512_256_init_digest );

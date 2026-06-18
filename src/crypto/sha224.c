@@ -49,24 +49,6 @@ static const struct sha256_digest sha224_init_digest = {
 	},
 };
 
-/**
- * Initialise SHA-224 algorithm
- *
- * @v ctx		SHA-224 context
- */
-static void sha224_init ( void *ctx ) {
-	struct sha256_context *context = ctx;
-
-	sha256_family_init ( context, &sha224_init_digest, SHA224_DIGEST_SIZE );
-}
-
 /** SHA-224 algorithm */
-struct digest_algorithm sha224_algorithm = {
-	.name		= "sha224",
-	.ctxsize	= sizeof ( struct sha256_context ),
-	.blocksize	= sizeof ( union sha256_block ),
-	.digestsize	= SHA224_DIGEST_SIZE,
-	.init		= sha224_init,
-	.update		= sha256_update,
-	.final		= sha256_final,
-};
+SHA256_ALGORITHM ( sha224, sha224_algorithm, SHA224_DIGEST_SIZE,
+		   &sha224_init_digest );

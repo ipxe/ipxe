@@ -100,32 +100,18 @@ static const struct sha512_digest sha512_init_digest = {
 };
 
 /**
- * Initialise SHA-512 family algorithm
- *
- * @v context		SHA-512 context
- * @v init		Initial digest values
- * @v digestsize	Digest size
- */
-void sha512_family_init ( struct sha512_context *context,
-			  const struct sha512_digest *init,
-			  size_t digestsize ) {
-
-	context->len = 0;
-	context->digestsize = digestsize;
-	memcpy ( &context->ddq.dd.digest, init,
-		 sizeof ( context->ddq.dd.digest ) );
-}
-
-/**
  * Initialise SHA-512 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-512 context
  */
-static void sha512_init ( void *ctx ) {
+void sha512_init ( struct digest_algorithm *digest, void *ctx ) {
+	const struct sha512_algorithm *sha = digest->priv;
 	struct sha512_context *context = ctx;
 
-	sha512_family_init ( context, &sha512_init_digest,
-			     sizeof ( struct sha512_digest ) );
+	context->len = 0;
+	memcpy ( &context->ddq.dd.digest, sha->init,
+		 sizeof ( context->ddq.dd.digest ) );
 }
 
 /**
@@ -227,11 +213,13 @@ static void sha512_digest ( struct sha512_context *context ) {
 /**
  * Accumulate data with SHA-512 algorithm
  *
+ * @v digest		Digest
  * @v ctx		SHA-512 context
  * @v data		Data
  * @v len		Length of data
  */
-void sha512_update ( void *ctx, const void *data, size_t len ) {
+void sha512_update ( struct digest_algorithm *digest __unused, void *ctx,
+		     const void *data, size_t len ) {
 	struct sha512_context *context = ctx;
 	const uint8_t *byte = data;
 	size_t offset;
@@ -251,10 +239,11 @@ void sha512_update ( void *ctx, const void *data, size_t len ) {
 /**
  * Generate SHA-512 digest
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-512 context
  * @v out		Output buffer
  */
-void sha512_final ( void *ctx, void *out ) {
+void sha512_final ( struct digest_algorithm *digest, void *ctx, void *out ) {
 	struct sha512_context *context = ctx;
 	uint64_t len_bits_hi;
 	uint64_t len_bits_lo;
@@ -267,27 +256,20 @@ void sha512_final ( void *ctx, void *out ) {
 	/* Pad with a single "1" bit followed by as many "0" bits as required */
 	pad = 0x80;
 	do {
-		sha512_update ( ctx, &pad, sizeof ( pad ) );
+		sha512_update ( digest, ctx, &pad, sizeof ( pad ) );
 		pad = 0x00;
 	} while ( ( context->len % sizeof ( context->ddq.dd.data ) ) !=
 		  offsetof ( typeof ( context->ddq.dd.data ), final.len_hi ) );
 
 	/* Append length (in bits) */
-	sha512_update ( ctx, &len_bits_hi, sizeof ( len_bits_hi ) );
-	sha512_update ( ctx, &len_bits_lo, sizeof ( len_bits_lo ) );
+	sha512_update ( digest, ctx, &len_bits_hi, sizeof ( len_bits_hi ) );
+	sha512_update ( digest, ctx, &len_bits_lo, sizeof ( len_bits_lo ) );
 	assert ( ( context->len % sizeof ( context->ddq.dd.data ) ) == 0 );
 
 	/* Copy out final digest */
-	memcpy ( out, &context->ddq.dd.digest, context->digestsize );
+	memcpy ( out, &context->ddq.dd.digest, digest->digestsize );
 }
 
 /** SHA-512 algorithm */
-struct digest_algorithm sha512_algorithm = {
-	.name		= "sha512",
-	.ctxsize	= sizeof ( struct sha512_context ),
-	.blocksize	= sizeof ( union sha512_block ),
-	.digestsize	= sizeof ( struct sha512_digest ),
-	.init		= sha512_init,
-	.update		= sha512_update,
-	.final		= sha512_final,
-};
+SHA512_ALGORITHM ( sha512, sha512_algorithm, SHA512_DIGEST_SIZE,
+		   &sha512_init_digest );

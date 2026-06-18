@@ -84,32 +84,18 @@ static const struct sha256_digest sha256_init_digest = {
 };
 
 /**
- * Initialise SHA-256 family algorithm
- *
- * @v context		SHA-256 context
- * @v init		Initial digest values
- * @v digestsize	Digest size
- */
-void sha256_family_init ( struct sha256_context *context,
-			  const struct sha256_digest *init,
-			  size_t digestsize ) {
-
-	context->len = 0;
-	context->digestsize = digestsize;
-	memcpy ( &context->ddd.dd.digest, init,
-		 sizeof ( context->ddd.dd.digest ) );
-}
-
-/**
  * Initialise SHA-256 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-256 context
  */
-static void sha256_init ( void *ctx ) {
+void sha256_init ( struct digest_algorithm *digest, void *ctx ) {
+	struct sha256_algorithm *sha = digest->priv;
 	struct sha256_context *context = ctx;
 
-	sha256_family_init ( context, &sha256_init_digest,
-			     sizeof ( struct sha256_digest ) );
+	context->len = 0;
+	memcpy ( &context->ddd.dd.digest, sha->init,
+		 sizeof ( context->ddd.dd.digest ) );
 }
 
 /**
@@ -210,11 +196,13 @@ static void sha256_digest ( struct sha256_context *context ) {
 /**
  * Accumulate data with SHA-256 algorithm
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-256 context
  * @v data		Data
  * @v len		Length of data
  */
-void sha256_update ( void *ctx, const void *data, size_t len ) {
+void sha256_update ( struct digest_algorithm *digest __unused, void *ctx,
+		     const void *data, size_t len ) {
 	struct sha256_context *context = ctx;
 	const uint8_t *byte = data;
 	size_t offset;
@@ -234,10 +222,11 @@ void sha256_update ( void *ctx, const void *data, size_t len ) {
 /**
  * Generate SHA-256 digest
  *
+ * @v digest		Digest algorithm
  * @v ctx		SHA-256 context
  * @v out		Output buffer
  */
-void sha256_final ( void *ctx, void *out ) {
+void sha256_final ( struct digest_algorithm *digest, void *ctx, void *out ) {
 	struct sha256_context *context = ctx;
 	uint64_t len_bits;
 	uint8_t pad;
@@ -248,26 +237,19 @@ void sha256_final ( void *ctx, void *out ) {
 	/* Pad with a single "1" bit followed by as many "0" bits as required */
 	pad = 0x80;
 	do {
-		sha256_update ( ctx, &pad, sizeof ( pad ) );
+		sha256_update ( digest, ctx, &pad, sizeof ( pad ) );
 		pad = 0x00;
 	} while ( ( context->len % sizeof ( context->ddd.dd.data ) ) !=
 		  offsetof ( typeof ( context->ddd.dd.data ), final.len ) );
 
 	/* Append length (in bits) */
-	sha256_update ( ctx, &len_bits, sizeof ( len_bits ) );
+	sha256_update ( digest, ctx, &len_bits, sizeof ( len_bits ) );
 	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
 
 	/* Copy out final digest */
-	memcpy ( out, &context->ddd.dd.digest, context->digestsize );
+	memcpy ( out, &context->ddd.dd.digest, digest->digestsize );
 }
 
 /** SHA-256 algorithm */
-struct digest_algorithm sha256_algorithm = {
-	.name		= "sha256",
-	.ctxsize	= sizeof ( struct sha256_context ),
-	.blocksize	= sizeof ( union sha256_block ),
-	.digestsize	= sizeof ( struct sha256_digest ),
-	.init		= sha256_init,
-	.update		= sha256_update,
-	.final		= sha256_final,
-};
+SHA256_ALGORITHM ( sha256, sha256_algorithm, SHA256_DIGEST_SIZE,
+		   &sha256_init_digest );

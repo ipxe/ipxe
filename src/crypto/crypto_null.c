@@ -34,16 +34,19 @@ FILE_SECBOOT ( PERMITTED );
 #include <errno.h>
 #include <ipxe/crypto.h>
 
-void digest_null_init ( void *ctx __unused ) {
+void digest_null_init ( struct digest_algorithm *digest __unused,
+			void *ctx __unused ) {
 	/* Do nothing */
 }
 
-void digest_null_update ( void *ctx __unused, const void *src __unused,
+void digest_null_update ( struct digest_algorithm *digest __unused,
+			  void *ctx __unused, const void *src __unused,
 			  size_t len __unused ) {
 	/* Do nothing */
 }
 
-void digest_null_final ( void *ctx __unused, void *out __unused ) {
+void digest_null_final ( struct digest_algorithm *digest __unused,
+			 void *ctx __unused, void *out __unused ) {
 	/* Do nothing */
 }
 

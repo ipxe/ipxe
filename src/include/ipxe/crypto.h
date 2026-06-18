@@ -27,24 +27,31 @@ struct digest_algorithm {
 	size_t digestsize;
 	/** Initialise digest
 	 *
+	 * @v digest		Digest algorithm
 	 * @v ctx		Context
 	 */
-	void ( * init ) ( void *ctx );
+	void ( * init ) ( struct digest_algorithm *digest, void *ctx );
 	/** Update digest with new data
 	 *
+	 * @v digest		Digest algorithm
 	 * @v ctx		Context
 	 * @v src		Data to digest
 	 * @v len		Length of data
 	 *
 	 * @v len is not necessarily a multiple of @c blocksize.
 	 */
-	void ( * update ) ( void *ctx, const void *src, size_t len );
+	void ( * update ) ( struct digest_algorithm *digest, void *ctx,
+			    const void *src, size_t len );
 	/** Finalise digest
 	 *
+	 * @v digest		Digest algorithm
 	 * @v ctx		Context
 	 * @v out		Buffer for digest output
 	 */
-	void ( * final ) ( void *ctx, void *out );
+	void ( * final ) ( struct digest_algorithm *digest, void *ctx,
+			   void *out );
+	/** Algorithm private data */
+	void *priv;
 };
 
 /** A cipher algorithm */
@@ -259,18 +266,18 @@ struct elliptic_curve {
 
 static inline __attribute__ (( always_inline )) void
 digest_init ( struct digest_algorithm *digest, void *ctx ) {
-	digest->init ( ctx );
+	digest->init ( digest, ctx );
 }
 
 static inline __attribute__ (( always_inline )) void
 digest_update ( struct digest_algorithm *digest, void *ctx,
 		const void *data, size_t len ) {
-	digest->update ( ctx, data, len );
+	digest->update ( digest, ctx, data, len );
 }
 
 static inline __attribute__ (( always_inline )) void
 digest_final ( struct digest_algorithm *digest, void *ctx, void *out ) {
-	digest->final ( ctx, out );
+	digest->final ( digest, ctx, out );
 }
 
 static inline __attribute__ (( always_inline )) int
@@ -389,9 +396,11 @@ elliptic_add ( struct elliptic_curve *curve, const void *addend,
 	return curve->add ( curve, addend, augend, result );
 }
 
-extern void digest_null_init ( void *ctx );
-extern void digest_null_update ( void *ctx, const void *src, size_t len );
-extern void digest_null_final ( void *ctx, void *out );
+extern void digest_null_init ( struct digest_algorithm *digest, void *ctx );
+extern void digest_null_update ( struct digest_algorithm *digest, void *ctx,
+				 const void *src, size_t len );
+extern void digest_null_final ( struct digest_algorithm *digest, void *ctx,
+				void *out );
 
 extern int cipher_null_setkey ( void *ctx, const void *key, size_t keylen );
 extern void cipher_null_setiv ( void *ctx, const void *iv, size_t ivlen );
