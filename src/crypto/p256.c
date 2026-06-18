@@ -71,5 +71,8 @@ static const uint8_t p256_order[P256_LEN] = {
 };
 
 /** P-256 elliptic curve */
-WEIERSTRASS_CURVE ( p256, p256_curve, p256_algorithm, P256_LEN,
+WEIERSTRASS_CURVE ( p256, p256_curve, P256_LEN,
 		    p256_prime, p256_a, p256_b, p256_base, p256_order );
+
+/** P-256 key exchange */
+ELLIPTIC_EXCHANGE ( p256, p256_algorithm, P256_LEN, &p256_curve );

@@ -12,6 +12,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/bigint.h>
 #include <ipxe/crypto.h>
+#include <ipxe/elliptic.h>
 
 /** Number of axes in Weierstrass curve point representation */
 #define WEIERSTRASS_AXES 2
@@ -66,37 +67,6 @@ FILE_SECBOOT ( PERMITTED );
 		bigint_t ( size * 2 ) xy;				\
 		bigint_t ( size * 3 ) all;				\
 	}
-
-/**
- * Define a Weierstrass raw affine co-ordinate type
- *
- * @v len		Length of scalar values
- * @ret type		Raw affine co-ordinate type
- */
-#define weierstrass_raw_t( len )					\
-	union {								\
-		uint8_t axis[2][ len ];					\
-		struct {						\
-			uint8_t x[ len ];				\
-			uint8_t y[ len ];				\
-		} __attribute__ (( packed ));				\
-		uint8_t xy[ len * 2 ];					\
-	}
-
-/**
- * Define a Weierstrass "uncompressed" affine co-ordinate type
- *
- * @v len		Length of scalar values
- * @ret type		Uncompressed affine co-ordinate type
- */
-#define weierstrass_uncompressed_t( len )				\
-	struct {							\
-		uint8_t format;						\
-		weierstrass_raw_t ( len );				\
-	} __attribute__ (( packed ))
-
-/** Format byte for Weierstrass curve point representation */
-#define WEIERSTRASS_FORMAT 0x04 /* "uncompressed" */
 
 /** Indexes for stored multiples of the field prime */
 enum weierstrass_multiple {
@@ -169,8 +139,8 @@ extern int weierstrass_agree ( struct exchange_algorithm *exchange,
 			       void *shared );
 
 /** Define a Weierstrass curve */
-#define WEIERSTRASS_CURVE( _name, _curve, _exchange, _len, _prime,	\
-			   _a, _b, _base, _order )			\
+#define WEIERSTRASS_CURVE( _name, _curve, _len, _prime, _a, _b, _base,	\
+			   _order )					\
 	static bigint_t ( weierstrass_size(_len) )			\
 		_name ## _cache[WEIERSTRASS_NUM_CACHED];		\
 	static struct weierstrass_curve _name ## _weierstrass = {	\
@@ -193,7 +163,7 @@ extern int weierstrass_agree ( struct exchange_algorithm *exchange,
 	};								\
 	struct elliptic_curve _curve = {				\
 		.name = #_name,						\
-		.pointsize = sizeof ( weierstrass_raw_t(_len) ),	\
+		.pointsize = ( (_len) * WEIERSTRASS_AXES ),		\
 		.keysize = (_len),					\
 		.base = (_base),					\
 		.order = (_order),					\
@@ -201,15 +171,6 @@ extern int weierstrass_agree ( struct exchange_algorithm *exchange,
 		.multiply = weierstrass_multiply,			\
 		.add = weierstrass_add_once,				\
 		.priv = &_name ## _weierstrass,				\
-	};								\
-	struct exchange_algorithm _exchange = {				\
-		.name = #_name,						\
-		.privsize = (_len),					\
-		.pubsize = sizeof ( weierstrass_uncompressed_t(_len) ), \
-		.sharedsize = (_len),					\
-		.share = weierstrass_share,				\
-		.agree = weierstrass_agree,				\
-		.priv = &_curve,					\
 	}
 
 #endif /* _IPXE_WEIERSTRASS_H */

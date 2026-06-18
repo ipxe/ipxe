@@ -82,5 +82,8 @@ static const uint8_t p384_order[P384_LEN] = {
 };
 
 /** P-384 elliptic curve */
-WEIERSTRASS_CURVE ( p384, p384_curve, p384_algorithm, P384_LEN,
+WEIERSTRASS_CURVE ( p384, p384_curve, P384_LEN,
 		    p384_prime, p384_a, p384_b, p384_base, p384_order );
+
+/** P-384 key exchange */
+ELLIPTIC_EXCHANGE ( p384, p384_algorithm, P384_LEN, &p384_curve );
