@@ -170,37 +170,38 @@ enum weierstrass_opcode {
 /**
  * Initialise curve
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  */
-static void weierstrass_init_curve ( struct weierstrass_curve *curve ) {
-	unsigned int size = curve->size;
+static void weierstrass_init_curve ( struct elliptic_curve *curve ) {
+	struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
 	bigint_t ( size ) __attribute__ (( may_alias )) *prime =
-		( ( void * ) curve->prime[0] );
+		( ( void * ) weierstrass->prime[0] );
 	bigint_t ( size ) __attribute__ (( may_alias )) *fermat =
-		( ( void * ) curve->fermat );
+		( ( void * ) weierstrass->fermat );
 	bigint_t ( size ) __attribute__ (( may_alias )) *square =
-		( ( void * ) curve->square );
+		( ( void * ) weierstrass->square );
 	bigint_t ( size ) __attribute__ (( may_alias )) *one =
-		( ( void * ) curve->one );
+		( ( void * ) weierstrass->one );
 	bigint_t ( size ) __attribute__ (( may_alias )) *a =
-		( ( void * ) curve->a );
+		( ( void * ) weierstrass->a );
 	bigint_t ( size ) __attribute__ (( may_alias )) *b3 =
-		( ( void * ) curve->b3 );
+		( ( void * ) weierstrass->b3 );
 	bigint_t ( size ) __attribute__ (( may_alias )) *mont =
-		( ( void * ) curve->mont[0] );
+		( ( void * ) weierstrass->mont[0] );
 	bigint_t ( size ) __attribute__ (( may_alias )) *temp =
-		( ( void * ) curve->prime[1] );
+		( ( void * ) weierstrass->prime[1] );
 	bigint_t ( size * 2 ) __attribute__ (( may_alias )) *product =
 		( ( void * ) temp );
 	bigint_t ( size ) __attribute__ (( may_alias )) *two =
 		( ( void * ) temp );
 	static const uint8_t one_raw[] = { 1 };
 	static const uint8_t two_raw[] = { 2 };
-	size_t len = curve->len;
+	size_t len = weierstrass->len;
 	unsigned int i;
 
 	/* Initialise field prime */
-	bigint_init ( prime, curve->prime_raw, len );
+	bigint_init ( prime, weierstrass->prime_raw, len );
 	DBGC ( curve, "WEIERSTRASS %s   N = %s\n",
 	       curve->name, bigint_ntoa ( prime ) );
 
@@ -210,7 +211,7 @@ static void weierstrass_init_curve ( struct weierstrass_curve *curve ) {
 	       curve->name, bigint_ntoa ( square ) );
 
 	/* Calculate constant "3b" */
-	bigint_init ( b3, curve->b_raw, len );
+	bigint_init ( b3, weierstrass->b_raw, len );
 	DBGC ( curve, "WEIERSTRASS %s   b = %s\n",
 	       curve->name, bigint_ntoa ( b3 ) );
 	bigint_copy ( b3, a );
@@ -218,7 +219,7 @@ static void weierstrass_init_curve ( struct weierstrass_curve *curve ) {
 	bigint_add ( a, b3 );
 
 	/* Initialise "a" */
-	bigint_init ( a, curve->a_raw, len );
+	bigint_init ( a, weierstrass->a_raw, len );
 	DBGC ( curve, "WEIERSTRASS %s   a = %s\n",
 	       curve->name, bigint_ntoa ( a ) );
 
@@ -261,16 +262,17 @@ static void weierstrass_init_curve ( struct weierstrass_curve *curve ) {
 /**
  * Execute bytecode instruction
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v regs		Registers
  * @v size		Big integer size
  * @v op		Operation
  */
-static void weierstrass_exec ( const struct weierstrass_curve *curve,
+static void weierstrass_exec ( const struct elliptic_curve *curve,
 			       void **regs, unsigned int size,
 			       unsigned int op ) {
+	const struct weierstrass_curve *weierstrass = curve->priv;
 	const bigint_t ( size ) __attribute__ (( may_alias ))
-		*prime = ( ( const void * ) curve->prime[0] );
+		*prime = ( ( const void * ) weierstrass->prime[0] );
 	bigint_t ( size * 2 ) __attribute__ (( may_alias ))
 		*product = regs[WEIERSTRASS_Wp];
 	bigint_t ( size ) __attribute__ (( may_alias )) *dest;
@@ -331,7 +333,8 @@ static void weierstrass_exec ( const struct weierstrass_curve *curve,
 			DBGCP ( curve, "WEIERSTRASS %s R%d := R%d - R%d + "
 				"%dN = ", curve->name, op_dest, op_left,
 				op_right, ( 1 << op_code ) );
-			addend = ( ( const void * ) curve->prime[op_code] );
+			addend = ( ( const void * )
+				   weierstrass->prime[op_code] );
 		} else {
 			DBGCP ( curve, "WEIERSTRASS %s R%d := R%d - R%d = ",
 				curve->name, op_dest, op_left, op_right );
@@ -349,7 +352,7 @@ static void weierstrass_exec ( const struct weierstrass_curve *curve,
 /**
  * Add points on curve
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v augend0		Element 0 of point (x1,y1,z1) to be added
  * @v addend0		Element 0 of point (x2,y2,z2) to be added
  * @v result0		Element 0 of point (x3,y3,z3) to hold result
@@ -365,17 +368,18 @@ static void weierstrass_exec ( const struct weierstrass_curve *curve,
  * The result may overlap either input, since the inputs are fully
  * consumed before the result is written.
  */
-static void weierstrass_add_raw ( const struct weierstrass_curve *curve,
+static void weierstrass_add_raw ( const struct elliptic_curve *curve,
 				  const bigint_element_t *augend0,
 				  const bigint_element_t *addend0,
 				  bigint_element_t *result0 ) {
-	unsigned int size = curve->size;
+	const struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
 	const bigint_t ( size ) __attribute__ (( may_alias ))
-		*prime = ( ( const void * ) curve->prime[0] );
+		*prime = ( ( const void * ) weierstrass->prime[0] );
 	const bigint_t ( size ) __attribute__ (( may_alias ))
-		*a = ( ( const void * ) curve->a );
+		*a = ( ( const void * ) weierstrass->a );
 	const bigint_t ( size ) __attribute__ (( may_alias ))
-		*b3 = ( ( const void * ) curve->b3 );
+		*b3 = ( ( const void * ) weierstrass->b3 );
 	const weierstrass_t ( size ) __attribute__ (( may_alias ))
 		*augend = ( ( const void * ) augend0 );
 	const weierstrass_t ( size ) __attribute__ (( may_alias ))
@@ -623,7 +627,7 @@ static void weierstrass_add_raw ( const struct weierstrass_curve *curve,
 /**
  * Add points on curve
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v augend		Point (x1,y1,z1) to be added
  * @v addend		Point (x2,y2,z2) to be added
  * @v result0		Point (x3,y3,z3) to hold result
@@ -647,10 +651,11 @@ static void weierstrass_add_ladder ( const bigint_element_t *operand0,
 				     bigint_element_t *result0,
 				     unsigned int size, const void *ctx,
 				     void *tmp __unused ) {
-	const struct weierstrass_curve *curve = ctx;
-	const weierstrass_t ( curve->size ) __attribute__ (( may_alias ))
+	const struct elliptic_curve *curve = ctx;
+	const struct weierstrass_curve *weierstrass = curve->priv;
+	const weierstrass_t ( weierstrass->size ) __attribute__ (( may_alias ))
 		*operand = ( ( const void * ) operand0 );
-	weierstrass_t ( curve->size ) __attribute__ (( may_alias ))
+	weierstrass_t ( weierstrass->size ) __attribute__ (( may_alias ))
 		*result = ( ( void * ) result0 );
 
 	/* Add curve points */
@@ -662,7 +667,7 @@ static void weierstrass_add_ladder ( const bigint_element_t *operand0,
 /**
  * Verify freshly initialised point is on curve
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v point0		Element 0 of point (x,y,z) to be verified
  * @ret rc		Return status code
  *
@@ -674,15 +679,16 @@ static void weierstrass_add_ladder ( const bigint_element_t *operand0,
  * freshly constructed via weierstrass_init() (i.e. must either have
  * z=1 or be the point at infinity (0,1,0)).
  */
-static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
+static int weierstrass_verify_raw ( const struct elliptic_curve *curve,
 				    const bigint_element_t *point0 ) {
-	unsigned int size = curve->size;
+	const struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
 	const bigint_t ( size ) __attribute__ (( may_alias ))
-		*prime = ( ( const void * ) curve->prime[0] );
+		*prime = ( ( const void * ) weierstrass->prime[0] );
 	const bigint_t ( size ) __attribute__ (( may_alias ))
-		*a = ( ( const void * ) curve->a );
+		*a = ( ( const void * ) weierstrass->a );
 	const bigint_t ( size ) __attribute__ (( may_alias ))
-		*b3 = ( ( const void * ) curve->b3 );
+		*b3 = ( ( const void * ) weierstrass->b3 );
 	const weierstrass_t ( size ) __attribute__ (( may_alias ))
 		*point = ( ( const void * ) point0 );
 	struct {
@@ -761,7 +767,7 @@ static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
 /**
  * Verify freshly initialised point is on curve
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v point		Point (x,y,z) to be verified
  * @ret rc		Return status code
  */
@@ -772,25 +778,26 @@ static int weierstrass_verify_raw ( const struct weierstrass_curve *curve,
 /**
  * Initialise curve point
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v point0		Element 0 of point (x,y,z) to be filled in
  * @v temp0		Element 0 of temporary point buffer
  * @v data		Raw curve point
  * @ret rc		Return status code
  */
-static int weierstrass_init_raw ( struct weierstrass_curve *curve,
+static int weierstrass_init_raw ( struct elliptic_curve *curve,
 				  bigint_element_t *point0,
 				  bigint_element_t *temp0, const void *data ) {
-	unsigned int size = curve->size;
-	size_t len = curve->len;
+	struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
+	size_t len = weierstrass->len;
 	const bigint_t ( size ) __attribute__ (( may_alias )) *prime =
-		( ( const void * ) curve->prime[0] );
+		( ( const void * ) weierstrass->prime[0] );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *prime2 =
-		( ( const void * ) curve->prime[WEIERSTRASS_2N] );
+		( ( const void * ) weierstrass->prime[WEIERSTRASS_2N] );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *square =
-		( ( const void * ) curve->square );
+		( ( const void * ) weierstrass->square );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *one =
-		( ( const void * ) curve->one );
+		( ( const void * ) weierstrass->one );
 	weierstrass_t ( size ) __attribute__ (( may_alias ))
 		*point = ( ( void * ) point0 );
 	union {
@@ -837,7 +844,7 @@ static int weierstrass_init_raw ( struct weierstrass_curve *curve,
 /**
  * Initialise curve point
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v point		Point (x,y,z) to be filled in
  * @v temp		Temporary point buffer
  * @v data		Raw curve point
@@ -851,22 +858,23 @@ static int weierstrass_init_raw ( struct weierstrass_curve *curve,
 /**
  * Finalise curve point
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v point0		Element 0 of point (x,y,z)
  * @v temp0		Element 0 of temporary point buffer
  * @v out		Output buffer
  */
-static void weierstrass_done_raw ( struct weierstrass_curve *curve,
+static void weierstrass_done_raw ( struct elliptic_curve *curve,
 				   bigint_element_t *point0,
 				   bigint_element_t *temp0, void *out ) {
-	unsigned int size = curve->size;
-	size_t len = curve->len;
+	struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
+	size_t len = weierstrass->len;
 	const bigint_t ( size ) __attribute__ (( may_alias )) *prime =
-		( ( const void * ) curve->prime[0] );
+		( ( const void * ) weierstrass->prime[0] );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *fermat =
-		( ( const void * ) curve->fermat );
+		( ( const void * ) weierstrass->fermat );
 	const bigint_t ( size ) __attribute__ (( may_alias )) *one =
-		( ( const void * ) curve->one );
+		( ( const void * ) weierstrass->one );
 	weierstrass_t ( size ) __attribute__ (( may_alias ))
 		*point = ( ( void * ) point0 );
 	union {
@@ -900,7 +908,7 @@ static void weierstrass_done_raw ( struct weierstrass_curve *curve,
 /**
  * Finalise curve point
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v point		Point (x,y,z)
  * @v temp		Temporary point buffer
  * @v out		Output buffer
@@ -914,13 +922,15 @@ static void weierstrass_done_raw ( struct weierstrass_curve *curve,
 /**
  * Check if this is the point at infinity
  *
+ * @v curve		Elliptic curve
  * @v point		Curve point
  * @ret is_infinity	This is the point at infinity
  */
-int weierstrass_is_infinity ( struct weierstrass_curve *curve,
+int weierstrass_is_infinity ( struct elliptic_curve *curve,
 			      const void *point ) {
-	unsigned int size = curve->size;
-	size_t len = curve->len;
+	struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
+	size_t len = weierstrass->len;
 	struct {
 		bigint_t ( size ) axis;
 	} temp;
@@ -944,18 +954,19 @@ int weierstrass_is_infinity ( struct weierstrass_curve *curve,
 /**
  * Multiply curve point by scalar
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v base		Base point
  * @v scalar		Scalar multiple
  * @v result		Result point to fill in
  * @ret rc		Return status code
  */
-int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
+int weierstrass_multiply ( struct elliptic_curve *curve, const void *base,
 			   const void *scalar, void *result ) {
-	unsigned int size = curve->size;
-	size_t len = curve->len;
+	struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
+	size_t len = weierstrass->len;
 	const bigint_t ( size ) __attribute__ (( may_alias )) *one =
-		( ( const void * ) curve->one );
+		( ( const void * ) weierstrass->one );
 	struct {
 		weierstrass_t ( size ) result;
 		weierstrass_t ( size ) multiple;
@@ -991,16 +1002,17 @@ int weierstrass_multiply ( struct weierstrass_curve *curve, const void *base,
 /**
  * Add curve points (as a one-off operation)
  *
- * @v curve		Weierstrass curve
+ * @v curve		Elliptic curve
  * @v addend		Curve point to add
  * @v augend		Curve point to add
  * @v result		Curve point to hold result
  * @ret rc		Return status code
  */
-int weierstrass_add_once ( struct weierstrass_curve *curve,
+int weierstrass_add_once ( struct elliptic_curve *curve,
 			   const void *addend, const void *augend,
 			   void *result ) {
-	unsigned int size = curve->size;
+	struct weierstrass_curve *weierstrass = curve->priv;
+	unsigned int size = weierstrass->size;
 	struct {
 		weierstrass_t ( size ) addend;
 		weierstrass_t ( size ) augend;
@@ -1036,14 +1048,15 @@ int weierstrass_add_once ( struct weierstrass_curve *curve,
  */
 void weierstrass_share ( struct exchange_algorithm *exchange,
 			 const void *private, void *public ) {
-	struct weierstrass_curve *curve = exchange->priv;
-	size_t len = curve->len;
+	struct elliptic_curve *curve = exchange->priv;
+	struct weierstrass_curve *weierstrass = curve->priv;
+	size_t len = weierstrass->len;
 	weierstrass_uncompressed_t ( len ) *uncompressed = public;
 	int rc;
 
 	/* Calculate public key */
 	uncompressed->format = WEIERSTRASS_FORMAT;
-	rc = weierstrass_multiply ( curve, curve->base, private,
+	rc = weierstrass_multiply ( curve, weierstrass->base, private,
 				    &uncompressed->xy );
 
 	/* Can never fail when using the curve's own base point */
@@ -1062,8 +1075,9 @@ void weierstrass_share ( struct exchange_algorithm *exchange,
 int weierstrass_agree ( struct exchange_algorithm *exchange,
 			const void *private, const void *partner,
 			void *shared ) {
-	struct weierstrass_curve *curve = exchange->priv;
-	size_t len = curve->len;
+	struct elliptic_curve *curve = exchange->priv;
+	struct weierstrass_curve *weierstrass = curve->priv;
+	size_t len = weierstrass->len;
 	const weierstrass_uncompressed_t ( len ) *uncompressed = partner;
 	weierstrass_raw_t ( len ) point;
 	int rc;

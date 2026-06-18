@@ -223,6 +223,7 @@ struct elliptic_curve {
 	const void *order;
 	/** Check if this is the point at infinity
 	 *
+	 * @v curve		Elliptic curve
 	 * @v point		Curve point
 	 * @ret is_infinity	This is the point at infinity
 	 *
@@ -230,24 +231,30 @@ struct elliptic_curve {
 	 * coordinates.  Each curve must choose a representation of
 	 * the point at infinity (e.g. all zeroes).
 	 */
-	int ( * is_infinity ) ( const void *point );
+	int ( * is_infinity ) ( struct elliptic_curve *curve,
+				const void *point );
 	/** Multiply scalar by curve point
 	 *
+	 * @v curve		Elliptic curve
 	 * @v base		Base point
 	 * @v scalar		Scalar multiple
 	 * @v result		Result point to fill in
 	 * @ret rc		Return status code
 	 */
-	int ( * multiply ) ( const void *base, const void *scalar,
-			     void *result );
+	int ( * multiply ) ( struct elliptic_curve *curve, const void *base,
+			     const void *scalar, void *result );
 	/** Add curve points (as a one-off operation)
 	 *
+	 * @v curve		Elliptic curve
 	 * @v addend		Curve point to add
 	 * @v augend		Curve point to add
 	 * @v result		Curve point to hold result
 	 * @ret rc		Return status code
 	 */
-	int ( * add ) ( const void *addend, const void *augend, void *result );
+	int ( * add ) ( struct elliptic_curve *curve, const void *addend,
+			const void *augend, void *result );
+	/** Algorithm private data */
+	void *priv;
 };
 
 static inline __attribute__ (( always_inline )) void
@@ -367,19 +374,19 @@ exchange_agree ( struct exchange_algorithm *exchange, const void *private,
 
 static inline __attribute__ (( always_inline )) int
 elliptic_is_infinity ( struct elliptic_curve *curve, const void *point ) {
-	return curve->is_infinity ( point );
+	return curve->is_infinity ( curve, point );
 }
 
 static inline __attribute__ (( always_inline )) int
 elliptic_multiply ( struct elliptic_curve *curve,
 		    const void *base, const void *scalar, void *result ) {
-	return curve->multiply ( base, scalar, result );
+	return curve->multiply ( curve, base, scalar, result );
 }
 
 static inline __attribute__ (( always_inline )) int
 elliptic_add ( struct elliptic_curve *curve, const void *addend,
 	       const void *augend, void *result ) {
-	return curve->add ( addend, augend, result );
+	return curve->add ( curve, addend, augend, result );
 }
 
 extern void digest_null_init ( void *ctx );
