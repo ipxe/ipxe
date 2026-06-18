@@ -255,21 +255,21 @@ static int ffdhe ( struct ffdhe_group *group, const void *public,
 }
 
 /**
- * Calculate public key
+ * Share public key
  *
  * @v exchange		Key exchange algorithm
  * @v private		Private key
  * @v public		Public key to fill in
  */
-void ffdhe_public ( struct exchange_algorithm *exchange, const void *private,
-		    void *public ) {
+void ffdhe_share ( struct exchange_algorithm *exchange, const void *private,
+		   void *public ) {
 	struct ffdhe_group *group = exchange->priv;
 
 	ffdhe ( group, NULL, private, public );
 }
 
 /**
- * Calculate shared secret
+ * Agree shared secret
  *
  * @v exchange		Key exchange algorithm
  * @v private		Private key
@@ -277,8 +277,8 @@ void ffdhe_public ( struct exchange_algorithm *exchange, const void *private,
  * @v shared		Shared secret to fill in
  * @ret rc		Return status code
  */
-int ffdhe_shared ( struct exchange_algorithm *exchange, const void *private,
-		   const void *partner, void *shared ) {
+int ffdhe_agree ( struct exchange_algorithm *exchange, const void *private,
+		  const void *partner, void *shared ) {
 	struct ffdhe_group *group = exchange->priv;
 
 	return ffdhe ( group, partner, private, shared );

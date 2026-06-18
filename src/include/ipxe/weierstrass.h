@@ -164,11 +164,11 @@ extern int weierstrass_multiply ( struct weierstrass_curve *curve,
 extern int weierstrass_add_once ( struct weierstrass_curve *curve,
 				  const void *addend, const void *augend,
 				  void *result );
-extern void weierstrass_public ( struct exchange_algorithm *exchange,
-				 const void *private, void *public );
-extern int weierstrass_shared ( struct exchange_algorithm *exchange,
-				const void *private, const void *partner,
-				void *shared );
+extern void weierstrass_share ( struct exchange_algorithm *exchange,
+				const void *private, void *public );
+extern int weierstrass_agree ( struct exchange_algorithm *exchange,
+			       const void *private, const void *partner,
+			       void *shared );
 
 /** Define a Weierstrass curve */
 #define WEIERSTRASS_CURVE( _name, _curve, _exchange, _len, _prime,	\
@@ -224,8 +224,8 @@ extern int weierstrass_shared ( struct exchange_algorithm *exchange,
 		.privsize = (_len),					\
 		.pubsize = sizeof ( weierstrass_uncompressed_t(_len) ), \
 		.sharedsize = (_len),					\
-		.public = weierstrass_public,				\
-		.shared = weierstrass_shared,				\
+		.share = weierstrass_share,				\
+		.agree = weierstrass_agree,				\
 		.priv = &_name ## _weierstrass,				\
 	}
 

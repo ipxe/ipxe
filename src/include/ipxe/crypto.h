@@ -185,16 +185,16 @@ struct exchange_algorithm {
 	/** Shared secret size */
 	size_t sharedsize;
 	/**
-	 * Calculate public key
+	 * Share public key
 	 *
 	 * @v exchange		Key exchange algorithm
 	 * @v private		Private key
 	 * @v public		Public key to fill in
 	 */
-	void ( * public ) ( struct exchange_algorithm *exchange,
-			    const void *private, void *public );
+	void ( * share ) ( struct exchange_algorithm *exchange,
+			   const void *private, void *public );
 	/**
-	 * Calculate shared secret
+	 * Agree shared secret
 	 *
 	 * @v exchange		Key exchange algorithm
 	 * @v private		Private key
@@ -202,9 +202,9 @@ struct exchange_algorithm {
 	 * @v shared		Shared secret to fill in
 	 * @ret rc		Return status code
 	 */
-	int ( * shared ) ( struct exchange_algorithm *exchange,
-			   const void *private, const void *partner,
-			   void *shared );
+	int ( * agree ) ( struct exchange_algorithm *exchange,
+			  const void *private, const void *partner,
+			  void *shared );
 	/** Algorithm private data */
 	void *priv;
 };
@@ -354,15 +354,15 @@ pubkey_match ( struct pubkey_algorithm *pubkey,
 }
 
 static inline __attribute__ (( always_inline )) void
-exchange_public ( struct exchange_algorithm *exchange, const void *private,
-		  void *public ) {
-	exchange->public ( exchange, private, public );
+exchange_share ( struct exchange_algorithm *exchange, const void *private,
+		 void *public ) {
+	exchange->share ( exchange, private, public );
 }
 
 static inline __attribute__ (( always_inline )) int
-exchange_shared ( struct exchange_algorithm *exchange, const void *private,
-		  const void *partner, void *shared ) {
-	return exchange->shared ( exchange, private, partner, shared );
+exchange_agree ( struct exchange_algorithm *exchange, const void *private,
+		 const void *partner, void *shared ) {
+	return exchange->agree ( exchange, private, partner, shared );
 }
 
 static inline __attribute__ (( always_inline )) int

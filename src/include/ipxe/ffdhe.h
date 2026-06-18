@@ -33,11 +33,11 @@ struct ffdhe_group {
 	uint32_t lsb32;
 };
 
-extern void ffdhe_public ( struct exchange_algorithm *exchange,
-			   const void *private, void *public );
-extern int ffdhe_shared ( struct exchange_algorithm *exchange,
-			  const void *private, const void *partner,
-			  void *shared );
+extern void ffdhe_share ( struct exchange_algorithm *exchange,
+			  const void *private, void *public );
+extern int ffdhe_agree ( struct exchange_algorithm *exchange,
+			 const void *private, const void *partner,
+			 void *shared );
 extern int ffdhe_has_params ( struct exchange_algorithm *exchange,
 			      const void *modulus, size_t len,
 			      const void *generator, size_t generator_len );
@@ -51,7 +51,7 @@ extern int ffdhe_has_params ( struct exchange_algorithm *exchange,
 static inline __attribute__ (( always_inline )) int
 is_ffdhe ( struct exchange_algorithm *exchange ) {
 
-	return ( exchange->public == ffdhe_public );
+	return ( exchange->share == ffdhe_share );
 }
 
 /** Define a finite field DHE group */
@@ -70,8 +70,8 @@ is_ffdhe ( struct exchange_algorithm *exchange ) {
 		.privsize = ( ( _expbits + 7 ) / 8 ),			  \
 		.pubsize = ( _bits / 8 ),				  \
 		.sharedsize = ( _bits / 8 ),				  \
-		.public = ffdhe_public,					  \
-		.shared = ffdhe_shared,					  \
+		.share = ffdhe_share,					  \
+		.agree = ffdhe_agree,					  \
 		.priv = &_name ## _group,				  \
 	}
 

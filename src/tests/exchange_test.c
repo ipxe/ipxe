@@ -67,7 +67,7 @@ void exchange_okx ( struct exchange_test *test, const char *file,
 	/* Verify calculation of public key */
 	DBGC ( test, "KEX %s private key:\n", exchange->name );
 	DBGC_HDA ( test, 0, test->private, exchange->privsize );
-	exchange_public ( exchange, test->private, actual->public );
+	exchange_share ( exchange, test->private, actual->public );
 	DBGC ( test, "KEX %s public key:\n", exchange->name );
 	DBGC_HDA ( test, 0, actual->public, exchange->pubsize );
 	okx ( memcmp ( actual->public, test->public, exchange->pubsize ) == 0,
@@ -76,8 +76,8 @@ void exchange_okx ( struct exchange_test *test, const char *file,
 	/* Verify calculation of shared secret */
 	DBGC ( test, "KEX %s partner key:\n", exchange->name );
 	DBGC_HDA ( test, 0, test->partner, exchange->pubsize );
-	rc = exchange_shared ( exchange, test->private, test->partner,
-			       actual->shared );
+	rc = exchange_agree ( exchange, test->private, test->partner,
+			      actual->shared );
 	if ( test->shared_len ) {
 		/* Verify successful calculation */
 		okx ( rc == 0, file, line );

@@ -1762,7 +1762,7 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			  htonl ( sizeof ( key_xchg ) -
 				  sizeof ( key_xchg.type_length ) ) );
 		key_xchg.public_len = sizeof ( key_xchg.public );
-		exchange_public ( exchange, private, key_xchg.public );
+		exchange_share ( exchange, private, key_xchg.public );
 
 		/* Transmit Client Key Exchange record */
 		if ( ( rc = tls_send_handshake ( tls, &key_xchg,
@@ -1771,8 +1771,8 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 		}
 
 		/* Generate pre-master secret */
-		if ( ( rc = exchange_shared ( exchange, private, ecdh->public,
-					      pre_master_secret ) ) != 0 ) {
+		if ( ( rc = exchange_agree ( exchange, private, ecdh->public,
+					     pre_master_secret ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not exchange keys: %s\n",
 			       tls, strerror ( rc ) );
 			return rc;
