@@ -323,12 +323,14 @@ static void rsa_cipher ( struct rsa_context *context,
 /**
  * Encrypt using RSA PKCS#1
  *
+ * @v pubkey		Public-key algorithm
  * @v key		Key
  * @v plaintext		Plaintext
  * @v ciphertext	Ciphertext
  * @ret ciphertext_len	Length of ciphertext, or negative error
  */
-static int rsa_pkcs1_encrypt ( const struct asn1_cursor *key,
+static int rsa_pkcs1_encrypt ( struct pubkey_algorithm *pubkey __unused,
+			       const struct asn1_cursor *key,
 			       const struct asn1_cursor *plaintext,
 			       struct asn1_builder *ciphertext ) {
 	struct rsa_context context;
@@ -400,12 +402,14 @@ static int rsa_pkcs1_encrypt ( const struct asn1_cursor *key,
 /**
  * Decrypt using RSA PKCS#1
  *
+ * @v pubkey		Public-key algorithm
  * @v key		Key
  * @v ciphertext	Ciphertext
  * @v plaintext		Plaintext
  * @ret rc		Return status code
  */
-static int rsa_pkcs1_decrypt ( const struct asn1_cursor *key,
+static int rsa_pkcs1_decrypt ( struct pubkey_algorithm *pubkey __unused,
+			       const struct asn1_cursor *key,
 			       const struct asn1_cursor *ciphertext,
 			       struct asn1_builder *plaintext ) {
 	struct rsa_context context;
@@ -667,16 +671,18 @@ static int rsa_pss_encode ( struct rsa_context *context,
 /**
  * Sign digest value using RSA
  *
+ * @v pubkey		Public-key algorithm
  * @v key		Key
  * @v digest		Digest algorithm
  * @v value		Digest value
  * @v signature		Signature
- * @v encode		Encoding method
  * @ret rc		Return status code
  */
-static int rsa_sign ( const struct asn1_cursor *key,
+static int rsa_sign ( struct pubkey_algorithm *pubkey,
+		      const struct asn1_cursor *key,
 		      struct digest_algorithm *digest, const void *value,
-		      struct asn1_builder *signature, rsa_encode_t *encode ) {
+		      struct asn1_builder *signature ) {
+	rsa_encode_t *encode = pubkey->priv;
 	struct rsa_context context;
 	int rc;
 
@@ -717,17 +723,18 @@ static int rsa_sign ( const struct asn1_cursor *key,
 /**
  * Verify signed digest value using RSA
  *
+ * @v pubkey		Public-key algorithm
  * @v key		Key
  * @v digest		Digest algorithm
  * @v value		Digest value
  * @v signature		Signature
- * @v encoding		Encoding method
  * @ret rc		Return status code
  */
-static int rsa_verify ( const struct asn1_cursor *key,
+static int rsa_verify ( struct pubkey_algorithm *pubkey,
+			const struct asn1_cursor *key,
 			struct digest_algorithm *digest, const void *value,
-			const struct asn1_cursor *signature,
-			rsa_encode_t *encode ) {
+			const struct asn1_cursor *signature ) {
+	rsa_encode_t *encode = pubkey->priv;
 	struct rsa_context context;
 	void *temp;
 	void *expected;
@@ -793,78 +800,15 @@ static int rsa_verify ( const struct asn1_cursor *key,
 }
 
 /**
- * Sign digest value using RSA PKCS#1
- *
- * @v key		Key
- * @v digest		Digest algorithm
- * @v value		Digest value
- * @v signature		Signature
- * @ret rc		Return status code
- */
-static int rsa_pkcs1_sign ( const struct asn1_cursor *key,
-			    struct digest_algorithm *digest, const void *value,
-			    struct asn1_builder *signature ) {
-
-	return rsa_sign ( key, digest, value, signature, rsa_pkcs1_encode );
-}
-
-/**
- * Verify signed digest value using RSA PKCS#1
- *
- * @v key		Key
- * @v digest		Digest algorithm
- * @v value		Digest value
- * @v signature		Signature
- * @ret rc		Return status code
- */
-static int rsa_pkcs1_verify ( const struct asn1_cursor *key,
-			      struct digest_algorithm *digest,
-			      const void *value,
-			      const struct asn1_cursor *signature ) {
-
-	return rsa_verify ( key, digest, value, signature, rsa_pkcs1_encode );
-}
-
-/**
- * Sign digest value using RSA PSS
- *
- * @v key		Key
- * @v digest		Digest algorithm
- * @v value		Digest value
- * @v signature		Signature
- * @ret rc		Return status code
- */
-static int rsa_pss_sign ( const struct asn1_cursor *key,
-			  struct digest_algorithm *digest, const void *value,
-			  struct asn1_builder *signature ) {
-
-	return rsa_sign ( key, digest, value, signature, rsa_pss_encode );
-}
-
-/**
- * Verify signed digest value using RSA PSS
- *
- * @v key		Key
- * @v digest		Digest algorithm
- * @v value		Digest value
- * @v signature		Signature
- * @ret rc		Return status code
- */
-static int rsa_pss_verify ( const struct asn1_cursor *key,
-			    struct digest_algorithm *digest, const void *value,
-			    const struct asn1_cursor *signature ) {
-
-	return rsa_verify ( key, digest, value, signature, rsa_pss_encode );
-}
-
-/**
  * Check for matching RSA public/private key pair
  *
+ * @v pubkey		Public-key algorithm
  * @v private_key	Private key
  * @v public_key	Public key
  * @ret rc		Return status code
  */
-static int rsa_match ( const struct asn1_cursor *private_key,
+static int rsa_match ( struct pubkey_algorithm *pubkey __unused,
+		       const struct asn1_cursor *private_key,
 		       const struct asn1_cursor *public_key ) {
 	struct asn1_cursor private_modulus;
 	struct asn1_cursor private_exponent;
@@ -892,9 +836,10 @@ struct pubkey_algorithm rsa_algorithm = {
 	.name		= "rsa",
 	.encrypt	= rsa_pkcs1_encrypt,
 	.decrypt	= rsa_pkcs1_decrypt,
-	.sign		= rsa_pkcs1_sign,
-	.verify		= rsa_pkcs1_verify,
+	.sign		= rsa_sign,
+	.verify		= rsa_verify,
 	.match		= rsa_match,
+	.priv		= rsa_pkcs1_encode,
 };
 
 /** RSA-PSS public-key algorithm */
@@ -902,9 +847,10 @@ struct pubkey_algorithm rsa_pss_algorithm = {
 	.name		= "rsa_pss",
 	.encrypt	= pubkey_null_encrypt,
 	.decrypt	= pubkey_null_decrypt,
-	.sign		= rsa_pss_sign,
-	.verify		= rsa_pss_verify,
+	.sign		= rsa_sign,
+	.verify		= rsa_verify,
 	.match		= rsa_match,
+	.priv		= rsa_pss_encode,
 };
 
 /* Drag in objects via rsa_algorithm */

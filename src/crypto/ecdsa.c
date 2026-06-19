@@ -768,13 +768,15 @@ static int ecdsa_verify_rs ( struct ecdsa_context *ctx ) {
 /**
  * Sign digest value using ECDSA
  *
+ * @v pubkey		Public-key algorithm
  * @v key		Key
  * @v digest		Digest algorithm
  * @v value		Digest value
  * @v signature		Signature
  * @ret rc		Return status code
  */
-static int ecdsa_sign ( const struct asn1_cursor *key,
+static int ecdsa_sign ( struct pubkey_algorithm *pubkey __unused,
+			const struct asn1_cursor *key,
 			struct digest_algorithm *digest, const void *value,
 			struct asn1_builder *signature ) {
 	struct ecdsa_context ctx;
@@ -824,13 +826,15 @@ static int ecdsa_sign ( const struct asn1_cursor *key,
 /**
  * Verify signed digest using ECDSA
  *
+ * @v pubkey		Public-key algorithm
  * @v key		Key
  * @v digest		Digest algorithm
  * @v value		Digest value
  * @v signature		Signature
  * @ret rc		Return status code
  */
-static int ecdsa_verify ( const struct asn1_cursor *key,
+static int ecdsa_verify ( struct pubkey_algorithm *pubkey __unused,
+			  const struct asn1_cursor *key,
 			  struct digest_algorithm *digest, const void *value,
 			  const struct asn1_cursor *signature ) {
 	struct ecdsa_context ctx;
@@ -872,30 +876,32 @@ static int ecdsa_verify ( const struct asn1_cursor *key,
 /**
  * Check for matching ECDSA public/private key pair
  *
+ * @v pubkey		Public-key algorithm
  * @v private_key	Private key
  * @v public_key	Public key
  * @ret rc		Return status code
  */
-static int ecdsa_match ( const struct asn1_cursor *private_key,
+static int ecdsa_match ( struct pubkey_algorithm *pubkey __unused,
+			 const struct asn1_cursor *private_key,
 			 const struct asn1_cursor *public_key ) {
 	struct elliptic_curve *curve;
-	struct ecdsa_key privkey;
-	struct ecdsa_key pubkey;
+	struct ecdsa_key private;
+	struct ecdsa_key public;
 	int rc;
 
 	/* Parse keys */
-	if ( ( rc = ecdsa_parse_key ( &privkey, private_key ) ) != 0 )
+	if ( ( rc = ecdsa_parse_key ( &private, private_key ) ) != 0 )
 		return rc;
-	if ( ( rc = ecdsa_parse_key ( &pubkey, public_key ) ) != 0 )
+	if ( ( rc = ecdsa_parse_key ( &public, public_key ) ) != 0 )
 		return rc;
 
 	/* Compare curves */
-	if ( privkey.curve != pubkey.curve )
+	if ( private.curve != public.curve )
 		return -ENOTTY;
-	curve = privkey.curve;
+	curve = private.curve;
 
 	/* Compare public curve points */
-	if ( memcmp ( privkey.public, pubkey.public, curve->pointsize ) != 0 )
+	if ( memcmp ( private.public, public.public, curve->pointsize ) != 0 )
 		return -ENOTTY;
 
 	return 0;
