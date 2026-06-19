@@ -17,6 +17,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/crypto.h>
 #include <ipxe/md5.h>
 #include <ipxe/sha1.h>
+#include <ipxe/sha256.h>
 #include <ipxe/x509.h>
 #include <ipxe/privkey.h>
 #include <ipxe/pending.h>
@@ -351,6 +352,15 @@ struct tls_session {
 	struct list_head conn;
 };
 
+/** HKDF algorithm for ephemeral secrets */
+#define tls_ephemeral_algorithm sha256_algorithm
+
+/** TLS key schedule */
+struct tls_key_schedule {
+	/** Ephemeral secret pseudorandom key */
+	uint8_t ephemeral[SHA256_DIGEST_SIZE];
+};
+
 /** TLS transmit state */
 struct tls_tx {
 	/** Cipher specifications */
@@ -455,6 +465,8 @@ struct tls_connection {
 	/** Verification data */
 	struct tls_verify_data verify;
 
+	/** Key schedule */
+	struct tls_key_schedule key;
 	/** Transmit state */
 	struct tls_tx tx;
 	/** Receive state */
