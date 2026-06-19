@@ -96,9 +96,10 @@ struct cipher_algorithm {
 	 * @v ctx	Context
 	 * @v iv	Initialisation vector
 	 * @v ivlen	Initialisation vector length
+	 * @ret rc	Return status code
 	 */
-	void ( * setiv ) ( struct cipher_algorithm *cipher, void *ctx,
-			   const void *iv, size_t ivlen );
+	int ( * setiv ) ( struct cipher_algorithm *cipher, void *ctx,
+			  const void *iv, size_t ivlen );
 	/** Encrypt data
 	 *
 	 * @v cipher	Cipher algorithm
@@ -296,10 +297,10 @@ cipher_setkey ( struct cipher_algorithm *cipher, void *ctx,
 	return cipher->setkey ( cipher, ctx, key, keylen );
 }
 
-static inline __attribute__ (( always_inline )) void
+static inline __attribute__ (( always_inline )) int
 cipher_setiv ( struct cipher_algorithm *cipher, void *ctx,
 	       const void *iv, size_t ivlen ) {
-	cipher->setiv ( cipher, ctx, iv, ivlen );
+	return cipher->setiv ( cipher, ctx, iv, ivlen );
 }
 
 static inline __attribute__ (( always_inline )) void
@@ -414,8 +415,8 @@ extern void digest_null_final ( struct digest_algorithm *digest, void *ctx,
 
 extern int cipher_null_setkey ( struct cipher_algorithm *cipher, void *ctx,
 				const void *key, size_t keylen );
-extern void cipher_null_setiv ( struct cipher_algorithm *cipehr, void *ctx,
-				const void *iv, size_t ivlen );
+extern int cipher_null_setiv ( struct cipher_algorithm *cipehr, void *ctx,
+			       const void *iv, size_t ivlen );
 extern void cipher_null_encrypt ( struct cipher_algorithm *cipher, void *ctx,
 				  const void *src, void *dst, size_t len );
 extern void cipher_null_decrypt ( struct cipher_algorithm *cipher, void *ctx,

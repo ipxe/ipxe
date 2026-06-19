@@ -452,9 +452,10 @@ int gcm_setkey ( struct cipher_algorithm *cipher, void *ctx,
  * @v ctx		Context
  * @v iv		Initialisation vector
  * @v ivlen		Initialisation vector length
+ * @ret rc		Return status code
  */
-void gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
-		 const void *iv, size_t ivlen ) {
+int gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
+		const void *iv, size_t ivlen ) {
 	gcm_context_t ( cipher->ctxsize ) *context = ctx;
 
 	/* Reset non-key state */
@@ -490,6 +491,7 @@ void gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
 	DBGC2 ( context, "GCM %p Y[0]:\n", context );
 	DBGC2_HDA ( context, 0, &context->gcm.ctr,
 		    sizeof ( context->gcm.ctr ) );
+	return 0;
 }
 
 /**

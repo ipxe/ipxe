@@ -941,12 +941,18 @@ static int cms_cipher_key ( struct cms_message *cms,
 	}
 
 	/* Set cipher initialization vector */
-	cipher_setiv ( cipher, ctx, cms->iv.data, cms->iv.len );
+	if ( ( rc = cipher_setiv ( cipher, ctx, cms->iv.data,
+				   cms->iv.len ) ) != 0 ) {
+		DBGC ( cms, "CMS %p could not set cipher IV: %s\n",
+		       cms, strerror ( rc ) );
+		goto err_setiv;
+	}
 	if ( cms->iv.len ) {
 		DBGC ( cms, "CMS %p cipher IV:\n", cms );
 		DBGC_HDA ( cms, 0, cms->iv.data, cms->iv.len );
 	}
 
+ err_setiv:
  err_setkey:
  err_decrypt:
 	free ( cipher_key.data );

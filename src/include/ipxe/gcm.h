@@ -67,8 +67,8 @@ struct gcm_context {
 
 extern int gcm_setkey ( struct cipher_algorithm *cipher, void *ctx,
 			const void *key, size_t keylen );
-extern void gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
-			const void *iv, size_t ivlen );
+extern int gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
+		       const void *iv, size_t ivlen );
 extern void gcm_encrypt ( struct cipher_algorithm *cipher, void *ctx,
 			  const void *src, void *dst, size_t len );
 extern void gcm_decrypt ( struct cipher_algorithm *cipher, void *ctx,

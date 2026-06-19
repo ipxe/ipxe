@@ -1017,6 +1017,8 @@ static int peerblk_parse_iv ( struct peerdist_block *peerblk, size_t buf_len,
 	peerblk_msg_blk_t ( digestsize, buf_len, vrf_len, blksize ) *msg =
 		peerblk->buffer.data;
 	size_t len = peerblk->buffer.len;
+	size_t ivlen;
+	int rc;
 
 	/* Check message length */
 	if ( len < sizeof ( *msg ) ) {
@@ -1025,18 +1027,16 @@ static int peerblk_parse_iv ( struct peerdist_block *peerblk, size_t buf_len,
 		       peerblk->segment, peerblk->block, len );
 		return -ERANGE;
 	}
-
-	/* Check initialisation vector size */
-	if ( ntohl ( msg->msg.iv.iv.blksize ) != blksize ) {
-		DBGC ( peerblk, "PEERBLK %p %d.%d incorrect IV size %d\n",
-		       peerblk, peerblk->segment, peerblk->block,
-		       ntohl ( msg->msg.iv.iv.blksize ) );
-		return -EPROTO;
-	}
+	ivlen = ntohl ( msg->msg.iv.iv.blksize );
 
 	/* Set initialisation vector */
-	cipher_setiv ( peerblk->cipher, peerblk->cipherctx, msg->msg.iv.data,
-		       blksize );
+	if ( ( rc = cipher_setiv ( peerblk->cipher, peerblk->cipherctx,
+				   msg->msg.iv.data, ivlen ) ) != 0 ) {
+		DBGC ( peerblk, "PEERBLK %p %d.%d could not set IV: %s\n",
+		       peerblk, peerblk->segment, peerblk->block,
+		       strerror ( rc ) );
+		return rc;
+	}
 
 	return 0;
 }

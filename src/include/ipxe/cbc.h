@@ -21,8 +21,8 @@ FILE_SECBOOT ( PERMITTED );
 
 extern int cbc_setkey ( struct cipher_algorithm *cipher, void *ctx,
 			const void *key, size_t keylen );
-extern void cbc_setiv ( struct cipher_algorithm *cipher, void *ctx,
-			const void *iv, size_t ivlen );
+extern int cbc_setiv ( struct cipher_algorithm *cipher, void *ctx,
+		       const void *iv, size_t ivlen );
 extern void cbc_encrypt ( struct cipher_algorithm *cipher, void *ctx,
 			  const void *src, void *dst, size_t len );
 extern void cbc_decrypt ( struct cipher_algorithm *cipher, void *ctx,

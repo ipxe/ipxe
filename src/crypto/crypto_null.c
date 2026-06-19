@@ -67,10 +67,11 @@ int cipher_null_setkey ( struct cipher_algorithm *cipher __unused,
 	return 0;
 }
 
-void cipher_null_setiv ( struct cipher_algorithm *cipher __unused,
-			 void *ctx __unused, const void *iv __unused,
-			 size_t ivlen __unused ) {
+int cipher_null_setiv ( struct cipher_algorithm *cipher __unused,
+			void *ctx __unused, const void *iv __unused,
+			size_t ivlen __unused ) {
 	/* Do nothing */
+	return 0;
 }
 
 void cipher_null_encrypt ( struct cipher_algorithm *cipher __unused,

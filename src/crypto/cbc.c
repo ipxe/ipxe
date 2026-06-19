@@ -26,6 +26,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 #include <ipxe/crypto.h>
 #include <ipxe/cbc.h>
 
@@ -61,15 +62,22 @@ int cbc_setkey ( struct cipher_algorithm *cipher, void *ctx,
  * @v ctx		Context
  * @v iv		Initialisation vector
  * @v ivlen		Initialisation vector length
+ * @ret rc		Return status code
  */
-void cbc_setiv ( struct cipher_algorithm *cipher, void *ctx,
-		 const void *iv, size_t ivlen ) {
+int cbc_setiv ( struct cipher_algorithm *cipher, void *ctx,
+		const void *iv, size_t ivlen ) {
 	size_t blocksize = cipher->blocksize;
 	size_t ctxsize = cipher->ctxsize;
 	cbc_context_t ( blocksize, ctxsize ) *context = ctx;
 
-	assert ( ivlen == sizeof ( context->cbc ) );
+	/* Check length */
+	if ( ivlen != sizeof ( context->cbc ) )
+		return -ENOTSUP;
+
+	/* Record IV */
 	memcpy ( context->cbc, iv, sizeof ( context->cbc ) );
+
+	return 0;
 }
 
 /**

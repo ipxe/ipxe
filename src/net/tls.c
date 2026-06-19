@@ -3089,8 +3089,12 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 						  sizeof ( iv.rec ) ) ) != 0 ) {
 			goto err_random;
 		}
-		cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv,
-			       sizeof ( iv ) );
+		if ( ( rc = cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv,
+					   sizeof ( iv ) ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not set TX IV: %s\n",
+			       tls, strerror ( rc ) );
+			goto err_setiv;
+		}
 
 		/* Construct and process authentication data */
 		authhdr.seq = cpu_to_be64 ( tls->tx.seq );
@@ -3171,6 +3175,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 	return 0;
 
  err_deliver:
+ err_setiv:
  err_random:
 	free_iob ( iobuf );
 	return rc;
@@ -3304,7 +3309,12 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	authhdr.header.length = htons ( len );
 
 	/* Set initialisation vector */
-	cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv, sizeof ( iv ) );
+	if ( ( rc = cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv,
+				   sizeof ( iv ) ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not set RX IV: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
 
 	/* Process authentication data, if applicable */
 	if ( is_auth_cipher ( cipher ) ) {

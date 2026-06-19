@@ -451,6 +451,7 @@ FILE_SECBOOT ( PERMITTED );
 #define ERRFILE_ecdsa		      ( ERRFILE_OTHER | 0x00690000 )
 #define ERRFILE_crypto_null	      ( ERRFILE_OTHER | 0x006a0000 )
 #define ERRFILE_ffdhe		      ( ERRFILE_OTHER | 0x006b0000 )
+#define ERRFILE_cbc		      ( ERRFILE_OTHER | 0x006c0000 )
 
 /** @} */
 
