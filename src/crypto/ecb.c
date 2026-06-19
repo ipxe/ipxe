@@ -35,16 +35,33 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 /**
+ * Set key
+ *
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
+ * @v key		Key
+ * @v keylen		Key length
+ * @ret rc		Return status code
+ */
+int ecb_setkey ( struct cipher_algorithm *cipher, void *ctx,
+		 const void *key, size_t keylen ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
+
+	return cipher_setkey ( raw_cipher, ctx, key, keylen );
+}
+
+/**
  * Encrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to encrypt
  * @v dst		Buffer for encrypted data
  * @v len		Length of data
- * @v raw_cipher	Underlying cipher algorithm
  */
-void ecb_encrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *raw_cipher ) {
+void ecb_encrypt ( struct cipher_algorithm *cipher, void *ctx,
+		   const void *src, void *dst, size_t len ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
 	size_t blocksize = raw_cipher->blocksize;
 
 	assert ( ( len % blocksize ) == 0 );
@@ -60,14 +77,15 @@ void ecb_encrypt ( void *ctx, const void *src, void *dst, size_t len,
 /**
  * Decrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to decrypt
  * @v dst		Buffer for decrypted data
  * @v len		Length of data
- * @v raw_cipher	Underlying cipher algorithm
  */
-void ecb_decrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *raw_cipher ) {
+void ecb_decrypt ( struct cipher_algorithm *cipher, void *ctx,
+		   const void *src, void *dst, size_t len ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
 	size_t blocksize = raw_cipher->blocksize;
 
 	assert ( ( len % blocksize ) == 0 );

@@ -580,12 +580,14 @@ static uint32_t des_rol28 ( uint32_t dword ) {
 /**
  * Set key
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v key		Key
  * @v keylen		Key length
  * @ret rc		Return status code
  */
-static int des_setkey ( void *ctx, const void *key, size_t keylen ) {
+static int des_setkey ( struct cipher_algorithm *cipher __unused, void *ctx,
+			const void *key, size_t keylen ) {
 	struct des_context *des = ctx;
 	union des_round_key *rkey = des->rkey;
 	union des_block reg;
@@ -640,12 +642,14 @@ static int des_setkey ( void *ctx, const void *key, size_t keylen ) {
 /**
  * Encrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to encrypt
  * @v dst		Buffer for encrypted data
  * @v len		Length of data
  */
-static void des_encrypt ( void *ctx, const void *src, void *dst, size_t len ) {
+static void des_encrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
+			  const void *src, void *dst, size_t len ) {
 	struct des_context *des = ctx;
 
 	/* Sanity check */
@@ -658,12 +662,14 @@ static void des_encrypt ( void *ctx, const void *src, void *dst, size_t len ) {
 /**
  * Decrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to decrypt
  * @v dst		Buffer for decrypted data
  * @v len		Length of data
  */
-static void des_decrypt ( void *ctx, const void *src, void *dst, size_t len ) {
+static void des_decrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
+			  const void *src, void *dst, size_t len ) {
 	struct des_context *des = ctx;
 
 	/* Sanity check */

@@ -36,6 +36,43 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 /**
+ * Set key
+ *
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
+ * @v key		Key
+ * @v keylen		Key length
+ * @ret rc		Return status code
+ */
+int cbc_setkey ( struct cipher_algorithm *cipher, void *ctx,
+		 const void *key, size_t keylen ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
+	size_t blocksize = cipher->blocksize;
+	size_t ctxsize = cipher->ctxsize;
+	cbc_context_t ( blocksize, ctxsize ) *context = ctx;
+
+	return cipher_setkey ( raw_cipher, context->raw, key, keylen );
+}
+
+/**
+ * Set initialisation vector
+ *
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
+ * @v iv		Initialisation vector
+ * @v ivlen		Initialisation vector length
+ */
+void cbc_setiv ( struct cipher_algorithm *cipher, void *ctx,
+		 const void *iv, size_t ivlen ) {
+	size_t blocksize = cipher->blocksize;
+	size_t ctxsize = cipher->ctxsize;
+	cbc_context_t ( blocksize, ctxsize ) *context = ctx;
+
+	assert ( ivlen == sizeof ( context->cbc ) );
+	memcpy ( context->cbc, iv, sizeof ( context->cbc ) );
+}
+
+/**
  * XOR data blocks
  *
  * @v src		Input data
@@ -57,23 +94,26 @@ static void cbc_xor ( const void *src, void *dst, size_t len ) {
 /**
  * Encrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to encrypt
  * @v dst		Buffer for encrypted data
  * @v len		Length of data
- * @v raw_cipher	Underlying cipher algorithm
- * @v cbc_ctx		CBC context
  */
-void cbc_encrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *raw_cipher, void *cbc_ctx ) {
-	size_t blocksize = raw_cipher->blocksize;
+void cbc_encrypt ( struct cipher_algorithm *cipher, void *ctx,
+		   const void *src, void *dst, size_t len ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
+	size_t blocksize = cipher->blocksize;
+	size_t ctxsize = cipher->ctxsize;
+	cbc_context_t ( blocksize, ctxsize ) *context = ctx;
 
 	assert ( ( len % blocksize ) == 0 );
 
 	while ( len ) {
-		cbc_xor ( src, cbc_ctx, blocksize );
-		cipher_encrypt ( raw_cipher, ctx, cbc_ctx, dst, blocksize );
-		memcpy ( cbc_ctx, dst, blocksize );
+		cbc_xor ( src, context->cbc, blocksize );
+		cipher_encrypt ( raw_cipher, context->raw, context->cbc, dst,
+				 blocksize );
+		memcpy ( context->cbc, dst, blocksize );
 		dst += blocksize;
 		src += blocksize;
 		len -= blocksize;
@@ -83,25 +123,28 @@ void cbc_encrypt ( void *ctx, const void *src, void *dst, size_t len,
 /**
  * Decrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to decrypt
  * @v dst		Buffer for decrypted data
  * @v len		Length of data
- * @v raw_cipher	Underlying cipher algorithm
- * @v cbc_ctx		CBC context
  */
-void cbc_decrypt ( void *ctx, const void *src, void *dst, size_t len,
-		   struct cipher_algorithm *raw_cipher, void *cbc_ctx ) {
-	size_t blocksize = raw_cipher->blocksize;
+void cbc_decrypt ( struct cipher_algorithm *cipher, void *ctx,
+		   const void *src, void *dst, size_t len ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
+	size_t blocksize = cipher->blocksize;
+	size_t ctxsize = cipher->ctxsize;
+	cbc_context_t ( blocksize, ctxsize ) *context = ctx;
 	uint8_t next_cbc_ctx[blocksize];
 
 	assert ( ( len % blocksize ) == 0 );
 
 	while ( len ) {
 		memcpy ( next_cbc_ctx, src, blocksize );
-		cipher_decrypt ( raw_cipher, ctx, src, dst, blocksize );
-		cbc_xor ( cbc_ctx, dst, blocksize );
-		memcpy ( cbc_ctx, next_cbc_ctx, blocksize );
+		cipher_decrypt ( raw_cipher, context->raw, src, dst,
+				 blocksize );
+		cbc_xor ( context->cbc, dst, blocksize );
+		memcpy ( context->cbc, next_cbc_ctx, blocksize );
 		dst += blocksize;
 		src += blocksize;
 		len -= blocksize;

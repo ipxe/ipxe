@@ -391,12 +391,14 @@ static void aes_final ( const struct aes_table *table, size_t stride,
 /**
  * Encrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to encrypt
  * @v dst		Buffer for encrypted data
  * @v len		Length of data
  */
-static void aes_encrypt ( void *ctx, const void *src, void *dst, size_t len ) {
+static void aes_encrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
+			  const void *src, void *dst, size_t len ) {
 	struct aes_context *aes = ctx;
 	union aes_matrix buffer[2];
 	union aes_matrix *in = &buffer[0];
@@ -427,12 +429,14 @@ static void aes_encrypt ( void *ctx, const void *src, void *dst, size_t len ) {
 /**
  * Decrypt data
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v src		Data to decrypt
  * @v dst		Buffer for decrypted data
  * @v len		Length of data
  */
-static void aes_decrypt ( void *ctx, const void *src, void *dst, size_t len ) {
+static void aes_decrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
+			  const void *src, void *dst, size_t len ) {
 	struct aes_context *aes = ctx;
 	union aes_matrix buffer[2];
 	union aes_matrix *in = &buffer[0];
@@ -674,12 +678,14 @@ aes_key_rcon ( uint32_t column, unsigned int rcon ) {
 /**
  * Set key
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v key		Key
  * @v keylen		Key length
  * @ret rc		Return status code
  */
-static int aes_setkey ( void *ctx, const void *key, size_t keylen ) {
+static int aes_setkey ( struct cipher_algorithm *cipher __unused, void *ctx,
+			const void *key, size_t keylen ) {
 	struct aes_context *aes = ctx;
 	union aes_matrix *enc;
 	union aes_matrix *dec;

@@ -53,21 +53,28 @@ struct gcm_context {
 	union gcm_block ctr;
 	/** Hash key (H) */
 	union gcm_block key;
-	/** Underlying block cipher */
-	struct cipher_algorithm *raw_cipher;
-	/** Underlying block cipher context */
-	uint8_t raw_ctx[0];
+	/** Processing flags */
+	unsigned int flags;
 };
 
-extern void gcm_tag ( struct gcm_context *context, union gcm_block *tag );
-extern int gcm_setkey ( struct gcm_context *context, const void *key,
-			size_t keylen, struct cipher_algorithm *raw_cipher );
-extern void gcm_setiv ( struct gcm_context *context, const void *iv,
-			size_t ivlen );
-extern void gcm_encrypt ( struct gcm_context *context, const void *src,
-			  void *dst, size_t len );
-extern void gcm_decrypt ( struct gcm_context *context, const void *src,
-			  void *dst, size_t len );
+/** A GCM mode context */
+#define gcm_context_t( ctxsize )					\
+	struct {							\
+		struct gcm_context gcm;					\
+		uint8_t raw[ (ctxsize) -				\
+			     sizeof ( struct gcm_context ) ];		\
+	}
+
+extern int gcm_setkey ( struct cipher_algorithm *cipher, void *ctx,
+			const void *key, size_t keylen );
+extern void gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
+			const void *iv, size_t ivlen );
+extern void gcm_encrypt ( struct cipher_algorithm *cipher, void *ctx,
+			  const void *src, void *dst, size_t len );
+extern void gcm_decrypt ( struct cipher_algorithm *cipher, void *ctx,
+			  const void *src, void *dst, size_t len );
+extern void gcm_auth ( struct cipher_algorithm *cipher, void *ctx,
+		       void *auth );
 
 /**
  * Create a GCM mode of behaviour of an existing cipher
@@ -80,52 +87,20 @@ extern void gcm_decrypt ( struct gcm_context *context, const void *src,
  */
 #define GCM_CIPHER( _gcm_name, _gcm_cipher, _raw_cipher, _raw_context,	\
 		    _blocksize )					\
-struct _gcm_name ## _context {						\
-	/** GCM context */						\
-	struct gcm_context gcm;						\
-	/** Underlying block cipher context */				\
-	_raw_context raw;						\
-};									\
-static int _gcm_name ## _setkey ( void *ctx, const void *key,		\
-				  size_t keylen ) {			\
-	struct _gcm_name ## _context *context = ctx;			\
-	build_assert ( _blocksize == sizeof ( context->gcm.key ) );	\
-	build_assert ( offsetof ( typeof ( *context ), gcm ) == 0 );	\
-	build_assert ( offsetof ( typeof ( *context ), raw ) ==		\
-		       offsetof ( typeof ( *context ), gcm.raw_ctx ) );	\
-	return gcm_setkey ( &context->gcm, key, keylen, &_raw_cipher );	\
-}									\
-static void _gcm_name ## _setiv ( void *ctx, const void *iv,		\
-				  size_t ivlen ) {			\
-	struct _gcm_name ## _context *context = ctx;			\
-	gcm_setiv ( &context->gcm, iv, ivlen );				\
-}									\
-static void _gcm_name ## _encrypt ( void *ctx, const void *src,		\
-				    void *dst, size_t len ) {		\
-	struct _gcm_name ## _context *context = ctx;			\
-	gcm_encrypt ( &context->gcm, src, dst, len );			\
-}									\
-static void _gcm_name ## _decrypt ( void *ctx, const void *src,		\
-				    void *dst, size_t len ) {		\
-	struct _gcm_name ## _context *context = ctx;			\
-	gcm_decrypt ( &context->gcm, src, dst, len );			\
-}									\
-static void _gcm_name ## _auth ( void *ctx, void *auth ) {		\
-	struct _gcm_name ## _context *context = ctx;			\
-	union gcm_block *tag = auth;					\
-	gcm_tag ( &context->gcm, tag );					\
-}									\
+static_assert ( _blocksize == sizeof ( union gcm_block ) );		\
 struct cipher_algorithm _gcm_cipher = {					\
 	.name		= #_gcm_name,					\
-	.ctxsize	= sizeof ( struct _gcm_name ## _context ),	\
+	.ctxsize	= ( sizeof ( struct gcm_context ) +		\
+			    sizeof ( _raw_context ) ),			\
 	.blocksize	= 1,						\
 	.alignsize	= sizeof ( union gcm_block ),			\
 	.authsize	= sizeof ( union gcm_block ),			\
-	.setkey		= _gcm_name ## _setkey,				\
-	.setiv		= _gcm_name ## _setiv,				\
-	.encrypt	= _gcm_name ## _encrypt,			\
-	.decrypt	= _gcm_name ## _decrypt,			\
-	.auth		= _gcm_name ## _auth,				\
+	.setkey		= gcm_setkey,					\
+	.setiv		= gcm_setiv,					\
+	.encrypt	= gcm_encrypt,					\
+	.decrypt	= gcm_decrypt,					\
+	.auth		= gcm_auth,					\
+	.priv		= &_raw_cipher,					\
 };
 
 #endif /* _IPXE_GCM_H */

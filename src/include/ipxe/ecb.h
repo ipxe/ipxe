@@ -12,13 +12,15 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/crypto.h>
 
-extern void ecb_encrypt ( void *ctx, const void *src, void *dst,
-			  size_t len, struct cipher_algorithm *raw_cipher );
-extern void ecb_decrypt ( void *ctx, const void *src, void *dst,
-			  size_t len, struct cipher_algorithm *raw_cipher );
+extern int ecb_setkey ( struct cipher_algorithm *cipher, void *ctx,
+			const void *key, size_t keylen );
+extern void ecb_encrypt ( struct cipher_algorithm *cipher, void *ctx,
+			  const void *src, void *dst, size_t len );
+extern void ecb_decrypt ( struct cipher_algorithm *cipher, void *ctx,
+			  const void *src, void *dst, size_t len );
 
 /**
- * Create a cipher-block chaining mode of behaviour of an existing cipher
+ * Create an electronic codebook mode of behaviour of an existing cipher
  *
  * @v _ecb_name		Name for the new ECB cipher
  * @v _ecb_cipher	New cipher algorithm
@@ -28,33 +30,18 @@ extern void ecb_decrypt ( void *ctx, const void *src, void *dst,
  */
 #define ECB_CIPHER( _ecb_name, _ecb_cipher, _raw_cipher, _raw_context,	\
 		    _blocksize )					\
-static int _ecb_name ## _setkey ( void *ctx, const void *key,		\
-				  size_t keylen ) {			\
-	return cipher_setkey ( &_raw_cipher, ctx, key, keylen );	\
-}									\
-static void _ecb_name ## _setiv ( void *ctx, const void *iv,		\
-				  size_t ivlen ) {			\
-	cipher_setiv ( &_raw_cipher, ctx, iv, ivlen );			\
-}									\
-static void _ecb_name ## _encrypt ( void *ctx, const void *src,		\
-				    void *dst, size_t len ) {		\
-	ecb_encrypt ( ctx, src, dst, len, &_raw_cipher );		\
-}									\
-static void _ecb_name ## _decrypt ( void *ctx, const void *src,		\
-				    void *dst, size_t len ) {		\
-	ecb_decrypt ( ctx, src, dst, len, &_raw_cipher );		\
-}									\
 struct cipher_algorithm _ecb_cipher = {					\
 	.name		= #_ecb_name,					\
 	.ctxsize	= sizeof ( _raw_context ),			\
 	.blocksize	= _blocksize,					\
 	.alignsize	= _blocksize,					\
 	.authsize	= 0,						\
-	.setkey		= _ecb_name ## _setkey,				\
-	.setiv		= _ecb_name ## _setiv,				\
-	.encrypt	= _ecb_name ## _encrypt,			\
-	.decrypt	= _ecb_name ## _decrypt,			\
+	.setkey		= ecb_setkey,					\
+	.setiv		= cipher_null_setiv,				\
+	.encrypt	= ecb_encrypt,					\
+	.decrypt	= ecb_decrypt,					\
 	.auth		= cipher_null_auth,				\
+	.priv		= &_raw_cipher,					\
 };
 
 #endif /* _IPXE_ECB_H */

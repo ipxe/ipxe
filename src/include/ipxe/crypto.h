@@ -82,21 +82,26 @@ struct cipher_algorithm {
 	size_t authsize;
 	/** Set key
 	 *
+	 * @v cipher	Cipher algorithm
 	 * @v ctx	Context
 	 * @v key	Key
 	 * @v keylen	Key length
 	 * @ret rc	Return status code
 	 */
-	int ( * setkey ) ( void *ctx, const void *key, size_t keylen );
+	int ( * setkey ) ( struct cipher_algorithm *cipher, void *ctx,
+			   const void *key, size_t keylen );
 	/** Set initialisation vector
 	 *
+	 * @v cipher	Cipher algorithm
 	 * @v ctx	Context
 	 * @v iv	Initialisation vector
 	 * @v ivlen	Initialisation vector length
 	 */
-	void ( * setiv ) ( void *ctx, const void *iv, size_t ivlen );
+	void ( * setiv ) ( struct cipher_algorithm *cipher, void *ctx,
+			   const void *iv, size_t ivlen );
 	/** Encrypt data
 	 *
+	 * @v cipher	Cipher algorithm
 	 * @v ctx	Context
 	 * @v src	Data to encrypt
 	 * @v dst	Buffer for encrypted data, or NULL for additional data
@@ -104,10 +109,11 @@ struct cipher_algorithm {
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
-	void ( * encrypt ) ( void *ctx, const void *src, void *dst,
-			     size_t len );
+	void ( * encrypt ) ( struct cipher_algorithm *cipher, void *ctx,
+			     const void *src, void *dst, size_t len );
 	/** Decrypt data
 	 *
+	 * @v cipher	Cipher algorithm
 	 * @v ctx	Context
 	 * @v src	Data to decrypt
 	 * @v dst	Buffer for decrypted data, or NULL for additional data
@@ -115,14 +121,18 @@ struct cipher_algorithm {
 	 *
 	 * @v len is guaranteed to be a multiple of @c blocksize.
 	 */
-	void ( * decrypt ) ( void *ctx, const void *src, void *dst,
-			     size_t len );
+	void ( * decrypt ) ( struct cipher_algorithm *cipher, void *ctx,
+			     const void *src, void *dst, size_t len );
 	/** Generate authentication tag
 	 *
+	 * @v cipher	Cipher algorithm
 	 * @v ctx	Context
 	 * @v auth	Authentication tag
 	 */
-	void ( * auth ) ( void *ctx, void *auth );
+	void ( * auth ) ( struct cipher_algorithm *cipher, void *ctx,
+			  void *auth );
+	/** Algorithm private data */
+	void *priv;
 };
 
 /** A public key algorithm */
@@ -283,19 +293,19 @@ digest_final ( struct digest_algorithm *digest, void *ctx, void *out ) {
 static inline __attribute__ (( always_inline )) int
 cipher_setkey ( struct cipher_algorithm *cipher, void *ctx,
 		const void *key, size_t keylen ) {
-	return cipher->setkey ( ctx, key, keylen );
+	return cipher->setkey ( cipher, ctx, key, keylen );
 }
 
 static inline __attribute__ (( always_inline )) void
 cipher_setiv ( struct cipher_algorithm *cipher, void *ctx,
 	       const void *iv, size_t ivlen ) {
-	cipher->setiv ( ctx, iv, ivlen );
+	cipher->setiv ( cipher, ctx, iv, ivlen );
 }
 
 static inline __attribute__ (( always_inline )) void
 cipher_encrypt ( struct cipher_algorithm *cipher, void *ctx,
 		 const void *src, void *dst, size_t len ) {
-	cipher->encrypt ( ctx, src, dst, len );
+	cipher->encrypt ( cipher, ctx, src, dst, len );
 }
 #define cipher_encrypt( cipher, ctx, src, dst, len ) do {		\
 	assert ( ( (len) & ( (cipher)->blocksize - 1 ) ) == 0 );	\
@@ -305,7 +315,7 @@ cipher_encrypt ( struct cipher_algorithm *cipher, void *ctx,
 static inline __attribute__ (( always_inline )) void
 cipher_decrypt ( struct cipher_algorithm *cipher, void *ctx,
 		 const void *src, void *dst, size_t len ) {
-	cipher->decrypt ( ctx, src, dst, len );
+	cipher->decrypt ( cipher, ctx, src, dst, len );
 }
 #define cipher_decrypt( cipher, ctx, src, dst, len ) do {		\
 	assert ( ( (len) & ( (cipher)->blocksize - 1 ) ) == 0 );	\
@@ -314,7 +324,7 @@ cipher_decrypt ( struct cipher_algorithm *cipher, void *ctx,
 
 static inline __attribute__ (( always_inline )) void
 cipher_auth ( struct cipher_algorithm *cipher, void *ctx, void *auth ) {
-	cipher->auth ( ctx, auth );
+	cipher->auth ( cipher, ctx, auth );
 }
 
 static inline __attribute__ (( always_inline )) int
@@ -402,13 +412,16 @@ extern void digest_null_update ( struct digest_algorithm *digest, void *ctx,
 extern void digest_null_final ( struct digest_algorithm *digest, void *ctx,
 				void *out );
 
-extern int cipher_null_setkey ( void *ctx, const void *key, size_t keylen );
-extern void cipher_null_setiv ( void *ctx, const void *iv, size_t ivlen );
-extern void cipher_null_encrypt ( void *ctx, const void *src, void *dst,
-				  size_t len );
-extern void cipher_null_decrypt ( void *ctx, const void *src, void *dst,
-				  size_t len );
-extern void cipher_null_auth ( void *ctx, void *auth );
+extern int cipher_null_setkey ( struct cipher_algorithm *cipher, void *ctx,
+				const void *key, size_t keylen );
+extern void cipher_null_setiv ( struct cipher_algorithm *cipehr, void *ctx,
+				const void *iv, size_t ivlen );
+extern void cipher_null_encrypt ( struct cipher_algorithm *cipher, void *ctx,
+				  const void *src, void *dst, size_t len );
+extern void cipher_null_decrypt ( struct cipher_algorithm *cipher, void *ctx,
+				  const void *src, void *dst, size_t len );
+extern void cipher_null_auth ( struct cipher_algorithm *cipher, void *ctx,
+			       void *auth );
 
 extern int pubkey_null_encrypt ( const struct asn1_cursor *key,
 				 const struct asn1_cursor *plaintext,

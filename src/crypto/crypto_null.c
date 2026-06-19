@@ -60,28 +60,33 @@ struct digest_algorithm digest_null = {
 	.final = digest_null_final,
 };
 
-int cipher_null_setkey ( void *ctx __unused, const void *key __unused,
+int cipher_null_setkey ( struct cipher_algorithm *cipher __unused,
+			 void *ctx __unused, const void *key __unused,
 			 size_t keylen __unused ) {
 	/* Do nothing */
 	return 0;
 }
 
-void cipher_null_setiv ( void *ctx __unused, const void *iv __unused,
+void cipher_null_setiv ( struct cipher_algorithm *cipher __unused,
+			 void *ctx __unused, const void *iv __unused,
 			 size_t ivlen __unused ) {
 	/* Do nothing */
 }
 
-void cipher_null_encrypt ( void *ctx __unused, const void *src, void *dst,
+void cipher_null_encrypt ( struct cipher_algorithm *cipher __unused,
+			   void *ctx __unused, const void *src, void *dst,
 			   size_t len ) {
 	memcpy ( dst, src, len );
 }
 
-void cipher_null_decrypt ( void *ctx __unused, const void *src, void *dst,
+void cipher_null_decrypt ( struct cipher_algorithm *cipher __unused,
+			   void *ctx __unused, const void *src, void *dst,
 			   size_t len ) {
 	memcpy ( dst, src, len );
 }
 
-void cipher_null_auth ( void *ctx __unused, void *auth __unused ) {
+void cipher_null_auth ( struct cipher_algorithm *cipher __unused,
+			void *ctx __unused, void *auth __unused ) {
 	/* Do nothing */
 }
 

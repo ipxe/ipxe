@@ -309,77 +309,6 @@ static void gcm_multiply_key ( const union gcm_block *key,
 }
 
 /**
- * Encrypt/decrypt/authenticate data
- *
- * @v context		Context
- * @v src		Input data
- * @v dst		Output data, or NULL to process additional data
- * @v len		Length of data
- * @v flags		Operation flags
- */
-static void gcm_process ( struct gcm_context *context, const void *src,
-			  void *dst, size_t len, unsigned int flags ) {
-	union gcm_block tmp;
-	uint64_t *total;
-	size_t frag_len;
-	unsigned int block;
-
-	/* Calculate block number (for debugging) */
-	block = ( ( ( context->len.len.add + 8 * sizeof ( tmp ) - 1 ) /
-		    ( 8 * sizeof ( tmp ) ) ) +
-		  ( ( context->len.len.data + 8 * sizeof ( tmp ) - 1 ) /
-		    ( 8 * sizeof ( tmp ) ) ) + 1 );
-
-	/* Update total length (in bits) */
-	total = ( ( dst || ( flags & GCM_FL_IV ) ) ?
-		  &context->len.len.data : &context->len.len.add );
-	*total += ( len * 8 );
-
-	/* Process data */
-	for ( ; len ; src += frag_len, len -= frag_len, block++ ) {
-
-		/* Calculate fragment length */
-		frag_len = len;
-		if ( frag_len > sizeof ( tmp ) )
-			frag_len = sizeof ( tmp );
-
-		/* Update hash with input data */
-		gcm_xor ( src, &context->hash, &context->hash, frag_len );
-
-		/* Encrypt/decrypt block, if applicable */
-		if ( dst ) {
-
-			/* Increment counter */
-			gcm_count ( &context->ctr, 1 );
-
-			/* Encrypt counter */
-			DBGC2 ( context, "GCM %p Y[%d]:\n", context, block );
-			DBGC2_HDA ( context, 0, &context->ctr,
-				    sizeof ( context->ctr ) );
-			cipher_encrypt ( context->raw_cipher, &context->raw_ctx,
-					 &context->ctr, &tmp, sizeof ( tmp ) );
-			DBGC2 ( context, "GCM %p E(K,Y[%d]):\n",
-				context, block );
-			DBGC2_HDA ( context, 0, &tmp, sizeof ( tmp ) );
-
-			/* Encrypt/decrypt data */
-			gcm_xor ( src, &tmp, dst, frag_len );
-			dst += frag_len;
-
-			/* Update hash with encrypted data, if applicable */
-			gcm_xor ( &tmp, &context->hash, &context->hash,
-				  ( frag_len & flags ) );
-		}
-
-		/* Update hash */
-		gcm_multiply_key ( &context->key, &context->hash );
-		DBGC2 ( context, "GCM %p X[%d]:\n", context, block );
-		DBGC2_HDA ( context, 0, &context->hash,
-			    sizeof ( context->hash ) );
-	}
-}
-
-/**
  * Construct hash
  *
  * @v context		Context
@@ -401,66 +330,117 @@ static void gcm_hash ( struct gcm_context *context, union gcm_block *hash ) {
 }
 
 /**
- * Construct tag
+ * Encrypt/decrypt/authenticate data
  *
- * @v context		Context
- * @v tag		Tag
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
+ * @v src		Input data
+ * @v dst		Output data, or NULL to process additional data
+ * @v len		Length of data
+ * @v flags		Operation flags
  */
-void gcm_tag ( struct gcm_context *context, union gcm_block *tag ) {
+static void gcm_process ( struct cipher_algorithm *cipher, void *ctx,
+			  const void *src, void *dst, size_t len ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
+	gcm_context_t ( cipher->ctxsize ) *context = ctx;
+	unsigned int flags = context->gcm.flags;
 	union gcm_block tmp;
-	uint32_t offset;
+	uint64_t *total;
+	size_t frag_len;
+	unsigned int block;
 
-	/* Construct hash */
-	gcm_hash ( context, tag );
+	/* Calculate block number (for debugging) */
+	block = ( ( ( context->gcm.len.len.add + 8 * sizeof ( tmp ) - 1 ) /
+		    ( 8 * sizeof ( tmp ) ) ) +
+		  ( ( context->gcm.len.len.data + 8 * sizeof ( tmp ) - 1 ) /
+		    ( 8 * sizeof ( tmp ) ) ) + 1 );
 
-	/* Construct encrypted initial counter value */
-	memcpy ( &tmp, &context->ctr, sizeof ( tmp ) );
-	offset = ( ( -context->len.len.data ) / ( 8 * sizeof ( tmp ) ) );
-	gcm_count ( &tmp, offset );
-	cipher_encrypt ( context->raw_cipher, &context->raw_ctx, &tmp,
-			 &tmp, sizeof ( tmp ) );
-	DBGC2 ( context, "GCM %p E(K,Y[0]):\n", context );
-	DBGC2_HDA ( context, 0, &tmp, sizeof ( tmp ) );
+	/* Update total length (in bits) */
+	total = ( ( dst || ( flags & GCM_FL_IV ) ) ?
+		  &context->gcm.len.len.data : &context->gcm.len.len.add );
+	*total += ( len * 8 );
 
-	/* Construct tag */
-	gcm_xor_block ( &tmp, tag );
-	DBGC2 ( context, "GCM %p T:\n", context );
-	DBGC2_HDA ( context, 0, tag, sizeof ( *tag ) );
+	/* Process data */
+	for ( ; len ; src += frag_len, len -= frag_len, block++ ) {
+
+		/* Calculate fragment length */
+		frag_len = len;
+		if ( frag_len > sizeof ( tmp ) )
+			frag_len = sizeof ( tmp );
+
+		/* Update hash with input data */
+		gcm_xor ( src, &context->gcm.hash, &context->gcm.hash,
+			  frag_len );
+
+		/* Encrypt/decrypt block, if applicable */
+		if ( dst ) {
+
+			/* Increment counter */
+			gcm_count ( &context->gcm.ctr, 1 );
+
+			/* Encrypt counter */
+			DBGC2 ( context, "GCM %p Y[%d]:\n", context, block );
+			DBGC2_HDA ( context, 0, &context->gcm.ctr,
+				    sizeof ( context->gcm.ctr ) );
+			cipher_encrypt ( raw_cipher, &context->raw,
+					 &context->gcm.ctr, &tmp,
+					 sizeof ( tmp ) );
+			DBGC2 ( context, "GCM %p E(K,Y[%d]):\n",
+				context, block );
+			DBGC2_HDA ( context, 0, &tmp, sizeof ( tmp ) );
+
+			/* Encrypt/decrypt data */
+			gcm_xor ( src, &tmp, dst, frag_len );
+			dst += frag_len;
+
+			/* Update hash with encrypted data, if applicable */
+			gcm_xor ( &tmp, &context->gcm.hash, &context->gcm.hash,
+				  ( frag_len & flags ) );
+		}
+
+		/* Update hash */
+		gcm_multiply_key ( &context->gcm.key, &context->gcm.hash );
+		DBGC2 ( context, "GCM %p X[%d]:\n", context, block );
+		DBGC2_HDA ( context, 0, &context->gcm.hash,
+			    sizeof ( context->gcm.hash ) );
+	}
 }
 
 /**
  * Set key
  *
- * @v context		Context
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
  * @v key		Key
  * @v keylen		Key length
- * @v raw_cipher	Underlying cipher
  * @ret rc		Return status code
  */
-int gcm_setkey ( struct gcm_context *context, const void *key, size_t keylen,
-		 struct cipher_algorithm *raw_cipher ) {
+int gcm_setkey ( struct cipher_algorithm *cipher, void *ctx,
+		 const void *key, size_t keylen ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
+	gcm_context_t ( cipher->ctxsize ) *context = ctx;
 	int rc;
 
 	/* Initialise GCM context */
-	memset ( context, 0, sizeof ( *context ) );
-	context->raw_cipher = raw_cipher;
+	memset ( &context->gcm, 0, sizeof ( context->gcm ) );
 
 	/* Set underlying block cipher key */
-	if ( ( rc = cipher_setkey ( raw_cipher, context->raw_ctx, key,
+	if ( ( rc = cipher_setkey ( raw_cipher, context->raw, key,
 				    keylen ) ) != 0 )
 		return rc;
 
 	/* Construct GCM hash key */
-	cipher_encrypt ( raw_cipher, context->raw_ctx, &context->ctr,
-			 &context->key, sizeof ( context->key ) );
+	cipher_encrypt ( raw_cipher, context->raw, &context->gcm.ctr,
+			 &context->gcm.key, sizeof ( context->gcm.key ) );
 	DBGC2 ( context, "GCM %p H:\n", context );
-	DBGC2_HDA ( context, 0, &context->key, sizeof ( context->key ) );
+	DBGC2_HDA ( context, 0, &context->gcm.key,
+		    sizeof ( context->gcm.key ) );
 
 	/* Reset counter */
-	context->ctr.ctr.value = cpu_to_be32 ( 1 );
+	context->gcm.ctr.ctr.value = cpu_to_be32 ( 1 );
 
 	/* Construct cached tables */
-	gcm_cache ( &context->key );
+	gcm_cache ( &context->gcm.key );
 
 	return 0;
 }
@@ -468,75 +448,114 @@ int gcm_setkey ( struct gcm_context *context, const void *key, size_t keylen,
 /**
  * Set initialisation vector
  *
+ * @v cipher		Cipher algorithm
  * @v ctx		Context
  * @v iv		Initialisation vector
  * @v ivlen		Initialisation vector length
  */
-void gcm_setiv ( struct gcm_context *context, const void *iv, size_t ivlen ) {
+void gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
+		 const void *iv, size_t ivlen ) {
+	gcm_context_t ( cipher->ctxsize ) *context = ctx;
 
 	/* Reset non-key state */
-	memset ( context, 0, gcm_offset ( key ) );
+	memset ( &context->gcm, 0, gcm_offset ( key ) );
 	build_assert ( gcm_offset ( key ) > gcm_offset ( hash ) );
 	build_assert ( gcm_offset ( key ) > gcm_offset ( len ) );
 	build_assert ( gcm_offset ( key ) > gcm_offset ( ctr ) );
-	build_assert ( gcm_offset ( key ) < gcm_offset ( raw_cipher ) );
-	build_assert ( gcm_offset ( key ) < gcm_offset ( raw_ctx ) );
 
 	/* Reset counter */
-	context->ctr.ctr.value = cpu_to_be32 ( 1 );
+	context->gcm.ctr.ctr.value = cpu_to_be32 ( 1 );
 
 	/* Process initialisation vector */
-	if ( ivlen == sizeof ( context->ctr.ctr.iv ) ) {
+	if ( ivlen == sizeof ( context->gcm.ctr.ctr.iv ) ) {
 
 		/* Initialisation vector is exactly 96 bits, use it as-is */
-		memcpy ( context->ctr.ctr.iv, iv, ivlen );
+		memcpy ( context->gcm.ctr.ctr.iv, iv, ivlen );
 
 	} else {
 
 		/* Calculate hash over initialisation vector */
-		gcm_process ( context, iv, NULL, ivlen, GCM_FL_IV );
-		gcm_hash ( context, &context->ctr );
-		assert ( context->len.len.add == 0 );
+		context->gcm.flags = GCM_FL_IV;
+		gcm_process ( cipher, ctx, iv, NULL, ivlen );
+		gcm_hash ( &context->gcm, &context->gcm.ctr );
+		assert ( context->gcm.len.len.add == 0 );
 
 		/* Reset non-key, non-counter state */
-		memset ( context, 0, gcm_offset ( ctr ) );
+		memset ( &context->gcm, 0, gcm_offset ( ctr ) );
 		build_assert ( gcm_offset ( ctr ) > gcm_offset ( hash ) );
 		build_assert ( gcm_offset ( ctr ) > gcm_offset ( len ) );
 		build_assert ( gcm_offset ( ctr ) < gcm_offset ( key ) );
-		build_assert ( gcm_offset ( ctr ) < gcm_offset ( raw_cipher ) );
-		build_assert ( gcm_offset ( ctr ) < gcm_offset ( raw_ctx ) );
 	}
 
 	DBGC2 ( context, "GCM %p Y[0]:\n", context );
-	DBGC2_HDA ( context, 0, &context->ctr, sizeof ( context->ctr ) );
+	DBGC2_HDA ( context, 0, &context->gcm.ctr,
+		    sizeof ( context->gcm.ctr ) );
 }
 
 /**
  * Encrypt data
  *
- * @v context		Context
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
  * @v src		Data to encrypt
  * @v dst		Buffer for encrypted data, or NULL for additional data
  * @v len		Length of data
  */
-void gcm_encrypt ( struct gcm_context *context, const void *src, void *dst,
-		   size_t len ) {
+void gcm_encrypt ( struct cipher_algorithm *cipher, void *ctx,
+		   const void *src, void *dst, size_t len ) {
+	gcm_context_t ( cipher->ctxsize ) *context = ctx;
 
 	/* Process data */
-	gcm_process ( context, src, dst, len, GCM_FL_ENCRYPT );
+	context->gcm.flags = GCM_FL_ENCRYPT;
+	gcm_process ( cipher, ctx, src, dst, len );
 }
 
 /**
  * Decrypt data
  *
- * @v context		Context
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
  * @v src		Data to decrypt
  * @v dst		Buffer for decrypted data, or NULL for additional data
  * @v len		Length of data
  */
-void gcm_decrypt ( struct gcm_context *context, const void *src, void *dst,
-		   size_t len ) {
+void gcm_decrypt ( struct cipher_algorithm *cipher, void *ctx,
+		   const void *src, void *dst, size_t len ) {
+	gcm_context_t ( cipher->ctxsize ) *context = ctx;
 
 	/* Process data */
-	gcm_process ( context, src, dst, len, 0 );
+	context->gcm.flags = 0;
+	gcm_process ( cipher, ctx, src, dst, len );
+}
+
+/**
+ * Generate authentication tag
+ *
+ * @v cipher		Cipher algorithm
+ * @v ctx		Context
+ * @v auth		Authentication tag
+ */
+void gcm_auth ( struct cipher_algorithm *cipher, void *ctx, void *auth ) {
+	struct cipher_algorithm *raw_cipher = cipher->priv;
+	gcm_context_t ( cipher->ctxsize ) *context = ctx;
+	union gcm_block *tag = auth;
+	union gcm_block tmp;
+	uint32_t offset;
+
+	/* Construct hash */
+	gcm_hash ( &context->gcm, tag );
+
+	/* Construct encrypted initial counter value */
+	memcpy ( &tmp, &context->gcm.ctr, sizeof ( tmp ) );
+	offset = ( ( -context->gcm.len.len.data ) / ( 8 * sizeof ( tmp ) ) );
+	gcm_count ( &tmp, offset );
+	cipher_encrypt ( raw_cipher, &context->raw, &tmp, &tmp,
+			 sizeof ( tmp ) );
+	DBGC2 ( context, "GCM %p E(K,Y[0]):\n", context );
+	DBGC2_HDA ( context, 0, &tmp, sizeof ( tmp ) );
+
+	/* Construct tag */
+	gcm_xor_block ( &tmp, tag );
+	DBGC2 ( context, "GCM %p T:\n", context );
+	DBGC2_HDA ( context, 0, tag, sizeof ( *tag ) );
 }
