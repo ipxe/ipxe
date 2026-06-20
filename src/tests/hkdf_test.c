@@ -123,8 +123,16 @@ struct hkdf_test {
 static void hkdf_okx ( struct hkdf_test *test, const char *file,
 		       unsigned int line ) {
 	size_t digestsize = test->digest->digestsize;
+	union {
+		uint8_t ikm[test->ikm_len];
+		uint8_t salt[test->salt_len];
+		uint8_t info[test->info_len];
+		uint8_t prk[test->prk_len];
+		uint8_t okm[test->okm_len];
+	} overlap;
 	uint8_t prk[digestsize];
 	uint8_t okm[test->okm_len];
+	size_t check_len;
 
 	/* Sanity checks */
 	okx ( ( test->salt != NULL ) || ( test->salt_len == 0 ), file, line );
@@ -137,8 +145,41 @@ static void hkdf_okx ( struct hkdf_test *test, const char *file,
 
 	/* Test expansion */
 	hkdf_expand ( test->digest, test->prk, test->info, test->info_len,
-		      okm, sizeof ( okm ) );
+		      okm, test->okm_len );
 	okx ( memcmp ( okm, test->okm, test->okm_len ) == 0, file, line );
+
+	/* Test overlap between salt and pseudorandom key */
+	if ( test->salt ) {
+		memcpy ( overlap.salt, test->salt, test->salt_len );
+		hkdf_extract ( test->digest, overlap.salt, test->salt_len,
+			       test->ikm, test->ikm_len, overlap.prk );
+		okx ( memcmp ( overlap.prk, test->prk, digestsize ) == 0,
+		      file, line );
+	}
+
+	/* Test overlap between input keying material and pseudorandom key */
+	memcpy ( overlap.ikm, test->ikm, test->ikm_len );
+	hkdf_extract ( test->digest, test->salt, test->salt_len, overlap.ikm,
+		       test->ikm_len, overlap.prk );
+	okx ( memcmp ( overlap.prk, test->prk, digestsize ) == 0,
+	      file, line );
+
+	/* Calculate length for expansion overlap tests */
+	check_len = test->okm_len;
+	if ( check_len > digestsize )
+		check_len = digestsize;
+
+	/* Test overlap between pseudorandom key and output */
+	memcpy ( overlap.prk, test->prk, test->prk_len );
+	hkdf_expand ( test->digest, overlap.prk, test->info, test->info_len,
+		      overlap.okm, test->okm_len );
+	okx ( memcmp ( overlap.okm, test->okm, check_len ) == 0, file, line );
+
+	/* Test overlap between additional information and output */
+	memcpy ( overlap.info, test->info, test->info_len );
+	hkdf_expand ( test->digest, test->prk, overlap.info, test->info_len,
+		      overlap.okm, test->okm_len );
+	okx ( memcmp ( overlap.okm, test->okm, check_len ) == 0, file, line );
 }
 #define hkdf_ok( test ) hkdf_okx ( test, __FILE__, __LINE__ )
 

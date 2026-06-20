@@ -49,18 +49,22 @@ FILE_SECBOOT ( PERMITTED );
  * @v ikm		Input keying material
  * @v ikm_len		Length of input keying material
  * @v prk		Pseudorandom key to fill in
+ *
+ * The salt and input keying material are allowed to overlap the
+ * buffer that will be filled in with the pseudorandom key.
  */
 void hkdf_extract ( struct digest_algorithm *digest, const void *salt,
 		    size_t salt_len, const void *ikm, size_t ikm_len,
 		    void *prk ) {
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
+	uint8_t zero[ digest->digestsize ];
 
 	/* Use all-zero salt if not specified */
 	if ( ! salt ) {
 		assert ( salt_len == 0 );
-		salt_len = digest->digestsize;
-		memset ( prk, 0, salt_len );
-		salt = prk;
+		memset ( zero, 0, sizeof ( zero ) );
+		salt = zero;
+		salt_len = sizeof ( zero );
 	}
 
 	/* Calculate pseudorandom key */
@@ -78,6 +82,15 @@ void hkdf_extract ( struct digest_algorithm *digest, const void *salt,
  * @v info_len		Length of additional information
  * @v out		Output keying material
  * @v len		Length of output keying material
+ *
+ * The pseudorandom key and additional information are allowed to
+ * overlap the buffer that will be filled in with the output keying
+ * material, provided that the length of the output keying material is
+ * less than or equal to the length of the pseudorandom key.
+ *
+ * In particular, this allows hkdf_expand() to be used to create a new
+ * generation of pseudorandom key (i.e. to have the output keying
+ * material overwrite the existing pseudorandom key).
  */
 void hkdf_expand ( struct digest_algorithm *digest, const void *prk,
 		   const void *info, size_t info_len, void *out, size_t len ) {
