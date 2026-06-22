@@ -262,6 +262,7 @@ err_tx_alloc:
 */
 static void atl_close ( struct net_device *netdev ) {
 	struct atl_nic *nic = netdev->priv;
+	unsigned int i;
 
 	nic->hw_ops->stop ( nic );
 	/* rpb global ctrl */
@@ -282,6 +283,13 @@ static void atl_close ( struct net_device *netdev ) {
 
 	atl_ring_free ( &nic->tx_ring );
 	atl_ring_free ( &nic->rx_ring );
+
+	/* Discard any outstanding receive I/O buffers */
+	for ( i = 0 ; i < ATL_RING_SIZE ; i++ ) {
+		if ( nic->iobufs[i] )
+			free_rx_iob ( nic->iobufs[i] );
+		nic->iobufs[i] = NULL;
+	}
 }
 
 /**
