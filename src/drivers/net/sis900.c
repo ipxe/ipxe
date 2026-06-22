@@ -1156,7 +1156,7 @@ sis900_transmit(struct nic  *nic,
     }
     
     if (tx_status & (ABORT | UNDERRUN | OWCOLL)) {
-        /* packet unsuccessfully transmited */
+        /* packet unsuccessfully transmitted */
         printf("sis900_transmit: Transmit error, Tx status %X.\n", 
 	       (unsigned int) tx_status);
     }
