@@ -528,8 +528,10 @@ static int atl_probe ( struct pci_device *pci ) {
 		goto err_ioremap;
 	}
 
-	 /* Configure DMA */
+	/* Configure DMA */
 	nic->dma = &pci->dma;
+	dma_set_mask_64bit ( nic->dma );
+	netdev->dma = nic->dma;
 
 	/* Reset the NIC */
 	if ( ( rc = nic->hw_ops->reset ( nic ) ) != 0 )
