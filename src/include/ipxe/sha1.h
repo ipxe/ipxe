@@ -12,6 +12,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/crypto.h>
+#include <ipxe/mdhash.h>
 
 /** An SHA-1 digest */
 struct sha1_digest {
@@ -46,25 +47,8 @@ struct sha1_digest_data {
 	union sha1_block data;
 } __attribute__ (( packed ));
 
-/** SHA-1 digest and data block */
-union sha1_digest_data_dwords {
-	/** Digest and data block */
-	struct sha1_digest_data dd;
-	/** Raw dwords */
-	uint32_t dword[ sizeof ( struct sha1_digest_data ) /
-			sizeof ( uint32_t ) ];
-};
-
-/** An SHA-1 context */
-struct sha1_context {
-	/** Amount of accumulated data */
-	size_t len;
-	/** Digest and accumulated data */
-	union sha1_digest_data_dwords ddd;
-} __attribute__ (( packed ));
-
 /** SHA-1 context size */
-#define SHA1_CTX_SIZE sizeof ( struct sha1_context )
+#define SHA1_CTX_SIZE MDHASH_CTX_SIZE ( struct sha1_digest_data )
 
 /** SHA-1 block size */
 #define SHA1_BLOCK_SIZE sizeof ( union sha1_block )

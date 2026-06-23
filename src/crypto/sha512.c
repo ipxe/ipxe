@@ -31,8 +31,6 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 #include <stdint.h>
-#include <string.h>
-#include <byteswap.h>
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
@@ -40,9 +38,7 @@ FILE_SECBOOT ( PERMITTED );
 
 /** SHA-512 variables */
 struct sha512_variables {
-	/* This layout matches that of struct sha512_digest_data,
-	 * allowing for efficient endianness-conversion,
-	 */
+	/* This layout matches that of struct sha512_digest_data */
 	uint64_t a;
 	uint64_t b;
 	uint64_t c;
@@ -51,7 +47,8 @@ struct sha512_variables {
 	uint64_t f;
 	uint64_t g;
 	uint64_t h;
-	uint64_t w[SHA512_ROUNDS];
+	/* We reuse w[0..15] to construct w[16..79] on demand */
+	uint64_t w[16];
 } __attribute__ (( packed ));
 
 /** SHA-512 constants */
@@ -86,53 +83,37 @@ static const uint64_t k[SHA512_ROUNDS] = {
 };
 
 /** SHA-512 initial digest values */
-static const struct sha512_digest sha512_init_digest = {
+static const struct sha512_digest sha512_init = {
 	.h = {
-		cpu_to_be64 ( 0x6a09e667f3bcc908ULL ),
-		cpu_to_be64 ( 0xbb67ae8584caa73bULL ),
-		cpu_to_be64 ( 0x3c6ef372fe94f82bULL ),
-		cpu_to_be64 ( 0xa54ff53a5f1d36f1ULL ),
-		cpu_to_be64 ( 0x510e527fade682d1ULL ),
-		cpu_to_be64 ( 0x9b05688c2b3e6c1fULL ),
-		cpu_to_be64 ( 0x1f83d9abfb41bd6bULL ),
-		cpu_to_be64 ( 0x5be0cd19137e2179ULL ),
-	},
+		0x6a09e667f3bcc908ULL, 0xbb67ae8584caa73bULL,
+		0x3c6ef372fe94f82bULL, 0xa54ff53a5f1d36f1ULL,
+		0x510e527fade682d1ULL, 0x9b05688c2b3e6c1fULL,
+		0x1f83d9abfb41bd6bULL, 0x5be0cd19137e2179ULL,
+	}
 };
-
-/**
- * Initialise SHA-512 algorithm
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-512 context
- */
-void sha512_init ( struct digest_algorithm *digest, void *ctx ) {
-	const struct sha512_algorithm *sha = digest->priv;
-	struct sha512_context *context = ctx;
-
-	context->len = 0;
-	memcpy ( &context->ddq.dd.digest, sha->init,
-		 sizeof ( context->ddq.dd.digest ) );
-}
 
 /**
  * Calculate SHA-512 digest of accumulated data
  *
- * @v context		SHA-512 context
+ * @v dd		Digest and data block
+ * @v digest		Copy of current digest value
  */
-static void sha512_digest ( struct sha512_context *context ) {
+void sha512_compress ( struct sha512_digest_data *dd,
+		       const struct sha512_digest *digest ) {
         union {
-		union sha512_digest_data_qwords ddq;
+		struct sha512_digest_data dd;
 		struct sha512_variables v;
-	} u;
-	uint64_t *a = &u.v.a;
-	uint64_t *b = &u.v.b;
-	uint64_t *c = &u.v.c;
-	uint64_t *d = &u.v.d;
-	uint64_t *e = &u.v.e;
-	uint64_t *f = &u.v.f;
-	uint64_t *g = &u.v.g;
-	uint64_t *h = &u.v.h;
-	uint64_t *w = u.v.w;
+	} *u = container_of ( dd, typeof ( *u ), dd );
+	struct sha512_variables *v = &u->v;
+	uint64_t *a = &v->a;
+	uint64_t *b = &v->b;
+	uint64_t *c = &v->c;
+	uint64_t *d = &v->d;
+	uint64_t *e = &v->e;
+	uint64_t *f = &v->f;
+	uint64_t *g = &v->g;
+	uint64_t *h = &v->h;
+	uint64_t *w = v->w;
 	uint64_t s0;
 	uint64_t s1;
 	uint64_t maj;
@@ -142,40 +123,16 @@ static void sha512_digest ( struct sha512_context *context ) {
 	unsigned int i;
 
 	/* Sanity checks */
-	assert ( ( context->len % sizeof ( context->ddq.dd.data ) ) == 0 );
-	build_assert ( &u.ddq.dd.digest.h[0] == a );
-	build_assert ( &u.ddq.dd.digest.h[1] == b );
-	build_assert ( &u.ddq.dd.digest.h[2] == c );
-	build_assert ( &u.ddq.dd.digest.h[3] == d );
-	build_assert ( &u.ddq.dd.digest.h[4] == e );
-	build_assert ( &u.ddq.dd.digest.h[5] == f );
-	build_assert ( &u.ddq.dd.digest.h[6] == g );
-	build_assert ( &u.ddq.dd.digest.h[7] == h );
-	build_assert ( &u.ddq.dd.data.qword[0] == w );
-
-	DBGC ( context, "SHA512 digesting:\n" );
-	DBGC_HDA ( context, 0, &context->ddq.dd.digest,
-		   sizeof ( context->ddq.dd.digest ) );
-	DBGC_HDA ( context, context->len, &context->ddq.dd.data,
-		   sizeof ( context->ddq.dd.data ) );
-
-	/* Convert h[0..7] to host-endian, and initialise a, b, c, d,
-	 * e, f, g, h, and w[0..15]
-	 */
-	for ( i = 0 ; i < ( sizeof ( u.ddq.qword ) /
-			    sizeof ( u.ddq.qword[0] ) ) ; i++ ) {
-		be64_to_cpus ( &context->ddq.qword[i] );
-		u.ddq.qword[i] = context->ddq.qword[i];
-	}
-
-	/* Initialise w[16..79] */
-	for ( i = 16 ; i < SHA512_ROUNDS ; i++ ) {
-		s0 = ( ror64 ( w[i-15], 1 ) ^ ror64 ( w[i-15], 8 ) ^
-		       ( w[i-15] >> 7 ) );
-		s1 = ( ror64 ( w[i-2], 19 ) ^ ror64 ( w[i-2], 61 ) ^
-		       ( w[i-2] >> 6 ) );
-		w[i] = ( w[i-16] + s0 + w[i-7] + s1 );
-	}
+	build_assert ( &u->dd.digest.h[0] == a );
+	build_assert ( &u->dd.digest.h[1] == b );
+	build_assert ( &u->dd.digest.h[2] == c );
+	build_assert ( &u->dd.digest.h[3] == d );
+	build_assert ( &u->dd.digest.h[4] == e );
+	build_assert ( &u->dd.digest.h[5] == f );
+	build_assert ( &u->dd.digest.h[6] == g );
+	build_assert ( &u->dd.digest.h[7] == h );
+	build_assert ( &u->dd.data.qword[0] == w );
+	build_assert ( sizeof ( u->dd ) == sizeof ( u->v ) );
 
 	/* Main loop */
 	for ( i = 0 ; i < SHA512_ROUNDS ; i++ ) {
@@ -184,7 +141,7 @@ static void sha512_digest ( struct sha512_context *context ) {
 		t2 = ( s0 + maj );
 		s1 = ( ror64 ( *e, 14 ) ^ ror64 ( *e, 18 ) ^ ror64 ( *e, 41 ) );
 		ch = ( ( *e & *f ) ^ ( (~*e) & *g ) );
-		t1 = ( *h + s1 + ch + k[i] + w[i] );
+		t1 = ( *h + s1 + ch + k[i] + w[ i % 16 ] );
 		*h = *g;
 		*g = *f;
 		*f = *e;
@@ -193,83 +150,23 @@ static void sha512_digest ( struct sha512_context *context ) {
 		*c = *b;
 		*b = *a;
 		*a = ( t1 + t2 );
-		DBGC2 ( context, "%2d : %016llx %016llx %016llx %016llx "
-			"%016llx %016llx %016llx %016llx\n",
+		s0 = ( ror64 ( w[ ( i - 15 ) % 16 ], 1 ) ^
+		       ror64 ( w[ ( i - 15 ) % 16 ], 8 ) ^
+		       ( w[ ( i - 15 ) % 16 ] >> 7 ) );
+		s1 = ( ror64 ( w[ ( i - 2 ) % 16 ], 19 ) ^
+		       ror64 ( w[ ( i - 2 ) % 16 ], 61 ) ^
+		       ( w[ ( i - 2 ) % 16 ] >> 6 ) );
+		w[ i % 16 ] = ( w[ ( i - 16 ) % 16 ] + s0 +
+				w[ ( i - 7 ) % 16 ] + s1 );
+		DBGC2 ( &sha512_algorithm, "%2d : %016llx %016llx %016llx "
+			"%016llx %016llx %016llx %016llx %016llx\n",
 			i, *a, *b, *c, *d, *e, *f, *g, *h );
 	}
 
-	/* Add chunk to hash and convert back to big-endian */
-	for ( i = 0 ; i < 8 ; i++ ) {
-		context->ddq.dd.digest.h[i] =
-			cpu_to_be64 ( context->ddq.dd.digest.h[i] +
-				      u.ddq.dd.digest.h[i] );
-	}
-
-	DBGC ( context, "SHA512 digested:\n" );
-	DBGC_HDA ( context, 0, &context->ddq.dd.digest,
-		   sizeof ( context->ddq.dd.digest ) );
-}
-
-/**
- * Accumulate data with SHA-512 algorithm
- *
- * @v digest		Digest
- * @v ctx		SHA-512 context
- * @v data		Data
- * @v len		Length of data
- */
-void sha512_update ( struct digest_algorithm *digest __unused, void *ctx,
-		     const void *data, size_t len ) {
-	struct sha512_context *context = ctx;
-	const uint8_t *byte = data;
-	size_t offset;
-
-	/* Accumulate data a byte at a time, performing the digest
-	 * whenever we fill the data buffer
-	 */
-	while ( len-- ) {
-		offset = ( context->len % sizeof ( context->ddq.dd.data ) );
-		context->ddq.dd.data.byte[offset] = *(byte++);
-		context->len++;
-		if ( ( context->len % sizeof ( context->ddq.dd.data ) ) == 0 )
-			sha512_digest ( context );
-	}
-}
-
-/**
- * Generate SHA-512 digest
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-512 context
- * @v out		Output buffer
- */
-void sha512_final ( struct digest_algorithm *digest, void *ctx, void *out ) {
-	struct sha512_context *context = ctx;
-	uint64_t len_bits_hi;
-	uint64_t len_bits_lo;
-	uint8_t pad;
-
-	/* Record length before pre-processing */
-	len_bits_hi = 0;
-	len_bits_lo = cpu_to_be64 ( ( ( uint64_t ) context->len ) * 8 );
-
-	/* Pad with a single "1" bit followed by as many "0" bits as required */
-	pad = 0x80;
-	do {
-		sha512_update ( digest, ctx, &pad, sizeof ( pad ) );
-		pad = 0x00;
-	} while ( ( context->len % sizeof ( context->ddq.dd.data ) ) !=
-		  offsetof ( typeof ( context->ddq.dd.data ), final.len_hi ) );
-
-	/* Append length (in bits) */
-	sha512_update ( digest, ctx, &len_bits_hi, sizeof ( len_bits_hi ) );
-	sha512_update ( digest, ctx, &len_bits_lo, sizeof ( len_bits_lo ) );
-	assert ( ( context->len % sizeof ( context->ddq.dd.data ) ) == 0 );
-
-	/* Copy out final digest */
-	memcpy ( out, &context->ddq.dd.digest, digest->digestsize );
+	/* Add chunk to hash */
+	for ( i = 0 ; i < 8 ; i++ )
+		dd->digest.h[i] += digest->h[i];
 }
 
 /** SHA-512 algorithm */
-SHA512_ALGORITHM ( sha512, sha512_algorithm, SHA512_DIGEST_SIZE,
-		   &sha512_init_digest );
+SHA512_ALGORITHM ( sha512, sha512_algorithm, sha512_init, SHA512_DIGEST_SIZE );

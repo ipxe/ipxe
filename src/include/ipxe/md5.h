@@ -12,6 +12,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/crypto.h>
+#include <ipxe/mdhash.h>
 
 /** An MD5 digest */
 struct md5_digest {
@@ -46,25 +47,8 @@ struct md5_digest_data {
 	union md5_block data;
 } __attribute__ (( packed ));
 
-/** MD5 digest and data block */
-union md5_digest_data_dwords {
-	/** Digest and data block */
-	struct md5_digest_data dd;
-	/** Raw dwords */
-	uint32_t dword[ sizeof ( struct md5_digest_data ) /
-			sizeof ( uint32_t ) ];
-};
-
-/** An MD5 context */
-struct md5_context {
-	/** Amount of accumulated data */
-	size_t len;
-	/** Digest and accumulated data */
-	union md5_digest_data_dwords ddd;
-} __attribute__ (( packed ));
-
 /** MD5 context size */
-#define MD5_CTX_SIZE sizeof ( struct md5_context )
+#define MD5_CTX_SIZE MDHASH_CTX_SIZE ( struct md5_digest_data )
 
 /** MD5 block size */
 #define MD5_BLOCK_SIZE sizeof ( union md5_block )

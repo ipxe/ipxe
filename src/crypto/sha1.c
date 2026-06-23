@@ -31,8 +31,6 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 #include <stdint.h>
-#include <string.h>
-#include <byteswap.h>
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
@@ -40,15 +38,14 @@ FILE_SECBOOT ( PERMITTED );
 
 /** SHA-1 variables */
 struct sha1_variables {
-	/* This layout matches that of struct sha1_digest_data,
-	 * allowing for efficient endianness-conversion,
-	 */
+	/* This layout matches that of struct sha1_digest_data */
 	uint32_t a;
 	uint32_t b;
 	uint32_t c;
 	uint32_t d;
 	uint32_t e;
-	uint32_t w[80];
+	/* We reuse w[0..15] to construct w[16..79] on demand */
+	uint32_t w[16];
 } __attribute__ (( packed ));
 
 /**
@@ -95,7 +92,7 @@ struct sha1_step {
 };
 
 /** SHA-1 steps */
-static struct sha1_step sha1_steps[4] = {
+static const struct sha1_step sha1_steps[4] = {
 	/** 0 to 19 */
 	{ .f = sha1_f_0_19,		.k = 0x5a827999 },
 	/** 20 to 39 */
@@ -106,166 +103,69 @@ static struct sha1_step sha1_steps[4] = {
 	{ .f = sha1_f_20_39_60_79,	.k = 0xca62c1d6 },
 };
 
-/**
- * Initialise SHA-1 algorithm
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-1 context
- */
-static void sha1_init ( struct digest_algorithm *digest __unused, void *ctx ) {
-	struct sha1_context *context = ctx;
-
-	context->ddd.dd.digest.h[0] = cpu_to_be32 ( 0x67452301 );
-	context->ddd.dd.digest.h[1] = cpu_to_be32 ( 0xefcdab89 );
-	context->ddd.dd.digest.h[2] = cpu_to_be32 ( 0x98badcfe );
-	context->ddd.dd.digest.h[3] = cpu_to_be32 ( 0x10325476 );
-	context->ddd.dd.digest.h[4] = cpu_to_be32 ( 0xc3d2e1f0 );
-	context->len = 0;
-}
+/** SHA-1 initial digest values */
+static const struct sha1_digest sha1_init = {
+	.h = { 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0 }
+};
 
 /**
  * Calculate SHA-1 digest of accumulated data
  *
- * @v context		SHA-1 context
+ * @v dd		Digest and data block
+ * @v digest		Copy of current digest value
  */
-static void sha1_digest ( struct sha1_context *context ) {
+static void sha1_compress ( struct sha1_digest_data *dd,
+			    const struct sha1_digest *digest ) {
         union {
-		union sha1_digest_data_dwords ddd;
+		struct sha1_digest_data dd;
 		struct sha1_variables v;
-	} u;
-	uint32_t *a = &u.v.a;
-	uint32_t *b = &u.v.b;
-	uint32_t *c = &u.v.c;
-	uint32_t *d = &u.v.d;
-	uint32_t *e = &u.v.e;
-	uint32_t *w = u.v.w;
+	} *u = container_of ( dd, typeof ( *u ), dd );
+	struct sha1_variables *v = &u->v;
+	const struct sha1_step *step;
+	uint32_t *a = &v->a;
+	uint32_t *b = &v->b;
+	uint32_t *c = &v->c;
+	uint32_t *d = &v->d;
+	uint32_t *e = &v->e;
+	uint32_t *w = v->w;
 	uint32_t f;
 	uint32_t k;
 	uint32_t temp;
-	struct sha1_step *step;
 	unsigned int i;
 
 	/* Sanity checks */
-	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-	build_assert ( &u.ddd.dd.digest.h[0] == a );
-	build_assert ( &u.ddd.dd.digest.h[1] == b );
-	build_assert ( &u.ddd.dd.digest.h[2] == c );
-	build_assert ( &u.ddd.dd.digest.h[3] == d );
-	build_assert ( &u.ddd.dd.digest.h[4] == e );
-	build_assert ( &u.ddd.dd.data.dword[0] == w );
-
-	DBGC ( context, "SHA1 digesting:\n" );
-	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
-		   sizeof ( context->ddd.dd.digest ) );
-	DBGC_HDA ( context, context->len, &context->ddd.dd.data,
-		   sizeof ( context->ddd.dd.data ) );
-
-	/* Convert h[0..4] to host-endian, and initialise a, b, c, d,
-	 * e, and w[0..15]
-	 */
-	for ( i = 0 ; i < ( sizeof ( u.ddd.dword ) /
-			    sizeof ( u.ddd.dword[0] ) ) ; i++ ) {
-		be32_to_cpus ( &context->ddd.dword[i] );
-		u.ddd.dword[i] = context->ddd.dword[i];
-	}
-
-	/* Initialise w[16..79] */
-	for ( i = 16 ; i < 80 ; i++ )
-		w[i] = rol32 ( ( w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16] ), 1 );
+	build_assert ( &u->dd.digest.h[0] == a );
+	build_assert ( &u->dd.digest.h[1] == b );
+	build_assert ( &u->dd.digest.h[2] == c );
+	build_assert ( &u->dd.digest.h[3] == d );
+	build_assert ( &u->dd.digest.h[4] == e );
+	build_assert ( &u->dd.data.dword[0] == w );
+	build_assert ( sizeof ( u->dd ) == sizeof ( u->v ) );
 
 	/* Main loop */
 	for ( i = 0 ; i < 80 ; i++ ) {
 		step = &sha1_steps[ i / 20 ];
-		f = step->f ( &u.v );
+		f = step->f ( v );
 		k = step->k;
-		temp = ( rol32 ( *a, 5 ) + f + *e + k + w[i] );
+		temp = ( rol32 ( *a, 5 ) + f + *e + k + w[ i % 16 ] );
 		*e = *d;
 		*d = *c;
 		*c = rol32 ( *b, 30 );
 		*b = *a;
 		*a = temp;
-		DBGC2 ( context, "%2d : %08x %08x %08x %08x %08x\n",
+		w[ i % 16 ] = rol32 ( ( w[ ( i - 3 ) % 16 ] ^
+					w[ ( i - 8 ) % 16 ] ^
+					w[ ( i - 14 ) % 16 ] ^
+					w[ ( i - 16 ) % 16 ] ), 1 );
+		DBGC2 ( &sha1_algorithm, "%2d : %08x %08x %08x %08x %08x\n",
 			i, *a, *b, *c, *d, *e );
 	}
 
-	/* Add chunk to hash and convert back to big-endian */
-	for ( i = 0 ; i < 5 ; i++ ) {
-		context->ddd.dd.digest.h[i] =
-			cpu_to_be32 ( context->ddd.dd.digest.h[i] +
-				      u.ddd.dd.digest.h[i] );
-	}
-
-	DBGC ( context, "SHA1 digested:\n" );
-	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
-		   sizeof ( context->ddd.dd.digest ) );
-}
-
-/**
- * Accumulate data with SHA-1 algorithm
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-1 context
- * @v data		Data
- * @v len		Length of data
- */
-static void sha1_update ( struct digest_algorithm *digest __unused,
-			  void *ctx, const void *data, size_t len ) {
-	struct sha1_context *context = ctx;
-	const uint8_t *byte = data;
-	size_t offset;
-
-	/* Accumulate data a byte at a time, performing the digest
-	 * whenever we fill the data buffer
-	 */
-	while ( len-- ) {
-		offset = ( context->len % sizeof ( context->ddd.dd.data ) );
-		context->ddd.dd.data.byte[offset] = *(byte++);
-		context->len++;
-		if ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 )
-			sha1_digest ( context );
-	}
-}
-
-/**
- * Generate SHA-1 digest
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-1 context
- * @v out		Output buffer
- */
-static void sha1_final ( struct digest_algorithm *digest, void *ctx,
-			 void *out ) {
-	struct sha1_context *context = ctx;
-	uint64_t len_bits;
-	uint8_t pad;
-
-	/* Record length before pre-processing */
-	len_bits = cpu_to_be64 ( ( ( uint64_t ) context->len ) * 8 );
-
-	/* Pad with a single "1" bit followed by as many "0" bits as required */
-	pad = 0x80;
-	do {
-		sha1_update ( digest, ctx, &pad, sizeof ( pad ) );
-		pad = 0x00;
-	} while ( ( context->len % sizeof ( context->ddd.dd.data ) ) !=
-		  offsetof ( typeof ( context->ddd.dd.data ), final.len ) );
-
-	/* Append length (in bits) */
-	sha1_update ( digest, ctx, &len_bits, sizeof ( len_bits ) );
-	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-
-	/* Copy out final digest */
-	memcpy ( out, &context->ddd.dd.digest,
-		 sizeof ( context->ddd.dd.digest ) );
+	/* Add chunk to hash */
+	for ( i = 0 ; i < 5 ; i++ )
+		dd->digest.h[i] += digest->h[i];
 }
 
 /** SHA-1 algorithm */
-struct digest_algorithm sha1_algorithm = {
-	.name		= "sha1",
-	.ctxsize	= sizeof ( struct sha1_context ),
-	.blocksize	= sizeof ( union sha1_block ),
-	.digestsize	= sizeof ( struct sha1_digest ),
-	.init		= sha1_init,
-	.update		= sha1_update,
-	.final		= sha1_final,
-};
+MDHASH_ALGORITHM ( sha1, sha1_algorithm, sha1_compress, __BIG_ENDIAN,
+		   struct sha1_digest_data, sha1_init, SHA1_DIGEST_SIZE );

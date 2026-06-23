@@ -31,8 +31,6 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 #include <stdint.h>
-#include <string.h>
-#include <byteswap.h>
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
@@ -40,9 +38,7 @@ FILE_SECBOOT ( PERMITTED );
 
 /** MD4 variables */
 struct md4_variables {
-	/* This layout matches that of struct md4_digest_data,
-	 * allowing for efficient endianness-conversion,
-	 */
+	/* This layout matches that of struct md4_digest_data */
 	uint32_t a;
 	uint32_t b;
 	uint32_t c;
@@ -109,7 +105,7 @@ struct md4_step {
 };
 
 /** MD4 steps */
-static struct md4_step md4_steps[4] = {
+static const struct md4_step md4_steps[4] = {
 	/** 0 to 15 */
 	{ .f = md4_f_0_15,	.constant = 0x00000000UL },
 	/** 16 to 31 */
@@ -118,158 +114,62 @@ static struct md4_step md4_steps[4] = {
 	{ .f = md4_f_32_47,	.constant = 0x6ed9eba1UL },
 };
 
-/**
- * Initialise MD4 algorithm
- *
- * @v digest		Digest algorithm
- * @v ctx		MD4 context
- */
-static void md4_init ( struct digest_algorithm *digest __unused, void *ctx ) {
-	struct md4_context *context = ctx;
-
-	context->ddd.dd.digest.h[0] = cpu_to_le32 ( 0x67452301 );
-	context->ddd.dd.digest.h[1] = cpu_to_le32 ( 0xefcdab89 );
-	context->ddd.dd.digest.h[2] = cpu_to_le32 ( 0x98badcfe );
-	context->ddd.dd.digest.h[3] = cpu_to_le32 ( 0x10325476 );
-	context->len = 0;
-}
+/** MD4 initial digest values */
+static const struct md4_digest md4_init = {
+	.h = { 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476 }
+};
 
 /**
  * Calculate MD4 digest of accumulated data
  *
- * @v context		MD4 context
+ * @v dd		Digest and data block
+ * @v digest		Copy of current digest value
  */
-static void md4_digest ( struct md4_context *context ) {
+static void md4_compress ( struct md4_digest_data *dd,
+			   const struct md4_digest *digest ) {
         union {
-		union md4_digest_data_dwords ddd;
+		struct md4_digest_data dd;
 		struct md4_variables v;
-	} u;
-	uint32_t *a = &u.v.a;
-	uint32_t *b = &u.v.b;
-	uint32_t *c = &u.v.c;
-	uint32_t *d = &u.v.d;
-	uint32_t *w = u.v.w;
+	} *u = container_of ( dd, typeof ( *u ), dd );
+	struct md4_variables *v = &u->v;
+	const struct md4_step *step;
+	uint32_t *a = &v->a;
+	uint32_t *b = &v->b;
+	uint32_t *c = &v->c;
+	uint32_t *d = &v->d;
+	uint32_t *w = v->w;
 	uint32_t f;
 	uint32_t temp;
-	struct md4_step *step;
 	unsigned int round;
 	unsigned int i;
 
 	/* Sanity checks */
-	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-	build_assert ( &u.ddd.dd.digest.h[0] == a );
-	build_assert ( &u.ddd.dd.digest.h[1] == b );
-	build_assert ( &u.ddd.dd.digest.h[2] == c );
-	build_assert ( &u.ddd.dd.digest.h[3] == d );
-	build_assert ( &u.ddd.dd.data.dword[0] == w );
-
-	DBGC ( context, "MD4 digesting:\n" );
-	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
-		   sizeof ( context->ddd.dd.digest ) );
-	DBGC_HDA ( context, context->len, &context->ddd.dd.data,
-		   sizeof ( context->ddd.dd.data ) );
-
-	/* Convert h[0..3] to host-endian, and initialise a, b, c, d,
-	 * and x[0..15]
-	 */
-	for ( i = 0 ; i < ( sizeof ( u.ddd.dword ) /
-			    sizeof ( u.ddd.dword[0] ) ) ; i++ ) {
-		le32_to_cpus ( &context->ddd.dword[i] );
-		u.ddd.dword[i] = context->ddd.dword[i];
-	}
+	build_assert ( &u->dd.digest.h[0] == a );
+	build_assert ( &u->dd.digest.h[1] == b );
+	build_assert ( &u->dd.digest.h[2] == c );
+	build_assert ( &u->dd.digest.h[3] == d );
+	build_assert ( &u->dd.data.dword[0] == w );
+	build_assert ( sizeof ( u->dd ) == sizeof ( u->v ) );
 
 	/* Main loop */
 	for ( i = 0 ; i < 48 ; i++ ) {
 		round = ( i / 16 );
 		step = &md4_steps[round];
-		f = step->f ( &u.v, ( i % 16 ) );
+		f = step->f ( v, ( i % 16 ) );
 		temp = *d;
 		*d = *c;
 		*c = *b;
 		*b = rol32 ( ( *a + f + step->constant ), r[round][ i % 4 ] );
 		*a = temp;
-		DBGC2 ( context, "%2d : %08x %08x %08x %08x\n",
+		DBGC2 ( &md4_algorithm, "%2d : %08x %08x %08x %08x\n",
 			i, *a, *b, *c, *d );
 	}
 
-	/* Add chunk to hash and convert back to little-endian */
-	for ( i = 0 ; i < 4 ; i++ ) {
-		context->ddd.dd.digest.h[i] =
-			cpu_to_le32 ( context->ddd.dd.digest.h[i] +
-				      u.ddd.dd.digest.h[i] );
-	}
-
-	DBGC ( context, "MD4 digested:\n" );
-	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
-		   sizeof ( context->ddd.dd.digest ) );
-}
-
-/**
- * Accumulate data with MD4 algorithm
- *
- * @v digest		Digest algorithm
- * @v ctx		MD4 context
- * @v data		Data
- * @v len		Length of data
- */
-static void md4_update ( struct digest_algorithm *digest __unused, void *ctx,
-			 const void *data, size_t len ) {
-	struct md4_context *context = ctx;
-	const uint8_t *byte = data;
-	size_t offset;
-
-	/* Accumulate data a byte at a time, performing the digest
-	 * whenever we fill the data buffer
-	 */
-	while ( len-- ) {
-		offset = ( context->len % sizeof ( context->ddd.dd.data ) );
-		context->ddd.dd.data.byte[offset] = *(byte++);
-		context->len++;
-		if ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 )
-			md4_digest ( context );
-	}
-}
-
-/**
- * Generate MD4 digest
- *
- * @v digest		Digest algorithm
- * @v ctx		MD4 context
- * @v out		Output buffer
- */
-static void md4_final ( struct digest_algorithm *digest, void *ctx,
-			void *out ) {
-	struct md4_context *context = ctx;
-	uint64_t len_bits;
-	uint8_t pad;
-
-	/* Record length before pre-processing */
-	len_bits = cpu_to_le64 ( ( ( uint64_t ) context->len ) * 8 );
-
-	/* Pad with a single "1" bit followed by as many "0" bits as required */
-	pad = 0x80;
-	do {
-		md4_update ( digest, ctx, &pad, sizeof ( pad ) );
-		pad = 0x00;
-	} while ( ( context->len % sizeof ( context->ddd.dd.data ) ) !=
-		  offsetof ( typeof ( context->ddd.dd.data ), final.len ) );
-
-	/* Append length (in bits) */
-	md4_update ( digest, ctx, &len_bits, sizeof ( len_bits ) );
-	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-
-	/* Copy out final digest */
-	memcpy ( out, &context->ddd.dd.digest,
-		 sizeof ( context->ddd.dd.digest ) );
+	/* Add chunk to hash */
+	for ( i = 0 ; i < 4 ; i++ )
+		dd->digest.h[i] += digest->h[i];
 }
 
 /** MD4 algorithm */
-struct digest_algorithm md4_algorithm = {
-	.name		= "md4",
-	.ctxsize	= sizeof ( struct md4_context ),
-	.blocksize	= sizeof ( union md4_block ),
-	.digestsize	= sizeof ( struct md4_digest ),
-	.init		= md4_init,
-	.update		= md4_update,
-	.final		= md4_final,
-};
+MDHASH_ALGORITHM ( md4, md4_algorithm, md4_compress, __LITTLE_ENDIAN,
+		   struct md4_digest_data, md4_init, MD4_DIGEST_SIZE );

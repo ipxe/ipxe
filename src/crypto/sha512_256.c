@@ -30,25 +30,19 @@ FILE_SECBOOT ( PERMITTED );
  *
  */
 
-#include <stdint.h>
-#include <byteswap.h>
 #include <ipxe/crypto.h>
 #include <ipxe/sha512.h>
 
 /** SHA-512/256 initial digest values */
-static const struct sha512_digest sha512_256_init_digest = {
+static const struct sha512_digest sha512_256_init = {
 	.h = {
-		cpu_to_be64 ( 0x22312194fc2bf72cULL ),
-		cpu_to_be64 ( 0x9f555fa3c84c64c2ULL ),
-		cpu_to_be64 ( 0x2393b86b6f53b151ULL ),
-		cpu_to_be64 ( 0x963877195940eabdULL ),
-		cpu_to_be64 ( 0x96283ee2a88effe3ULL ),
-		cpu_to_be64 ( 0xbe5e1e2553863992ULL ),
-		cpu_to_be64 ( 0x2b0199fc2c85b8aaULL ),
-		cpu_to_be64 ( 0x0eb72ddc81c52ca2ULL ),
-	},
+		0x22312194fc2bf72cULL, 0x9f555fa3c84c64c2ULL,
+		0x2393b86b6f53b151ULL, 0x963877195940eabdULL,
+		0x96283ee2a88effe3ULL, 0xbe5e1e2553863992ULL,
+		0x2b0199fc2c85b8aaULL, 0x0eb72ddc81c52ca2ULL,
+	}
 };
 
 /** SHA-512/256 algorithm */
-SHA512_ALGORITHM ( sha512_256, sha512_256_algorithm, SHA512_256_DIGEST_SIZE,
-		   &sha512_256_init_digest );
+SHA512_ALGORITHM ( sha512_256, sha512_256_algorithm, sha512_256_init,
+		   SHA512_256_DIGEST_SIZE );

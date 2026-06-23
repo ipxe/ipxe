@@ -31,8 +31,6 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 #include <stdint.h>
-#include <string.h>
-#include <byteswap.h>
 #include <assert.h>
 #include <ipxe/rotate.h>
 #include <ipxe/crypto.h>
@@ -40,9 +38,7 @@ FILE_SECBOOT ( PERMITTED );
 
 /** SHA-256 variables */
 struct sha256_variables {
-	/* This layout matches that of struct sha256_digest_data,
-	 * allowing for efficient endianness-conversion,
-	 */
+	/* This layout matches that of struct sha256_digest_data */
 	uint32_t a;
 	uint32_t b;
 	uint32_t c;
@@ -51,7 +47,8 @@ struct sha256_variables {
 	uint32_t f;
 	uint32_t g;
 	uint32_t h;
-	uint32_t w[SHA256_ROUNDS];
+	/* We reuse w[0..15] to construct w[16..63] on demand */
+	uint32_t w[16];
 } __attribute__ (( packed ));
 
 /** SHA-256 constants */
@@ -70,53 +67,35 @@ static const uint32_t k[SHA256_ROUNDS] = {
 };
 
 /** SHA-256 initial digest values */
-static const struct sha256_digest sha256_init_digest = {
+static const struct sha256_digest sha256_init = {
 	.h = {
-		cpu_to_be32 ( 0x6a09e667 ),
-		cpu_to_be32 ( 0xbb67ae85 ),
-		cpu_to_be32 ( 0x3c6ef372 ),
-		cpu_to_be32 ( 0xa54ff53a ),
-		cpu_to_be32 ( 0x510e527f ),
-		cpu_to_be32 ( 0x9b05688c ),
-		cpu_to_be32 ( 0x1f83d9ab ),
-		cpu_to_be32 ( 0x5be0cd19 ),
-	},
+		0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+		0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+	}
 };
-
-/**
- * Initialise SHA-256 algorithm
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-256 context
- */
-void sha256_init ( struct digest_algorithm *digest, void *ctx ) {
-	struct sha256_algorithm *sha = digest->priv;
-	struct sha256_context *context = ctx;
-
-	context->len = 0;
-	memcpy ( &context->ddd.dd.digest, sha->init,
-		 sizeof ( context->ddd.dd.digest ) );
-}
 
 /**
  * Calculate SHA-256 digest of accumulated data
  *
- * @v context		SHA-256 context
+ * @v dd		Digest and data block
+ * @v digest		Copy of current digest value
  */
-static void sha256_digest ( struct sha256_context *context ) {
+void sha256_compress ( struct sha256_digest_data *dd,
+		       const struct sha256_digest *digest ) {
         union {
-		union sha256_digest_data_dwords ddd;
+		struct sha256_digest_data dd;
 		struct sha256_variables v;
-	} u;
-	uint32_t *a = &u.v.a;
-	uint32_t *b = &u.v.b;
-	uint32_t *c = &u.v.c;
-	uint32_t *d = &u.v.d;
-	uint32_t *e = &u.v.e;
-	uint32_t *f = &u.v.f;
-	uint32_t *g = &u.v.g;
-	uint32_t *h = &u.v.h;
-	uint32_t *w = u.v.w;
+	} *u = container_of ( dd, typeof ( *u ), dd );
+	struct sha256_variables *v = &u->v;
+	uint32_t *a = &v->a;
+	uint32_t *b = &v->b;
+	uint32_t *c = &v->c;
+	uint32_t *d = &v->d;
+	uint32_t *e = &v->e;
+	uint32_t *f = &v->f;
+	uint32_t *g = &v->g;
+	uint32_t *h = &v->h;
+	uint32_t *w = v->w;
 	uint32_t s0;
 	uint32_t s1;
 	uint32_t maj;
@@ -126,40 +105,16 @@ static void sha256_digest ( struct sha256_context *context ) {
 	unsigned int i;
 
 	/* Sanity checks */
-	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-	build_assert ( &u.ddd.dd.digest.h[0] == a );
-	build_assert ( &u.ddd.dd.digest.h[1] == b );
-	build_assert ( &u.ddd.dd.digest.h[2] == c );
-	build_assert ( &u.ddd.dd.digest.h[3] == d );
-	build_assert ( &u.ddd.dd.digest.h[4] == e );
-	build_assert ( &u.ddd.dd.digest.h[5] == f );
-	build_assert ( &u.ddd.dd.digest.h[6] == g );
-	build_assert ( &u.ddd.dd.digest.h[7] == h );
-	build_assert ( &u.ddd.dd.data.dword[0] == w );
-
-	DBGC ( context, "SHA256 digesting:\n" );
-	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
-		   sizeof ( context->ddd.dd.digest ) );
-	DBGC_HDA ( context, context->len, &context->ddd.dd.data,
-		   sizeof ( context->ddd.dd.data ) );
-
-	/* Convert h[0..7] to host-endian, and initialise a, b, c, d,
-	 * e, f, g, h, and w[0..15]
-	 */
-	for ( i = 0 ; i < ( sizeof ( u.ddd.dword ) /
-			    sizeof ( u.ddd.dword[0] ) ) ; i++ ) {
-		be32_to_cpus ( &context->ddd.dword[i] );
-		u.ddd.dword[i] = context->ddd.dword[i];
-	}
-
-	/* Initialise w[16..63] */
-	for ( i = 16 ; i < SHA256_ROUNDS ; i++ ) {
-		s0 = ( ror32 ( w[i-15], 7 ) ^ ror32 ( w[i-15], 18 ) ^
-		       ( w[i-15] >> 3 ) );
-		s1 = ( ror32 ( w[i-2], 17 ) ^ ror32 ( w[i-2], 19 ) ^
-		       ( w[i-2] >> 10 ) );
-		w[i] = ( w[i-16] + s0 + w[i-7] + s1 );
-	}
+	build_assert ( &u->dd.digest.h[0] == a );
+	build_assert ( &u->dd.digest.h[1] == b );
+	build_assert ( &u->dd.digest.h[2] == c );
+	build_assert ( &u->dd.digest.h[3] == d );
+	build_assert ( &u->dd.digest.h[4] == e );
+	build_assert ( &u->dd.digest.h[5] == f );
+	build_assert ( &u->dd.digest.h[6] == g );
+	build_assert ( &u->dd.digest.h[7] == h );
+	build_assert ( &u->dd.data.dword[0] == w );
+	build_assert ( sizeof ( u->dd ) == sizeof ( u->v ) );
 
 	/* Main loop */
 	for ( i = 0 ; i < SHA256_ROUNDS ; i++ ) {
@@ -168,7 +123,7 @@ static void sha256_digest ( struct sha256_context *context ) {
 		t2 = ( s0 + maj );
 		s1 = ( ror32 ( *e, 6 ) ^ ror32 ( *e, 11 ) ^ ror32 ( *e, 25 ) );
 		ch = ( ( *e & *f ) ^ ( (~*e) & *g ) );
-		t1 = ( *h + s1 + ch + k[i] + w[i] );
+		t1 = ( *h + s1 + ch + k[i] + w[ i % 16 ] );
 		*h = *g;
 		*g = *f;
 		*f = *e;
@@ -177,79 +132,23 @@ static void sha256_digest ( struct sha256_context *context ) {
 		*c = *b;
 		*b = *a;
 		*a = ( t1 + t2 );
-		DBGC2 ( context, "%2d : %08x %08x %08x %08x %08x %08x %08x "
-			"%08x\n", i, *a, *b, *c, *d, *e, *f, *g, *h );
+		s0 = ( ror32 ( w[ ( i - 15 ) % 16 ], 7 ) ^
+		       ror32 ( w[ ( i - 15 ) % 16 ], 18 ) ^
+		       ( w[ ( i - 15 ) % 16 ] >> 3 ) );
+		s1 = ( ror32 ( w[ ( i - 2 ) % 16 ], 17 ) ^
+		       ror32 ( w[ ( i - 2 ) % 16 ], 19 ) ^
+		       ( w[ ( i - 2 ) % 16 ] >> 10 ) );
+		w[ i % 16 ] = ( w[ ( i - 16 ) % 16 ] + s0 +
+				w[ ( i - 7 ) % 16 ] + s1 );
+		DBGC2 ( &sha256_algorithm,
+			"%2d : %08x %08x %08x %08x %08x %08x %08x %08x\n",
+			i, *a, *b, *c, *d, *e, *f, *g, *h );
 	}
 
-	/* Add chunk to hash and convert back to big-endian */
-	for ( i = 0 ; i < 8 ; i++ ) {
-		context->ddd.dd.digest.h[i] =
-			cpu_to_be32 ( context->ddd.dd.digest.h[i] +
-				      u.ddd.dd.digest.h[i] );
-	}
-
-	DBGC ( context, "SHA256 digested:\n" );
-	DBGC_HDA ( context, 0, &context->ddd.dd.digest,
-		   sizeof ( context->ddd.dd.digest ) );
-}
-
-/**
- * Accumulate data with SHA-256 algorithm
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-256 context
- * @v data		Data
- * @v len		Length of data
- */
-void sha256_update ( struct digest_algorithm *digest __unused, void *ctx,
-		     const void *data, size_t len ) {
-	struct sha256_context *context = ctx;
-	const uint8_t *byte = data;
-	size_t offset;
-
-	/* Accumulate data a byte at a time, performing the digest
-	 * whenever we fill the data buffer
-	 */
-	while ( len-- ) {
-		offset = ( context->len % sizeof ( context->ddd.dd.data ) );
-		context->ddd.dd.data.byte[offset] = *(byte++);
-		context->len++;
-		if ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 )
-			sha256_digest ( context );
-	}
-}
-
-/**
- * Generate SHA-256 digest
- *
- * @v digest		Digest algorithm
- * @v ctx		SHA-256 context
- * @v out		Output buffer
- */
-void sha256_final ( struct digest_algorithm *digest, void *ctx, void *out ) {
-	struct sha256_context *context = ctx;
-	uint64_t len_bits;
-	uint8_t pad;
-
-	/* Record length before pre-processing */
-	len_bits = cpu_to_be64 ( ( ( uint64_t ) context->len ) * 8 );
-
-	/* Pad with a single "1" bit followed by as many "0" bits as required */
-	pad = 0x80;
-	do {
-		sha256_update ( digest, ctx, &pad, sizeof ( pad ) );
-		pad = 0x00;
-	} while ( ( context->len % sizeof ( context->ddd.dd.data ) ) !=
-		  offsetof ( typeof ( context->ddd.dd.data ), final.len ) );
-
-	/* Append length (in bits) */
-	sha256_update ( digest, ctx, &len_bits, sizeof ( len_bits ) );
-	assert ( ( context->len % sizeof ( context->ddd.dd.data ) ) == 0 );
-
-	/* Copy out final digest */
-	memcpy ( out, &context->ddd.dd.digest, digest->digestsize );
+	/* Add chunk to hash */
+	for ( i = 0 ; i < 8 ; i++ )
+		dd->digest.h[i] += digest->h[i];
 }
 
 /** SHA-256 algorithm */
-SHA256_ALGORITHM ( sha256, sha256_algorithm, SHA256_DIGEST_SIZE,
-		   &sha256_init_digest );
+SHA256_ALGORITHM ( sha256, sha256_algorithm, sha256_init, SHA256_DIGEST_SIZE );

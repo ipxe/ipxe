@@ -11,7 +11,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
+#include <endian.h>
 #include <ipxe/crypto.h>
+#include <ipxe/mdhash.h>
 
 /** SHA-512 number of rounds */
 #define SHA512_ROUNDS 80
@@ -32,10 +34,13 @@ union sha512_block {
 	struct {
 		/** Padding */
 		uint8_t pad[112];
-		/** High 64 bits of length in bits */
-		uint64_t len_hi;
-		/** Low 64 bits of length in bits */
-		uint64_t len_lo;
+		/** Length in bits */
+		struct {
+			/** High 64 bits (unused by iPXE) */
+			uint64_t hi;
+			/** Low 64 bits (unused by iPXE) */
+			uint64_t lo;
+		} __attribute__ (( packed )) len;
 	} final;
 };
 
@@ -51,31 +56,8 @@ struct sha512_digest_data {
 	union sha512_block data;
 } __attribute__ (( packed ));
 
-/** SHA-512 digest and data block */
-union sha512_digest_data_qwords {
-	/** Digest and data block */
-	struct sha512_digest_data dd;
-	/** Raw qwords */
-	uint64_t qword[ sizeof ( struct sha512_digest_data ) /
-			sizeof ( uint64_t ) ];
-};
-
-/** An SHA-512 context */
-struct sha512_context {
-	/** Amount of accumulated data */
-	size_t len;
-	/** Digest and accumulated data */
-	union sha512_digest_data_qwords ddq;
-} __attribute__ (( packed ));
-
-/** A SHA-512 family algorithm */
-struct sha512_algorithm {
-	/** Initial digest values */
-	const struct sha512_digest *init;
-};
-
 /** SHA-512 context size */
-#define SHA512_CTX_SIZE sizeof ( struct sha512_context )
+#define SHA512_CTX_SIZE MDHASH_CTX_SIZE ( struct sha512_digest_data )
 
 /** SHA-512 block size */
 #define SHA512_BLOCK_SIZE sizeof ( union sha512_block )
@@ -92,27 +74,14 @@ struct sha512_algorithm {
 /** SHA-512/224 digest size */
 #define SHA512_224_DIGEST_SIZE ( SHA512_DIGEST_SIZE * 224 / 512 )
 
-extern void sha512_init ( struct digest_algorithm *digest, void *ctx );
-extern void sha512_update ( struct digest_algorithm *digest, void *ctx,
-			    const void *data, size_t len );
-extern void sha512_final ( struct digest_algorithm *digest, void *ctx,
-			   void *out );
+extern void sha512_compress ( struct sha512_digest_data *dd,
+			      const struct sha512_digest *digest );
 
 /** Define a SHA-512 family digest algorithm */
-#define SHA512_ALGORITHM( _name, _digest, _digestsize, _init )		\
-	static struct sha512_algorithm _name ## _sha512 = {		\
-		.init		= (_init),				\
-	};								\
-	struct digest_algorithm _digest = {				\
-		.name		= #_name,				\
-		.ctxsize	= sizeof ( struct sha512_context ),	\
-		.blocksize	= sizeof ( union sha512_block ),	\
-		.digestsize	= (_digestsize),			\
-		.init		= sha512_init,				\
-		.update		= sha512_update,			\
-		.final		= sha512_final,				\
-		.priv		= &_name ## _sha512,			\
-	}
+#define SHA512_ALGORITHM( _name, _digest, _init, _digestsize )		\
+	MDHASH_ALGORITHM( _name, _digest, sha512_compress,		\
+			  __BIG_ENDIAN, struct sha512_digest_data,	\
+			  _init, _digestsize )
 
 extern struct digest_algorithm sha512_algorithm;
 extern struct digest_algorithm sha384_algorithm;

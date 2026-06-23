@@ -12,6 +12,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <ipxe/crypto.h>
+#include <ipxe/mdhash.h>
 
 /** An MD4 digest */
 struct md4_digest {
@@ -46,25 +47,8 @@ struct md4_digest_data {
 	union md4_block data;
 } __attribute__ (( packed ));
 
-/** MD4 digest and data block */
-union md4_digest_data_dwords {
-	/** Digest and data block */
-	struct md4_digest_data dd;
-	/** Raw dwords */
-	uint32_t dword[ sizeof ( struct md4_digest_data ) /
-			sizeof ( uint32_t ) ];
-};
-
-/** An MD4 context */
-struct md4_context {
-	/** Amount of accumulated data */
-	size_t len;
-	/** Digest and accumulated data */
-	union md4_digest_data_dwords ddd;
-} __attribute__ (( packed ));
-
 /** MD4 context size */
-#define MD4_CTX_SIZE sizeof ( struct md4_context )
+#define MD4_CTX_SIZE MDHASH_CTX_SIZE ( struct md4_digest_data )
 
 /** MD4 block size */
 #define MD4_BLOCK_SIZE sizeof ( union md4_block )

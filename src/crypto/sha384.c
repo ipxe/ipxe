@@ -30,25 +30,18 @@ FILE_SECBOOT ( PERMITTED );
  *
  */
 
-#include <stdint.h>
-#include <byteswap.h>
 #include <ipxe/crypto.h>
 #include <ipxe/sha512.h>
 
 /** SHA-384 initial digest values */
-static const struct sha512_digest sha384_init_digest = {
+static const struct sha512_digest sha384_init = {
 	.h = {
-		cpu_to_be64 ( 0xcbbb9d5dc1059ed8ULL ),
-		cpu_to_be64 ( 0x629a292a367cd507ULL ),
-		cpu_to_be64 ( 0x9159015a3070dd17ULL ),
-		cpu_to_be64 ( 0x152fecd8f70e5939ULL ),
-		cpu_to_be64 ( 0x67332667ffc00b31ULL ),
-		cpu_to_be64 ( 0x8eb44a8768581511ULL ),
-		cpu_to_be64 ( 0xdb0c2e0d64f98fa7ULL ),
-		cpu_to_be64 ( 0x47b5481dbefa4fa4ULL ),
-	},
+		0xcbbb9d5dc1059ed8ULL, 0x629a292a367cd507ULL,
+		0x9159015a3070dd17ULL, 0x152fecd8f70e5939ULL,
+		0x67332667ffc00b31ULL, 0x8eb44a8768581511ULL,
+		0xdb0c2e0d64f98fa7ULL, 0x47b5481dbefa4fa4ULL,
+	}
 };
 
 /** SHA-384 algorithm */
-SHA512_ALGORITHM ( sha384, sha384_algorithm, SHA384_DIGEST_SIZE,
-		   &sha384_init_digest );
+SHA512_ALGORITHM ( sha384, sha384_algorithm, sha384_init, SHA384_DIGEST_SIZE );
