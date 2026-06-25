@@ -47,6 +47,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <ipxe/ffdhe.h>
@@ -165,27 +166,6 @@ static const uint8_t pi[] = {
 	0x90, 0xa6, 0xc0, 0x8f, 0x4d, 0xf4, 0x35, 0xc9
 };
 
-/** Maximum number of elements in big integer values */
-#define FFDHE_SIZE bigint_required_size ( FFDHE_LEN )
-
-/** Maximally sized big integer */
-typedef bigint_t ( FFDHE_SIZE ) ffdhe_t;
-
-/** Temporary storage */
-static struct {
-	/** Prime modulus */
-	ffdhe_t modulus;
-	/** Base */
-	ffdhe_t base;
-	/** Result */
-	ffdhe_t result;
-	/** Temporary working space */
-	union {
-		uint8_t mod_exp[ bigint_mod_exp_tmp_len ( (ffdhe_t *) NULL ) ];
-		uint8_t raw[FFDHE_LEN];
-	} tmp;
-} ffdhe_temp;
-
 /**
  * Calculate FFDHE result
  *
@@ -201,23 +181,41 @@ static int ffdhe ( struct ffdhe_group *group, const void *public,
 	unsigned int size = group->size;
 	size_t explen = group->explen;
 	size_t len = group->len;
-	ffdhe_modulus_t ( len ) *tmp = ( ( void * ) &ffdhe_temp.tmp );
-	bigint_t ( size ) *modulus = ( ( void * ) &ffdhe_temp.modulus );
-	bigint_t ( size ) *base = ( ( void * ) &ffdhe_temp.base );
-	bigint_t ( size ) *result = ( ( void * ) &ffdhe_temp.result );
 	bigint_t ( expsize ) exponent;
+	bigint_t ( size ) *modulus;
+	bigint_t ( size ) *base;
+	bigint_t ( size ) *result;
+	ffdhe_modulus_t ( len ) *raw;
+	struct {
+		typeof ( *modulus ) modulus;
+		typeof ( *base ) base;
+		typeof ( *result ) result;
+		uint8_t mod_exp[ bigint_mod_exp_tmp_len ( modulus ) ];
+	} *tmp;
 	static const uint8_t two[1] = { 2 };
+	int rc;
 
 	/* Sanity checks */
 	static_assert ( sizeof ( euler ) == FFDHE_CONSTANT_LEN );
 	static_assert ( sizeof ( pi ) == FFDHE_CONSTANT_LEN );
 
-	/* Construct modulus */
-	assert ( sizeof ( *tmp ) == len );
-	memset ( tmp, 0xff, sizeof ( *tmp ) );
-	memcpy ( tmp->constant, group->constant, sizeof ( tmp->constant ) );
-	tmp->lsb32 = group->lsb32;
-	bigint_init ( modulus, tmp, len );
+	/* Allocate temporary space */
+	tmp = malloc ( sizeof ( *tmp ) );
+	if ( ! tmp ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	modulus = &tmp->modulus;
+	base = &tmp->base;
+	result = &tmp->result;
+
+	/* Construct modulus (using base as temporary buffer) */
+	assert ( sizeof ( *raw ) <= sizeof ( *base ) );
+	raw = ( ( void * ) base );
+	memset ( raw, 0xff, sizeof ( *raw ) );
+	memcpy ( raw->constant, group->constant, sizeof ( raw->constant ) );
+	raw->lsb32 = group->lsb32;
+	bigint_init ( modulus, raw, len );
 	DBGC ( group, "FFDHE %s mod: %s\n",
 	       group->name, bigint_ntoa ( modulus ) );
 
@@ -236,7 +234,7 @@ static int ffdhe ( struct ffdhe_group *group, const void *public,
 	       group->name, bigint_ntoa ( &exponent ) );
 
 	/* Calculate result */
-	bigint_mod_exp ( base, modulus, &exponent, result, &ffdhe_temp.tmp );
+	bigint_mod_exp ( base, modulus, &exponent, result, tmp->mod_exp );
 	DBGC ( group, "FFDHE %s %s: %s\n", group->name,
 	       ( public ? "shr" : "pub" ), bigint_ntoa ( result ) );
 	bigint_done ( result, shared, len );
@@ -246,16 +244,24 @@ static int ffdhe ( struct ffdhe_group *group, const void *public,
 	if ( ! bigint_is_geq ( result, base ) ) {
 		/* Result is 0 or 1 */
 		DBGC ( group, "FFDHE %s invalid result\n", group->name );
-		return -EPERM;
+		rc = -EPERM;
+		goto err_result;
 	}
 	bigint_add ( base, result );
 	if ( ! bigint_is_geq ( modulus, result ) ) {
 		/* Result is p-1 */
 		DBGC ( group, "FFDHE %s invalid result\n", group->name );
-		return -EPERM;
+		rc = -EPERM;
+		goto err_result;
 	}
 
-	return 0;
+	/* Success */
+	rc = 0;
+
+ err_result:
+	free ( tmp );
+ err_alloc:
+	return rc;
 }
 
 /**
