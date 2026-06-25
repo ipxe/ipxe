@@ -51,7 +51,6 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/rbg.h>
 #include <ipxe/validator.h>
 #include <ipxe/job.h>
-#include <ipxe/dhe.h>
 #include <ipxe/ffdhe.h>
 #include <ipxe/tls.h>
 #include <config/crypto.h>
@@ -1599,7 +1598,6 @@ static int tls_verify_dh_params ( struct tls_connection *tls,
 static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 	struct tls_named_group *group;
 	struct exchange_algorithm *exchange;
-	uint8_t private[ sizeof ( tls->client.random.random ) ];
 	const struct {
 		uint16_t len;
 		uint8_t data[0];
@@ -1611,6 +1609,10 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 	size_t remaining;
 	size_t frag_len;
 	size_t param_len;
+	size_t dh_ys_len;
+	size_t privsize;
+	size_t pubsize;
+	size_t sharedsize;
 	unsigned int i;
 	int rc;
 
@@ -1654,25 +1656,35 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 		goto err_group;
 	}
 	exchange = group->exchange;
+	privsize = exchange->privsize;
+	pubsize = exchange->pubsize;
+	sharedsize = exchange->sharedsize;
 	DBGC ( tls, "TLS %p using named group %s\n", tls, exchange->name );
 
-	/* Generate Diffie-Hellman private key */
-	tls_ephemeral_label ( tls, exchange->name, private,
-			      sizeof ( private ) );
+	/* Check key length (allowing for missing leading zeros) */
+	dh_ys_len = ntohs ( dh_ys->len );
+	if ( dh_ys_len > pubsize ) {
+		DBGC ( tls, "TLS %p invalid %s key\n", tls, exchange->name );
+		DBGC_HDA ( tls, 0, tls->server.exchange,
+			   tls->server.exchange_len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_key_len;
+	}
 
 	/* Construct pre-master secret and ClientKeyExchange record */
 	{
-		size_t len = ntohs ( dh_p->len );
+		uint8_t private[privsize];
 		struct {
 			uint32_t type_length;
 			uint16_t dh_xs_len;
-			uint8_t dh_xs[len];
+			uint8_t dh_xs[pubsize];
 		} __attribute__ (( packed )) *key_xchg;
 		struct {
-			uint8_t pre_master_secret[len];
+			uint8_t pre_master_secret[sharedsize];
 			typeof ( *key_xchg ) key_xchg;
 		} *dynamic;
 		uint8_t *pre_master_secret;
+		size_t pre_master_secret_len;
 
 		/* Allocate space */
 		dynamic = malloc ( sizeof ( *dynamic ) );
@@ -1681,29 +1693,22 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 			goto err_alloc;
 		}
 		pre_master_secret = dynamic->pre_master_secret;
+		pre_master_secret_len = sizeof ( dynamic->pre_master_secret );
 		key_xchg = &dynamic->key_xchg;
+
+		/* Generate ephemeral private key */
+		tls_ephemeral_label ( tls, exchange->name, private,
+				      sizeof ( private ) );
+
+		/* Generate Client Key Exchange record */
 		key_xchg->type_length =
 			( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
 			  htonl ( sizeof ( *key_xchg ) -
 				  sizeof ( key_xchg->type_length ) ) );
-		key_xchg->dh_xs_len = htons ( len );
-
-		/* Calculate pre-master secret and client public value */
-		if ( ( rc = dhe_key ( dh_p->data, len,
-				      dh_g->data, ntohs ( dh_g->len ),
-				      dh_ys->data, ntohs ( dh_ys->len ),
-				      private, sizeof ( private ),
-				      key_xchg->dh_xs,
-				      pre_master_secret ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not calculate DHE key: %s\n",
-			       tls, strerror ( rc ) );
-			goto err_dhe_key;
-		}
-
-		/* Strip leading zeroes from pre-master secret */
-		while ( len && ( ! *pre_master_secret ) ) {
-			pre_master_secret++;
-			len--;
+		key_xchg->dh_xs_len = htons ( sizeof ( key_xchg->dh_xs ) );
+		if ( ( rc = exchange_share ( exchange, private,
+					     key_xchg->dh_xs ) ) != 0 ) {
+			goto err_share;
 		}
 
 		/* Transmit Client Key Exchange record */
@@ -1712,14 +1717,39 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 			goto err_send_handshake;
 		}
 
-		/* Generate master secret */
-		tls_generate_master_secret ( tls, pre_master_secret, len );
+		/* Zero-pad partner key as needed */
+		memset ( key_xchg->dh_xs, 0, sizeof ( key_xchg->dh_xs ) );
+		assert ( dh_ys_len <= sizeof ( key_xchg->dh_xs ) );
+		memcpy ( &key_xchg->dh_xs[ sizeof ( key_xchg->dh_xs ) -
+					   dh_ys_len ],
+			 dh_ys->data, dh_ys_len );
 
+		/* Generate pre-master secret */
+		if ( ( rc = exchange_agree ( exchange, private,
+					     key_xchg->dh_xs,
+					     pre_master_secret ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not exchange keys: %s\n",
+			       tls, strerror ( rc ) );
+			goto err_agree;
+		}
+
+		/* Strip leading zeroes from pre-master secret */
+		while ( pre_master_secret_len && ( ! *pre_master_secret ) ) {
+			pre_master_secret++;
+			pre_master_secret_len--;
+		}
+
+		/* Generate master secret */
+		tls_generate_master_secret ( tls, pre_master_secret,
+					     pre_master_secret_len );
+
+	err_agree:
 	err_send_handshake:
-	err_dhe_key:
+	err_share:
 		free ( dynamic );
 	}
  err_alloc:
+ err_key_len:
  err_group:
  err_verify:
  err_header:
