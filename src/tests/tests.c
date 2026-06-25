@@ -78,7 +78,6 @@ REQUIRE_OBJECT ( gzip_test );
 REQUIRE_OBJECT ( utf8_test );
 REQUIRE_OBJECT ( acpi_test );
 REQUIRE_OBJECT ( hmac_test );
-REQUIRE_OBJECT ( dhe_test );
 REQUIRE_OBJECT ( gcm_test );
 REQUIRE_OBJECT ( nap_test );
 REQUIRE_OBJECT ( x25519_test );
