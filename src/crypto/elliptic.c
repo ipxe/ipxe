@@ -42,8 +42,9 @@ FILE_SECBOOT ( PERMITTED );
  * @v exchange		Key exchange algorithm
  * @v private		Private key
  * @v public		Public key to fill in
+ * @ret rc		Return status code
  */
-void elliptic_share ( struct exchange_algorithm *exchange, const void *private,
+int elliptic_share ( struct exchange_algorithm *exchange, const void *private,
 		      void *public ) {
 	struct elliptic_curve *curve = exchange->priv;
 	size_t len = exchange->sharedsize;
@@ -57,10 +58,14 @@ void elliptic_share ( struct exchange_algorithm *exchange, const void *private,
 
 	/* Calculate public key */
 	result->format = ELLIPTIC_FORMAT_UNCOMPRESSED;
-	rc = elliptic_multiply ( curve, curve->base, private, &result->xy );
+	if ( ( rc = elliptic_multiply ( curve, curve->base, private,
+					&result->xy ) ) != 0 ) {
+		/* Can never fail when using the curve's own base point */
+		assert ( 0 );
+		return rc;
+	}
 
-	/* Can never fail when using the curve's own base point */
-	assert ( rc == 0 );
+	return rc;
 }
 
 /**

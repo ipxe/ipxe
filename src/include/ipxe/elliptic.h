@@ -29,8 +29,8 @@ FILE_SECBOOT ( PERMITTED );
 /** Format byte for uncompressed curve point representation */
 #define ELLIPTIC_FORMAT_UNCOMPRESSED 0x04
 
-extern void elliptic_share ( struct exchange_algorithm *exchange,
-			     const void *private, void *public );
+extern int elliptic_share ( struct exchange_algorithm *exchange,
+			    const void *private, void *public );
 extern int elliptic_agree ( struct exchange_algorithm *exchange,
 			    const void *private, const void *partner,
 			    void *shared );

@@ -33,8 +33,8 @@ struct ffdhe_group {
 	uint32_t lsb32;
 };
 
-extern void ffdhe_share ( struct exchange_algorithm *exchange,
-			  const void *private, void *public );
+extern int ffdhe_share ( struct exchange_algorithm *exchange,
+			 const void *private, void *public );
 extern int ffdhe_agree ( struct exchange_algorithm *exchange,
 			 const void *private, const void *partner,
 			 void *shared );

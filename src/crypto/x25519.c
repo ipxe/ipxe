@@ -836,12 +836,15 @@ void x25519_key ( const struct x25519_value *base,
  * @v exchange		Key exchange algorithm
  * @v private		Private key
  * @v public		Public key to fill in
+ * @ret rc		Return status code
  */
-static void x25519_share ( struct exchange_algorithm *exchange __unused,
-			   const void *private, void *public ) {
+static int x25519_share ( struct exchange_algorithm *exchange __unused,
+			  const void *private, void *public ) {
 
 	/* Calculate public key */
 	x25519_key ( &x25519_generator, private, public );
+
+	return 0;
 }
 
 /**

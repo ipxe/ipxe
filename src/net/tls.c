@@ -1820,7 +1820,10 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			  htonl ( sizeof ( key_xchg ) -
 				  sizeof ( key_xchg.type_length ) ) );
 		key_xchg.public_len = sizeof ( key_xchg.public );
-		exchange_share ( exchange, private, key_xchg.public );
+		if ( ( rc = exchange_share ( exchange, private,
+					     key_xchg.public ) ) != 0 ) {
+			return rc;
+		}
 
 		/* Transmit Client Key Exchange record */
 		if ( ( rc = tls_send_handshake ( tls, &key_xchg,

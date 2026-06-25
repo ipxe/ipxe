@@ -264,12 +264,13 @@ static int ffdhe ( struct ffdhe_group *group, const void *public,
  * @v exchange		Key exchange algorithm
  * @v private		Private key
  * @v public		Public key to fill in
+ * @ret rc		Return status code
  */
-void ffdhe_share ( struct exchange_algorithm *exchange, const void *private,
-		   void *public ) {
+int ffdhe_share ( struct exchange_algorithm *exchange, const void *private,
+		  void *public ) {
 	struct ffdhe_group *group = exchange->priv;
 
-	ffdhe ( group, NULL, private, public );
+	return ffdhe ( group, NULL, private, public );
 }
 
 /**
