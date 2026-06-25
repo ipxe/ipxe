@@ -52,7 +52,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/ffdhe.h>
 
 /** Maximum length of FFDHE prime modulus */
-#define FFDHE_LEN 4096
+#define FFDHE_LEN 512
 
 /** Maximum length of group constant portion of FFDHE prime modulus */
 #define FFDHE_CONSTANT_LEN \
@@ -68,7 +68,7 @@ FILE_SECBOOT ( PERMITTED );
 	} __attribute__ (( packed ))
 
 /** Euler's constant ("e") */
-static const uint8_t euler[FFDHE_CONSTANT_LEN] = {
+static const uint8_t euler[] = {
 	0xad, 0xf8, 0x54, 0x58, 0xa2, 0xbb, 0x4a, 0x9a, 0xaf, 0xdc, 0x56,
 	0x20, 0x27, 0x3d, 0x3c, 0xf1, 0xd8, 0xb9, 0xc5, 0x83, 0xce, 0x2d,
 	0x36, 0x95, 0xa9, 0xe1, 0x36, 0x41, 0x14, 0x64, 0x33, 0xfb, 0xcc,
@@ -117,7 +117,7 @@ static const uint8_t euler[FFDHE_CONSTANT_LEN] = {
 };
 
 /** Constant "pi" */
-static const uint8_t pi[FFDHE_CONSTANT_LEN] = {
+static const uint8_t pi[] = {
 	0xc9, 0x0f, 0xda, 0xa2, 0x21, 0x68, 0xc2, 0x34, 0xc4, 0xc6, 0x62,
 	0x8b, 0x80, 0xdc, 0x1c, 0xd1, 0x29, 0x02, 0x4e, 0x08, 0x8a, 0x67,
 	0xcc, 0x74, 0x02, 0x0b, 0xbe, 0xa6, 0x3b, 0x13, 0x9b, 0x22, 0x51,
@@ -207,6 +207,10 @@ static int ffdhe ( struct ffdhe_group *group, const void *public,
 	bigint_t ( size ) *result = ( ( void * ) &ffdhe_temp.result );
 	bigint_t ( expsize ) exponent;
 	static const uint8_t two[1] = { 2 };
+
+	/* Sanity checks */
+	static_assert ( sizeof ( euler ) == FFDHE_CONSTANT_LEN );
+	static_assert ( sizeof ( pi ) == FFDHE_CONSTANT_LEN );
 
 	/* Construct modulus */
 	assert ( sizeof ( *tmp ) == len );
