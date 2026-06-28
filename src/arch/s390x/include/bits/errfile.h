@@ -14,6 +14,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * @{
  */
 
+#define ERRFILE_prno		( ERRFILE_ARCH | ERRFILE_CORE | 0x00010000 )
+
 /** @} */
 
 #endif /* _BITS_ERRFILE_H */

@@ -9,6 +9,9 @@
 
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
+/** Message-security-assist extension 5 facility ID */
+#define FACILITY_MSA5 57
+
 /** Installed facilities */
 struct s390x_facilities {
 	/** Bit mask of installed facilities */
