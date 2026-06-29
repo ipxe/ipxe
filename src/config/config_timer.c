@@ -53,3 +53,6 @@ REQUIRE_OBJECT ( acpi_timer );
 #ifdef TIMER_ZICNTR
 REQUIRE_OBJECT ( zicntr );
 #endif
+#ifdef TIMER_TOD
+REQUIRE_OBJECT ( tod );
+#endif
