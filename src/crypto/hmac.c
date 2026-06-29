@@ -48,34 +48,70 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/hmac.h>
 
 /**
- * Initialise HMAC
+ * Construct HMAC reduced key
  *
  * @v digest		Digest algorithm to use
  * @v ctx		HMAC context
- * @v key		Key
- * @v key_len		Length of key
+ * @v secret		Secret key
+ * @v len		Length of secret key
+ * @v key		HMAC reduced key to fill in
  */
-void hmac_init ( struct digest_algorithm *digest, void *ctx, const void *key,
-		 size_t key_len ) {
+void hmac_key ( struct digest_algorithm *digest, void *ctx, const void *secret,
+		size_t len, void *key ) {
 	hmac_context_t ( digest ) *hctx = ctx;
+	hmac_key_t ( digest ) *hkey = key;
+
+	/* Reduce key (if applicable) and zero-pad to block size */
+	memset ( hkey->pad, 0, sizeof ( hkey->pad ) );
+	if ( len <= sizeof ( hkey->pad ) ) {
+		memcpy ( hkey->pad, secret, len );
+	} else {
+		digest_init ( digest, hctx->ctx );
+		digest_update ( digest, hctx->ctx, secret, len );
+		digest_final ( digest, hctx->ctx, hkey->pad );
+	}
+}
+
+/**
+ * Initialise HMAC from reduced key
+ *
+ * @v digest		Digest algorithm
+ * @v ctx		HMAC context
+ * @v hkey		HMAC key
+ */
+void hmac_init_key ( struct digest_algorithm *digest, void *ctx,
+		     const void *key ) {
+	hmac_context_t ( digest ) *hctx = ctx;
+	const hmac_key_t ( digest ) *hkey = key;
 	unsigned int i;
 
 	/* Construct input pad */
-	memset ( hctx->pad, 0, sizeof ( hctx->pad ) );
-	if ( key_len <= sizeof ( hctx->pad ) ) {
-		memcpy ( hctx->pad, key, key_len );
-	} else {
-		digest_init ( digest, hctx->ctx );
-		digest_update ( digest, hctx->ctx, key, key_len );
-		digest_final ( digest, hctx->ctx, hctx->pad );
-	}
-	for ( i = 0 ; i < sizeof ( hctx->pad ) ; i++ ) {
-		hctx->pad[i] ^= 0x36;
+	for ( i = 0 ; i < sizeof ( hkey->pad ) ; i++ ) {
+		hctx->pad[i] = ( hkey->pad[i] ^ 0x36 );
 	}
 
 	/* Start inner hash */
 	digest_init ( digest, hctx->ctx );
 	digest_update ( digest, hctx->ctx, hctx->pad, sizeof ( hctx->pad ) );
+}
+
+/**
+ * Initialise HMAC
+ *
+ * @v digest		Digest algorithm to use
+ * @v ctx		HMAC context
+ * @v secret		Secret key
+ * @v len		Length of secret key
+ */
+void hmac_init ( struct digest_algorithm *digest, void *ctx,
+		 const void *secret, size_t len ) {
+	hmac_context_t ( digest ) *hctx = ctx;
+
+	/* Construct reduced key (in input pad) */
+	hmac_key ( digest, hctx->ctx, secret, len, hctx->pad );
+
+	/* Initialise HMAC */
+	hmac_init_key ( digest, hctx->ctx, hctx->pad );
 }
 
 /**

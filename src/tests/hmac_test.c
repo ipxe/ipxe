@@ -101,11 +101,13 @@ static void hmac_okx ( struct hmac_test *test, const char *file,
 		       unsigned int line ) {
 	struct digest_algorithm *digest = test->digest;
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
+	uint8_t key[ hmac_keysize ( digest ) ];
 	uint8_t hmac[digest->digestsize];
 
 	/* Sanity checks */
 	okx ( sizeof ( ctx ) == ( digest->ctxsize + digest->blocksize ),
 	      file, line );
+	okx ( sizeof ( key ) == digest->blocksize, file, line );
 	okx ( test->expected_len == digest->digestsize, file, line );
 
 	/* Calculate HMAC */
@@ -118,8 +120,18 @@ static void hmac_okx ( struct hmac_test *test, const char *file,
 	hmac_final ( digest, ctx, hmac );
 	DBGC ( test, "HMAC-%s result:\n", digest->name );
 	DBGC_HDA ( test, 0, hmac, sizeof ( hmac ) );
+	okx ( memcmp ( hmac, test->expected, test->expected_len ) == 0,
+	      file, line );
 
-	/* Compare against expected result */
+	/* Calculate HMAC using reduced key */
+	hmac_key ( digest, ctx, test->key, test->key_len, key );
+	DBGC ( test, "HMAC-%s key:\n", digest->name );
+	DBGC_HDA ( test, 0, key, sizeof ( key ) );
+	hmac_init_key ( digest, ctx, key );
+	hmac_update ( digest, ctx, test->data, test->data_len );
+	hmac_final ( digest, ctx, hmac );
+	DBGC ( test, "HMAC-%s result:\n", digest->name );
+	DBGC_HDA ( test, 0, hmac, sizeof ( hmac ) );
 	okx ( memcmp ( hmac, test->expected, test->expected_len ) == 0,
 	      file, line );
 }
