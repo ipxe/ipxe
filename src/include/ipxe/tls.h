@@ -354,6 +354,19 @@ struct tls_session {
 
 /** TLS key schedule */
 struct tls_key_schedule {
+	/** Digest algorithm
+	 *
+	 * This is the digest algorithm specified by the cipher suite.
+	 * It is used to construct the handshake running transcript
+	 * digest value, and as the HMAC digest algorithm for key
+	 * derivation.
+	 */
+	struct digest_algorithm *digest;
+	/** Dynamically-allocated storage */
+	void *dynamic;
+	/** Handshake running transcript digest context */
+	void *handshake;
+
 	/** Ephemeral master secret */
 	uint8_t ephemeral[SHA256_DIGEST_SIZE];
 };
@@ -451,10 +464,6 @@ struct tls_connection {
 	uint16_t version;
 	/** Master secret */
 	uint8_t master_secret[48];
-	/** Digest algorithm used for handshake verification */
-	struct digest_algorithm *handshake_digest;
-	/** Digest algorithm context used for handshake verification */
-	uint8_t *handshake_ctx;
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
 	/** Extended master secret flag */

@@ -208,6 +208,7 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 				const void *data, size_t len );
 static void tls_clear_cipher ( struct tls_connection *tls,
 			       struct tls_cipherspec *cipherspec );
+static void tls_clear_digest ( struct tls_connection *tls );
 static void tls_verify_handshake ( struct tls_connection *tls, void *out );
 
 /******************************************************************************
@@ -331,8 +332,8 @@ static void free_tls ( struct refcnt *refcnt ) {
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.pending );
+	tls_clear_digest ( tls );
 	free ( tls->server.exchange );
-	free ( tls->handshake_ctx );
 	list_for_each_entry_safe ( iobuf, tmp, &tls->rx.data, list ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
@@ -475,6 +476,59 @@ static void tls_regenerate_ephemeral_master ( struct tls_connection *tls ) {
 }
 
 /**
+ * Clear key schedule digest algorithm
+ *
+ * @v tls		TLS connection
+ */
+static void tls_clear_digest ( struct tls_connection *tls ) {
+	struct tls_key_schedule *key = &tls->key;
+
+	/* Set null digest algorithm */
+	key->digest = &digest_null;
+
+	/* Free any dynamic storage */
+	free ( key->dynamic );
+	key->dynamic = NULL;
+	key->handshake = NULL;
+}
+
+/**
+ * Set key schedule digest algorithm
+ *
+ * @v tls		TLS connection
+ * @v digest		Key schedule digest algorithm
+ * @ret rc		Return status code
+ */
+static int tls_set_digest ( struct tls_connection *tls,
+			    struct digest_algorithm *digest ) {
+	struct tls_key_schedule *key = &tls->key;
+	size_t total;
+	void *dynamic;
+
+	/* Clear existing key schedule digest algorithm */
+	tls_clear_digest ( tls );
+
+	/* Allocate dynamic storage */
+	total = digest->ctxsize;
+	dynamic = zalloc ( total );
+	if ( ! dynamic )
+		return -ENOMEM;
+
+	/* Assign storage */
+	key->dynamic = dynamic;
+	key->handshake = dynamic;		dynamic += digest->ctxsize;
+	assert ( ( key->dynamic + total ) == dynamic );
+
+	/* Store digest algorithm */
+	key->digest = digest;
+
+	/* Initialise handshake context */
+	digest_init ( digest, key->handshake );
+
+	return 0;
+}
+
+/**
  * Update HMAC with a list of ( data, len ) pairs
  *
  * @v digest		Hash function to use
@@ -579,7 +633,7 @@ static void tls_prf ( struct tls_connection *tls, const void *secret,
 
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		/* Use handshake digest PRF for TLSv1.2 and later */
-		tls_p_hash_va ( tls, tls->handshake_digest, secret, secret_len,
+		tls_p_hash_va ( tls, tls->key.digest, secret, secret_len,
 				out, out_len, seeds );
 	} else {
 		/* Use combination of P_MD5 and P_SHA-1 for TLSv1.1
@@ -644,7 +698,7 @@ static void tls_prf ( struct tls_connection *tls, const void *secret,
 static void tls_generate_master_secret ( struct tls_connection *tls,
 					 const void *pre_master_secret,
 					 size_t pre_master_secret_len ) {
-	struct digest_algorithm *digest = tls->handshake_digest;
+	struct digest_algorithm *digest = tls->key.digest;
 	uint8_t digest_out[ digest->digestsize ];
 
 	/* Generate handshake digest */
@@ -772,44 +826,6 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
  */
 
 /**
- * Clear handshake digest algorithm
- *
- * @v tls		TLS connection
- */
-static void tls_clear_handshake ( struct tls_connection *tls ) {
-
-	/* Select null digest algorithm */
-	tls->handshake_digest = &digest_null;
-
-	/* Free any existing context */
-	free ( tls->handshake_ctx );
-	tls->handshake_ctx = NULL;
-}
-
-/**
- * Select handshake digest algorithm
- *
- * @v tls		TLS connection
- * @v digest		Handshake digest algorithm
- * @ret rc		Return status code
- */
-static int tls_select_handshake ( struct tls_connection *tls,
-				  struct digest_algorithm *digest ) {
-
-	/* Clear existing handshake digest */
-	tls_clear_handshake ( tls );
-
-	/* Allocate and initialise context */
-	tls->handshake_ctx = malloc ( digest->ctxsize );
-	if ( ! tls->handshake_ctx )
-		return -ENOMEM;
-	tls->handshake_digest = digest;
-	digest_init ( digest, tls->handshake_ctx );
-
-	return 0;
-}
-
-/**
  * Add handshake record to verification hash
  *
  * @v tls		TLS connection
@@ -819,9 +835,10 @@ static int tls_select_handshake ( struct tls_connection *tls,
  */
 static int tls_add_handshake ( struct tls_connection *tls,
 			       const void *data, size_t len ) {
-	struct digest_algorithm *digest = tls->handshake_digest;
+	struct tls_key_schedule *key = &tls->key;
+	struct digest_algorithm *digest = key->digest;
 
-	digest_update ( digest, tls->handshake_ctx, data, len );
+	digest_update ( digest, key->handshake, data, len );
 	return 0;
 }
 
@@ -834,10 +851,11 @@ static int tls_add_handshake ( struct tls_connection *tls,
  * Calculates the digest over all handshake messages seen so far.
  */
 static void tls_verify_handshake ( struct tls_connection *tls, void *out ) {
-	struct digest_algorithm *digest = tls->handshake_digest;
+	struct tls_key_schedule *key = &tls->key;
+	struct digest_algorithm *digest = key->digest;
 	uint8_t ctx[ digest->ctxsize ];
 
-	memcpy ( ctx, tls->handshake_ctx, sizeof ( ctx ) );
+	memcpy ( ctx, key->handshake, sizeof ( ctx ) );
 	digest_final ( digest, ctx, out );
 }
 
@@ -952,10 +970,10 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		return -ENOTSUP_CIPHER;
 	}
 
-	/* Set handshake digest algorithm */
+	/* Set key schedule digest algorithm */
 	digest = ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ?
 		   suite->handshake : &md5_sha1_algorithm );
-	if ( ( rc = tls_select_handshake ( tls, digest ) ) != 0 )
+	if ( ( rc = tls_set_digest ( tls, digest ) ) != 0 )
 		return rc;
 
 	/* Set ciphers */
@@ -1918,7 +1936,7 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_certificate_verify ( struct tls_connection *tls ) {
-	struct digest_algorithm *digest = tls->handshake_digest;
+	struct digest_algorithm *digest = tls->key.digest;
 	struct x509_certificate *cert = x509_first ( tls->client.chain );
 	struct pubkey_algorithm *pubkey = cert->signature_algorithm->pubkey;
 	struct asn1_cursor *key = privkey_cursor ( tls->client.key );
@@ -2016,7 +2034,7 @@ static int tls_send_change_cipher ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_finished ( struct tls_connection *tls ) {
-	struct digest_algorithm *digest = tls->handshake_digest;
+	struct digest_algorithm *digest = tls->key.digest;
 	struct {
 		uint32_t type_length;
 		uint8_t verify_data[ sizeof ( tls->verify.client ) ];
@@ -2701,7 +2719,7 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
 static int tls_new_finished ( struct tls_connection *tls,
 			      const void *data, size_t len ) {
 	struct tls_session *session = tls->session;
-	struct digest_algorithm *digest = tls->handshake_digest;
+	struct digest_algorithm *digest = tls->key.digest;
 	const struct {
 		uint8_t verify_data[ sizeof ( tls->verify.server ) ];
 		char next[0];
@@ -4078,7 +4096,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.pending );
-	tls_clear_handshake ( tls );
+	tls_clear_digest ( tls );
 	iob_populate ( &tls->rx.iobuf, &tls->rx.header, 0,
 		       sizeof ( tls->rx.header ) );
 	INIT_LIST_HEAD ( &tls->rx.data );
