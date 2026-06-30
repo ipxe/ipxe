@@ -37,6 +37,30 @@ struct md5_sha1_digest {
 /** MD5+SHA1 digest size */
 #define MD5_SHA1_DIGEST_SIZE sizeof ( struct md5_sha1_digest )
 
+/** An MD5+SHA1 data block */
+union md5_sha1_block {
+	/** MD5 data block */
+	uint8_t md5[MD5_BLOCK_SIZE];
+	/** SHA-1 data block */
+	uint8_t sha1[SHA1_BLOCK_SIZE];
+};
+
+/** MD5+SHA1 block size */
+#define MD5_SHA1_BLOCK_SIZE sizeof ( union md5_sha1_block )
+
+/** An MD5+SHA1 HMAC key block
+ *
+ * The hybrid PRF used in TLS version 1.1 and earlier does not use
+ * HMAC with the hybrid MD5+SHA1 algorithm: it uses separate
+ * invocations of HMAC-MD5 and HMAC-SHA1.
+ */
+struct md5_sha1_hmac_keys {
+	/** MD5 HMAC key */
+	uint8_t md5[MD5_BLOCK_SIZE];
+	/** SHA-1 HMAC key */
+	uint8_t sha1[SHA1_BLOCK_SIZE];
+};
+
 extern struct digest_algorithm md5_sha1_algorithm;
 
 #endif /* _IPXE_MD5_SHA1_H */

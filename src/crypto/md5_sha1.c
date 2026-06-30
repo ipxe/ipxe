@@ -84,7 +84,7 @@ static void md5_sha1_final ( struct digest_algorithm *digest __unused,
 struct digest_algorithm md5_sha1_algorithm = {
 	.name		= "md5+sha1",
 	.ctxsize	= sizeof ( struct md5_sha1_context ),
-	.blocksize	= 0, /* Not applicable */
+	.blocksize	= sizeof ( union md5_sha1_block ),
 	.digestsize	= sizeof ( struct md5_sha1_digest ),
 	.init		= md5_sha1_init,
 	.update		= md5_sha1_update,
@@ -97,3 +97,7 @@ struct rsa_digestinfo_prefix rsa_md5_sha1_prefix __rsa_digestinfo_prefix = {
 	.data = NULL, /* MD5+SHA1 signatures have no digestInfo */
 	.len = 0,
 };
+
+/* Sanity checks */
+static_assert ( MD5_SHA1_BLOCK_SIZE == MD5_BLOCK_SIZE );
+static_assert ( MD5_SHA1_BLOCK_SIZE == SHA1_BLOCK_SIZE );
