@@ -196,7 +196,7 @@ FILE_SECBOOT ( PERMITTED );
 /** List of TLS session */
 static LIST_HEAD ( tls_sessions );
 
-static void tls_key_reset ( struct tls_connection *tls );
+static void tls_regenerate_ephemeral_master ( struct tls_connection *tls );
 static void tls_tx_resume_all ( struct tls_session *session );
 static struct io_buffer * tls_alloc_iob ( struct tls_connection *tls,
 					  size_t len );
@@ -379,8 +379,8 @@ static void tls_close ( struct tls_connection *tls, int rc ) {
 	list_del ( &tls->list );
 	INIT_LIST_HEAD ( &tls->list );
 
-	/* Destroy ephemeral master key */
-	tls_key_reset ( tls );
+	/* Destroy ephemeral master secret */
+	tls_regenerate_ephemeral_master ( tls );
 
 	/* Resume all other connections, in case we were the lead connection */
 	tls_tx_resume_all ( tls->session );
@@ -394,12 +394,12 @@ static void tls_close ( struct tls_connection *tls, int rc ) {
  */
 
 /**
- * Initialise key schedule
+ * Generate ephemeral master secret
  *
  * @v tls		TLS connection
  * @ret rc		Return status code
  */
-static int tls_key_init ( struct tls_connection *tls ) {
+static int tls_generate_ephemeral_master ( struct tls_connection *tls ) {
 	struct tls_key_schedule *key = &tls->key;
 	struct digest_algorithm *digest = &tls_ephemeral_algorithm;
 	static const char salt[16] = "ephemeral master";
@@ -458,11 +458,11 @@ static void tls_ephemeral_label ( struct tls_connection *tls,
 }
 
 /**
- * Reset key schedule
+ * Regenerate ephemeral master secret
  *
  * @v tls		TLS connection
  */
-static void tls_key_reset ( struct tls_connection *tls ) {
+static void tls_regenerate_ephemeral_master ( struct tls_connection *tls ) {
 	struct tls_key_schedule *key = &tls->key;
 
 	/* Derive a new ephemeral master secret */
@@ -1141,8 +1141,8 @@ static void tls_restart ( struct tls_connection *tls ) {
 	assert ( ! is_pending ( &tls->server.negotiation ) );
 	assert ( ! is_pending ( &tls->server.validation ) );
 
-	/* Reset key schedule */
-	tls_key_reset ( tls );
+	/* Reset ephemeral master secret */
+	tls_regenerate_ephemeral_master ( tls );
 
 	/* (Re)start negotiation */
 	tls->tx.pending = TLS_TX_CLIENT_HELLO;
@@ -4082,8 +4082,8 @@ int add_tls ( struct interface *xfer, const char *name,
 	iob_populate ( &tls->rx.iobuf, &tls->rx.header, 0,
 		       sizeof ( tls->rx.header ) );
 	INIT_LIST_HEAD ( &tls->rx.data );
-	if ( ( rc = tls_key_init ( tls ) ) != 0 )
-		goto err_key;
+	if ( ( rc = tls_generate_ephemeral_master ( tls ) ) != 0 )
+		goto err_ephemeral;
 	if ( ( rc = tls_session ( tls, name ) ) != 0 )
 		goto err_session;
 	list_add_tail ( &tls->list, &tls->session->conn );
@@ -4097,7 +4097,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	return 0;
 
  err_session:
- err_key:
+ err_ephemeral:
 	ref_put ( &tls->refcnt );
  err_alloc:
 	return rc;

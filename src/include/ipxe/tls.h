@@ -354,7 +354,7 @@ struct tls_session {
 
 /** TLS key schedule */
 struct tls_key_schedule {
-	/** Ephemeral secret pseudorandom key */
+	/** Ephemeral master secret */
 	uint8_t ephemeral[SHA256_DIGEST_SIZE];
 };
 
