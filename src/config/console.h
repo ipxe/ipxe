@@ -83,6 +83,12 @@ FILE_SECBOOT ( PERMITTED );
 #define KEYBOARD_MAP	us	/* Default US keyboard map */
 //#define KEYBOARD_MAP	dynamic	/* Runtime selectable keyboard map */
 
+/* Use dynamic keyboard by default on EFI platforms */
+#if defined ( PLATFORM_efi )
+  #undef KEYBOARD_MAP
+  #define KEYBOARD_MAP	dynamic
+#endif
+
 /*****************************************************************************
  *
  * Log levels
