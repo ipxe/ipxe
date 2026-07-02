@@ -340,8 +340,8 @@ struct tls_session {
 	void *ticket;
 	/** Length of session ticket */
 	size_t ticket_len;
-	/** Master secret */
-	uint8_t master_secret[48];
+	/** Resumption master secret */
+	uint8_t resumption_master_secret[48];
 	/** Extended master secret flag */
 	int extended_master_secret;
 

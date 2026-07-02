@@ -2355,6 +2355,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		/* Session ID match: reuse master secret */
 		DBGC ( tls, "TLS %p resuming session ID:\n", tls );
 		DBGC_HDA ( tls, 0, tls->session_id, tls->session_id_len );
+		memcpy ( tls->master_secret,
+			 tls->session->resumption_master_secret,
+			 sizeof ( tls->master_secret ) );
 		if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
 			return rc;
 
@@ -2758,8 +2761,8 @@ static int tls_new_finished ( struct tls_connection *tls,
 
 	/* Record session ID, ticket, and master secret, if applicable */
 	if ( tls->session_id_len || tls->new_session_ticket_len ) {
-		memcpy ( session->master_secret, tls->master_secret,
-			 sizeof ( session->master_secret ) );
+		memcpy ( session->resumption_master_secret, tls->master_secret,
+			 sizeof ( session->resumption_master_secret ) );
 		session->extended_master_secret = tls->extended_master_secret;
 	}
 	if ( tls->session_id_len ) {
@@ -3911,8 +3914,6 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 			memcpy ( tls->session_id, session->id,
 				 sizeof ( tls->session_id ) );
 			tls->session_id_len = session->id_len;
-			memcpy ( tls->master_secret, session->master_secret,
-				 sizeof ( tls->master_secret ) );
 		} else {
 			/* No existing session: use a random session ID */
 			assert ( sizeof ( tls->session_id ) ==
