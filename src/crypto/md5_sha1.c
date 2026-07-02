@@ -31,6 +31,7 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 #include <ipxe/crypto.h>
+#include <ipxe/rsa.h>
 #include <ipxe/md5_sha1.h>
 
 /**
@@ -88,4 +89,11 @@ struct digest_algorithm md5_sha1_algorithm = {
 	.init		= md5_sha1_init,
 	.update		= md5_sha1_update,
 	.final		= md5_sha1_final,
+};
+
+/** RSA digestInfo prefix for MD5+SHA1 algorithm */
+struct rsa_digestinfo_prefix rsa_md5_sha1_prefix __rsa_digestinfo_prefix = {
+	.digest = &md5_sha1_algorithm,
+	.data = NULL, /* MD5+SHA1 signatures have no digestInfo */
+	.len = 0,
 };
