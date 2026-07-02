@@ -124,6 +124,8 @@ static int virtio_net_enable ( struct virtio_net *vnet,
 			       struct virtio_net_queue *queue ) {
 	struct virtio_device *virtio = &vnet->virtio;
 	struct virtio_desc *desc;
+	unsigned int count;
+	unsigned int max;
 	unsigned int fill;
 	unsigned int slot;
 	unsigned int index;
@@ -139,17 +141,18 @@ static int virtio_net_enable ( struct virtio_net *vnet,
 	}
 
 	/* Enable queue */
-	if ( ( rc = virtio_enable ( virtio, &queue->queue,
-				    queue->count ) ) != 0 ) {
+	count = ( queue->count * VIRTIO_NET_DESCS );
+	if ( ( rc = virtio_enable ( virtio, &queue->queue, count ) ) != 0 ) {
 		DBGC ( vnet, "VNET %s Q%d could not initialise: %s\n",
 		       virtio->name, queue->queue.index, strerror ( rc ) );
 		goto err_enable;
 	}
 
 	/* Calculate mask */
-	fill = queue->queue.count;
-	if ( fill > queue->max )
-		fill = queue->max;
+	max = ( queue->queue.count / VIRTIO_NET_DESCS );
+	fill = queue->max;
+	if ( fill > max )
+		fill = max;
 	queue->fill = fill;
 	queue->mask = ( fill - 1 );
 
@@ -167,8 +170,8 @@ static int virtio_net_enable ( struct virtio_net *vnet,
 		desc[1].flags = cpu_to_le16 ( write );
 	}
 
-	DBGC ( vnet, "VNET %s Q%d using %d/%d descriptors\n", virtio->name,
-	       queue->queue.index, queue->fill, queue->queue.count );
+	DBGC ( vnet, "VNET %s Q%d using %d/%d descriptor pairs\n",
+	       virtio->name, queue->queue.index, queue->fill, max );
 	return 0;
 
 	/* There may be no way to disable individual queues: the
