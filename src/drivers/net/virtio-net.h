@@ -48,7 +48,7 @@ union virtio_net_header {
 #define VIRTIO_NET_TX_COUNT 128
 
 /** Transmit queue maximum fill level */
-#define VIRTIO_NET_TX_MAX 32
+#define VIRTIO_NET_TX_MAX 128
 
 /** Number of descriptors per packet */
 #define VIRTIO_NET_DESCS 2

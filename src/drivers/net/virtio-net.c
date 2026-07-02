@@ -396,14 +396,12 @@ static void virtio_net_close ( struct net_device *netdev ) {
 static int virtio_net_transmit ( struct net_device *netdev,
 				 struct io_buffer *iobuf ) {
 	struct virtio_net *vnet = netdev->priv;
-	struct virtio_device *virtio = &vnet->virtio;
 	struct virtio_net_queue *queue = &vnet->tx;
 
-	/* Check for an available transmit descriptor */
+	/* Defer packet if there are no available transmit descriptors */
 	if ( ( queue->queue.prod - queue->queue.cons ) >= queue->fill ) {
-		DBGC ( vnet, "VNET %s out of transmit descriptors\n",
-		       virtio->name );
-		return -ENOBUFS;
+		netdev_tx_defer ( netdev, iobuf );
+		return 0;
 	}
 
 	/* Submit I/O buffer */
