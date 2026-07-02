@@ -13,6 +13,9 @@ FILE_SECBOOT ( PERMITTED );
 /** Minimum TLS version */
 #define TLS_VERSION_MIN TLS_VERSION_TLS_1_1
 
+/** Maximum TLS version */
+#define TLS_VERSION_MAX TLS_VERSION_TLS_1_2
+
 /** Public-key exchange algorithm */
 #define CRYPTO_EXCHANGE_PUBKEY
 

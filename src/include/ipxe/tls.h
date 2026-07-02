@@ -48,9 +48,6 @@ struct tls_header {
 /** TLS version 1.2 */
 #define TLS_VERSION_TLS_1_2 0x0303
 
-/** Maximum supported TLS version */
-#define TLS_VERSION_MAX TLS_VERSION_TLS_1_2
-
 /** Change cipher content type */
 #define TLS_TYPE_CHANGE_CIPHER 20
 
