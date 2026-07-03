@@ -490,6 +490,7 @@ static void tls_clear_digest ( struct tls_connection *tls ) {
 	free ( key->dynamic );
 	key->dynamic = NULL;
 	key->handshake = NULL;
+	key->kdf = NULL;
 }
 
 /**
@@ -502,6 +503,7 @@ static void tls_clear_digest ( struct tls_connection *tls ) {
 static int tls_set_digest ( struct tls_connection *tls,
 			    struct digest_algorithm *digest ) {
 	struct tls_key_schedule *key = &tls->key;
+	size_t kdfsize;
 	size_t total;
 	void *dynamic;
 
@@ -509,7 +511,12 @@ static int tls_set_digest ( struct tls_connection *tls,
 	tls_clear_digest ( tls );
 
 	/* Allocate dynamic storage */
-	total = digest->ctxsize;
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
+		kdfsize = hmac_keysize ( digest );
+	} else {
+		kdfsize = sizeof ( struct md5_sha1_hmac_keys );
+	}
+	total = ( digest->ctxsize + kdfsize );
 	dynamic = zalloc ( total );
 	if ( ! dynamic )
 		return -ENOMEM;
@@ -517,6 +524,7 @@ static int tls_set_digest ( struct tls_connection *tls,
 	/* Assign storage */
 	key->dynamic = dynamic;
 	key->handshake = dynamic;		dynamic += digest->ctxsize;
+	key->kdf = dynamic;			dynamic += kdfsize;
 	assert ( ( key->dynamic + total ) == dynamic );
 
 	/* Store digest algorithm */
@@ -551,17 +559,14 @@ static void tls_hmac_update_va ( struct digest_algorithm *digest,
  *
  * @v tls		TLS connection
  * @v digest		Hash function to use
- * @v secret		Secret
- * @v secret_len	Length of secret
+ * @v hkey		HMAC key
  * @v out		Output buffer
  * @v out_len		Length of output buffer
  * @v seeds		( data, len ) pairs of seed data, terminated by NULL
  */
 static void tls_p_hash_va ( struct tls_connection *tls,
-			    struct digest_algorithm *digest,
-			    const void *secret, size_t secret_len,
-			    void *out, size_t out_len,
-			    va_list seeds ) {
+			    struct digest_algorithm *digest, const void *hkey,
+			    void *out, size_t out_len, va_list seeds ) {
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t ctx_partial[ sizeof ( ctx ) ];
 	uint8_t a[digest->digestsize];
@@ -569,11 +574,8 @@ static void tls_p_hash_va ( struct tls_connection *tls,
 	size_t frag_len = digest->digestsize;
 	va_list tmp;
 
-	DBGC2 ( tls, "TLS %p %s secret:\n", tls, digest->name );
-	DBGC2_HD ( tls, secret, secret_len );
-
 	/* Calculate A(1) */
-	hmac_init ( digest, ctx, secret, secret_len );
+	hmac_init_key ( digest, ctx, hkey );
 	va_copy ( tmp, seeds );
 	tls_hmac_update_va ( digest, ctx, tmp );
 	va_end ( tmp );
@@ -583,8 +585,9 @@ static void tls_p_hash_va ( struct tls_connection *tls,
 
 	/* Generate as much data as required */
 	while ( out_len ) {
+
 		/* Calculate output portion */
-		hmac_init ( digest, ctx, secret, secret_len );
+		hmac_init_key ( digest, ctx, hkey );
 		hmac_update ( digest, ctx, a, sizeof ( a ) );
 		memcpy ( ctx_partial, ctx, sizeof ( ctx_partial ) );
 		va_copy ( tmp, seeds );
@@ -613,48 +616,44 @@ static void tls_p_hash_va ( struct tls_connection *tls,
  * Generate secure pseudo-random data
  *
  * @v tls		TLS connection
- * @v secret		Secret
- * @v secret_len	Length of secret
  * @v out		Output buffer
  * @v out_len		Length of output buffer
  * @v ...		( data, len ) pairs of seed data, terminated by NULL
  */
-static void tls_prf ( struct tls_connection *tls, const void *secret,
-		      size_t secret_len, void *out, size_t out_len, ... ) {
+static void tls_prf ( struct tls_connection *tls, void *out,
+		      size_t out_len, ... ) {
+	struct tls_key_schedule *key = &tls->key;
+	struct md5_sha1_hmac_keys *hkeys;
 	va_list seeds;
 	va_list tmp;
-	size_t subsecret_len;
-	const void *md5_secret;
-	const void *sha1_secret;
 	uint8_t buf[out_len];
 	unsigned int i;
 
 	va_start ( seeds, out_len );
 
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
-		/* Use handshake digest PRF for TLSv1.2 and later */
-		tls_p_hash_va ( tls, tls->key.digest, secret, secret_len,
+
+		/* Use P_Hash for TLSv1.2 and later */
+		tls_p_hash_va ( tls, key->digest, key->kdf,
 				out, out_len, seeds );
+
 	} else {
+
 		/* Use combination of P_MD5 and P_SHA-1 for TLSv1.1
 		 * and earlier
 		 */
-
-		/* Split secret into two, with an overlap of up to one byte */
-		subsecret_len = ( ( secret_len + 1 ) / 2 );
-		md5_secret = secret;
-		sha1_secret = ( secret + secret_len - subsecret_len );
+		hkeys = key->kdf;
 
 		/* Calculate MD5 portion */
 		va_copy ( tmp, seeds );
-		tls_p_hash_va ( tls, &md5_algorithm, md5_secret,
-				subsecret_len, out, out_len, seeds );
+		tls_p_hash_va ( tls, &md5_algorithm, hkeys->md5,
+				out, out_len, seeds );
 		va_end ( tmp );
 
 		/* Calculate SHA1 portion */
 		va_copy ( tmp, seeds );
-		tls_p_hash_va ( tls, &sha1_algorithm, sha1_secret,
-				subsecret_len, buf, out_len, seeds );
+		tls_p_hash_va ( tls, &sha1_algorithm, hkeys->sha1,
+				buf, out_len, seeds );
 		va_end ( tmp );
 
 		/* XOR the two portions together into the final output buffer */
@@ -668,23 +667,61 @@ static void tls_prf ( struct tls_connection *tls, const void *secret,
 /**
  * Generate secure pseudo-random data
  *
- * @v secret		Secret
- * @v secret_len	Length of secret
+ * @v tls		TLS connection
  * @v out		Output buffer
  * @v out_len		Length of output buffer
  * @v label		String literal label
  * @v ...		( data, len ) pairs of seed data
  */
-#define tls_prf_label( tls, secret, secret_len, out, out_len, label, ... ) \
-	tls_prf ( (tls), (secret), (secret_len), (out), (out_len),	   \
+#define tls_prf_label( tls, out, out_len, label, ... )			\
+	tls_prf ( (tls), (out), (out_len),				\
 		  label, ( sizeof ( label ) - 1 ), __VA_ARGS__, NULL )
 
-/******************************************************************************
+/**
+ * Set key derivation function master secret
  *
- * Secret management
- *
- ******************************************************************************
+ * @v tls		TLS connection
+ * @v secret		Secret
+ * @v secret_len	Length of secret
  */
+static void tls_set_kdf_master ( struct tls_connection *tls,
+				 const void *secret, size_t secret_len ) {
+	struct tls_key_schedule *key = &tls->key;
+	struct digest_algorithm *digest = key->digest;
+	uint8_t ctx[ hmac_ctxsize ( digest ) ];
+	struct md5_sha1_hmac_keys *hkeys;
+	size_t subsecret_len;
+	const void *md5_secret;
+	const void *sha1_secret;
+
+	DBGC2 ( tls, "TLS %p KDF secret:\n", tls );
+	DBGC2_HD ( tls, secret, secret_len );
+
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
+
+		/* Set HMAC key for TLSv1.2 and later */
+		hmac_key ( digest, ctx, secret, secret_len, key->kdf );
+
+	} else {
+
+		/* Set MD5+SHA1 HMAC keys for TLSv1.1 and earlier */
+		hkeys = key->kdf;
+		assert ( key->digest == &md5_sha1_algorithm );
+		assert ( sizeof ( ctx ) >= hmac_ctxsize ( &md5_algorithm ) );
+		assert ( sizeof ( ctx ) >= hmac_ctxsize ( &sha1_algorithm ) );
+
+		/* Split secret into two, with an overlap of up to one byte */
+		subsecret_len = ( ( secret_len + 1 ) / 2 );
+		md5_secret = secret;
+		sha1_secret = ( secret + secret_len - subsecret_len );
+
+		/* Set MD5 and SHA-1 HMAC keys */
+		hmac_key ( &md5_algorithm, ctx, md5_secret, subsecret_len,
+			   hkeys->md5 );
+		hmac_key ( &sha1_algorithm, ctx, sha1_secret, subsecret_len,
+			   hkeys->sha1 );
+	}
+}
 
 /**
  * Generate master secret
@@ -700,6 +737,7 @@ static void tls_generate_master_secret ( struct tls_connection *tls,
 					 size_t pre_master_secret_len ) {
 	struct digest_algorithm *digest = tls->key.digest;
 	uint8_t digest_out[ digest->digestsize ];
+	uint8_t master_secret[48];
 
 	/* Generate handshake digest */
 	tls_verify_handshake ( tls, digest_out );
@@ -714,17 +752,16 @@ static void tls_generate_master_secret ( struct tls_connection *tls,
 	DBGC ( tls, "TLS %p session hash:\n", tls );
 	DBGC_HD ( tls, digest_out, sizeof ( digest_out ) );
 
+	/* Set key derivation function secret to the pre-master secret */
+	tls_set_kdf_master ( tls, pre_master_secret, pre_master_secret_len );
+
 	/* Generate master secret */
 	if ( tls->extended_master_secret ) {
-		tls_prf_label ( tls, pre_master_secret, pre_master_secret_len,
-				&tls->master_secret,
-				sizeof ( tls->master_secret ),
+		tls_prf_label ( tls, master_secret, sizeof ( master_secret ),
 				"extended master secret",
 				digest_out, sizeof ( digest_out ) );
 	} else {
-		tls_prf_label ( tls, pre_master_secret, pre_master_secret_len,
-				&tls->master_secret,
-				sizeof ( tls->master_secret ),
+		tls_prf_label ( tls, master_secret, sizeof ( master_secret ),
 				"master secret",
 				&tls->client.random,
 				sizeof ( tls->client.random ),
@@ -735,7 +772,10 @@ static void tls_generate_master_secret ( struct tls_connection *tls,
 	/* Show output */
 	DBGC ( tls, "TLS %p generated %smaster secret:\n", tls,
 	       ( tls->extended_master_secret ? "extended ": "" ) );
-	DBGC_HD ( tls, &tls->master_secret, sizeof ( tls->master_secret ) );
+	DBGC_HD ( tls, master_secret, sizeof ( master_secret ) );
+
+	/* Set key derivation function secret to the master secret */
+	tls_set_kdf_master ( tls, master_secret, sizeof ( master_secret ) );
 }
 
 /**
@@ -757,8 +797,7 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 	int rc;
 
 	/* Generate key block */
-	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
-			key_block, sizeof ( key_block ), "key expansion",
+	tls_prf_label ( tls, key_block, sizeof ( key_block ), "key expansion",
 			&tls->server.random, sizeof ( tls->server.random ),
 			&tls->client.random, sizeof ( tls->client.random ) );
 
@@ -816,6 +855,78 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 	assert ( ( key_block + total ) == key );
 
 	return 0;
+}
+
+/**
+ * Generate resumption master secret
+ *
+ * @v tls		TLS connection
+ */
+static void tls_generate_resumption_master ( struct tls_connection *tls ) {
+	struct tls_session *session = tls->session;
+	struct tls_key_schedule *key = &tls->key;
+	struct digest_algorithm *digest = key->digest;
+	struct md5_sha1_hmac_keys *hkeys;
+	union {
+		uint8_t opaque[48];
+		struct {
+			uint8_t md5[24];
+			uint8_t sha1[24];
+		} __attribute__ (( packed ));
+	} *secret;
+
+	/* Sanity check */
+	assert ( sizeof ( *secret ) <=
+		 sizeof ( session->resumption_master_secret ) );
+	secret = ( ( void * ) session->resumption_master_secret );
+
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
+
+		/* For TLSv1.2, the pre-master secret may be any
+		 * length but the master secret is fixed at 48 bytes.
+		 * This is smaller than the block size for all
+		 * supported digest algorithms.  The HMAC key
+		 * constructed from the master secret will therefore
+		 * be just the zero-padded master secret value.  We
+		 * can therefore preserve just these first 48 bytes of
+		 * the KDF master secret (ignoring the zero padding up
+		 * to the digest block size).
+		 */
+		assert ( sizeof ( *secret ) <= hmac_keysize ( digest ) );
+		memcpy ( secret, key->kdf, sizeof ( *secret ) );
+		session->resumption_master_secret_len = sizeof ( *secret );
+
+	} else {
+
+		/* For TLSv1.1 and earlier, the master secret is again
+		 * fixed at 48 bytes, but will be split as 24 bytes in
+		 * each of the MD5 and SHA-1 HMAC keys.
+		 */
+		assert ( key->digest == &md5_sha1_algorithm );
+		assert ( sizeof ( secret->md5 ) <=
+			 hmac_keysize ( &md5_algorithm ) );
+		assert ( sizeof ( secret->sha1 ) <=
+			 hmac_keysize ( &sha1_algorithm ) );
+		hkeys = key->kdf;
+		memcpy ( secret->md5, hkeys->md5, sizeof ( secret->md5 ) );
+		memcpy ( secret->sha1, hkeys->sha1, sizeof ( secret->sha1 ) );
+		session->resumption_master_secret_len = sizeof ( *secret );
+	}
+}
+
+/**
+ * Resume from resumption master secret
+ *
+ * @v tls		TLS connection
+ */
+static void tls_resume_secret ( struct tls_connection *tls ) {
+	struct tls_session *session = tls->session;
+
+	/* For TLSv1.2 and earlier, the resumption master secret is
+	 * just the original master secret value.
+	 */
+	tls_set_kdf_master ( tls, session->resumption_master_secret,
+			     session->resumption_master_secret_len );
 }
 
 /******************************************************************************
@@ -2044,8 +2155,7 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 
 	/* Construct client verification data */
 	tls_verify_handshake ( tls, digest_out );
-	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
-			tls->verify.client, sizeof ( tls->verify.client ),
+	tls_prf_label ( tls, tls->verify.client, sizeof ( tls->verify.client ),
 			"client finished", digest_out, sizeof ( digest_out ) );
 
 	/* Construct record */
@@ -2355,9 +2465,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		/* Session ID match: reuse master secret */
 		DBGC ( tls, "TLS %p resuming session ID:\n", tls );
 		DBGC_HDA ( tls, 0, tls->session_id, tls->session_id_len );
-		memcpy ( tls->master_secret,
-			 tls->session->resumption_master_secret,
-			 sizeof ( tls->master_secret ) );
+		tls_resume_secret ( tls );
 		if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
 			return rc;
 
@@ -2738,8 +2846,7 @@ static int tls_new_finished ( struct tls_connection *tls,
 
 	/* Verify data */
 	tls_verify_handshake ( tls, digest_out );
-	tls_prf_label ( tls, &tls->master_secret, sizeof ( tls->master_secret ),
-			tls->verify.server, sizeof ( tls->verify.server ),
+	tls_prf_label ( tls, tls->verify.server, sizeof ( tls->verify.server ),
 			"server finished", digest_out, sizeof ( digest_out ) );
 	if ( memcmp ( tls->verify.server, finished->verify_data,
 		      sizeof ( tls->verify.server ) ) != 0 ) {
@@ -2761,8 +2868,7 @@ static int tls_new_finished ( struct tls_connection *tls,
 
 	/* Record session ID, ticket, and master secret, if applicable */
 	if ( tls->session_id_len || tls->new_session_ticket_len ) {
-		memcpy ( session->resumption_master_secret, tls->master_secret,
-			 sizeof ( session->resumption_master_secret ) );
+		tls_generate_resumption_master ( tls );
 		session->extended_master_secret = tls->extended_master_secret;
 	}
 	if ( tls->session_id_len ) {

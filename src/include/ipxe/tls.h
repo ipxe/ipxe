@@ -342,6 +342,8 @@ struct tls_session {
 	size_t ticket_len;
 	/** Resumption master secret */
 	uint8_t resumption_master_secret[48];
+	/** Length of resumption master secret */
+	size_t resumption_master_secret_len;
 	/** Extended master secret flag */
 	int extended_master_secret;
 
@@ -366,7 +368,8 @@ struct tls_key_schedule {
 	void *dynamic;
 	/** Handshake running transcript digest context */
 	void *handshake;
-
+	/** Key derivation function master secret */
+	void *kdf;
 	/** Ephemeral master secret */
 	uint8_t ephemeral[SHA256_DIGEST_SIZE];
 };
@@ -462,8 +465,6 @@ struct tls_connection {
 
 	/** Protocol version */
 	uint16_t version;
-	/** Master secret */
-	uint8_t master_secret[48];
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
 	/** Extended master secret flag */
