@@ -47,6 +47,3 @@ REQUIRE_OBJECT ( httpntlm );
 #ifdef HTTP_ENC_PEERDIST
 REQUIRE_OBJECT ( peerdist );
 #endif
-#ifdef HTTP_HACK_GCE
-REQUIRE_OBJECT ( httpgce );
-#endif

@@ -5,5 +5,7 @@ echo CPU: ${cpuvendor} ${cpumodel}
 ifstat ||
 dhcp ||
 route ||
-chain -ar http://metadata.google.internal/computeMetadata/v1/instance/attributes/ipxeboot ||
+params ||
+param --header Metadata-Flavor Google ||
+chain -ar http://metadata.google.internal/computeMetadata/v1/instance/attributes/ipxeboot##params ||
 ifstat ||
