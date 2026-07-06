@@ -724,17 +724,128 @@ static void tls_set_kdf_master ( struct tls_connection *tls,
 }
 
 /**
+ * Share ephemeral public key
+ *
+ * @v tls		TLS connection
+ * @v public		Public key to fill in
+ * @ret rc		Return status code
+ */
+static int tls_share_ephemeral ( struct tls_connection *tls, void *public ) {
+	struct tls_key_schedule *key = &tls->key;
+	struct tls_named_group *group = key->group;
+	struct exchange_algorithm *exchange = group->exchange;
+	size_t privsize = exchange->privsize;
+	struct {
+		uint8_t private[privsize];
+	} tmp;
+	int rc;
+
+	/* (Re)generate ephemeral private key */
+	tls_ephemeral_label ( tls, exchange->name, tmp.private, privsize );
+
+	/* Derive public key */
+	if ( ( rc = exchange_share ( exchange, tmp.private, public ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not share ephemeral key: %s\n",
+		       tls, strerror ( rc ) );
+		goto err_share;
+	}
+
+ err_share:
+	memset ( &tmp, 0, sizeof ( tmp ) );
+	return rc;
+}
+
+/**
+ * Agree ephemeral public key (i.e. pre-master secret)
+ *
+ * @v tls		TLS connection
+ * @v partner		Partner public key
+ * @v partner_len	Length of partner public key
+ * @v strip		Strip/pad leading zeros
+ * @ret rc		Return status code
+ */
+static int tls_agree_ephemeral ( struct tls_connection *tls,
+				 const void *partner, size_t partner_len,
+				 int strip ) {
+	struct tls_key_schedule *key = &tls->key;
+	struct tls_named_group *group = key->group;
+	struct exchange_algorithm *exchange = group->exchange;
+	size_t privsize = exchange->privsize;
+	size_t pubsize = exchange->pubsize;
+	size_t sharedsize = exchange->sharedsize;
+	struct {
+		uint8_t private[privsize];
+		uint8_t partner[pubsize];
+		uint8_t shared[sharedsize];
+	} *tmp;
+	size_t pad_len;
+	size_t shared_len;
+	uint8_t *shared;
+	int rc;
+
+	/* Allocate working space */
+	tmp = zalloc ( sizeof ( *tmp ) );
+	if ( ! tmp ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* (Re)generate ephemeral private key */
+	tls_ephemeral_label ( tls, exchange->name, tmp->private, privsize );
+
+	/* Zero-pad partner key if needed */
+	if ( partner_len > pubsize ) {
+		DBGC ( tls, "TLS %p partner key too long:\n", tls );
+		DBGC_HDA ( tls, 0, partner, partner_len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_partner_len;
+	}
+	pad_len = ( pubsize - partner_len );
+	if ( pad_len && ( ! strip ) ) {
+		DBGC ( tls, "TLS %p partner key too short:\n", tls );
+		DBGC_HDA ( tls, 0, partner, partner_len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_partner_len;
+	}
+	memcpy ( ( tmp->partner + pad_len ), partner, partner_len );
+
+	/* Agree shared secret */
+	if ( ( rc = exchange_agree ( exchange, tmp->private, tmp->partner,
+				     tmp->shared ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not agree shared key: %s\n",
+		       tls, strerror ( rc ) );
+		goto err_agree;
+	}
+
+	/* Strip leading zeros if needed */
+	shared = tmp->shared;
+	shared_len = sharedsize;
+	while ( strip && shared_len && ( ! *shared ) ) {
+		shared++;
+		shared_len--;
+	}
+
+	/* Set key derivation function secret to the shared secret */
+	DBGC ( tls, "TLS %p pre-master secret:\n", tls );
+	DBGC_HDA ( tls, 0, shared, shared_len );
+	tls_set_kdf_master ( tls, shared, shared_len );
+
+ err_agree:
+ err_partner_len:
+	memset ( tmp, 0, sizeof ( *tmp ) );
+	free ( tmp );
+ err_alloc:
+	return rc;
+}
+
+/**
  * Generate master secret
  *
  * @v tls		TLS connection
- * @v pre_master_secret	Pre-master secret
- * @v pre_master_secret_len Length of pre-master secret
  *
  * The client and server random values must already be known.
  */
-static void tls_generate_master_secret ( struct tls_connection *tls,
-					 const void *pre_master_secret,
-					 size_t pre_master_secret_len ) {
+static void tls_generate_master_secret ( struct tls_connection *tls ) {
 	struct digest_algorithm *digest = tls->key.digest;
 	uint8_t digest_out[ digest->digestsize ];
 	uint8_t master_secret[48];
@@ -743,17 +854,12 @@ static void tls_generate_master_secret ( struct tls_connection *tls,
 	tls_verify_handshake ( tls, digest_out );
 
 	/* Show inputs */
-	DBGC ( tls, "TLS %p pre-master secret:\n", tls );
-	DBGC_HD ( tls, pre_master_secret, pre_master_secret_len );
 	DBGC ( tls, "TLS %p client random bytes:\n", tls );
 	DBGC_HD ( tls, &tls->client.random, sizeof ( tls->client.random ) );
 	DBGC ( tls, "TLS %p server random bytes:\n", tls );
 	DBGC_HD ( tls, &tls->server.random, sizeof ( tls->server.random ) );
 	DBGC ( tls, "TLS %p session hash:\n", tls );
 	DBGC_HD ( tls, digest_out, sizeof ( digest_out ) );
-
-	/* Set key derivation function secret to the pre-master secret */
-	tls_set_kdf_master ( tls, pre_master_secret, pre_master_secret_len );
 
 	/* Generate master secret */
 	if ( tls->extended_master_secret ) {
@@ -1572,6 +1678,8 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	tls_ephemeral_label ( tls, "classic pre-master",
 			      &pre_master_secret.random,
 			      sizeof ( pre_master_secret.random ) );
+	tls_set_kdf_master ( tls, &pre_master_secret,
+			     sizeof ( pre_master_secret ) );
 
 	/* Encrypt pre-master secret using server's public key */
 	if ( ( rc = pubkey_encrypt ( pubkey, &tls->server.key, &cursor,
@@ -1609,8 +1717,7 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	}
 
 	/* Generate master secret */
-	tls_generate_master_secret ( tls, &pre_master_secret,
-				     sizeof ( pre_master_secret ) );
+	tls_generate_master_secret ( tls );
 
  err_encrypt:
  err_prepend:
@@ -1738,10 +1845,6 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 	size_t remaining;
 	size_t frag_len;
 	size_t param_len;
-	size_t dh_ys_len;
-	size_t privsize;
-	size_t pubsize;
-	size_t sharedsize;
 	unsigned int i;
 	int rc;
 
@@ -1784,50 +1887,31 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 		rc = -ENOTSUP_GROUP;
 		goto err_group;
 	}
+	tls->key.group = group;
 	exchange = group->exchange;
-	privsize = exchange->privsize;
-	pubsize = exchange->pubsize;
-	sharedsize = exchange->sharedsize;
 	DBGC ( tls, "TLS %p using named group %s\n", tls, exchange->name );
 
-	/* Check key length (allowing for missing leading zeros) */
-	dh_ys_len = ntohs ( dh_ys->len );
-	if ( dh_ys_len > pubsize ) {
-		DBGC ( tls, "TLS %p invalid %s key\n", tls, exchange->name );
-		DBGC_HDA ( tls, 0, tls->server.exchange,
-			   tls->server.exchange_len );
-		rc = -EINVAL_KEY_EXCHANGE;
-		goto err_key_len;
+	/* Generate pre-master secret */
+	if ( ( rc = tls_agree_ephemeral ( tls, dh_ys->data,
+					  ntohs ( dh_ys->len ), 1 ) ) != 0 ) {
+		goto err_agree;
 	}
 
-	/* Construct pre-master secret and ClientKeyExchange record */
+	/* Construct and send ClientKeyExchange record */
 	{
-		uint8_t private[privsize];
+		size_t pubsize = exchange->pubsize;
 		struct {
 			uint32_t type_length;
 			uint16_t dh_xs_len;
 			uint8_t dh_xs[pubsize];
 		} __attribute__ (( packed )) *key_xchg;
-		struct {
-			uint8_t pre_master_secret[sharedsize];
-			typeof ( *key_xchg ) key_xchg;
-		} *dynamic;
-		uint8_t *pre_master_secret;
-		size_t pre_master_secret_len;
 
 		/* Allocate space */
-		dynamic = malloc ( sizeof ( *dynamic ) );
-		if ( ! dynamic ) {
+		key_xchg = malloc ( sizeof ( *key_xchg ) );
+		if ( ! key_xchg ) {
 			rc = -ENOMEM;
 			goto err_alloc;
 		}
-		pre_master_secret = dynamic->pre_master_secret;
-		pre_master_secret_len = sizeof ( dynamic->pre_master_secret );
-		key_xchg = &dynamic->key_xchg;
-
-		/* Generate ephemeral private key */
-		tls_ephemeral_label ( tls, exchange->name, private,
-				      sizeof ( private ) );
 
 		/* Generate Client Key Exchange record */
 		key_xchg->type_length =
@@ -1835,8 +1919,8 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 			  htonl ( sizeof ( *key_xchg ) -
 				  sizeof ( key_xchg->type_length ) ) );
 		key_xchg->dh_xs_len = htons ( sizeof ( key_xchg->dh_xs ) );
-		if ( ( rc = exchange_share ( exchange, private,
-					     key_xchg->dh_xs ) ) != 0 ) {
+		if ( ( rc = tls_share_ephemeral ( tls,
+						  key_xchg->dh_xs ) ) != 0 ) {
 			goto err_share;
 		}
 
@@ -1846,39 +1930,15 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 			goto err_send_handshake;
 		}
 
-		/* Zero-pad partner key as needed */
-		memset ( key_xchg->dh_xs, 0, sizeof ( key_xchg->dh_xs ) );
-		assert ( dh_ys_len <= sizeof ( key_xchg->dh_xs ) );
-		memcpy ( &key_xchg->dh_xs[ sizeof ( key_xchg->dh_xs ) -
-					   dh_ys_len ],
-			 dh_ys->data, dh_ys_len );
-
-		/* Generate pre-master secret */
-		if ( ( rc = exchange_agree ( exchange, private,
-					     key_xchg->dh_xs,
-					     pre_master_secret ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not exchange keys: %s\n",
-			       tls, strerror ( rc ) );
-			goto err_agree;
-		}
-
-		/* Strip leading zeroes from pre-master secret */
-		while ( pre_master_secret_len && ( ! *pre_master_secret ) ) {
-			pre_master_secret++;
-			pre_master_secret_len--;
-		}
-
 		/* Generate master secret */
-		tls_generate_master_secret ( tls, pre_master_secret,
-					     pre_master_secret_len );
+		tls_generate_master_secret ( tls );
 
-	err_agree:
 	err_send_handshake:
 	err_share:
-		free ( dynamic );
+		free ( key_xchg );
 	}
  err_alloc:
- err_key_len:
+ err_agree:
  err_group:
  err_verify:
  err_header:
@@ -1907,9 +1967,6 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 		uint8_t public[0];
 	} __attribute__ (( packed )) *ecdh;
 	size_t param_len;
-	size_t privsize;
-	size_t pubsize;
-	size_t sharedsize;
 	int rc;
 
 	/* Parse ServerKeyExchange record */
@@ -1945,33 +2002,24 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			   tls->server.exchange_len );
 		return -ENOTSUP_GROUP;
 	}
+	tls->key.group = group;
 	exchange = group->exchange;
-	privsize = exchange->privsize;
-	pubsize = exchange->pubsize;
-	sharedsize = exchange->sharedsize;
 	DBGC ( tls, "TLS %p using named group %s\n", tls, exchange->name );
 
-	/* Check key length */
-	if ( ecdh->public_len != pubsize ) {
-		DBGC ( tls, "TLS %p invalid %s key\n", tls, exchange->name );
-		DBGC_HDA ( tls, 0, tls->server.exchange,
-			   tls->server.exchange_len );
-		return -EINVAL_KEY_EXCHANGE;
+	/* Generate pre-master secret */
+	if ( ( rc = tls_agree_ephemeral ( tls, ecdh->public,
+					  ecdh->public_len, 0 ) ) != 0 ) {
+		return rc;
 	}
 
-	/* Construct pre-master secret and ClientKeyExchange record */
+	/* Construct and send ClientKeyExchange record */
 	{
-		uint8_t private[privsize];
-		uint8_t pre_master_secret[sharedsize];
+		size_t pubsize = exchange->pubsize;
 		struct {
 			uint32_t type_length;
 			uint8_t public_len;
 			uint8_t public[pubsize];
 		} __attribute__ (( packed )) key_xchg;
-
-		/* Generate ephemeral private key */
-		tls_ephemeral_label ( tls, exchange->name, private,
-				      sizeof ( private ) );
 
 		/* Generate Client Key Exchange record */
 		key_xchg.type_length =
@@ -1979,8 +2027,8 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			  htonl ( sizeof ( key_xchg ) -
 				  sizeof ( key_xchg.type_length ) ) );
 		key_xchg.public_len = sizeof ( key_xchg.public );
-		if ( ( rc = exchange_share ( exchange, private,
-					     key_xchg.public ) ) != 0 ) {
+		if ( ( rc = tls_share_ephemeral ( tls,
+						  key_xchg.public ) ) != 0 ) {
 			return rc;
 		}
 
@@ -1990,17 +2038,8 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 			return rc;
 		}
 
-		/* Generate pre-master secret */
-		if ( ( rc = exchange_agree ( exchange, private, ecdh->public,
-					     pre_master_secret ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not exchange keys: %s\n",
-			       tls, strerror ( rc ) );
-			return rc;
-		}
-
 		/* Generate master secret */
-		tls_generate_master_secret ( tls, pre_master_secret,
-					     sizeof ( pre_master_secret ) );
+		tls_generate_master_secret ( tls );
 	}
 
 	return 0;
