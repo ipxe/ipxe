@@ -360,9 +360,6 @@ static void free_tls ( struct refcnt *refcnt ) {
  */
 static void tls_close ( struct tls_connection *tls, int rc ) {
 
-	/* Send closure alert */
-	tls_send_alert ( tls, TLS_ALERT_WARNING, TLS_ALERT_CLOSE_NOTIFY );
-
 	/* Remove pending operations, if applicable */
 	pending_put ( &tls->client.negotiation );
 	pending_put ( &tls->server.negotiation );
@@ -385,6 +382,21 @@ static void tls_close ( struct tls_connection *tls, int rc ) {
 
 	/* Resume all other connections, in case we were the lead connection */
 	tls_tx_resume_all ( tls->session );
+}
+
+/**
+ * Send closure alert and finish with TLS connection
+ *
+ * @v tls		TLS connection
+ * @v rc		Status code
+ */
+static void tls_close_alert ( struct tls_connection *tls, int rc ) {
+
+	/* Send closure alert */
+	tls_send_alert ( tls, TLS_ALERT_WARNING, TLS_ALERT_CLOSE_NOTIFY );
+
+	/* Close connection */
+	tls_close ( tls, rc );
 }
 
 /******************************************************************************
@@ -3722,7 +3734,7 @@ static struct interface_operation tls_plainstream_ops[] = {
 	INTF_OP ( xfer_window, struct tls_connection *,
 		  tls_plainstream_window ),
 	INTF_OP ( job_progress, struct tls_connection *, tls_progress ),
-	INTF_OP ( intf_close, struct tls_connection *, tls_close ),
+	INTF_OP ( intf_close, struct tls_connection *, tls_close_alert ),
 };
 
 /** TLS plaintext stream interface descriptor */
@@ -3917,7 +3929,7 @@ static int tls_cipherstream_deliver ( struct tls_connection *tls,
 		/* Process data if buffer is now full */
 		if ( iob_tailroom ( dest ) == 0 ) {
 			if ( ( rc = process ( tls ) ) != 0 ) {
-				tls_close ( tls, rc );
+				tls_close_alert ( tls, rc );
 				goto done;
 			}
 		}
@@ -4006,7 +4018,7 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	return;
 
  err:
-	tls_close ( tls, rc );
+	tls_close_alert ( tls, rc );
 	return;
 }
 
@@ -4135,7 +4147,7 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 	return;
 
  err:
-	tls_close ( tls, rc );
+	tls_close_alert ( tls, rc );
 }
 
 /** TLS TX process descriptor */
