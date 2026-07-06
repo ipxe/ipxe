@@ -2888,10 +2888,15 @@ static int tls_new_finished ( struct tls_connection *tls,
 	} __attribute__ (( packed )) *finished = data;
 	uint8_t digest_out[ digest->digestsize ];
 
-	/* Sanity check */
+	/* Sanity checks */
+	if ( ! digest->digestsize ) {
+		DBGC ( tls, "TLS %p received premature Finished\n", tls );
+		DBGC_HDA ( tls, 0, data, len );
+		return -EINVAL_FINISHED;
+	}
 	if ( sizeof ( *finished ) != len ) {
 		DBGC ( tls, "TLS %p received overlength Finished\n", tls );
-		DBGC_HD ( tls, data, len );
+		DBGC_HDA ( tls, 0, data, len );
 		return -EINVAL_FINISHED;
 	}
 
