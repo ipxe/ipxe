@@ -366,6 +366,75 @@ struct tls_key_schedule {
 	struct digest_algorithm *digest;
 	/** Named key exchange group */
 	struct tls_named_group *group;
+	/** Schedule holds secret key material
+	 *
+	 * This flag is set when shared secret key material is
+	 * introduced into the schedule (e.g. when the TLS pre-master
+	 * secret is calculated, or when a session is resumed).
+	 *
+	 * If this flag has not been set, then the key schedule
+	 * contains only public information.
+	 *
+	 * This flag must be cleared whenever the key schedule is
+	 * reset.
+	 */
+	int keyed;
+	/** Schedule has been bound to the server identity
+	 *
+	 * This flag is set when the shared secret key material has
+	 * been bound to the identity represented by the server's
+	 * certificate.  It represents the successful delegation of
+	 * authority from the server's long-term authentication key to
+	 * the per-connection shared secret key material for the
+	 * purpose of authenticating the connection via a successfully
+	 * verified server Finished message.
+	 *
+	 * This binding may take place in several different ways,
+	 * depending on the protocol version and options:
+	 *
+	 *   - For classic RSA key transport, the binding occurs when
+	 *     the encrypted ClientKeyExchange message is sent and
+	 *     incorporated into the handshake digest.  A subsequent
+	 *     successfully verified server Finished message
+	 *     simultaneously proves knowledge of the certificate's
+	 *     private key and agreement on the shared secret key
+	 *     material.
+	 *
+	 *   - For ephemeral key exchange via ServerKeyExchange, the
+	 *     binding occurs when the signature over the DH
+	 *     parameters within ServerKeyExchange is verified against
+	 *     the certificate's public key.  That signature
+	 *     represents the server's intention to delegate authority
+	 *     to any shared secret constructed from the signed DH
+	 *     parameters.
+	 *
+	 *   - For ephemeral key exchange via ClientHello/ServerHello,
+	 *     the binding occurs when the signature over the
+	 *     handshake digest within the server CertificateVerify is
+	 *     verified against the certificate's public key.  The
+	 *     handshake digest incorporates the ephemeral key
+	 *     exchange and so the signature represents the server's
+	 *     intention to delegate authority to any shared secret
+	 *     constructed from the indirectly signed DH parameters.
+	 *
+	 *   - For session resumption, the binding occurs when the key
+	 *     schedule is resumed from the session secret.  The
+	 *     server's choice to accept the resumption represents its
+	 *     intention to delegate authority to the shared secret
+	 *     derived from the session secret.
+	 *
+	 * This flag may not be set unless the "keyed" flag has
+	 * already been set, and must be cleared whenever the "keyed"
+	 * flag is cleared.
+	 *
+	 * This flag must be cleared whenever the server identity
+	 * represented by the current certificate changes (e.g. when a
+	 * new certificate chain is provided), or whenever the key
+	 * derivation function master secret is overwritten with a
+	 * value that is not cryptographically derived from its
+	 * current value.
+	 */
+	int bound;
 	/** Dynamically-allocated storage */
 	void *dynamic;
 	/** Handshake running transcript digest context */
