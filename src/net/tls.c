@@ -116,6 +116,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EIO_ALERT							\
 	__einfo_uniqify ( EINFO_EIO, 0x01,				\
 			  "Unknown alert level" )
+#define ENOENT_CERT __einfo_error ( EINFO_ENOENT_CERT )
+#define EINFO_ENOENT_CERT						\
+	__einfo_uniqify ( EINFO_ENOENT, 0x01,				\
+			  "Missing server certificate" )
 #define ENOMEM_CONTEXT __einfo_error ( EINFO_ENOMEM_CONTEXT )
 #define EINFO_ENOMEM_CONTEXT						\
 	__einfo_uniqify ( EINFO_ENOMEM, 0x01,				\
@@ -2692,6 +2696,7 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
  */
 static int tls_parse_chain ( struct tls_connection *tls,
 			     const void *data, size_t len ) {
+	struct x509_certificate *cert;
 	size_t remaining = len;
 	int rc;
 
@@ -2721,7 +2726,6 @@ static int tls_parse_chain ( struct tls_connection *tls,
 		} __attribute__ (( packed )) *certificate = data;
 		size_t certificate_len;
 		size_t record_len;
-		struct x509_certificate *cert;
 
 		/* Parse header */
 		if ( sizeof ( *certificate ) > remaining ) {
@@ -2757,8 +2761,25 @@ static int tls_parse_chain ( struct tls_connection *tls,
 		remaining -= record_len;
 	}
 
+	/* Identify server certificate */
+	cert = x509_first ( tls->server.chain );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p certificate chain is empty\n", tls );
+		rc = -ENOENT_CERT;
+		goto err_empty;
+	}
+
+	/* Verify server name */
+	if ( ( rc = x509_check_name ( cert, tls->session->name ) ) != 0 ) {
+		DBGC ( tls, "TLS %p server certificate does not match %s: %s\n",
+		       tls, tls->session->name, strerror ( rc ) );
+		goto err_name;
+	}
+
 	return 0;
 
+ err_name:
+ err_empty:
  err_parse:
  err_overlength:
  err_underlength:
@@ -4044,7 +4065,6 @@ static struct interface_descriptor tls_cipherstream_desc =
  * @v rc		Reason for completion
  */
 static void tls_validator_done ( struct tls_connection *tls, int rc ) {
-	struct tls_session *session = tls->session;
 	struct x509_certificate *cert;
 
 	/* Mark validation as complete */
@@ -4064,13 +4084,6 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	/* Extract first certificate */
 	cert = x509_first ( tls->server.chain );
 	assert ( cert != NULL );
-
-	/* Verify server name */
-	if ( ( rc = x509_check_name ( cert, session->name ) ) != 0 ) {
-		DBGC ( tls, "TLS %p server certificate does not match %s: %s\n",
-		       tls, session->name, strerror ( rc ) );
-		goto err;
-	}
 
 	/* Extract the now trusted server public key */
 	tls->server.algorithm = cert->subject.public_key.algorithm;
