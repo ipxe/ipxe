@@ -332,6 +332,8 @@ struct tls_session {
 	/** Private key */
 	struct private_key *key;
 
+	/** Server certificate */
+	struct x509_certificate *cert;
 	/** Session ID */
 	uint8_t id[32];
 	/** Length of session ID */
@@ -379,17 +381,23 @@ struct tls_key_schedule {
 	 * reset.
 	 */
 	int keyed;
-	/** Schedule has been bound to the server identity
+	/** Server identity to which the schedule has been bound (if any)
 	 *
-	 * This flag is set when the shared secret key material has
-	 * been bound to the identity represented by the server's
-	 * certificate.  It represents the successful delegation of
-	 * authority from the server's long-term authentication key to
-	 * the per-connection shared secret key material for the
-	 * purpose of authenticating the connection via a successfully
-	 * verified server Finished message.
+	 * This reference to the server certificate is set when the
+	 * shared secret key material has been bound to the identity
+	 * represented by the server's certificate.  It represents the
+	 * successful delegation of authority from the server's
+	 * long-term authentication key to the per-connection shared
+	 * secret key material for the purpose of authenticating the
+	 * connection via a successfully verified server Finished
+	 * message.
 	 *
-	 * This binding may take place in several different ways,
+	 * Note that this reference may be set before the server
+	 * certificate has been validated.  The validation of the
+	 * server certificate's chain is independent from the binding
+	 * of the key schedule to the server certificate.
+	 *
+	 * The binding may take place in several different ways,
 	 * depending on the protocol version and options:
 	 *
 	 *   - For classic RSA key transport, the binding occurs when
@@ -423,18 +431,18 @@ struct tls_key_schedule {
 	 *     intention to delegate authority to the shared secret
 	 *     derived from the session secret.
 	 *
-	 * This flag may not be set unless the "keyed" flag has
+	 * This reference may not be set unless the "keyed" flag has
 	 * already been set, and must be cleared whenever the "keyed"
 	 * flag is cleared.
 	 *
-	 * This flag must be cleared whenever the server identity
+	 * This reference must be cleared whenever the server identity
 	 * represented by the current certificate changes (e.g. when a
 	 * new certificate chain is provided), or whenever the key
 	 * derivation function master secret is overwritten with a
 	 * value that is not cryptographically derived from its
 	 * current value.
 	 */
-	int bound;
+	struct x509_certificate *bound;
 	/** Dynamically-allocated storage */
 	void *dynamic;
 	/** Handshake running transcript digest context */
@@ -499,10 +507,6 @@ struct tls_server {
 	struct x509_root *root;
 	/** Certificate chain */
 	struct x509_chain *chain;
-	/** Public key algorithm (within server certificate) */
-	struct asn1_algorithm *algorithm;
-	/** Public key (within server certificate) */
-	struct asn1_cursor key;
 	/** Certificate validator */
 	struct interface validator;
 	/** Certificate validation pending operation */
