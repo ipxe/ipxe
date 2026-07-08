@@ -549,6 +549,9 @@ static int tls_set_digest ( struct tls_connection *tls,
 	/* Initialise handshake context */
 	digest_init ( digest, key->handshake );
 
+	/* Poison key derivation function master secret */
+	tls_ephemeral_label ( tls, "kdf poison", key->kdf, kdfsize );
+
 	/* Sanity checks */
 	assert ( ! key->keyed );
 	assert ( ! key->bound );
