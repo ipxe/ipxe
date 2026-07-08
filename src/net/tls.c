@@ -4268,6 +4268,11 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 	INIT_LIST_HEAD ( &session->conn );
 	list_add ( &session->list, &tls_sessions );
 
+	/* Poison resumption master secret */
+	tls_ephemeral_label ( tls, "res poison",
+			      session->resumption_master_secret,
+			      sizeof ( session->resumption_master_secret ) );
+
 	/* Record session */
 	tls->session = session;
 
