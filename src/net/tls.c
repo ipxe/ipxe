@@ -1069,18 +1069,24 @@ static void tls_generate_resumption_master ( struct tls_connection *tls ) {
 static void tls_resume_secret ( struct tls_connection *tls ) {
 	struct tls_session *session = tls->session;
 	struct tls_key_schedule *key = &tls->key;
+	size_t len = session->resumption_master_secret_len;
 
 	/* For TLSv1.2 and earlier, the resumption master secret is
 	 * just the original master secret value.
 	 */
-	tls_set_kdf_master ( tls, session->resumption_master_secret,
-			     session->resumption_master_secret_len );
+	tls_set_kdf_master ( tls, session->resumption_master_secret, len );
 
-	/* Key schedule now contains a shared secret that is already
-	 * bound to the server's identity.
+	/* If the resumption master secret was non-empty, then the key
+	 * schedule now contains a shared secret that is already bound
+	 * to the server's identity.
+	 *
+	 * If the resumption master secret was empty (which should not
+	 * be possible if this function is called), then the key
+	 * schedule no longer contains any shared secret.
 	 */
-	key->keyed = 1;
-	key->bound = 1;
+	assert ( len );
+	key->keyed = len;
+	key->bound = len;
 }
 
 /******************************************************************************
