@@ -15,6 +15,8 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/interface.h>
 #include <ipxe/xfer.h>
 
+struct image;
+
 /** A data transfer buffer */
 struct xfer_buffer {
 	/** Data */
@@ -38,12 +40,20 @@ struct xfer_buffer_operations {
 	 * @ret rc		Return status code
 	 */
 	int ( * realloc ) ( struct xfer_buffer *xferbuf, size_t len );
+	/**
+	 * Access data buffer
+	 *
+	 * @v xferbuf		Data transfer buffer
+	 * @ret raw		Raw data pointer
+	 */
+	void * ( * access ) ( struct xfer_buffer *xferbuf );
 };
 
 extern struct xfer_buffer_operations xferbuf_malloc_operations;
 extern struct xfer_buffer_operations xferbuf_umalloc_operations;
 extern struct xfer_buffer_operations xferbuf_fixed_operations;
 extern struct xfer_buffer_operations xferbuf_void_operations;
+extern struct xfer_buffer_operations xferbuf_image_operations;
 
 /**
  * Initialise malloc()-based data transfer buffer
@@ -99,7 +109,22 @@ xferbuf_void_init ( struct xfer_buffer *xferbuf ) {
 	xferbuf->op = &xferbuf_void_operations;
 }
 
-extern void xferbuf_detach ( struct xfer_buffer *xferbuf );
+/**
+ * Initialise image-based data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ * @v image		Backing (empty) image
+ *
+ * The data transfer buffer does not retain a separate reference to
+ * the image.  The caller must ensure that the image remains in scope
+ * for the lifetime of the data transfer buffer.
+ */
+static inline __attribute__ (( always_inline )) void
+xferbuf_image_init ( struct xfer_buffer *xferbuf, struct image *image ) {
+	xferbuf->op = &xferbuf_image_operations;
+	xferbuf->data = image;
+}
+
 extern void xferbuf_free ( struct xfer_buffer *xferbuf );
 extern int xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
 			   const void *data, size_t len );

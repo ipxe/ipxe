@@ -68,7 +68,6 @@ static void downloader_free ( struct refcnt *refcnt ) {
 	struct downloader *downloader =
 		container_of ( refcnt, struct downloader, refcnt );
 
-	xferbuf_free ( &downloader->buffer );
 	image_put ( downloader->image );
 	free ( downloader );
 }
@@ -80,7 +79,6 @@ static void downloader_free ( struct refcnt *refcnt ) {
  * @v rc		Reason for termination
  */
 static void downloader_finished ( struct downloader *downloader, int rc ) {
-	struct xfer_buffer *buffer = &downloader->buffer;
 	struct image *image = downloader->image;
 
 	/* Log download status */
@@ -90,11 +88,6 @@ static void downloader_finished ( struct downloader *downloader, int rc ) {
 		syslog ( LOG_ERR, "Download of \"%s\" failed: %s\n",
 			 image->name, strerror ( rc ) );
 	}
-
-	/* Transfer ownership from data transfer buffer to image */
-	image->data = buffer->data;
-	image->len = buffer->len;
-	xferbuf_detach ( buffer );
 
 	/* Shut down interfaces */
 	intf_shutdown ( &downloader->xfer, rc );
@@ -274,7 +267,7 @@ int create_downloader ( struct interface *job, struct image *image ) {
 	intf_init ( &downloader->xfer, &downloader_xfer_desc,
 		    &downloader->refcnt );
 	downloader->image = image_get ( image );
-	xferbuf_umalloc_init ( &downloader->buffer );
+	xferbuf_image_init ( &downloader->buffer, image );
 
 	/* Instantiate child objects and attach to our interfaces */
 	if ( ( rc = xfer_open_uri ( &downloader->xfer, image->uri ) ) != 0 )

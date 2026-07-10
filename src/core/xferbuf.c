@@ -31,6 +31,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/iobuf.h>
 #include <ipxe/umalloc.h>
 #include <ipxe/profile.h>
+#include <ipxe/image.h>
 #include <ipxe/xferbuf.h>
 
 /** @file
@@ -52,22 +53,6 @@ static struct profiler xferbuf_read_profiler __profiler =
 	{ .name = "xferbuf.read" };
 
 /**
- * Detach data from data transfer buffer
- *
- * @v xferbuf		Data transfer buffer
- *
- * The caller assumes responsibility for eventually freeing the data
- * previously owned by the data transfer buffer.
- */
-void xferbuf_detach ( struct xfer_buffer *xferbuf ) {
-
-	xferbuf->data = NULL;
-	xferbuf->len = 0;
-	xferbuf->max = 0;
-	xferbuf->pos = 0;
-}
-
-/**
  * Free data transfer buffer
  *
  * @v xferbuf		Data transfer buffer
@@ -75,7 +60,9 @@ void xferbuf_detach ( struct xfer_buffer *xferbuf ) {
 void xferbuf_free ( struct xfer_buffer *xferbuf ) {
 
 	xferbuf->op->realloc ( xferbuf, 0 );
-	xferbuf_detach ( xferbuf );
+	xferbuf->len = 0;
+	xferbuf->max = 0;
+	xferbuf->pos = 0;
 }
 
 /**
@@ -118,6 +105,7 @@ static int xferbuf_ensure_size ( struct xfer_buffer *xferbuf, size_t len ) {
 int xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
 		    const void *data, size_t len ) {
 	size_t max_len;
+	void *raw;
 	int rc;
 
 	/* Check for overflow */
@@ -130,9 +118,10 @@ int xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
 		return rc;
 
 	/* Copy data to buffer (if non-void) */
+	raw = xferbuf->op->access ( xferbuf );
 	profile_start ( &xferbuf_write_profiler );
-	if ( xferbuf->data )
-		memcpy ( ( xferbuf->data + offset ), data, len );
+	if ( raw )
+		memcpy ( ( raw + offset ), data, len );
 	profile_stop ( &xferbuf_write_profiler );
 
 	return 0;
@@ -148,19 +137,23 @@ int xferbuf_write ( struct xfer_buffer *xferbuf, size_t offset,
  */
 int xferbuf_read ( struct xfer_buffer *xferbuf, size_t offset,
 		   void *data, size_t len ) {
+	const void *raw;
 
 	/* Check that read is within buffer range */
 	if ( ( offset > xferbuf->len ) ||
 	     ( len > ( xferbuf->len - offset ) ) )
 		return -ENOENT;
 
+	/* Access raw data buffer */
+	raw = xferbuf->op->access ( xferbuf );
+
 	/* Check that buffer is non-void */
-	if ( len && ( ! xferbuf->data ) )
+	if ( len && ( ! raw ) )
 		return -ENOTTY;
 
 	/* Copy data from buffer */
 	profile_start ( &xferbuf_read_profiler );
-	memcpy ( data, ( xferbuf->data + offset ), len );
+	memcpy ( data, ( raw + offset ), len );
 	profile_stop ( &xferbuf_read_profiler );
 
 	return 0;
@@ -203,6 +196,17 @@ int xferbuf_deliver ( struct xfer_buffer *xferbuf, struct io_buffer *iobuf,
 }
 
 /**
+ * Access raw pointer based data buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ * @ret raw		Raw data pointer
+ */
+static void * xferbuf_raw_access ( struct xfer_buffer *xferbuf ) {
+
+	return xferbuf->data;
+}
+
+/**
  * Reallocate malloc()-based data transfer buffer
  *
  * @v xferbuf		Data transfer buffer
@@ -222,6 +226,7 @@ static int xferbuf_malloc_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
 /** malloc()-based data buffer operations */
 struct xfer_buffer_operations xferbuf_malloc_operations = {
 	.realloc = xferbuf_malloc_realloc,
+	.access = xferbuf_raw_access,
 };
 
 /**
@@ -244,6 +249,7 @@ static int xferbuf_umalloc_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
 /** umalloc()-based data buffer operations */
 struct xfer_buffer_operations xferbuf_umalloc_operations = {
 	.realloc = xferbuf_umalloc_realloc,
+	.access = xferbuf_raw_access,
 };
 
 /**
@@ -269,6 +275,7 @@ static int xferbuf_fixed_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
 /** Fixed-size data buffer operations */
 struct xfer_buffer_operations xferbuf_fixed_operations = {
 	.realloc = xferbuf_fixed_realloc,
+	.access = xferbuf_raw_access,
 };
 
 /**
@@ -289,6 +296,43 @@ static int xferbuf_void_realloc ( struct xfer_buffer *xferbuf,
 /** Void data buffer operations */
 struct xfer_buffer_operations xferbuf_void_operations = {
 	.realloc = xferbuf_void_realloc,
+	.access = xferbuf_raw_access,
+};
+
+/**
+ * Reallocate image-based data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ * @v len		New length (or zero to free buffer)
+ * @ret rc		Return status code
+ */
+static int xferbuf_image_realloc ( struct xfer_buffer *xferbuf, size_t len ) {
+	struct image *image = xferbuf->data;
+	int rc;
+
+	/* Resize image */
+	if ( ( rc = image_set_len ( image, len ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
+ * Access image-based data transfer buffer
+ *
+ * @v xferbuf		Data transfer buffer
+ * @ret raw		Raw data pointer
+ */
+static void * xferbuf_image_access ( struct xfer_buffer *xferbuf ) {
+	struct image *image = xferbuf->data;
+
+	return image->rwdata;
+}
+
+/** Image-based data buffer operations */
+struct xfer_buffer_operations xferbuf_image_operations = {
+	.realloc = xferbuf_image_realloc,
+	.access = xferbuf_image_access,
 };
 
 /**
