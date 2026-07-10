@@ -4020,9 +4020,17 @@ static int hermon_probe ( struct pci_device *pci ) {
 	config = pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR );
 	hermon->config = pci_ioremap ( pci, config,
 				       HERMON_PCI_CONFIG_BAR_SIZE );
+	if ( ! hermon->config ) {
+		rc = -ENODEV;
+		goto err_ioremap_config;
+	}
 	uar = pci_bar_start ( pci, HERMON_PCI_UAR_BAR );
 	hermon->uar = pci_ioremap ( pci, uar,
 				    HERMON_UAR_NON_EQ_PAGE * HERMON_PAGE_SIZE );
+	if ( ! hermon->uar ) {
+		rc = -ENODEV;
+		goto err_ioremap_uar;
+	}
 
 	/* Reset device */
 	if ( ( rc = hermon_reset ( hermon ) ) != 0 )
@@ -4121,7 +4129,9 @@ static int hermon_probe ( struct pci_device *pci ) {
  err_start_firmware:
  err_reset:
 	iounmap ( hermon->uar );
+ err_ioremap_uar:
 	iounmap ( hermon->config );
+ err_ioremap_config:
 	hermon_free ( hermon );
  err_alloc:
 	return rc;
@@ -4180,6 +4190,10 @@ static int hermon_bofm_probe ( struct pci_device *pci ) {
 	config = pci_bar_start ( pci, HERMON_PCI_CONFIG_BAR );
 	hermon->config = pci_ioremap ( pci, config,
 				       HERMON_PCI_CONFIG_BAR_SIZE );
+	if ( ! hermon->config ) {
+		rc = -ENODEV;
+		goto err_ioremap;
+	}
 
 	/* Initialise BOFM device */
 	bofm_init ( &hermon->bofm, pci, &hermon_bofm_operations );
@@ -4195,6 +4209,7 @@ static int hermon_bofm_probe ( struct pci_device *pci ) {
 
  err_bofm_register:
 	iounmap ( hermon->config );
+ err_ioremap:
 	hermon_free ( hermon );
  err_alloc:
 	return rc;
