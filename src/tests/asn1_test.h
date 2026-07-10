@@ -42,13 +42,15 @@ struct asn1_test {
  * @ret test		ASN.1 test
  */
 #define ASN1( _name, _type, _file, ... )				\
-	static const char _name ## __file[] = _file;			\
+	static const char _name ## __raw[] = _file;			\
+	static const char _name ## __file				\
+		[ sizeof ( _name ## __raw ) + 1 /* NUL */ ] = _file;	\
 	static struct image _name ## __image = {			\
 		.refcnt = REF_INIT ( ref_no_free ),			\
 		.name = #_name,						\
 		.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),		\
 		.data = _name ## __file,				\
-		.len = sizeof ( _name ## __file ),			\
+		.len = ( sizeof ( _name ## __file ) - 1 /* NUL */ ),	\
 	};								\
 	static struct asn1_test_digest _name ## _expected[] = {		\
 		__VA_ARGS__						\

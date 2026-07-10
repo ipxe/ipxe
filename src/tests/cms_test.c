@@ -79,33 +79,41 @@ struct cms_test_keypair {
 
 /** Define a test image */
 #define IMAGE( NAME, DATA )						\
-	static const uint8_t NAME ## _data[] = DATA;			\
+	static const uint8_t NAME ## _raw[] = DATA;			\
+	static const uint8_t NAME ## _data				\
+		[ sizeof ( NAME ## _raw ) + 1 /* NUL */ ] = DATA;	\
 	static struct cms_test_image NAME = {				\
 		.image = {						\
 			.refcnt = REF_INIT ( ref_no_free ),		\
 			.name = #NAME,					\
 			.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),	\
 			.data = NAME ## _data,				\
-			.len = sizeof ( NAME ## _data ),		\
+			.len = ( sizeof ( NAME ## _data )		\
+				 - 1 /* NUL */ ),			\
 		},							\
 	}
 
 /** Define a writable test image */
 #define IMAGE_RW( NAME, DATA )						\
-	static uint8_t NAME ## _data[] = DATA;				\
+	static uint8_t NAME ## _raw[] = DATA;				\
+	static uint8_t NAME ## _data					\
+		[ sizeof ( NAME ## _raw ) + 1 /* NUL */ ] = DATA;	\
 	static struct cms_test_image NAME = {				\
 		.image = {						\
 			.refcnt = REF_INIT ( ref_no_free ),		\
 			.name = #NAME,					\
 			.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),	\
 			.data = NAME ## _data,				\
-			.len = sizeof ( NAME ## _data ),		\
+			.len = ( sizeof ( NAME ## _data )		\
+				 - 1 /* NUL */ ),			\
 		},							\
 	}
 
 /** Define a test message */
 #define MESSAGE( NAME, DATA )						\
-	static const uint8_t NAME ## _data[] = DATA;			\
+	static const uint8_t NAME ## _raw[] = DATA;			\
+	static const uint8_t NAME ## _data				\
+		[ sizeof ( NAME ## _raw ) + 1 /* NUL */ ] = DATA;	\
 	static struct cms_test_message NAME = {				\
 		.image = {						\
 			.refcnt = REF_INIT ( ref_no_free ),		\
@@ -113,7 +121,8 @@ struct cms_test_keypair {
 			.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),	\
 			.type = &der_image_type,			\
 			.data = NAME ## _data,				\
-			.len = sizeof ( NAME ## _data ),		\
+			.len = ( sizeof ( NAME ## _data )		\
+				 - 1 /* NUL */ ),			\
 		},							\
 	}
 

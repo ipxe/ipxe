@@ -164,6 +164,7 @@ static struct image test_image = {
 	.name = "<TESTS>",
 	.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),
 	.type = &test_image_type,
+	.data = empty_image_data,
 };
 
 static void test_init ( void ) {

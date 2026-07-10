@@ -36,14 +36,16 @@ struct pixel_buffer_test {
  * @ret test		Pixel buffer test
  */
 #define PIX( _name, _type, _file, _width, _height, _data )		\
-	static const char _name ## __file[] = _file;			\
+	static const char _name ## __raw[] = _file;			\
+	static const char _name ## __file				\
+		[ sizeof ( _name ## __raw ) + 1 /* NUL */ ] = _file;	\
 	static const uint32_t _name ## __data[] = _data;		\
 	static struct image _name ## __image = {			\
 		.refcnt = REF_INIT ( ref_no_free ),			\
 		.name = #_name,						\
 		.flags = ( IMAGE_STATIC | IMAGE_STATIC_NAME ),		\
 		.data = _name ## __file,				\
-		.len = sizeof ( _name ## __file ),			\
+		.len = ( sizeof ( _name ## __file ) - 1 /* NUL */ ),	\
 	};								\
 	static struct pixel_buffer_test _name = {			\
 		.type = _type,						\

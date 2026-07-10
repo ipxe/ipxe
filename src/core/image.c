@@ -74,6 +74,9 @@ static int require_trusted_images = 0;
 /** Prevent changes to image trust requirement */
 static int require_trusted_images_permanent = 0;
 
+/** Empty image terminating NUL */
+const char empty_image_data[] = { '\0' };
+
 /**
  * Free executable image
  *
@@ -110,7 +113,7 @@ void free_image ( struct refcnt *refcnt ) {
 
 	/* Free image data and image itself, if dynamically allocated */
 	if ( ! ( image->flags & IMAGE_STATIC ) ) {
-		ufree ( image->rwdata );
+		image_set_len ( image, 0 );
 		free ( image );
 	}
 }
@@ -134,6 +137,7 @@ struct image * alloc_image ( struct uri *uri ) {
 	ref_init ( &image->refcnt, free_image );
 	if ( uri && ( ( rc = image_set_uri ( image, uri ) ) != 0 ) )
 		goto err_set_uri;
+	image->data = empty_image_data;
 
 	return image;
 
@@ -243,18 +247,35 @@ int image_set_cmdline ( struct image *image, const char *cmdline ) {
  * @ret rc		Return status code
  */
 int image_set_len ( struct image *image, size_t len ) {
+	size_t alloc_len;
+	void *data;
 	void *new;
+	char *nul;
 
 	/* Refuse to reallocate static images */
 	if ( image->flags & IMAGE_STATIC )
 		return -ENOTTY;
 
+	/* Calculate allocation length (including a terminating NUL) */
+	alloc_len = ( len ? ( len + 1 ) : 0 );
+	if ( alloc_len < len )
+		return -ERANGE;
+
 	/* (Re)allocate image data */
-	new = urealloc ( image->rwdata, len );
+	data = image->rwdata;
+	if ( data == empty_image_data )
+		data = NULL;
+	new = urealloc ( data, alloc_len );
 	if ( ! new )
 		return -ENOMEM;
-	image->rwdata = new;
+	image->data = ( len ? new : empty_image_data );
 	image->len = len;
+
+	/* Add terminating NUL (if not the empty image) */
+	if ( len ) {
+		nul = ( image->rwdata + len );
+		*nul = '\0';
+	}
 
 	return 0;
 }
@@ -329,6 +350,17 @@ int register_image ( struct image *image ) {
 		snprintf ( name, sizeof ( name ), "img%d", imgindex++ );
 		if ( ( rc = image_set_name ( image, name ) ) != 0 )
 			return rc;
+	}
+
+	/* Check for terminating NUL (required for text-based images) */
+	if ( ! image->data ) {
+		DBGC ( image, "IMAGE %s has no data\n", image->name );
+		return -EINVAL;
+	}
+	if ( image->text[image->len] != '\0' ) {
+		DBGC ( image, "IMAGE %s missing terminating NUL\n",
+		       image->name );
+		return -EINVAL;
 	}
 
 	/* Add to image list */

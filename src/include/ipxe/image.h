@@ -51,6 +51,13 @@ struct image {
 		const void *data;
 		/** Writable data */
 		void *rwdata;
+		/** Read-only text (guaranteed to be NUL terminated)
+		 *
+		 * Images are allocated with a trailing NUL byte, to
+		 * allow string functions to be used more easily on
+		 * image data.
+		 */
+		const char *text;
 	};
 	/** Length of raw file image */
 	size_t len;
@@ -186,6 +193,7 @@ struct image_tag {
 extern struct list_head images;
 extern struct image_tag current_image;
 extern struct image_tag selected_image;
+extern const char empty_image_data[];
 
 /** Iterate over all registered images */
 #define for_each_image( image ) \

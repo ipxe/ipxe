@@ -25,6 +25,7 @@ FILE_SECBOOT ( PERMITTED );
 		  ".equ embedded_image_" #_index "_len, "		\
 			"( embedded_image_" #_index "_end - "		\
 			"  embedded_image_" #_index "_data )\n\t"	\
+		  ".byte 0\n\t" /* NUL */				\
 		  ".previous\n\t" );
 EMBED_ALL
 
