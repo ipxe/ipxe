@@ -2843,6 +2843,7 @@ static int hermon_reset ( struct hermon *hermon ) {
 	pci_backup ( pci, &backup, PCI_CONFIG_BACKUP_ALL, backup_exclude );
 	writel ( HERMON_RESET_MAGIC,
 		 ( hermon->config + HERMON_RESET_OFFSET ) );
+	wmb();
 
 	/* Wait until device starts responding to configuration cycles */
 	for ( i = 0 ; i < HERMON_RESET_MAX_WAIT_MS ; i++ ) {
