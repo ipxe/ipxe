@@ -40,6 +40,7 @@ extern int __pure strncmp ( const char *first, const char *second,
 			    size_t max ) __nonnull;
 extern size_t __pure strlen ( const char *src ) __nonnull;
 extern size_t __pure strnlen ( const char *src, size_t max ) __nonnull;
+extern char * __pure strchrnul ( const char *src, int character ) __nonnull;
 extern char * __pure strchr ( const char *src, int character ) __nonnull;
 extern char * __pure strrchr ( const char *src, int character ) __nonnull;
 extern char * __pure strstr ( const char *haystack,

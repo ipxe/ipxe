@@ -263,6 +263,22 @@ size_t strnlen ( const char *src, size_t max ) {
 }
 
 /**
+ * Find character within a string, or NUL terminator
+ *
+ * @v src		String
+ * @v character		Character to find
+ * @ret found		Found character, or terminating NUL if not found
+ */
+char * strchrnul ( const char *src, int character ) {
+	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
+
+	for ( ; ; src_bytes++ ) {
+		if ( ( *src_bytes == character ) || ( ! *src_bytes ) )
+			return ( ( char * ) src_bytes );
+	}
+}
+
+/**
  * Find character within a string
  *
  * @v src		String
@@ -270,14 +286,12 @@ size_t strnlen ( const char *src, size_t max ) {
  * @ret found		Found character, or NULL if not found
  */
 char * strchr ( const char *src, int character ) {
-	const uint8_t *src_bytes = ( ( const uint8_t * ) src );
+	char *found;
 
-	for ( ; ; src_bytes++ ) {
-		if ( *src_bytes == character )
-			return ( ( char * ) src_bytes );
-		if ( ! *src_bytes )
-			return NULL;
-	}
+	found = strchrnul ( src, character );
+	if ( character != *( ( uint8_t * ) found ) )
+		return NULL;
+	return found;
 }
 
 /**

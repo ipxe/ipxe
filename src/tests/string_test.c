@@ -70,12 +70,20 @@ static void string_test_exec ( void ) {
 	ok ( *(strchr ( "Testing", 'e' )) == 'e' );
 	ok ( *(strchr ( "Testing", 'g' )) == 'g' );
 	ok ( strchr ( "Testing", 'x' ) == NULL );
+	ok ( *(strchr ( "Testing", '\0' )) == '\0' );
 
 	/* Test strrchr() */
 	ok ( strrchr ( "", 'a' ) == NULL );
 	ok ( *(strrchr ( "Haystack", 'a' )) == 'a' );
 	ok ( *(strrchr ( "Haystack", 'k' )) == 'k' );
 	ok ( strrchr ( "Haystack", 'x' ) == NULL );
+
+	/* Test strchrnul() */
+	ok ( *(strchrnul ( "", 'x' )) == '\0' );
+	ok ( *(strchrnul ( "Nonstandard", 's' )) == 's' );
+	ok ( *(strchrnul ( "Nonstandard", 't' )) == 't' );
+	ok ( *(strchrnul ( "Nonstandard", 'x' )) == '\0' );
+	ok ( *(strchrnul ( "Nonstandard", '\0' )) == '\0' );
 
 	/* Test memchr() */
 	ok ( memchr ( "", '\0', 0 ) == NULL );
