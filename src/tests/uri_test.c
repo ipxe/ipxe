@@ -455,7 +455,7 @@ static void uri_params_okx ( struct uri_params_test *test, const char *file,
 	struct uri *dup;
 
 	/* Create parameter list */
-	params = create_parameters ( test->name );
+	params = create_parameters ( test->name, NULL );
 	okx ( params != NULL, file, line );
 	if ( params ) {
 		for ( list = test->list ; list->key ; list++ ) {

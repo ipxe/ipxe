@@ -83,12 +83,16 @@ struct parameters * find_parameters ( const char *name ) {
  * Create request parameter list
  *
  * @v name		Parameter list name (may be NULL)
+ * @v method		Method name (may be NULL)
  * @ret params		Parameter list, or NULL on failure
  */
-struct parameters * create_parameters ( const char *name ) {
+struct parameters * create_parameters ( const char *name,
+					const char *method ) {
 	struct parameters *params;
 	size_t name_len;
+	size_t method_len;
 	char *name_copy;
+	char *method_copy;
 
 	/* Destroy any existing parameter list of this name */
 	params = find_parameters ( name );
@@ -99,16 +103,22 @@ struct parameters * create_parameters ( const char *name ) {
 
 	/* Allocate parameter list */
 	name_len = ( name ? ( strlen ( name ) + 1 /* NUL */ ) : 0 );
-	params = zalloc ( sizeof ( *params ) + name_len );
+	method_len = ( method ? ( strlen ( method ) + 1 /* NUL */ ) : 0 );
+	params = zalloc ( sizeof ( *params ) + name_len + method_len );
 	if ( ! params )
 		return NULL;
 	ref_init ( &params->refcnt, free_parameters );
-	name_copy = ( ( void * ) ( params + 1 ) );
+	name_copy = ( ( ( void * ) params ) + sizeof ( *params ) );
+	method_copy = ( ( ( void * ) name_copy ) + name_len );
 
 	/* Populate parameter list */
 	if ( name ) {
 		strcpy ( name_copy, name );
 		params->name = name_copy;
+	}
+	if ( method ) {
+		strcpy ( method_copy, method );
+		params->method = method_copy;
 	}
 	INIT_LIST_HEAD ( &params->entries );
 
@@ -116,6 +126,10 @@ struct parameters * create_parameters ( const char *name ) {
 	list_add_tail ( &params->list, &parameters );
 
 	DBGC ( params, "PARAMS \"%s\" created\n", params->name );
+	if ( params->method ) {
+		DBGC ( params, "PARAMS \"%s\" method is \"%s\"\n",
+		       params->name, params->method );
+	}
 	return params;
 }
 

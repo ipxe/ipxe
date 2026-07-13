@@ -136,19 +136,42 @@ static struct http_transfer_encoding http_transfer_identity;
  */
 
 /** HTTP HEAD method */
-struct http_method http_head = {
+struct http_method http_head __http_method = {
 	.name = "HEAD",
 };
 
 /** HTTP GET method */
-struct http_method http_get = {
+struct http_method http_get __http_method = {
 	.name = "GET",
 };
 
 /** HTTP POST method */
-struct http_method http_post = {
+struct http_method http_post __http_method = {
 	.name = "POST",
 };
+
+/** HTTP PUT method */
+struct http_method http_put __http_method = {
+	.name = "PUT",
+};
+
+/**
+ * Identify HTTP method
+ *
+ * @v name		Method name
+ * @ret method		HTTP method, or NULL if not known
+ */
+static struct http_method * http_method ( const char *name ) {
+	struct http_method *method;
+
+	/* Identify method */
+	for_each_table_entry ( method, HTTP_METHODS ) {
+		if ( strcasecmp ( name, method->name ) == 0 )
+			return method;
+	}
+
+	return NULL;
+}
 
 /******************************************************************************
  *
@@ -2025,6 +2048,17 @@ int http_open_uri ( struct interface *xfer, struct uri *uri ) {
 		data = NULL;
 	}
 
+	/* Use explicitly requested method name if applicable */
+	if ( params && params->method ) {
+		method = http_method ( params->method );
+		if ( ! method ) {
+			DBGC ( uri, "HTTP unsupported method \"%s\"\n",
+			       params->method );
+			rc = -ENOTSUP;
+			goto err_method;
+		}
+	}
+
 	/* Construct request content */
 	content.type = type;
 	content.data = data;
@@ -2035,6 +2069,7 @@ int http_open_uri ( struct interface *xfer, struct uri *uri ) {
 		goto err_open;
 
  err_open:
+ err_method:
 	free ( data );
  err_alloc:
 	return rc;

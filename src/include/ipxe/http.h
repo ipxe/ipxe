@@ -102,9 +102,16 @@ struct http_method {
 	const char *name;
 };
 
-extern struct http_method http_head;
-extern struct http_method http_get;
-extern struct http_method http_post;
+/** HTTP method table */
+#define HTTP_METHODS __table ( struct http_method, "http_methods" )
+
+/** Declare an HTTP method */
+#define __http_method __table_entry ( HTTP_METHODS, 01 )
+
+extern struct http_method http_head __http_method;
+extern struct http_method http_get __http_method;
+extern struct http_method http_post __http_method;
+extern struct http_method http_put __http_method;
 
 /******************************************************************************
  *

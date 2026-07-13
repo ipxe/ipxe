@@ -41,6 +41,8 @@ FILE_SECBOOT ( PERMITTED );
 struct params_options {
 	/** Name */
 	char *name;
+	/** Method */
+	char *method;
 	/** Delete */
 	int delete;
 };
@@ -49,6 +51,8 @@ struct params_options {
 static struct option_descriptor params_opts[] = {
 	OPTION_DESC ( "name", 'n', required_argument,
 		      struct params_options, name, parse_string ),
+	OPTION_DESC ( "method", 'm', required_argument,
+		      struct params_options, method, parse_string ),
 	OPTION_DESC ( "delete", 'd', no_argument,
 		      struct params_options, delete, parse_flag ),
 };
@@ -74,7 +78,7 @@ static int params_exec ( int argc, char **argv ) {
 		return rc;
 
 	/* Create parameter list */
-	params = create_parameters ( opts.name );
+	params = create_parameters ( opts.name, opts.method );
 	if ( ! params )
 		return -ENOMEM;
 

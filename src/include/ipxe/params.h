@@ -21,6 +21,8 @@ struct parameters {
 	struct list_head list;
 	/** Name */
 	const char *name;
+	/** Request method */
+	const char *method;
 	/** Parameters */
 	struct list_head entries;
 };
@@ -85,7 +87,8 @@ claim_parameters ( struct parameters *params ) {
 	list_for_each_entry ( (param), &(params)->entries, list )
 
 extern struct parameters * find_parameters ( const char *name );
-extern struct parameters * create_parameters ( const char *name );
+extern struct parameters * create_parameters ( const char *name,
+					       const char *method );
 extern struct parameter * add_parameter ( struct parameters *params,
 					  const char *key, const char *value,
 					  unsigned int flags );
