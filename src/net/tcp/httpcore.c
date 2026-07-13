@@ -931,6 +931,10 @@ static int http_format_headers ( struct http_transaction *http, char *buf,
 			used += ssnprintf ( ( buf + used ), ( len - used ),
 					    "%s: %s\r\n", param->key,
 					    param->value );
+			if ( used < len ) {
+				DBGC2 ( http, "HTTP %p TX %s: %s\n",
+					http, param->key, param->value );
+			}
 		}
 	}
 
