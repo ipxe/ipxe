@@ -71,7 +71,8 @@ struct parameters * find_parameters ( const char *name ) {
 
 	list_for_each_entry ( params, &parameters, list ) {
 		if ( ( params->name == name ) ||
-		     ( strcmp ( params->name, name ) == 0 ) ) {
+		     ( params->name && name &&
+		       ( strcmp ( params->name, name ) == 0 ) ) ) {
 			return params;
 		}
 	}
