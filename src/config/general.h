@@ -166,6 +166,7 @@ FILE_SECBOOT ( PERMITTED );
 #define IMAGE_PNG		/* PNG graphical image support */
 #define IMAGE_SCRIPT		/* iPXE script image support */
 //#define IMAGE_ZLIB		/* ZLIB compressed image support */
+//#define IMAGE_MIME		/* MIME image support */
 
 /* Image types supported only on BIOS platforms */
 #if defined ( PLATFORM_pcbios )

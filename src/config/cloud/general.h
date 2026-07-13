@@ -9,3 +9,6 @@
  * incurring unnecessary costs.
  */
 #define POWEROFF_CMD
+
+/* Enable MIME image support */
+#define IMAGE_MIME

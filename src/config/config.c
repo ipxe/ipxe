@@ -195,6 +195,9 @@ REQUIRE_OBJECT ( gzip );
 #ifdef IMAGE_UCODE
 REQUIRE_OBJECT ( ucode );
 #endif
+#ifdef IMAGE_MIME
+REQUIRE_OBJECT ( mime );
+#endif
 
 /*
  * Drag in all requested commands
