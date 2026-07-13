@@ -141,6 +141,19 @@ static void string_test_exec ( void ) {
 		ok ( found == NULL );
 	}
 
+	/* Test strcasestr() */
+	{
+		const char haystack[] = "Find ME!";
+		char *found;
+
+		found = strcasestr ( haystack, "FIND" );
+		ok ( found == &haystack[0] );
+		found = strcasestr ( haystack, "me" );
+		ok ( found == &haystack[5] );
+		found = strcasestr ( haystack, "me." );
+		ok ( found == NULL );
+	}
+
 	/* Test memset() */
 	{
 		static uint8_t test[7] = { '>', 1, 1, 1, 1, 1, '<' };

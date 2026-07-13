@@ -332,6 +332,23 @@ char * strstr ( const char *haystack, const char *needle ) {
 }
 
 /**
+ * Find case-insensitive substring
+ *
+ * @v haystack		String
+ * @v needle		Substring
+ * @ret found		Found substring, or NULL if not found
+ */
+char * strcasestr ( const char *haystack, const char *needle ) {
+	size_t len = strlen ( needle );
+
+	for ( ; *haystack ; haystack++ ) {
+		if ( strncasecmp ( haystack, needle, len ) == 0 )
+			return ( ( char * ) haystack );
+	}
+	return NULL;
+}
+
+/**
  * Copy string
  *
  * @v dest		Destination string
