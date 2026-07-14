@@ -309,6 +309,9 @@ REQUIRE_OBJECT ( image_crypt_cmd );
 #ifdef FDT_CMD
 REQUIRE_OBJECT ( fdt_cmd );
 #endif
+#ifdef IMAGE_SET_CMD
+REQUIRE_OBJECT ( image_set_cmd );
+#endif
 
 /*
  * Drag in miscellaneous objects

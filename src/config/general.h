@@ -100,6 +100,7 @@ FILE_SECBOOT ( PERMITTED );
 #define IMAGE_ARCHIVE_CMD	/* Archive image management commands */
 //#define IMAGE_CRYPT_CMD	/* Image encryption management commands */
 //#define IMAGE_MEM_CMD		/* Read memory command */
+#define IMAGE_SET_CMD		/* Image setting commands */
 //#define IMAGE_TRUST_CMD	/* Image trust management commands */
 //#define IPSTAT_CMD		/* IP statistics commands */
 #define IWMGMT_CMD		/* Wireless interface management commands */
