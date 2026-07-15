@@ -41,7 +41,7 @@ FILE_SECBOOT ( PERMITTED );
 #define ERRFILE_asprintf	       ( ERRFILE_CORE | 0x00000000 )
 #define ERRFILE_downloader	       ( ERRFILE_CORE | 0x00010000 )
 #define ERRFILE_exec		       ( ERRFILE_CORE | 0x00020000 )
-#define ERRFILE_hw		       ( ERRFILE_CORE | 0x00030000 )
+#define ERRFILE_blob		       ( ERRFILE_CORE | 0x00030000 )
 #define ERRFILE_iobuf		       ( ERRFILE_CORE | 0x00040000 )
 #define ERRFILE_job		       ( ERRFILE_CORE | 0x00050000 )
 #define ERRFILE_linebuf		       ( ERRFILE_CORE | 0x00060000 )
