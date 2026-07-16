@@ -94,3 +94,4 @@ REQUIRE_OBJECT ( ecdsa_test );
 REQUIRE_OBJECT ( hkdf_test );
 REQUIRE_OBJECT ( ffdhe_test );
 REQUIRE_OBJECT ( mime_test );
+REQUIRE_OBJECT ( datauri_test );

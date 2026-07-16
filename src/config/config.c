@@ -127,6 +127,9 @@ REQUIRE_OBJECT ( nfs_open );
 #ifdef DOWNLOAD_PROTO_SLAM
 REQUIRE_OBJECT ( slam );
 #endif
+#ifdef DOWNLOAD_PROTO_DATA
+REQUIRE_OBJECT ( datauri );
+#endif
 
 /*
  * Drag in all requested SAN boot protocols

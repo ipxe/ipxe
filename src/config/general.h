@@ -46,6 +46,7 @@ FILE_SECBOOT ( PERMITTED );
 //#define DOWNLOAD_PROTO_FTP	/* File Transfer Protocol */
 //#define DOWNLOAD_PROTO_SLAM	/* Scalable Local Area Multicast */
 //#define DOWNLOAD_PROTO_NFS	/* Network File System Protocol */
+#define DOWNLOAD_PROTO_DATA	/* Inline Data */
 
 /* Protocols supported only on platforms with filesystem abstractions */
 #if defined ( PLATFORM_efi )
