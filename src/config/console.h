@@ -25,6 +25,7 @@ FILE_SECBOOT ( PERMITTED );
 #define CONSOLE_FRAMEBUFFER	/* Graphical framebuffer console */
 #define CONSOLE_SYSLOG		/* Syslog console */
 #define CONSOLE_SYSLOGS		/* Encrypted syslog console */
+#define CONSOLE_DMESG		/* In-memory ring buffer console */
 //#define CONSOLE_DISKLOG	/* Disk log console */
 
 /* Console types supported only on systems with serial ports */
