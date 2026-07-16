@@ -43,10 +43,16 @@ FILE_SECBOOT ( PERMITTED );
  */
 
 /** "show" options */
-struct show_options {};
+struct show_options {
+	/** Do not display setting type, only value */
+	int quiet;
+};
 
 /** "show" option list */
-static struct option_descriptor show_opts[] = {};
+static struct option_descriptor show_opts[] = {
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct show_options, quiet, parse_flag ),
+};
 
 /** "show" command descriptor */
 static struct command_descriptor show_cmd =
@@ -88,7 +94,9 @@ static int show_exec ( int argc, char **argv ) {
 
 	/* Print setting value */
 	setting_name ( origin, &fetched, name_buf, sizeof ( name_buf ) );
-	printf ( "%s = %s\n", name_buf, value );
+	if ( ! opts.quiet )
+		printf ( "%s = ", name_buf );
+	printf ( "%s\n", value );
 
 	/* Success */
 	rc = 0;
