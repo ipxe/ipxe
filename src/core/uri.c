@@ -151,7 +151,7 @@ static int uri_character_escaped ( char c, unsigned int field ) {
 	 */
 	static const char *escaped[URI_EPATH] = {
 		/* Scheme or default: escape everything */
-		[URI_SCHEME]	= "/#:@?=&",
+		[URI_SCHEME]	= "/#:@?=&+",
 		/* Opaque part: escape characters which would affect
 		 * the reparsing of the URI, allowing everything else
 		 * (e.g. ':', which will appear in iSCSI URIs).
