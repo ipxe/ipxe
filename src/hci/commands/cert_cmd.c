@@ -124,7 +124,7 @@ static int cert_exec ( int argc, char **argv,
 
 	/* Acquire image, if applicable */
 	if ( ( optind < argc ) &&
-	     ( ( rc = imgacquire ( argv[optind], 0, &image ) ) != 0 ) )
+	     ( ( rc = imgacquire ( argv[optind], 0, 0, &image ) ) != 0 ) )
 		goto err_acquire;
 
 	/* Get first entry in certificate store */

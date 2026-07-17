@@ -47,25 +47,28 @@ FILE_SECBOOT ( PERMITTED );
  *
  * @v uri		URI
  * @v timeout		Download timeout
+ * @v quiet		Display only error messages
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgdownload ( struct uri *uri, unsigned long timeout,
+int imgdownload ( struct uri *uri, unsigned long timeout, int quiet,
 		  struct image **image ) {
+	char *uri_string_redacted = NULL;
 	struct uri uri_redacted;
-	char *uri_string_redacted;
 	int rc;
 
-	/* Construct redacted URI */
-	memcpy ( &uri_redacted, uri, sizeof ( uri_redacted ) );
-	uri_redacted.user = NULL;
-	uri_redacted.password = NULL;
-	uri_redacted.equery = NULL;
-	uri_redacted.efragment = NULL;
-	uri_string_redacted = format_uri_alloc ( &uri_redacted );
-	if ( ! uri_string_redacted ) {
-		rc = -ENOMEM;
-		goto err_uri_string;
+	/* Construct redacted URI, if applicable */
+	if ( ! quiet ) {
+		memcpy ( &uri_redacted, uri, sizeof ( uri_redacted ) );
+		uri_redacted.user = NULL;
+		uri_redacted.password = NULL;
+		uri_redacted.equery = NULL;
+		uri_redacted.efragment = NULL;
+		uri_string_redacted = format_uri_alloc ( &uri_redacted );
+		if ( ! uri_string_redacted ) {
+			rc = -ENOMEM;
+			goto err_uri_string;
+		}
 	}
 
 	/* Resolve URI */
@@ -115,18 +118,19 @@ int imgdownload ( struct uri *uri, unsigned long timeout,
  *
  * @v uri_string	URI string
  * @v timeout		Download timeout
+ * @v quiet		Display only error messages
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
 int imgdownload_string ( const char *uri_string, unsigned long timeout,
-			 struct image **image ) {
+			 int quiet, struct image **image ) {
 	struct uri *uri;
 	int rc;
 
 	if ( ! ( uri = parse_uri ( uri_string ) ) )
 		return -ENOMEM;
 
-	rc = imgdownload ( uri, timeout, image );
+	rc = imgdownload ( uri, timeout, quiet, image );
 
 	uri_put ( uri );
 	return rc;
@@ -137,10 +141,11 @@ int imgdownload_string ( const char *uri_string, unsigned long timeout,
  *
  * @v name_uri		Name or URI string
  * @v timeout		Download timeout
+ * @v quiet		Display only error messages
  * @v image		Image to fill in
  * @ret rc		Return status code
  */
-int imgacquire ( const char *name_uri, unsigned long timeout,
+int imgacquire ( const char *name_uri, unsigned long timeout, int quiet,
 		 struct image **image ) {
 
 	/* If we already have an image with the specified name, use it */
@@ -149,7 +154,7 @@ int imgacquire ( const char *name_uri, unsigned long timeout,
 		return 0;
 
 	/* Otherwise, download a new image */
-	return imgdownload_string ( name_uri, timeout, image );
+	return imgdownload_string ( name_uri, timeout, quiet, image );
 }
 
 /**

@@ -162,7 +162,7 @@ int uriboot ( struct uri *filename, struct uri **root_paths,
 
 	/* Attempt filename boot if applicable */
 	if ( filename ) {
-		if ( ( rc = imgdownload ( filename, 0, &image ) ) != 0 )
+		if ( ( rc = imgdownload ( filename, 0, 0, &image ) ) != 0 )
 			goto err_download;
 		imgstat ( image );
 		image->flags |= IMAGE_AUTO_UNREGISTER;

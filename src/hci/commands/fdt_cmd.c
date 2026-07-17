@@ -40,12 +40,16 @@ FILE_SECBOOT ( PERMITTED );
 struct fdt_options {
 	/** Download timeout */
 	unsigned long timeout;
+	/** Display only error messages */
+	int quiet;
 };
 
 /** "fdt" option list */
 static struct option_descriptor fdt_opts[] = {
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct fdt_options, timeout, parse_timeout ),
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct fdt_options, quiet, parse_flag ),
 };
 
 /** "fdt" command descriptor */
@@ -74,7 +78,7 @@ static int fdt_exec ( int argc, char **argv ) {
 
 	/* Acquire image, if applicable */
 	if ( name_uri && ( ( rc = imgacquire ( name_uri, opts.timeout,
-					       &image ) ) != 0 ) ) {
+					       opts.quiet, &image ) ) != 0 ) ){
 		goto err_image;
 	}
 

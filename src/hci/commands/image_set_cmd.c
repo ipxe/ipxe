@@ -44,6 +44,8 @@ struct imgset_options {
 	int keep;
 	/** Download timeout */
 	unsigned long timeout;
+	/** Display only error messages */
+	int quiet;
 };
 
 /** "imgset" option list */
@@ -52,6 +54,8 @@ static struct option_descriptor imgset_opts[] = {
 		      struct imgset_options, keep, parse_flag ),
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct imgset_options, timeout, parse_timeout ),
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct imgset_options, quiet, parse_flag ),
 };
 
 /** "imgset" command descriptor */
@@ -81,7 +85,8 @@ static int imgset_exec ( int argc, char **argv ) {
 		goto err_setting;
 
 	/* Acquire image */
-	if ( ( rc = imgacquire ( argv[optind], opts.timeout, &image ) ) != 0 )
+	if ( ( rc = imgacquire ( argv[optind], opts.timeout, opts.quiet,
+				 &image ) ) != 0 )
 		goto err_acquire;
 
 	/* Store setting value */

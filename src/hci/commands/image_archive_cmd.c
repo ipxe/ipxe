@@ -44,6 +44,8 @@ struct imgextract_options {
 	int keep;
 	/** Download timeout */
 	unsigned long timeout;
+	/** Display only error messages */
+	int quiet;
 };
 
 /** "imgextract" option list */
@@ -54,6 +56,8 @@ static struct option_descriptor imgextract_opts[] = {
 		      struct imgextract_options, keep, parse_flag ),
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct imgextract_options, timeout, parse_timeout ),
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct imgextract_options, quiet, parse_flag ),
 };
 
 /** "imgextract" command descriptor */
@@ -78,7 +82,8 @@ static int imgextract_exec ( int argc, char **argv ) {
 		goto err_parse;
 
 	/* Acquire image */
-	if ( ( rc = imgacquire ( argv[optind], opts.timeout, &image ) ) != 0 )
+	if ( ( rc = imgacquire ( argv[optind], opts.timeout, opts.quiet,
+				 &image ) ) != 0 )
 		goto err_acquire;
 
 	/* Extract archive image */

@@ -48,6 +48,8 @@ FILE_SECBOOT ( PERMITTED );
 struct shim_options {
 	/** Download timeout */
 	unsigned long timeout;
+	/** Display only error messages */
+	int quiet;
 	/** Require third party loader */
 	int require_loader;
 	/** Allow PXE base code protocol */
@@ -60,6 +62,8 @@ struct shim_options {
 static struct option_descriptor shim_opts[] = {
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct shim_options, timeout, parse_timeout ),
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct shim_options, quiet, parse_flag ),
 	OPTION_DESC ( "require-loader", 'l', no_argument,
 		      struct shim_options, require_loader, parse_flag ),
 	OPTION_DESC ( "allow-pxe", 'p', no_argument,
@@ -106,7 +110,7 @@ static int shim_exec ( int argc, char **argv ) {
 
 	/* Acquire image, if applicable */
 	if ( download && name_uri &&
-	     ( ( rc = imgacquire ( name_uri, opts.timeout,
+	     ( ( rc = imgacquire ( name_uri, opts.timeout, opts.quiet,
 				   &image ) ) != 0 ) ) {
 		goto err_image;
 	}

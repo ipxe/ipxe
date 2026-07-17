@@ -86,12 +86,12 @@ static int efi_autoexec_filesystem ( EFI_HANDLE handle, struct image **image ) {
 
 	/* Try loading from loaded image directory, if supported */
 	if ( ( rc = imgacquire ( "file:" EFI_AUTOEXEC_NAME,
-				 EFI_AUTOEXEC_TIMEOUT, image ) ) == 0 )
+				 EFI_AUTOEXEC_TIMEOUT, 0, image ) ) == 0 )
 		return 0;
 
 	/* Try loading from root directory, if supported */
 	if ( ( rc = imgacquire ( "file:/" EFI_AUTOEXEC_NAME,
-				 EFI_AUTOEXEC_TIMEOUT, image ) ) == 0 )
+				 EFI_AUTOEXEC_TIMEOUT, 0, image ) ) == 0 )
 		return 0;
 
 	return rc;
@@ -133,9 +133,9 @@ static int efi_autoexec_network ( EFI_HANDLE handle, struct image **image ) {
 
 	/* Attempt download from current working URI, then from root */
 	if ( ( ( rc = imgacquire ( EFI_AUTOEXEC_NAME, EFI_AUTOEXEC_TIMEOUT,
-				   image ) ) != 0 ) &&
+				   0, image ) ) != 0 ) &&
 	     ( ( rc = imgacquire ( "/" EFI_AUTOEXEC_NAME, EFI_AUTOEXEC_TIMEOUT,
-				   image ) ) != 0 ) ) {
+				   0, image ) ) != 0 ) ) {
 		DBGC ( device, "EFI %s could not download [/]%s: %s\n",
 		       efi_handle_name ( device ), EFI_AUTOEXEC_NAME,
 		       strerror ( rc ) );

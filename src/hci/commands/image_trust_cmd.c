@@ -94,6 +94,8 @@ struct imgverify_options {
 	int keep;
 	/** Download timeout */
 	unsigned long timeout;
+	/** Display only error messages */
+	int quiet;
 };
 
 /** "imgverify" option list */
@@ -104,6 +106,8 @@ static struct option_descriptor imgverify_opts[] = {
 		      struct imgverify_options, keep, parse_flag ),
 	OPTION_DESC ( "timeout", 't', required_argument,
 		      struct imgverify_options, timeout, parse_timeout),
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct imgverify_options, quiet, parse_flag ),
 };
 
 /** "imgverify" command descriptor */
@@ -137,11 +141,12 @@ static int imgverify_exec ( int argc, char **argv ) {
 	signature_name_uri = argv[ optind + 1 ];
 
 	/* Acquire the image */
-	if ( ( rc = imgacquire ( image_name_uri, opts.timeout, &image ) ) != 0 )
+	if ( ( rc = imgacquire ( image_name_uri, opts.timeout, opts.quiet,
+				 &image ) ) != 0 )
 		goto err_acquire_image;
 
 	/* Acquire the signature image */
-	if ( ( rc = imgacquire ( signature_name_uri, opts.timeout,
+	if ( ( rc = imgacquire ( signature_name_uri, opts.timeout, opts.quiet,
 				 &signature ) ) != 0 )
 		goto err_acquire_signature;
 

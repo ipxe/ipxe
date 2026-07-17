@@ -47,6 +47,8 @@ struct imgdecrypt_options {
 	int keep;
 	/** Download timeout */
 	unsigned long timeout;
+	/** Display only error messages */
+	int quiet;
 };
 
 /** "imgdecrypt" option list */
@@ -56,7 +58,9 @@ static struct option_descriptor imgdecrypt_opts[] = {
 	OPTION_DESC ( "keep", 'k', no_argument,
 		      struct imgdecrypt_options, keep, parse_flag ),
 	OPTION_DESC ( "timeout", 't', required_argument,
-		      struct imgdecrypt_options, timeout, parse_timeout),
+		      struct imgdecrypt_options, timeout, parse_timeout ),
+	OPTION_DESC ( "quiet", 'q', no_argument,
+		      struct imgdecrypt_options, quiet, parse_flag ),
 };
 
 /** "imgdecrypt" command descriptor */
@@ -90,11 +94,12 @@ static int imgdecrypt_exec ( int argc, char **argv ) {
 	envelope_name_uri = argv[ optind + 1 ];
 
 	/* Acquire the image */
-	if ( ( rc = imgacquire ( image_name_uri, opts.timeout, &image ) ) != 0 )
+	if ( ( rc = imgacquire ( image_name_uri, opts.timeout, opts.quiet,
+				 &image ) ) != 0 )
 		goto err_acquire_image;
 
 	/* Acquire the envelope image */
-	if ( ( rc = imgacquire ( envelope_name_uri, opts.timeout,
+	if ( ( rc = imgacquire ( envelope_name_uri, opts.timeout, opts.quiet,
 				 &envelope ) ) != 0 )
 		goto err_acquire_envelope;
 
