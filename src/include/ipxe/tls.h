@@ -197,12 +197,22 @@ struct tls_key_exchange_algorithm {
 	/** Algorithm name */
 	const char *name;
 	/**
+	 * Receive new Server Key Exchange record using ECDHE key exchange
+	 *
+	 * @v tls		TLS connection
+	 * @v data		Server Key Exchange handshake record
+	 * @v len		Length of Server Key Exchange handshake record
+	 * @ret rc		Return status code
+	 */
+	int ( * server ) ( struct tls_connection *tls, const void *data,
+			   size_t len );
+	/**
 	 * Transmit Client Key Exchange record
 	 *
 	 * @v tls		TLS connection
 	 * @ret rc		Return status code
 	 */
-	int ( * exchange ) ( struct tls_connection *tls );
+	int ( * client ) ( struct tls_connection *tls );
 };
 
 /** A TLS cipher suite */
@@ -499,10 +509,6 @@ struct tls_client {
 struct tls_server {
 	/** Random bytes */
 	uint8_t random[32];
-	/** Server Key Exchange record (if any) */
-	void *exchange;
-	/** Server Key Exchange record length */
-	size_t exchange_len;
 	/** Root of trust */
 	struct x509_root *root;
 	/** Certificate chain */
