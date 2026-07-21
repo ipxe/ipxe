@@ -77,6 +77,14 @@ int xfer_open_uri ( struct interface *intf, struct uri *uri ) {
 		goto err_resolve_uri;
 	}
 
+	/* Check that URI has a scheme */
+	if ( ! uri_is_absolute ( resolved_uri ) ) {
+		DBGC ( INTF_COL ( intf ), "INTF " INTF_FMT " attempted to open "
+		       "non-absolute URI\n", INTF_DBG ( intf ) );
+		rc = -ENOTSUP;
+		goto err_absolute;
+	}
+
 	/* Find opener which supports this URI scheme */
 	opener = xfer_uri_opener ( resolved_uri->scheme );
 	if ( ! opener ) {
@@ -98,6 +106,7 @@ int xfer_open_uri ( struct interface *intf, struct uri *uri ) {
 
  err_open:
  err_opener:
+ err_absolute:
 	uri_put ( resolved_uri );
  err_resolve_uri:
 	return rc;
