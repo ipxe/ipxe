@@ -80,7 +80,8 @@ mlx_memory_alloc_dma(
 					IN mlx_utils *utils,
 					IN mlx_size size ,
 					IN mlx_size align,
-					OUT mlx_void **ptr
+					OUT mlx_void **ptr,
+					OUT mlx_dma *mapping
 					)
 {
 	mlx_status status = MLX_SUCCESS;
@@ -89,7 +90,7 @@ mlx_memory_alloc_dma(
 		status = MLX_INVALID_PARAMETER;
 		goto bad_param;
 	}
-	status = mlx_memory_alloc_dma_priv(utils, size, align, ptr);
+	status = mlx_memory_alloc_dma_priv(utils, size, align, ptr, mapping);
 bad_param:
 	return status;
 }
@@ -98,7 +99,8 @@ mlx_status
 mlx_memory_free_dma(
 					IN mlx_utils *utils,
 					IN mlx_size size ,
-					IN mlx_void **ptr
+					IN mlx_void **ptr,
+					IN mlx_dma *mapping
 					)
 {
 	mlx_status status = MLX_SUCCESS;
@@ -106,7 +108,7 @@ mlx_memory_free_dma(
 		status = MLX_INVALID_PARAMETER;
 		goto bad_param;
 	}
-	status = mlx_memory_free_dma_priv(utils, size, *ptr);
+	status = mlx_memory_free_dma_priv(utils, size, *ptr, mapping);
 	*ptr = NULL;
 bad_param:
 	return status;
@@ -116,9 +118,9 @@ mlx_status
 mlx_memory_map_dma(
 					IN mlx_utils *utils,
 					IN mlx_void *addr ,
+					IN mlx_dma *mapping,
 					IN mlx_size number_of_bytes,
-					OUT mlx_physical_address *phys_addr,
-					OUT mlx_void **mapping
+					OUT mlx_physical_address *phys_addr
 					)
 {
 	mlx_status status = MLX_SUCCESS;
@@ -126,7 +128,7 @@ mlx_memory_map_dma(
 		status = MLX_INVALID_PARAMETER;
 		goto bad_param;
 	}
-	status = mlx_memory_map_dma_priv(utils, addr, number_of_bytes, phys_addr, mapping);
+	status = mlx_memory_map_dma_priv(utils, addr, mapping, number_of_bytes, phys_addr);
 bad_param:
 	return status;
 }
@@ -134,7 +136,7 @@ bad_param:
 mlx_status
 mlx_memory_ummap_dma(
 					IN mlx_utils *utils,
-					IN mlx_void *mapping
+					IN mlx_dma *mapping
 					)
 {
 	mlx_status status = MLX_SUCCESS;
