@@ -293,7 +293,7 @@ static int intel_reset ( struct intel_nic *intel ) {
 
 	/* The Intel I210's packet buffer size registers reset only on
 	 * power up.  If an operating system changes these but then
-	 * the computer recieves a reset signal without losing power,
+	 * the computer receives a reset signal without losing power,
 	 * the registers will stay the same (but be incompatible with
 	 * other register defaults), thus making the device unable to
 	 * pass traffic.
