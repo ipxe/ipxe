@@ -81,6 +81,16 @@ ARCHIVE_TEST ( multipart, &mime_image_type, "user-data", NULL, "user-data",
 		   "IyFpcHhlCgplY2hvIEhlbGxvIHdvcmxkCnNoZWxsCg==\r\n"
 		   "\r\n" ) );
 
+/** No explicit encoding */
+ARCHIVE_TEST ( no_encoding, &mime_image_type, "noenc.mime", NULL, "noenc",
+	TEXTFILE ( "Content-Type: text/x-ipxe; charset=\"utf-8\"\r\n"
+		   "MIME-Version: 1.0\r\n"
+		   "\r\n"
+		   "#!ipxe\r\n"
+		   "echo Default encoding\r\n" ),
+	TEXTFILE ( "#!ipxe\r\n"
+		   "echo Default encoding\r\n" ) );
+
 /**
  * Perform mime self-test
  *
@@ -89,6 +99,7 @@ static void mime_test_exec ( void ) {
 
 	archive_ok ( &hello_world );
 	archive_ok ( &multipart );
+	archive_ok ( &no_encoding );
 }
 
 /** MIME self-test */

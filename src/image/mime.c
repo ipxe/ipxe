@@ -180,7 +180,6 @@ static int mime_parse ( struct image *image, const char *text,
 
 	/* Initialise headers */
 	memset ( headers, 0, sizeof ( *headers ) );
-	headers->encoding = "7bit";
 
 	/* Parse headers until reaching empty-line separator */
 	for ( line = text ; ; line = next ) {
@@ -295,6 +294,7 @@ static int mime_decode_base64 ( struct image *image,
 /** MIME encodings */
 static const struct mime_encoding mime_encodings[] = {
 	{
+		/* Default encoding */
 		.name = "7bit",
 		.decode = mime_decode_identity,
 	},
@@ -315,13 +315,17 @@ static const struct mime_encoding mime_encodings[] = {
 /**
  * Identify MIME encoding
  *
- * @v name		Encoding
+ * @v name		Encoding name, or NULL to use default
  * @ret encoding	MIME encoding, or NULL if not recognised
  */
 static const struct mime_encoding * mime_encoding ( const char *name ) {
 	const struct mime_encoding *encoding;
 	size_t len;
 	unsigned int i;
+
+	/* Use default encoding if no name specified */
+	if ( ! name )
+		return &mime_encodings[0];
 
 	/* Identify MIME encoding */
 	for ( i = 0 ; i < ( sizeof ( mime_encodings ) /
