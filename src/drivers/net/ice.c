@@ -951,10 +951,19 @@ static void ice_remove ( struct pci_device *pci ) {
 
 /** PCI device IDs */
 static struct pci_device_id ice_nics[] = {
+	PCI_ROM ( 0x8086, 0x1248, "e835cc-bp", "E835-CC backplane", 0 ),
+	PCI_ROM ( 0x8086, 0x1249, "e835cc-qsfp", "E835-CC QSFP56", 0 ),
+	PCI_ROM ( 0x8086, 0x124a, "e835cc-sfp", "E835-CC SFP", 0 ),
 	PCI_ROM ( 0x8086, 0x124c, "e823l-bp", "E823-L backplane", 0 ),
 	PCI_ROM ( 0x8086, 0x124d, "e823l-sfp", "E823-L SFP", 0 ),
 	PCI_ROM ( 0x8086, 0x124e, "e823l-10gt", "E823-L 10GBASE-T", 0 ),
 	PCI_ROM ( 0x8086, 0x124f, "e823l-1g", "E823-L 1GbE", 0 ),
+	PCI_ROM ( 0x8086, 0x1261, "e835c-bp", "E835-C backplane", 0 ),
+	PCI_ROM ( 0x8086, 0x1262, "e835c-qsfp", "E835-C QSFP", 0 ),
+	PCI_ROM ( 0x8086, 0x1263, "e835c-sfp", "E835-C SFP", 0 ),
+	PCI_ROM ( 0x8086, 0x1265, "e835l-bp", "E835-L backplane", 0 ),
+	PCI_ROM ( 0x8086, 0x1266, "e835l-qsfp", "E835-L QSFP", 0 ),
+	PCI_ROM ( 0x8086, 0x1267, "e835l-sfp", "E835-L SFP", 0 ),
 	PCI_ROM ( 0x8086, 0x151d, "e823l-qsfp", "E823-L QSFP", 0 ),
 	PCI_ROM ( 0x8086, 0x1591, "e810c-bp", "E810-C backplane", 0 ),
 	PCI_ROM ( 0x8086, 0x1592, "e810c-qsfp", "E810-C QSFP", 0 ),

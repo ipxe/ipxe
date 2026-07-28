@@ -1877,6 +1877,9 @@ static struct pci_device_id intelxl_nics[] = {
 	PCI_ROM ( 0x8086, 0x37d1, "x722-1gt", "X722 1GBASE-T", 0 ),
 	PCI_ROM ( 0x8086, 0x37d2, "x722-10gt", "X722 10GBASE-T", 0 ),
 	PCI_ROM ( 0x8086, 0x37d3, "x722-sfp-i", "X722 10GbE SFP+", 0 ),
+	PCI_ROM ( 0x8086, 0x57b0, "e610-10gt", "E610 10GBASE T",  0 ),
+	PCI_ROM ( 0x8086, 0x57b1, "e610-2gt", "E610 2.5GBASE T", 0 ),
+	PCI_ROM ( 0x8086, 0x57b2, "e610-sgmii", "E610 SGMII", 0 ),
 };
 
 /** PCI driver */

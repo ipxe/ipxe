@@ -343,7 +343,7 @@ struct ice_admin_link_buffer {
 	/** Link speed */
 	uint16_t speed;
 	/** Reserved */
-	uint8_t reserved_b[20];
+	uint8_t reserved_b[44];
 } __attribute__ (( packed ));
 
 /** Admin queue Add Transmit Queues command */
