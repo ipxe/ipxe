@@ -319,10 +319,10 @@ static void free_tls_session ( struct refcnt *refcnt ) {
 	x509_root_put ( session->root );
 	privkey_put ( session->key );
 	x509_put ( session->cert );
-	free ( session->ticket );
+	zfree ( session->ticket );
 
 	/* Free session */
-	free ( session );
+	zfree ( session );
 }
 
 /**
@@ -338,7 +338,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	struct io_buffer *tmp;
 
 	/* Free dynamically-allocated resources */
-	free ( tls->new_session_ticket );
+	zfree ( tls->new_session_ticket );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.active );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
@@ -359,7 +359,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	ref_put ( &session->refcnt );
 
 	/* Free TLS structure itself */
-	free ( tls );
+	zfree ( tls );
 }
 
 /**
@@ -546,7 +546,7 @@ static void tls_clear_digest ( struct tls_connection *tls ) {
 	key->digest = &digest_null;
 
 	/* Free any dynamic storage */
-	free ( key->dynamic );
+	zfree ( key->dynamic );
 	key->dynamic = NULL;
 	key->handshake = NULL;
 	key->kdf = NULL;
@@ -912,7 +912,7 @@ static int tls_agree_ephemeral ( struct tls_connection *tls,
  err_agree:
  err_partner_len:
 	memset ( tmp, 0, sizeof ( *tmp ) );
-	free ( tmp );
+	zfree ( tmp );
  err_alloc:
 	return rc;
 }
@@ -1225,7 +1225,7 @@ tls_find_cipher_suite ( unsigned int cipher_suite ) {
 static void tls_clear_cipher ( struct tls_connection *tls __unused,
 			       struct tls_cipherspec *cipherspec ) {
 
-	free ( cipherspec->dynamic );
+	zfree ( cipherspec->dynamic );
 	memset ( cipherspec, 0, sizeof ( *cipherspec ) );
 	cipherspec->suite = &tls_cipher_suite_null;
 }
@@ -1656,7 +1656,7 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
  err_send:
  err_prepend:
  err_encrypt:
-	free ( builder.data );
+	zfree ( builder.data );
  err_cert:
 	return rc;
 }
@@ -1784,7 +1784,7 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 
  err_send_handshake:
  err_share:
-	free ( key_xchg );
+	zfree ( key_xchg );
  err_alloc:
 	return rc;
 }
@@ -2327,7 +2327,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
  err_prepend:
  err_pubkey_sign:
  err_sig_hash:
-	free ( builder.data );
+	zfree ( builder.data );
 	return rc;
 }
 
@@ -2769,7 +2769,7 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
 	}
 
 	/* Free any unapplied new session ticket */
-	free ( tls->new_session_ticket );
+	zfree ( tls->new_session_ticket );
 	tls->new_session_ticket = NULL;
 	tls->new_session_ticket_len = 0;
 
@@ -3111,7 +3111,7 @@ static int tls_new_finished ( struct tls_connection *tls,
 				 sizeof ( session->id ) );
 		}
 		if ( tls->new_session_ticket_len ) {
-			free ( session->ticket );
+			zfree ( session->ticket );
 			session->ticket = tls->new_session_ticket;
 			session->ticket_len = tls->new_session_ticket_len;
 			tls->new_session_ticket = NULL;

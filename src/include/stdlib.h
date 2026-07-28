@@ -29,6 +29,7 @@ extern void * __malloc malloc ( size_t size );
 extern void * realloc ( void *old_ptr, size_t new_size );
 extern void free ( void *ptr );
 extern void * __malloc zalloc ( size_t len );
+extern void zfree ( void *ptr );
 
 /**
  * Allocate cleared memory

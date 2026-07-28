@@ -925,7 +925,7 @@ int asn1_grow ( struct asn1_builder *builder, size_t extra ) {
 	new_len = ( builder->len + extra );
 	new = realloc ( builder->data, new_len );
 	if ( ! new ) {
-		free ( builder->data );
+		zfree ( builder->data );
 		builder->data = NULL;
 		return -ENOMEM;
 	}

@@ -425,7 +425,7 @@ static int ecdsa_alloc ( struct ecdsa_context *ctx ) {
 static void ecdsa_free ( struct ecdsa_context *ctx ) {
 
 	/* Free dynamic storage */
-	free ( ctx->dynamic );
+	zfree ( ctx->dynamic );
 }
 
 /**

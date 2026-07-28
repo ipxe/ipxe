@@ -96,8 +96,8 @@ void privkey_free ( struct refcnt *refcnt ) {
 	struct private_key *key =
 		container_of ( refcnt, struct private_key, refcnt );
 
-	free ( key->builder.data );
-	free ( key );
+	zfree ( key->builder.data );
+	zfree ( key );
 }
 
 /**
@@ -119,7 +119,7 @@ static int privkey_apply_settings ( void ) {
 			 sizeof ( private_key.builder ) );
 
 		/* Fetch new private key, if any */
-		free ( key_data );
+		zfree ( key_data );
 		if ( ( len = fetch_raw_setting_copy ( NULL, &privkey_setting,
 						      &key_data ) ) >= 0 ) {
 			private_key.builder.data = key_data;

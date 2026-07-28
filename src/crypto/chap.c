@@ -125,6 +125,6 @@ void chap_finish ( struct chap_response *chap ) {
 
 	DBG ( "CHAP %p finished\n", chap );
 
-	free ( state );
+	zfree ( state );
 	memset ( chap, 0, sizeof ( *chap ) );
 }

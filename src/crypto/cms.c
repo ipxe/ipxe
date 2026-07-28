@@ -955,7 +955,7 @@ static int cms_cipher_key ( struct cms_message *cms,
  err_setiv:
  err_setkey:
  err_decrypt:
-	free ( cipher_key.data );
+	zfree ( cipher_key.data );
 	return rc;
 }
 

@@ -259,7 +259,7 @@ static int ffdhe ( struct ffdhe_group *group, const void *public,
 	rc = 0;
 
  err_result:
-	free ( tmp );
+	zfree ( tmp );
  err_alloc:
 	return rc;
 }

@@ -116,7 +116,7 @@ rsa_find_prefix ( struct digest_algorithm *digest ) {
  */
 static inline void rsa_free ( struct rsa_context *context ) {
 
-	free ( context->dynamic );
+	zfree ( context->dynamic );
 }
 
 /**

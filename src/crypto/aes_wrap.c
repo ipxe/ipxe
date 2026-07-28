@@ -66,7 +66,7 @@ int aes_wrap ( const void *kek, const void *src, void *dest, int nblk )
 		}
 	}
 
-	free ( aes_ctx );
+	zfree ( aes_ctx );
 	return 0;
 }
 
@@ -112,7 +112,7 @@ int aes_unwrap ( const void *kek, const void *src, void *dest, int nblk )
 		}
 	}
 
-	free ( aes_ctx );
+	zfree ( aes_ctx );
 
 	/* Check IV */
 	for ( i = 0; i < 8; i++ ) {

@@ -673,6 +673,32 @@ void * zalloc ( size_t size ) {
 }
 
 /**
+ * Clear and free memory
+ *
+ * @v ptr		Memory allocated by malloc(), or NULL
+ *
+ * If @c ptr is NULL, no action is taken.
+ */
+void zfree ( void *ptr ) {
+	struct autosized_block *block;
+
+	if ( ptr && ( ptr != NOWHERE ) ) {
+		block = container_of ( ptr, struct autosized_block, data );
+		VALGRIND_MAKE_MEM_DEFINED ( &block->size,
+					    sizeof ( block->size ) );
+		assert ( block->size >= sizeof ( *block ) );
+		memset ( ptr, 0, ( block->size - sizeof ( *block ) ) );
+		VALGRIND_MAKE_MEM_NOACCESS ( &block->size,
+					     sizeof ( block->size ) );
+	}
+	free ( ptr );
+	if ( ASSERTED ) {
+		DBGC ( &heap, "HEAP detected possible memory corruption "
+		       "from %p\n", __builtin_return_address ( 0 ) );
+	}
+}
+
+/**
  * Allocate memory with specified physical alignment and offset
  *
  * @v size		Requested size
