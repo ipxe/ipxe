@@ -95,6 +95,7 @@ struct cipher_algorithm _gcm_cipher = {					\
 	.blocksize	= 1,						\
 	.alignsize	= sizeof ( union gcm_block ),			\
 	.authsize	= sizeof ( union gcm_block ),			\
+	.confidential	= 1,						\
 	.setkey		= gcm_setkey,					\
 	.setiv		= gcm_setiv,					\
 	.encrypt	= gcm_encrypt,					\

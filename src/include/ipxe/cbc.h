@@ -45,6 +45,7 @@ struct cipher_algorithm _cbc_cipher = {					\
 	.blocksize	= _blocksize,					\
 	.alignsize	= _blocksize,					\
 	.authsize	= 0,						\
+	.confidential	= 1,						\
 	.setkey		= cbc_setkey,					\
 	.setiv		= cbc_setiv,					\
 	.encrypt	= cbc_encrypt,					\

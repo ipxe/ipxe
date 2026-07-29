@@ -80,6 +80,8 @@ struct cipher_algorithm {
 	size_t alignsize;
 	/** Authentication tag size */
 	size_t authsize;
+	/** Cipher is capable of providing confidentiality */
+	int confidential;
 	/** Set key
 	 *
 	 * @v cipher	Cipher algorithm

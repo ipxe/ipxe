@@ -687,6 +687,7 @@ struct cipher_algorithm des_algorithm = {
 	.blocksize = DES_BLOCKSIZE,
 	.alignsize = 0,
 	.authsize = 0,
+	.confidential = 1,
 	.setkey = des_setkey,
 	.setiv = cipher_null_setiv,
 	.encrypt = des_encrypt,

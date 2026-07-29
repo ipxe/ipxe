@@ -182,6 +182,7 @@ void cipher_okx ( struct cipher_test *test, const char *file,
 	okx ( cipher->blocksize != 0, file, line );
 	okx ( ( len % cipher->blocksize ) == 0, file, line );
 	okx ( ( cipher->alignsize % cipher->blocksize ) == 0, file, line );
+	okx ( cipher->confidential, file, line );
 
 	/* Report encryption test result */
 	cipher_encrypt_okx ( test, file, line );

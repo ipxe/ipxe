@@ -36,6 +36,7 @@ struct cipher_algorithm _ecb_cipher = {					\
 	.blocksize	= _blocksize,					\
 	.alignsize	= _blocksize,					\
 	.authsize	= 0,						\
+	.confidential	= 1,						\
 	.setkey		= ecb_setkey,					\
 	.setiv		= cipher_null_setiv,				\
 	.encrypt	= ecb_encrypt,					\

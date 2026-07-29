@@ -793,6 +793,7 @@ struct cipher_algorithm aes_algorithm = {
 	.blocksize = AES_BLOCKSIZE,
 	.alignsize = 0,
 	.authsize = 0,
+	.confidential = 1,
 	.setkey = aes_setkey,
 	.setiv = cipher_null_setiv,
 	.encrypt = aes_encrypt,
