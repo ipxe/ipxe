@@ -40,6 +40,76 @@ FILE_SECBOOT ( PERMITTED );
  *
  * ASN.1 encoding
  *
+ * The ASN.1 parsing helper functions are designed to be safe to use
+ * on untrusted input, including malformed input.  Any parsing error
+ * will cause the function to invalidate the cursor by setting its
+ * length field to zero before returning.
+ *
+ * All parsing helper functions will strictly respect the cursor's
+ * bounds for all purposes (including for determining the tag type and
+ * the tag length).  An invalidated cursor (or any cursor that happens
+ * to naturally end up with a zero length, e.g. by skipping the only
+ * existent object) may therefore safely be passed in to any parsing
+ * helper function.
+ *
+ * A consequence of this design is that it is not necessary to check
+ * the return status from all parsing helper functions in a sequence,
+ * only to check the return status from the last.  The standard C
+ * comma operator may safely be used to connect a sequence of ASN.1
+ * parsing operations.  For example:
+ *
+ * @code
+ *
+ *	if ( ( rc = ( asn1_enter ( cursor, ASN1_SEQUENCE ),
+ *		      asn1_skip ( cursor, ASN1_INTEGER ),
+ *		      asn1_enter ( cursor, ASN1_SEQUENCE ) ) ) != 0 ) {
+ *		return rc;
+ *	}
+ *
+ * @endcode
+ *
+ * or equivalently, just:
+ *
+ * @code
+ *
+ *	asn1_enter ( cursor, ASN1_SEQUENCE );
+ *	asn1_skip ( cursor, ASN1_INTEGER );
+ *	if ( ( rc = asn1_enter ( cursor, ASN1_SEQUENCE ) ) != 0 )
+ *		return rc;
+ *
+ * @endcode
+ *
+ * The caller may not need to check the return status from the parsing
+ * helper functions at all.  For example, a caller that is trying to
+ * extract a fixed-length octet string from within a deeply nested
+ * ASN.1 structure may simply check that the resulting cursor length
+ * is correct (which it would have to check anyway).  Since any error
+ * will produce a zero-length cursor, this check would also suffice to
+ * catch any parsing errors.
+ *
+ * The cursor navigation functions such as asn1_enter() and
+ * asn1_skip() will validate the type and length bytes (which they
+ * consume themselves), but will not otherwise validate the contents
+ * of the cursor.  Callers must perform their own validation after
+ * navigating to the expected data structure (e.g. by checking that
+ * the resulting length is correct), or use the higher-level helpers
+ * such as asn1_boolean() and asn1_integer() that validate and extract
+ * the semantic contents of cursors.
+ *
+ * The type @c ASN1_ANY may be used as a wildcard type to enter or
+ * skip an object of any type.
+ *
+ * The function asn1_skip_if_exists() may be useful when parsing
+ * objects where an encountered type is not knowable in advance
+ * (e.g. for sequences containing optional elements).  If the
+ * potential type is not found, then asn1_skip_if_exists() will return
+ * an error but will not invalidate the cursor (since a missing
+ * optional object is not a parsing error).
+ *
+ * The function asn1_type() may be used to determine the type of an
+ * unknown object.  Calling asn1_type() on an invalidated cursor will
+ * return @c ASN1_END (and the cursor will remain invalidated).
+ *
  */
 
 /* Disambiguate the various error causes */
