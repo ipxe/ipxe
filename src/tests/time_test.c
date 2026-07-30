@@ -138,6 +138,12 @@ MKTIME_TEST ( mktime_29, 31, 20, 12, 24, 1, 146, 6, 54, 0, 2403087631ULL );
 MKTIME_TEST ( mktime_30, 49, 7, 18, 16, 10, 271, 6, 319, 0, 6370596469ULL );
 MKTIME_TEST ( mktime_31, 31, 55, 2, 25, 5, 141, 2, 175, 0, 2255741731ULL );
 
+/* Out-of-range month values */
+MKTIME_TEST ( mktime_32, 32, 55, 2, 25, 17, 140, 2, 175, 0, 2255741732ULL );
+MKTIME_TEST ( mktime_33, 33, 55, 2, 25, 65, 136, 2, 175, 0, 2255741733ULL );
+MKTIME_TEST ( mktime_34, 34, 55, 2, 25, -7, 142, 2, 175, 0, 2255741734ULL );
+MKTIME_TEST ( mktime_35, 35, 55, 2, 25, -55, 146, 2, 175, 0, 2255741735ULL );
+
 /**
  * Perform date and time self-tests
  *
@@ -178,6 +184,10 @@ static void time_test_exec ( void ) {
 	mktime_ok ( &mktime_29 );
 	mktime_ok ( &mktime_30 );
 	mktime_ok ( &mktime_31 );
+	mktime_ok ( &mktime_32 );
+	mktime_ok ( &mktime_33 );
+	mktime_ok ( &mktime_34 );
+	mktime_ok ( &mktime_35 );
 }
 
 /** Date and time self-test */

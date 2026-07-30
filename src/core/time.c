@@ -24,6 +24,7 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
+#include <assert.h>
 #include <time.h>
 
 /** @file
@@ -116,26 +117,45 @@ static const uint16_t days_to_month_start[] =
  * @ret time		Seconds since the Epoch
  */
 time_t mktime ( struct tm *tm ) {
+	int tm_year = tm->tm_year;
+	int tm_mon = tm->tm_mon;
+	int tm_mday = tm->tm_mday;
+	int tm_hour = tm->tm_hour;
+	int tm_min = tm->tm_min;
+	int tm_sec = tm->tm_sec;
+	int tm_yday;
+	int tm_wday;
 	int days_since_epoch;
 	int seconds_since_day;
 	time_t seconds;
 
+	/* Normalize month for use as an array index */
+	tm_year += ( tm_mon / 12 );
+	tm_mon = ( tm_mon % 12 );
+	if ( tm_mon < 0 ) {
+		tm_year--;
+		tm_mon += 12;
+	}
+	assert ( tm_mon >= 0 );
+	assert ( tm_mon < 12 );
+
 	/* Calculate day of year */
-	tm->tm_yday = ( ( tm->tm_mday - 1 ) +
-			days_to_month_start[ tm->tm_mon ] );
-	if ( ( tm->tm_mon >= 2 ) && is_leap_year ( tm->tm_year ) )
-		tm->tm_yday++;
+	tm_yday = ( ( tm_mday - 1 ) + days_to_month_start[tm_mon] );
+	if ( ( tm_mon >= 2 ) && is_leap_year ( tm_year ) )
+		tm_yday++;
+	tm->tm_yday = tm_yday;
 
 	/* Calculate day of week */
-	tm->tm_wday = day_of_week ( tm->tm_year, tm->tm_mon, tm->tm_mday );
+	tm_wday = day_of_week ( tm_year, tm_mon, tm_mday );
+	tm->tm_wday = tm_wday;
 
 	/* Calculate seconds since the Epoch */
-	days_since_epoch = ( tm->tm_yday + ( 365 * tm->tm_year ) - 25567 +
-			     leap_years_to_end ( tm->tm_year - 1 ) );
+	days_since_epoch = ( tm_yday + ( 365 * tm_year ) - 25567 +
+			     leap_years_to_end ( tm_year - 1 ) );
 	seconds_since_day =
-		( ( ( ( tm->tm_hour * 60 ) + tm->tm_min ) * 60 ) + tm->tm_sec );
-	seconds = ( ( ( ( time_t ) days_since_epoch ) * ( ( time_t ) 86400 ) ) +
-		    seconds_since_day );
+		( ( ( ( tm_hour * 60 ) + tm_min ) * 60 ) + tm_sec );
+	seconds = ( ( ( ( time_t ) days_since_epoch ) * ( ( time_t ) 86400 ) )
+		    + seconds_since_day );
 
 	DBGC ( &weekdays, "TIME %04d-%02d-%02d %02d:%02d:%02d => %lld (%s, "
 	       "day %d)\n", ( tm->tm_year + 1900 ), ( tm->tm_mon + 1 ),
