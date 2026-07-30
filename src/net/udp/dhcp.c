@@ -1223,6 +1223,11 @@ static int dhcp_deliver ( struct dhcp_session *dhcp,
 	 * waste a relatively scarce fully-aligned I/O buffer.
 	 */
 	data_len = iob_len ( iobuf );
+	if ( data_len < sizeof ( *dhcphdr ) ) {
+		DBGC ( dhcp, "DHCP %p received underlength packet\n", dhcp );
+		rc = -EINVAL;
+		goto err_dhcphdr;
+	}
 	dhcppkt = zalloc ( sizeof ( *dhcppkt ) + data_len );
 	if ( ! dhcppkt ) {
 		rc = -ENOMEM;
@@ -1275,6 +1280,7 @@ static int dhcp_deliver ( struct dhcp_session *dhcp,
  err_xid:
 	dhcppkt_put ( dhcppkt );
  err_alloc_dhcppkt:
+ err_dhcphdr:
  err_no_src:
 	free_iob ( iobuf );
 	return rc;

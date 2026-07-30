@@ -300,11 +300,18 @@ static struct settings_operations dhcppkt_settings_operations = {
  */
 void dhcppkt_init ( struct dhcp_packet *dhcppkt, struct dhcphdr *data,
 		    size_t len ) {
+
+	/* Sanity check */
+	assert ( len >= sizeof ( *data ) );
+
+	/* Initialise packet */
 	ref_init ( &dhcppkt->refcnt, NULL );
 	dhcppkt->dhcphdr = data;
 	dhcpopt_init ( &dhcppkt->options, &dhcppkt->dhcphdr->options,
 		       ( len - offsetof ( struct dhcphdr, options ) ),
 		       dhcpopt_no_realloc );
+
+	/* Initialise settings content */
 	settings_init ( &dhcppkt->settings, &dhcppkt_settings_operations,
 			&dhcppkt->refcnt, NULL );
 }
