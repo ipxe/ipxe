@@ -712,39 +712,6 @@ static void tls_set_kdf_master ( struct tls_connection *tls,
 }
 
 /**
- * Share ephemeral public key
- *
- * @v tls		TLS connection
- * @v public		Public key to fill in
- * @ret rc		Return status code
- */
-static int tls_share_ephemeral ( struct tls_connection *tls, void *public ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct tls_named_group *group = key->group;
-	struct exchange_algorithm *exchange = group->exchange;
-	size_t privsize = exchange->privsize;
-	struct {
-		uint8_t private[privsize];
-	} tmp;
-	int rc;
-
-	/* (Re)generate ephemeral private key */
-	channel_ephemeral_label ( &tls->channel, exchange->name,
-				  tmp.private, privsize );
-
-	/* Derive public key */
-	if ( ( rc = exchange_share ( exchange, tmp.private, public ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not share ephemeral key: %s\n",
-		       tls, strerror ( rc ) );
-		goto err_share;
-	}
-
- err_share:
-	memset ( &tmp, 0, sizeof ( tmp ) );
-	return rc;
-}
-
-/**
  * Agree ephemeral public key (i.e. pre-master secret)
  *
  * @v tls		TLS connection
@@ -1711,8 +1678,10 @@ static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 		  htonl ( sizeof ( *key_xchg ) -
 			  sizeof ( key_xchg->type_length ) ) );
 	key_xchg->dh_xs_len = htons ( sizeof ( key_xchg->dh_xs ) );
-	if ( ( rc = tls_share_ephemeral ( tls, key_xchg->dh_xs ) ) != 0 )
+	if ( ( rc = channel_key_share ( &tls->channel, exchange,
+					key_xchg->dh_xs ) ) != 0 ) {
 		goto err_share;
+	}
 
 	/* Transmit Client Key Exchange record */
 	if ( ( rc = tls_send_handshake ( tls, key_xchg,
@@ -1820,8 +1789,10 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 		  htonl ( sizeof ( key_xchg ) -
 			  sizeof ( key_xchg.type_length ) ) );
 	key_xchg.public_len = sizeof ( key_xchg.public );
-	if ( ( rc = tls_share_ephemeral ( tls, key_xchg.public ) ) != 0 )
+	if ( ( rc = channel_key_share ( &tls->channel, exchange,
+					key_xchg.public ) ) != 0 ) {
 		return rc;
+	}
 
 	/* Transmit Client Key Exchange record */
 	if ( ( rc = tls_send_handshake ( tls, &key_xchg,
