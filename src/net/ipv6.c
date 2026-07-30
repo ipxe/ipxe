@@ -691,7 +691,7 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	}
 
 	/* Truncate packet to specified length */
-	len = ntohs ( iphdr->len );
+	len = ( sizeof ( *iphdr ) + ntohs ( iphdr->len ) );
 	if ( len > iob_len ( iobuf ) ) {
 		DBGC ( ipv6col ( &iphdr->src ), "IPv6 length too long at %zd "
 		       "bytes (packet is %zd bytes)\n", len, iob_len ( iobuf ));
@@ -699,7 +699,7 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		rc = -EINVAL_LEN;
 		goto err_other;
 	}
-	iob_unput ( iobuf, ( iob_len ( iobuf ) - len - sizeof ( *iphdr ) ) );
+	iob_unput ( iobuf, ( iob_len ( iobuf ) - len ) );
 	hdrlen = sizeof ( *iphdr );
 
 	/* Print IPv6 header for debugging */
