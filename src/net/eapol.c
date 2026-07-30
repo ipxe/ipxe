@@ -66,7 +66,7 @@ static int eapol_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	struct eapol_supplicant *supplicant;
 	struct eapol_header *eapol;
 	struct eapol_handler *handler;
-	size_t remaining;
+	size_t max_len;
 	size_t len;
 	int rc;
 
@@ -91,9 +91,9 @@ static int eapol_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		goto drop;
 	}
 	eapol = iobuf->data;
-	remaining = ( iob_len ( iobuf ) - sizeof ( *eapol ) );
+	max_len = ( iob_len ( iobuf ) - sizeof ( *eapol ) );
 	len = ntohs ( eapol->len );
-	if ( len > remaining ) {
+	if ( len > max_len ) {
 		DBGC ( netdev, "EAPOL %s v%d type %d len %zd underlength "
 		       "payload:\n", netdev->name, eapol->version,
 		       eapol->type, len );
@@ -103,7 +103,7 @@ static int eapol_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	}
 
 	/* Strip any trailing padding */
-	iob_unput ( iobuf, ( len - remaining ) );
+	iob_unput ( iobuf, ( max_len - len ) );
 
 	/* Handle according to type */
 	for_each_table_entry ( handler, EAPOL_HANDLERS ) {
