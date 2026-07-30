@@ -80,8 +80,10 @@ int bitmap_test ( struct bitmap *bitmap, unsigned int bit ) {
 	unsigned int index = BITMAP_INDEX ( bit );
         bitmap_block_t mask = BITMAP_MASK ( bit );
 
+	/* Treat out-of-range bits as implicitly being zero */
 	if ( bit >= bitmap->length )
 		return 0;
+
 	return ( ( bitmap->blocks[index] & mask ) != 0 );
 }
 
@@ -90,12 +92,20 @@ int bitmap_test ( struct bitmap *bitmap, unsigned int bit ) {
  *
  * @v bitmap		Bitmap
  * @v bit		Bit index
+ * @ret rc		Return status code
  */
-void bitmap_set ( struct bitmap *bitmap, unsigned int bit ) {
+int bitmap_set ( struct bitmap *bitmap, unsigned int bit ) {
 	unsigned int index = BITMAP_INDEX ( bit );
         bitmap_block_t mask = BITMAP_MASK ( bit );
 
 	DBGC ( bitmap, "Bitmap %p setting bit %d\n", bitmap, bit );
+
+	/* Fail if we cannot set this bit */
+	if ( bit >= bitmap->length ) {
+		DBGC ( bitmap, "Bitmap %p bit %d is outside range [0,%d)\n",
+		       bitmap, bit, bitmap->length );
+		return -ERANGE;
+	}
 
 	/* Update bitmap */
 	bitmap->blocks[index] |= mask;
@@ -104,4 +114,6 @@ void bitmap_set ( struct bitmap *bitmap, unsigned int bit ) {
 	while ( bitmap_test ( bitmap, bitmap->first_gap ) ) {
 		bitmap->first_gap++;
 	}
+
+	return 0;
 }

@@ -852,7 +852,8 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 		goto done;
 
 	/* Mark block as received */
-	bitmap_set ( &tftp->bitmap, block );
+	if ( ( rc = bitmap_set ( &tftp->bitmap, block ) ) != 0 )
+		goto done;
 
 	/* Acknowledge block */
 	tftp_send_packet ( tftp );

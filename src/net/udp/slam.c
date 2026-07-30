@@ -553,7 +553,8 @@ static int slam_mc_socket_deliver ( struct slam_request *slam,
 		goto err;
 
 	/* Mark block as received */
-	bitmap_set ( &slam->bitmap, packet );
+	if ( ( rc = bitmap_set ( &slam->bitmap, packet ) ) != 0 )
+		goto err;
 
 	/* If we have received all blocks, terminate */
 	if ( bitmap_full ( &slam->bitmap ) )

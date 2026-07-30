@@ -48,7 +48,7 @@ struct bitmap {
 
 extern int bitmap_resize ( struct bitmap *bitmap, unsigned int new_length );
 extern int bitmap_test ( struct bitmap *bitmap, unsigned int bit );
-extern void bitmap_set ( struct bitmap *bitmap, unsigned int bit );
+extern int bitmap_set ( struct bitmap *bitmap, unsigned int bit );
 
 /**
  * Free bitmap resources
