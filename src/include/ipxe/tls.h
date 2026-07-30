@@ -23,6 +23,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/pending.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/tables.h>
+#include <ipxe/channel.h>
 
 struct tls_connection;
 
@@ -363,9 +364,6 @@ struct tls_session {
 	struct list_head conn;
 };
 
-/** HKDF algorithm for ephemeral secrets */
-#define tls_ephemeral_algorithm sha256_algorithm
-
 /** TLS key schedule */
 struct tls_key_schedule {
 	/** Digest algorithm
@@ -459,8 +457,6 @@ struct tls_key_schedule {
 	void *handshake;
 	/** Key derivation function master secret */
 	void *kdf;
-	/** Ephemeral master secret */
-	uint8_t ephemeral[SHA256_DIGEST_SIZE];
 };
 
 /** TLS transmit state */
@@ -553,6 +549,8 @@ struct tls_connection {
 	/** Verification data */
 	struct tls_verify_data verify;
 
+	/** Secure channel */
+	struct secure_channel channel;
 	/** Key schedule */
 	struct tls_key_schedule key;
 	/** Transmit state */

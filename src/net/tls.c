@@ -204,7 +204,6 @@ FILE_SECBOOT ( PERMITTED );
 /** List of TLS session */
 static LIST_HEAD ( tls_sessions );
 
-static void tls_regenerate_ephemeral_master ( struct tls_connection *tls );
 static void tls_tx_resume_all ( struct tls_session *session );
 static struct io_buffer * tls_alloc_iob ( struct tls_connection *tls,
 					  size_t len );
@@ -387,8 +386,8 @@ static void tls_close ( struct tls_connection *tls, int rc ) {
 	list_del ( &tls->list );
 	INIT_LIST_HEAD ( &tls->list );
 
-	/* Destroy ephemeral master secret */
-	tls_regenerate_ephemeral_master ( tls );
+	/* Close secure channel */
+	channel_close ( &tls->channel );
 
 	/* Resume all other connections, in case we were the lead connection */
 	tls_tx_resume_all ( tls->session );
@@ -415,87 +414,6 @@ static void tls_close_alert ( struct tls_connection *tls, int rc ) {
  *
  ******************************************************************************
  */
-
-/**
- * Generate ephemeral master secret
- *
- * @v tls		TLS connection
- * @ret rc		Return status code
- */
-static int tls_generate_ephemeral_master ( struct tls_connection *tls ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct digest_algorithm *digest = &tls_ephemeral_algorithm;
-	static const char salt[16] = "ephemeral master";
-	int rc;
-
-	/* Generate random bits with no additional input and without
-	 * prediction resistance
-	 */
-	if ( ( rc = rbg_generate ( NULL, 0, 0, key->ephemeral,
-				   sizeof ( key->ephemeral ) ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not generate random data: %s\n",
-		       tls, strerror ( rc ) );
-		return rc;
-	}
-
-	/* Generate ephemeral master secret */
-	hkdf_extract ( digest, salt, sizeof ( salt ), key->ephemeral,
-		       sizeof ( key->ephemeral ), key->ephemeral );
-
-	return 0;
-}
-
-/**
- * Generate ephemeral secret
- *
- * @v tls		TLS connection
- * @v info		Additional information (or NULL)
- * @v info_len		Length of additional information
- * @v out		Ephemeral secret to fill in
- * @v len		Length of ephemeral secret
- */
-static void tls_ephemeral ( struct tls_connection *tls, const void *info,
-			    size_t info_len, void *out, size_t len ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct digest_algorithm *digest = &tls_ephemeral_algorithm;
-
-	/* Generate from ephemeral master secret and additional information */
-	hkdf_expand ( digest, key->ephemeral, info, info_len, out, len );
-}
-
-/**
- * Generate ephemeral secret from label
- *
- * @v tls		TLS connection
- * @v label		Secret label
- * @v out		Ephemeral secret to fill in
- * @v len		Length of ephemeral secret
- */
-static void tls_ephemeral_label ( struct tls_connection *tls,
-				  const char *label, void *out, size_t len ) {
-
-	/* Generate from ephemeral master secret and label */
-	tls_ephemeral ( tls, label, strlen ( label ), out, len );
-	DBGC2 ( tls, "TLS %p ephemeral %s:\n", tls, label );
-	DBGC2_HDA ( tls, 0, out, len );
-}
-
-/**
- * Regenerate ephemeral master secret
- *
- * @v tls		TLS connection
- */
-static void tls_regenerate_ephemeral_master ( struct tls_connection *tls ) {
-	struct tls_key_schedule *key = &tls->key;
-
-	/* Derive a new ephemeral master secret */
-	tls_ephemeral_label ( tls, "key reset", key->ephemeral,
-			      sizeof ( key->ephemeral ) );
-
-	/* (Re)generate client random bytes */
-	tls_ephemeral_label ( tls, "client random", &tls->client.random.random,
-			      sizeof ( tls->client.random.random ) );
-}
 
 /**
  * Clear key schedule binding
@@ -597,7 +515,7 @@ static int tls_set_digest ( struct tls_connection *tls,
 	digest_init ( digest, key->handshake );
 
 	/* Poison key derivation function master secret */
-	tls_ephemeral_label ( tls, "kdf poison", key->kdf, kdfsize );
+	channel_poison ( &tls->channel, key->kdf, kdfsize );
 
 	/* Sanity checks */
 	assert ( ! key->keyed );
@@ -811,7 +729,8 @@ static int tls_share_ephemeral ( struct tls_connection *tls, void *public ) {
 	int rc;
 
 	/* (Re)generate ephemeral private key */
-	tls_ephemeral_label ( tls, exchange->name, tmp.private, privsize );
+	channel_ephemeral_label ( &tls->channel, exchange->name,
+				  tmp.private, privsize );
 
 	/* Derive public key */
 	if ( ( rc = exchange_share ( exchange, tmp.private, public ) ) != 0 ) {
@@ -861,7 +780,8 @@ static int tls_agree_ephemeral ( struct tls_connection *tls,
 	}
 
 	/* (Re)generate ephemeral private key */
-	tls_ephemeral_label ( tls, exchange->name, tmp->private, privsize );
+	channel_ephemeral_label ( &tls->channel, exchange->name,
+				  tmp->private, privsize );
 
 	/* Zero-pad partner key if needed */
 	if ( partner_len > pubsize ) {
@@ -1138,6 +1058,24 @@ static void tls_resume_secret ( struct tls_connection *tls ) {
 	key->keyed = len;
 	tls_set_binding ( tls, session->cert );
 }
+
+/**
+ * Reset the key schedule
+ *
+ * @v channel		Secure channel
+ */
+static void tls_channel_reset ( struct secure_channel *channel ) {
+	struct tls_connection *tls =
+		container_of ( channel, struct tls_connection, channel );
+
+	DBGC ( tls, "TLS %p key schedule reset\n", tls );
+	//
+}
+
+/** Secure channel operations */
+static struct secure_channel_operations tls_channel_ops = {
+	.reset = tls_channel_reset,
+};
 
 /******************************************************************************
  *
@@ -1588,9 +1526,9 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 
 	/* Generate pre-master secret */
 	pre_master_secret.version = htons ( TLS_VERSION_MAX );
-	tls_ephemeral_label ( tls, "classic pre-master",
-			      &pre_master_secret.random,
-			      sizeof ( pre_master_secret.random ) );
+	channel_ephemeral_label ( &tls->channel, "tls classic pre-master",
+				  &pre_master_secret.random,
+				  sizeof ( pre_master_secret.random ) );
 	tls_set_kdf_master ( tls, &pre_master_secret,
 			     sizeof ( pre_master_secret ) );
 
@@ -1942,8 +1880,13 @@ static void tls_restart ( struct tls_connection *tls ) {
 	assert ( ! is_pending ( &tls->server.negotiation ) );
 	assert ( ! is_pending ( &tls->server.validation ) );
 
-	/* Reset ephemeral master secret */
-	tls_regenerate_ephemeral_master ( tls );
+	/* Reset secure channel */
+	channel_reopen ( &tls->channel );
+
+	/* (Re)generate client random bytes */
+	channel_ephemeral_label ( &tls->channel, "tls client random",
+				  &tls->client.random.random,
+				  sizeof ( tls->client.random.random ) );
 
 	/* (Re)start negotiation */
 	tls->tx.pending = TLS_TX_CLIENT_HELLO;
@@ -3545,8 +3488,9 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 
 		/* Construct and set initialisation vector */
 		memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
-		tls_ephemeral ( tls, &authhdr, sizeof ( authhdr ), iv.rec,
-				sizeof ( iv.rec ) );
+		channel_ephemeral ( &tls->channel, &authhdr,
+				    sizeof ( authhdr ), iv.rec,
+				    sizeof ( iv.rec ) );
 		if ( ( rc = cipher_setiv ( cipher, cipherspec->cipher_ctx, &iv,
 					   sizeof ( iv ) ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not set TX IV: %s\n",
@@ -4369,9 +4313,9 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 	list_add ( &session->list, &tls_sessions );
 
 	/* Poison resumption master secret */
-	tls_ephemeral_label ( tls, "res poison",
-			      session->resumption_master_secret,
-			      sizeof ( session->resumption_master_secret ) );
+	channel_poison ( &tls->channel,
+			 session->resumption_master_secret,
+			 sizeof ( session->resumption_master_secret ) );
 
 	/* Record session */
 	tls->session = session;
@@ -4422,6 +4366,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->client.key = privkey_get ( key ? key : &private_key );
 	tls->server.root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_MAX;
+	channel_init ( &tls->channel, &tls_channel_ops );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.active );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
@@ -4430,8 +4375,12 @@ int add_tls ( struct interface *xfer, const char *name,
 	iob_populate ( &tls->rx.iobuf, &tls->rx.header, 0,
 		       sizeof ( tls->rx.header ) );
 	INIT_LIST_HEAD ( &tls->rx.data );
-	if ( ( rc = tls_generate_ephemeral_master ( tls ) ) != 0 )
-		goto err_ephemeral;
+
+	/* Open secure channel */
+	if ( ( rc = channel_open ( &tls->channel ) ) != 0 )
+		goto err_channel;
+
+	/* Find or create session */
 	if ( ( rc = tls_session ( tls, name ) ) != 0 )
 		goto err_session;
 	list_add_tail ( &tls->list, &tls->session->conn );
@@ -4445,7 +4394,8 @@ int add_tls ( struct interface *xfer, const char *name,
 	return 0;
 
  err_session:
- err_ephemeral:
+	channel_close ( &tls->channel );
+ err_channel:
 	ref_put ( &tls->refcnt );
  err_alloc:
 	return rc;
