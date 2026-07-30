@@ -1808,8 +1808,11 @@ static int http_rx_chunk_len ( struct http_transaction *http,
  */
 static int http_rx_chunk_data ( struct http_transaction *http,
 				struct io_buffer **iobuf ) {
+	struct {
+		uint8_t cr;
+		uint8_t lf;
+	} __attribute__ (( packed )) *crlf;
 	struct io_buffer *payload;
-	uint8_t *crlf;
 	size_t len;
 	int rc;
 
@@ -1818,12 +1821,16 @@ static int http_rx_chunk_data ( struct http_transaction *http,
 	 * (which we would ignore anyway) and hence avoid
 	 * unnecessarily copying the data.
 	 */
-	if ( iob_len ( *iobuf ) == ( http->remaining + 2 /* CRLF */ ) ) {
-		crlf = ( (*iobuf)->data + http->remaining );
-		if ( ( crlf[0] == '\r' ) && ( crlf[1] == '\n' ) )
-			iob_unput ( (*iobuf), 2 /* CRLF */ );
-	}
 	len = iob_len ( *iobuf );
+	if ( ( len >= sizeof ( *crlf ) ) &&
+	     ( ( len - sizeof ( *crlf ) ) == http->remaining ) ) {
+		crlf = ( (*iobuf)->data + http->remaining );
+		if ( ( crlf->cr == '\r' ) && ( crlf->lf == '\n' ) ) {
+			iob_unput ( *iobuf, sizeof ( *crlf ) );
+			len -= sizeof ( *crlf );
+		}
+	}
+	assert ( len == iob_len ( *iobuf ) );
 
 	/* Use whole/partial buffer as applicable */
 	if ( len <= http->remaining ) {
