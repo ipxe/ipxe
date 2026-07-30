@@ -187,13 +187,8 @@ static int eap_rx_request ( struct eap_supplicant *supplicant,
 		DBGC_HDA ( netdev, 0, msg, len );
 		return -EINVAL;
 	}
-	if ( len < ntohs ( msg->hdr.len ) ) {
-		DBGC ( netdev, "EAP %s truncated request:\n", netdev->name );
-		DBGC_HDA ( netdev, 0, msg, len );
-		return -EINVAL;
-	}
 	req = msg->data;
-	req_len = ( ntohs ( msg->hdr.len ) - sizeof ( *msg ) );
+	req_len = ( len - sizeof ( *msg ) );
 
 	/* Record request details */
 	supplicant->id = msg->hdr.id;
@@ -265,10 +260,22 @@ int eap_rx ( struct eap_supplicant *supplicant, const void *data,
 	     size_t len ) {
 	struct net_device *netdev = supplicant->netdev;
 	const union eap_packet *eap = data;
+	size_t msg_len;
 
-	/* Sanity check */
+	/* Sanity checks */
 	if ( len < sizeof ( eap->hdr ) ) {
 		DBGC ( netdev, "EAP %s underlength header:\n", netdev->name );
+		DBGC_HDA ( netdev, 0, eap, len );
+		return -EINVAL;
+	}
+	msg_len = ntohs ( eap->hdr.len );
+	if ( msg_len < sizeof ( eap->hdr ) ) {
+		DBGC ( netdev, "EAP %s underlength packet:\n", netdev->name );
+		DBGC_HDA ( netdev, 0, eap, len );
+		return -EINVAL;
+	}
+	if ( msg_len > len ) {
+		DBGC ( netdev, "EAP %s truncated packet:\n", netdev->name );
 		DBGC_HDA ( netdev, 0, eap, len );
 		return -EINVAL;
 	}
@@ -276,7 +283,7 @@ int eap_rx ( struct eap_supplicant *supplicant, const void *data,
 	/* Handle according to code */
 	switch ( eap->hdr.code ) {
 	case EAP_CODE_REQUEST:
-		return eap_rx_request ( supplicant, &eap->msg, len );
+		return eap_rx_request ( supplicant, &eap->msg, msg_len );
 	case EAP_CODE_RESPONSE:
 		DBGC2 ( netdev, "EAP %s ignoring response\n", netdev->name );
 		return 0;
