@@ -333,12 +333,6 @@ struct tls_signature_hash_algorithm {
 #define __tls_sig_hash_algorithm					\
 	__table_entry ( TLS_SIG_HASH_ALGORITHMS, 01 )
 
-/** TLS client random data */
-struct tls_client_random {
-	/** Random data */
-	uint8_t random[32];
-} __attribute__ (( packed ));
-
 /** A TLS pre-shared key */
 struct tls_preshared_key {
 	/** Bound peer identity */
@@ -372,7 +366,9 @@ struct tls_preshared_key {
 		 * digest algorithm is 48 bytes, when using SHA-384.
 		 */
 		uint8_t resumption_master_secret[48];
-	};
+	} key;
+	/** Extended master secret flag */
+	int extended_master_secret;
 };
 
 /** A TLS session */
@@ -399,8 +395,6 @@ struct tls_session {
 	size_t ticket_len;
 	/** Pre-shared key */
 	struct tls_preshared_key psk;
-	/** Extended master secret flag */
-	int extended_master_secret;
 
 	/** List of connections */
 	struct list_head conn;
@@ -461,7 +455,7 @@ struct tls_rx {
 /** TLS client state */
 struct tls_client {
 	/** Random bytes */
-	struct tls_client_random random;
+	uint8_t random[32];
 	/** Private key (if used) */
 	struct private_key *key;
 	/** Certificate chain (if used) */

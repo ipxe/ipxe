@@ -711,23 +711,25 @@ static int tls_set_kdf ( struct tls_connection *tls,
  * Generate master secret
  *
  * @v tls		TLS connection
+ * @ret rc		Return status code
  *
  * The client and server random values must already be known.
  */
-static void tls_generate_master_secret ( struct tls_connection *tls ) {
+static int tls_generate_master_secret ( struct tls_connection *tls ) {
 	struct tls_key_schedule *key = &tls->key;
 	struct digest_algorithm *digest = key->digest;
 	uint8_t digest_out[ digest->digestsize ];
 	uint8_t master_secret[48];
+	int rc;
 
 	/* Generate handshake digest */
 	tls_verify_handshake ( tls, digest_out );
 
 	/* Show inputs */
 	DBGC ( tls, "TLS %p client random bytes:\n", tls );
-	DBGC_HD ( tls, &tls->client.random, sizeof ( tls->client.random ) );
+	DBGC_HD ( tls, tls->client.random, sizeof ( tls->client.random ) );
 	DBGC ( tls, "TLS %p server random bytes:\n", tls );
-	DBGC_HD ( tls, &tls->server.random, sizeof ( tls->server.random ) );
+	DBGC_HD ( tls, tls->server.random, sizeof ( tls->server.random ) );
 	DBGC ( tls, "TLS %p session hash:\n", tls );
 	DBGC_HD ( tls, digest_out, sizeof ( digest_out ) );
 
@@ -739,9 +741,9 @@ static void tls_generate_master_secret ( struct tls_connection *tls ) {
 	} else {
 		tls_prf_label ( tls, master_secret, sizeof ( master_secret ),
 				"master secret",
-				&tls->client.random,
+				tls->client.random,
 				sizeof ( tls->client.random ),
-				&tls->server.random,
+				tls->server.random,
 				sizeof ( tls->server.random ) );
 	}
 
@@ -751,9 +753,11 @@ static void tls_generate_master_secret ( struct tls_connection *tls ) {
 	DBGC_HD ( tls, master_secret, sizeof ( master_secret ) );
 
 	/* Set key derivation function secret to the master secret */
-	tls_set_kdf_master ( tls, master_secret, sizeof ( master_secret ) );
+	if ( ( rc = tls_set_kdf ( tls, master_secret,
+				  sizeof ( master_secret ) ) ) != 0 )
+		return rc;
 
-	//
+	return 0;
 }
 
 /**
@@ -776,8 +780,8 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 
 	/* Generate key block */
 	tls_prf_label ( tls, key_block, sizeof ( key_block ), "key expansion",
-			&tls->server.random, sizeof ( tls->server.random ),
-			&tls->client.random, sizeof ( tls->client.random ) );
+			tls->server.random, sizeof ( tls->server.random ),
+			tls->client.random, sizeof ( tls->client.random ) );
 
 	/* Split key block into portions */
 	key = key_block;
@@ -1011,10 +1015,10 @@ static int tls_channel_save ( struct secure_channel *channel,
 		 * the KDF master secret (ignoring the zero padding up
 		 * to the digest block size).
 		 */
-		assert ( sizeof ( psk->master_secret ) <=
+		assert ( sizeof ( psk->key.master_secret ) <=
 			 hmac_keysize ( digest ) );
-		memcpy ( &psk->master_secret, key->kdf,
-			 sizeof ( psk->master_secret ) );
+		memcpy ( &psk->key.master_secret, key->kdf,
+			 sizeof ( psk->key.master_secret ) );
 
 	} else {
 
@@ -1023,16 +1027,19 @@ static int tls_channel_save ( struct secure_channel *channel,
 		 * each of the MD5 and SHA-1 HMAC keys.
 		 */
 		assert ( key->digest == &md5_sha1_algorithm );
-		assert ( sizeof ( psk->master_secret.md5 ) <=
+		assert ( sizeof ( psk->key.master_secret.md5 ) <=
 			 hmac_keysize ( &md5_algorithm ) );
-		assert ( sizeof ( psk->master_secret.sha1 ) <=
+		assert ( sizeof ( psk->key.master_secret.sha1 ) <=
 			 hmac_keysize ( &sha1_algorithm ) );
 		hkeys = key->kdf;
-		memcpy ( psk->master_secret.md5, hkeys->md5,
-			 sizeof ( psk->master_secret.md5 ) );
-		memcpy ( psk->master_secret.sha1, hkeys->sha1,
-			 sizeof ( psk->master_secret.sha1 ) );
+		memcpy ( psk->key.master_secret.md5, hkeys->md5,
+			 sizeof ( psk->key.master_secret.md5 ) );
+		memcpy ( psk->key.master_secret.sha1, hkeys->sha1,
+			 sizeof ( psk->key.master_secret.sha1 ) );
 	}
+
+	/* Record master secret generation method */
+	psk->extended_master_secret = tls->extended_master_secret;
 
 	return 0;
 }
@@ -1052,14 +1059,20 @@ static int tls_channel_resume ( struct secure_channel *channel,
 		container_of ( psid, struct tls_preshared_key, psid );
 	int rc;
 
+	/* Fail unless master secret generation method matches */
+	if ( tls->extended_master_secret != psk->extended_master_secret ) {
+		DBGC ( tls, "TLS %p mismatched extended master secret "
+		       "extension\n", tls );
+		return -EPERM_EMS;
+	}
+
 	/* For TLSv1.2 and earlier, the pre-shared key material
 	 * contains the master secret and so we just copy this back to
 	 * the key derivation function secret.
 	 */
-	if ( ( rc = tls_set_kdf ( tls, &psk->master_secret,
-				  sizeof ( psk->master_secret ) ) ) != 0 ) {
+	if ( ( rc = tls_set_kdf ( tls, &psk->key.master_secret,
+				  sizeof ( psk->key.master_secret ) ) ) != 0 )
 		return rc;
-	}
 
 	return 0;
 }
@@ -1399,7 +1412,6 @@ tls_parse_pubkey ( struct tls_connection *tls, const void *data, size_t len,
  */
 static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
-	struct tls_key_schedule *key = &tls->key;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct x509_certificate *cert;
 	struct {
@@ -1416,7 +1428,7 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	/* Generate pre-master secret */
 	pre_master_secret.version = htons ( TLS_VERSION_MAX );
 	channel_ephemeral_label ( &tls->channel, "tls classic pre-master",
-				  &pre_master_secret.random,
+				  pre_master_secret.random,
 				  sizeof ( pre_master_secret.random ) );
 	tls_set_kdf_master ( tls, &pre_master_secret,
 			     sizeof ( pre_master_secret ) );
@@ -1463,13 +1475,6 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 					 builder.len ) ) != 0 ) {
 		goto err_send;
 	}
-
-	/* Shared secret has now been incorporated into the handshake
-	 * digest.  It can be decrypted only with access to the
-	 * certificate's private key, and has thereby been bound to
-	 * the server's identity.
-	 */
-	tls_set_binding ( tls, cert );
 
  err_send:
  err_prepend:
@@ -1744,8 +1749,8 @@ static void tls_restart ( struct tls_connection *tls ) {
 
 	/* (Re)generate client random bytes */
 	channel_ephemeral_label ( &tls->channel, "tls client random",
-				  &tls->client.random.random,
-				  sizeof ( tls->client.random.random ) );
+				  tls->client.random,
+				  sizeof ( tls->client.random ) );
 
 	/* (Re)start negotiation */
 	tls->tx.pending = TLS_TX_CLIENT_HELLO;
@@ -1871,7 +1876,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 			      htonl ( sizeof ( hello ) -
 				      sizeof ( hello.type_length ) ) );
 	hello.version = htons ( TLS_VERSION_MAX );
-	memcpy ( &hello.random, &tls->client.random, sizeof ( hello.random ) );
+	memcpy ( hello.random, tls->client.random, sizeof ( hello.random ) );
 	hello.session_id_len = tls->session_id_len;
 	memcpy ( hello.session_id, tls->session_id,
 		 sizeof ( hello.session_id ) );
@@ -2040,7 +2045,8 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	}
 
 	/* Generate master secret */
-	tls_generate_master_secret ( tls );
+	if ( ( rc = tls_generate_master_secret ( tls ) ) != 0 )
+		return rc;
 
 	/* Generate keys from master secret */
 	if ( ( rc = tls_generate_keys ( tls ) ) != 0 ) {
@@ -2470,7 +2476,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		return rc;
 
 	/* Copy out server random bytes */
-	memcpy ( &tls->server.random, &hello_a->random,
+	memcpy ( tls->server.random, hello_a->random,
 		 sizeof ( tls->server.random ) );
 
 	/* Handle extended master secret */
@@ -2488,14 +2494,6 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		tls_resume_secret ( tls );
 		if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
 			return rc;
-
-		/* Ensure master secret generation method matches */
-		if ( tls->extended_master_secret !=
-		     tls->session->extended_master_secret ) {
-			DBGC ( tls, "TLS %p mismatched extended master secret "
-			       "extension\n", tls );
-			return -EPERM_EMS;
-		}
 
 	} else {
 
@@ -2606,11 +2604,6 @@ static int tls_parse_chain ( struct tls_connection *tls,
 	/* Free any existing certificate chain */
 	x509_chain_put ( tls->server.chain );
 	tls->server.chain = NULL;
-
-	/* Certificate has changed and so the key schedule is no
-	 * longer bound to the server identity.
-	 */
-	tls->key.bound = 0;
 
 	/* Create certificate chain */
 	tls->server.chain = x509_alloc_chain();
@@ -2824,7 +2817,7 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 
 		/* Calculate digest */
 		digest_init ( digest, ctx );
-		digest_update ( digest, ctx, &tls->client.random,
+		digest_update ( digest, ctx, tls->client.random,
 				sizeof ( tls->client.random ) );
 		digest_update ( digest, ctx, tls->server.random,
 				sizeof ( tls->server.random ) );
@@ -2998,9 +2991,6 @@ static int tls_new_finished ( struct tls_connection *tls,
 	if ( x509_is_valid ( key->bound, tls->server.root ) &&
 	     ( tls->session_id_len || tls->new_session_ticket_len ) ) {
 		tls_generate_resumption_master ( tls );
-		session->extended_master_secret = tls->extended_master_secret;
-		x509_put ( session->cert );
-		session->cert = x509_get ( key->bound );
 		if ( tls->session_id_len ) {
 			session->id_len = tls->session_id_len;
 			memcpy ( session->id, tls->session_id,
@@ -4139,7 +4129,7 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 			/* No existing session: use a random session ID */
 			assert ( sizeof ( tls->session_id ) ==
 				 sizeof ( tls->client.random ) );
-			memcpy ( tls->session_id, &tls->client.random,
+			memcpy ( tls->session_id, tls->client.random,
 				 sizeof ( tls->session_id ) );
 			tls->session_id_len = sizeof ( tls->session_id );
 		}
@@ -4265,10 +4255,9 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 	INIT_LIST_HEAD ( &session->conn );
 	list_add ( &session->list, &tls_sessions );
 
-	/* Poison resumption master secret */
-	channel_poison ( &tls->channel,
-			 session->resumption_master_secret,
-			 sizeof ( session->resumption_master_secret ) );
+	/* Poison pre-shared key material */
+	channel_poison ( &tls->channel, &session->psk.key,
+			 sizeof ( session->psk.key ) );
 
 	/* Record session */
 	tls->session = session;
