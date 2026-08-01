@@ -87,10 +87,13 @@ dhcp_option_offset ( struct dhcp_options *options,
  * Calculate length of any DHCP option
  *
  * @v option		DHCP option
+ * @v remaining		Remaining space
  * @ret len		Length (including tag and length field)
  */
-static unsigned int dhcp_option_len ( struct dhcp_option *option ) {
-	if ( ( option->tag == DHCP_END ) || ( option->tag == DHCP_PAD ) ) {
+static unsigned int dhcp_option_len ( struct dhcp_option *option,
+				      size_t remaining ) {
+	if ( ( option->tag == DHCP_END ) || ( option->tag == DHCP_PAD ) ||
+	     ( remaining < DHCP_OPTION_HEADER_LEN ) ) {
 		return 1;
 	} else {
 		return ( option->len + DHCP_OPTION_HEADER_LEN );
@@ -137,7 +140,7 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
 		 * the end of the data block).
 		 */
 		option = dhcp_option ( options, offset );
-		option_len = dhcp_option_len ( option );
+		option_len = dhcp_option_len ( option, remaining );
 		remaining -= option_len;
 		if ( remaining < 0 )
 			break;
@@ -160,12 +163,13 @@ static int find_dhcp_option_with_encap ( struct dhcp_options *options,
 		}
 		/* Check for start of matching encapsulation block */
 		if ( DHCP_IS_ENCAP_OPT ( tag ) &&
-		     ( option->tag == DHCP_ENCAPSULATOR ( tag ) ) ) {
+		     ( option->tag == DHCP_ENCAPSULATOR ( tag ) ) &&
+		     ( option_len >= DHCP_OPTION_HEADER_LEN ) ) {
 			if ( encap_offset )
 				*encap_offset = offset;
 			/* Continue search within encapsulated option block */
 			tag = DHCP_ENCAPSULATED ( tag );
-			remaining = option_len;
+			remaining = ( option_len - DHCP_OPTION_HEADER_LEN );
 			offset += DHCP_OPTION_HEADER_LEN;
 			continue;
 		}
@@ -303,7 +307,8 @@ static int set_dhcp_option ( struct dhcp_options *options, unsigned int tag,
 	/* Find old instance of this option, if any */
 	offset = find_dhcp_option_with_encap ( options, tag, &encap_offset );
 	if ( offset >= 0 ) {
-		old_len = dhcp_option_len ( dhcp_option ( options, offset ) );
+		old_len = dhcp_option_len ( dhcp_option ( options, offset ),
+					    ( options->used_len - offset ) );
 		DBGC ( options, "DHCPOPT %p resizing %s from %zd to %zd\n",
 		       options, dhcp_tag_name ( tag ), old_len, new_len );
 	} else {
@@ -428,7 +433,7 @@ void dhcpopt_update_used_len ( struct dhcp_options *options ) {
 	options->used_len = 0;
 	while ( remaining ) {
 		option = dhcp_option ( options, offset );
-		option_len = dhcp_option_len ( option );
+		option_len = dhcp_option_len ( option, remaining );
 		remaining -= option_len;
 		if ( remaining < 0 )
 			break;
