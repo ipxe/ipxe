@@ -293,7 +293,7 @@ static int eth_slow_rx ( struct io_buffer *iobuf,
 	}
 
 	/* Strip any trailing padding */
-	iob_unput ( iobuf, ( sizeof ( *eth_slow ) - iob_len ( iobuf ) ) );
+	iob_unput ( iobuf, ( iob_len ( iobuf ) - sizeof ( *eth_slow ) ) );
 
 	/* Handle according to subtype */
 	switch ( eth_slow->header.subtype ) {
