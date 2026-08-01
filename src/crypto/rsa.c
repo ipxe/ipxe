@@ -336,8 +336,8 @@ static int rsa_pkcs1_encrypt ( struct pubkey_algorithm *pubkey __unused,
 	struct rsa_context context;
 	void *temp;
 	uint8_t *encoded;
-	size_t max_len;
-	size_t random_nz_len;
+	size_t min_len;
+	size_t pad_len;
 	int rc;
 
 	DBGC ( &context, "RSA %p encrypting:\n", &context );
@@ -348,16 +348,14 @@ static int rsa_pkcs1_encrypt ( struct pubkey_algorithm *pubkey __unused,
 		goto err_init;
 
 	/* Calculate lengths */
-	max_len = ( context.max_len - 11 );
-	random_nz_len = ( max_len - plaintext->len + 8 );
-
-	/* Sanity check */
-	if ( plaintext->len > max_len ) {
-		DBGC ( &context, "RSA %p plaintext too long (%zd bytes, max "
-		       "%zd)\n", &context, plaintext->len, max_len );
-		rc = -ERANGE;
+	min_len = ( 1 /* "0x00" */ + 1 /* "0x02" */ + 8 /* minimum padding */
+		    + 1 /* "0x00" */ + plaintext->len );
+	if ( min_len > context.max_len ) {
+		DBGC ( &context, "RSA %p modulus too small for %zd-byte "
+		       "plaintext\n", &context, plaintext->len );
 		goto err_sanity;
 	}
+	pad_len = ( 8 /* minimum padding */ + context.max_len - min_len );
 
 	/* Construct encoded message (using the big integer output
 	 * buffer as temporary storage)
@@ -366,12 +364,12 @@ static int rsa_pkcs1_encrypt ( struct pubkey_algorithm *pubkey __unused,
 	encoded = temp;
 	encoded[0] = 0x00;
 	encoded[1] = 0x02;
-	if ( ( rc = rsa_get_random ( &encoded[2], random_nz_len ) ) != 0 ) {
+	if ( ( rc = rsa_get_random ( &encoded[2], pad_len ) ) != 0 ) {
 		DBGC ( &context, "RSA %p could not generate random data: %s\n",
 		       &context, strerror ( rc ) );
 		goto err_random;
 	}
-	encoded[ 2 + random_nz_len ] = 0x00;
+	encoded[ 2 + pad_len ] = 0x00;
 	memcpy ( &encoded[ context.max_len - plaintext->len ],
 		 plaintext->data, plaintext->len );
 	DBGC ( &context, "RSA %p encoded:\n", &context );
@@ -504,7 +502,7 @@ static int rsa_pkcs1_encode ( struct rsa_context *context,
 	size_t digest_len = digest->digestsize;
 	uint8_t *temp = encoded;
 	size_t digestinfo_len;
-	size_t max_len;
+	size_t min_len;
 	size_t pad_len;
 
 	/* Identify prefix */
@@ -517,11 +515,11 @@ static int rsa_pkcs1_encode ( struct rsa_context *context,
 	digestinfo_len = ( prefix->len + digest_len );
 
 	/* Sanity check */
-	max_len = ( context->max_len - 11 );
-	if ( digestinfo_len > max_len ) {
-		DBGC ( context, "RSA %p %s digestInfo too long (%zd bytes, "
-		       "max %zd)\n", context, digest->name, digestinfo_len,
-		       max_len );
+	min_len = ( 1 /* "0x00" */ + 1 /* "0x01" */ + 8 /* minimum padding */
+		    + 1 /* "0x00" */ + digestinfo_len );
+	if ( min_len > context->max_len ) {
+		DBGC ( context, "RSA %p modulus too small for %s digest\n",
+		       context, digest->name );
 		return -ERANGE;
 	}
 	DBGC ( context, "RSA %p encoding %s digest using PKCS#1:\n",
@@ -531,7 +529,7 @@ static int rsa_pkcs1_encode ( struct rsa_context *context,
 	/* Construct encoded message */
 	*(temp++) = 0x00;
 	*(temp++) = 0x01;
-	pad_len = ( max_len - digestinfo_len + 8 );
+	pad_len = ( 8 /* minimum padding */ + context->max_len - min_len );
 	memset ( temp, 0xff, pad_len );
 	temp += pad_len;
 	*(temp++) = 0x00;
