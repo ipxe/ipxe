@@ -179,13 +179,21 @@ static unsigned int png_pixel_len ( struct png_context *png ) {
  *
  * @v png		PNG context
  * @v interlace		Interlace pass
- * @ret scanline_len	Scanline length (including filter byte)
+ * @ret scanline_len	Scanline length (including filter byte), or 0 on error
  */
 static size_t png_scanline_len ( struct png_context *png,
 				 struct png_interlace *interlace ) {
+	size_t bits;
 
-	return ( 1 /* Filter byte */ +
-		 ( ( interlace->width * png->channels * png->depth ) + 7 ) / 8);
+	/* Calculate bit count and check for overflow */
+	bits = ( interlace->width * png->channels * png->depth );
+	assert ( png->channels != 0 );
+	assert ( png->depth != 0 );
+	if ( ( ( bits / png->channels ) / png->depth ) != interlace->width )
+		return 0;
+
+	/* Calculate byte length (cannot overflow) */
+	return ( 1 /* Filter byte */ + ( bits / 8 ) + ( !! ( bits & 7 ) ) );
 }
 
 /**
@@ -200,6 +208,8 @@ static int png_image_header ( struct image *image, struct png_context *png,
 			      size_t len ) {
 	const struct png_image_header *ihdr;
 	struct png_interlace interlace;
+	size_t scanline_len;
+	size_t pass_len;
 	unsigned int pass;
 
 	/* Sanity check */
@@ -273,8 +283,15 @@ static int png_image_header ( struct image *image, struct png_context *png,
 		png_interlace ( png, pass, &interlace );
 		if ( interlace.width == 0 )
 			continue;
-		png->raw.len += ( interlace.height *
-				  png_scanline_len ( png, &interlace ) );
+		scanline_len = png_scanline_len ( png, &interlace );
+		if ( ! scanline_len )
+			return -ERANGE;
+		pass_len = ( interlace.height * scanline_len );
+		if ( ( pass_len / scanline_len ) != interlace.height )
+			return -ERANGE;
+		png->raw.len += pass_len;
+		if ( png->raw.len < pass_len )
+			return -ERANGE;
 	}
 
 	/* Allocate raw data buffer */
