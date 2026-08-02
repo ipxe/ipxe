@@ -300,17 +300,13 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 	actual_offset = ( offset & ~( heap->align - 1 ) );
 	assert ( actual_offset <= offset );
 
-	/* Calculate size of memory block */
+	/* Calculate size of memory block and check for overflow */
 	actual_size = ( ( size + offset - actual_offset + heap->align - 1 )
 			& ~( heap->align - 1 ) );
-	if ( ! actual_size ) {
-		/* A zero result at this point indicates that unsigned
-		 * integer overflow has occurred.
-		 */
+	if ( actual_size < size ) {
 		ptr = NULL;
 		goto done;
 	}
-	assert ( actual_size >= size );
 
 	/* Calculate alignment mask */
 	align_mask = ( ( align - 1 ) | ( heap->align - 1 ) );
