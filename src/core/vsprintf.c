@@ -394,7 +394,7 @@ int snprintf ( char *buf, size_t size, const char *fmt, ... ) {
  * Version of vsnprintf() that accepts a signed buffer size
  *
  * @v buf		Buffer into which to write the string
- * @v size		Size of buffer
+ * @v ssize		Size of buffer
  * @v fmt		Format string
  * @v args		Arguments corresponding to the format string
  * @ret len		Length of formatted string
@@ -410,13 +410,33 @@ int vssnprintf ( char *buf, ssize_t ssize, const char *fmt, va_list args ) {
 }
 
 /**
- * Version of vsnprintf() that accepts a signed buffer size
+ * Version of snprintf() that accepts a signed buffer size
  *
  * @v buf		Buffer into which to write the string
- * @v size		Size of buffer
+ * @v ssize		Size of buffer
  * @v fmt		Format string
  * @v ...		Arguments corresponding to the format string
  * @ret len		Length of formatted string
+ *
+ * ssnprintf() is intended to be used in situations where a buffer is
+ * being assembled from multiple printf()-formatted strings.  The
+ * input size is allowed to go negative: a negative size will be
+ * treated as a zero size and so no data will be written to the
+ * buffer.  As with snprintf(), the return value is the length that
+ * would have been written to the string (excluding the terminating
+ * NUL) if enough space had been available.
+ *
+ * The expected usage pattern is that after each call to ssnprintf()
+ * within a sequence, the buffer pointer will be advanced and the
+ * remaining size reduced by the returned length.  The buffer pointer
+ * may safely be advanced beyond the available length, and the
+ * remaining size may safely be reduced below zero.
+ *
+ * A sequence of calls to ssnprintf() that starts with a NULL buffer
+ * pointer and a zero size may be used to determine the total length
+ * of space required.  A buffer can be allocated, and the exact same
+ * sequence of calls to ssnprintf() may be reused to fill in the
+ * buffer.
  */
 int ssnprintf ( char *buf, ssize_t ssize, const char *fmt, ... ) {
 	va_list args;
