@@ -277,10 +277,21 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 	void *ptr;
 
 	/* Sanity checks */
-	assert ( size != 0 );
-	assert ( ( align != 0 ) && ( ( align & ( align - 1 ) ) == 0 ) );
 	valgrind_make_blocks_defined ( heap );
 	check_blocks ( heap );
+
+	/* Validate inputs */
+	if ( ( size == 0 ) || ( align == 0 ) || ( align & ( align - 1 ) ) ) {
+		/* This is unreachable from any of our callers and
+		 * could instead be an assertion, but we perform a
+		 * runtime check anyway to guard against future
+		 * possible code changes.
+		 */
+		DBGC ( heap, "HEAP malformed allocation %#zx (aligned "
+		       "%#zx+%#zx)\n", size, align, offset );
+		ptr = NULL;
+		goto done;
+	}
 
 	/* Limit offset to requested alignment */
 	offset &= ( align - 1 );
@@ -293,9 +304,7 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 	actual_size = ( ( size + offset - actual_offset + heap->align - 1 )
 			& ~( heap->align - 1 ) );
 	if ( ! actual_size ) {
-		/* The requested size is not permitted to be zero.  A
-		 * zero result at this point indicates that either the
-		 * original requested size was zero, or that unsigned
+		/* A zero result at this point indicates that unsigned
 		 * integer overflow has occurred.
 		 */
 		ptr = NULL;
