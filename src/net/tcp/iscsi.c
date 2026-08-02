@@ -424,6 +424,10 @@ static int iscsi_rx_scsi_response ( struct iscsi_session *iscsi,
 	size_t data_len;
 	int rc;
 
+	/* Sanity check */
+	if ( ! iscsi->command )
+		return -EPROTO;
+
 	/* Buffer up the PDU data */
 	if ( ( rc = iscsi_rx_buffered_data ( iscsi, data, len ) ) != 0 ) {
 		DBGC ( iscsi, "iSCSI %p could not buffer SCSI response: %s\n",
@@ -474,9 +478,12 @@ static int iscsi_rx_data_in ( struct iscsi_session *iscsi,
 	unsigned long offset;
 	int rc;
 
+	/* Sanity check */
+	if ( ! iscsi->command )
+		return -EPROTO;
+
 	/* Copy data to data-in buffer */
 	offset = ntohl ( data_in->offset ) + iscsi->rx_offset;
-	assert ( iscsi->command != NULL );
 	if ( ( rc = xferbuf_write ( &iscsi->command->data_in, offset,
 				    data, len ) ) != 0 )
 		return rc;
@@ -509,6 +516,10 @@ static int iscsi_rx_r2t ( struct iscsi_session *iscsi,
 			  const void *data __unused, size_t len __unused,
 			  size_t remaining __unused ) {
 	struct iscsi_bhs_r2t *r2t = &iscsi->rx_bhs.r2t;
+
+	/* Sanity check */
+	if ( ! iscsi->command )
+		return -EPROTO;
 
 	/* Record transfer parameters and trigger first data-out */
 	iscsi->ttt = ntohl ( r2t->ttt );
