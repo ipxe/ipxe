@@ -42,10 +42,21 @@ assert_printf ( const char *fmt, ... ) asm ( "printf" );
  * Assert a condition at run-time.
  *
  * If the condition is not true, a debug message will be printed.
- * Assertions only take effect in debug-enabled builds (see DBG()).
+ * Assertions only take effect when debugging is enabled for the
+ * object in which the assertion is compiled (see DBG()).
  *
- * @todo Make an assertion failure abort the program
+ * Assertions are non-terminating even when enabled.  Execution will
+ * continue, since in a debug build this is often more useful to the
+ * developer than terminating immediately (and, as a bootloader, there
+ * is often no defined way to terminate the program other than by
+ * rebooting the system).  However, all behaviour after the first
+ * assertion has triggered should be considered to be undefined.
  *
+ * Assertion conditions will always be compile-checked even when
+ * debugging is not enabled, and can therefore serve as consumers of
+ * otherwise unused variables.  The assertion condition is removed by
+ * dead code elimination when debugging is disabled.  Assertion
+ * conditions must therefore not have side effects.
  */
 #define assert( condition ) 						     \
 	do { 								     \
