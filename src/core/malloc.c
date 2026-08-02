@@ -278,12 +278,12 @@ static void * heap_alloc_block ( struct heap *heap, size_t size, size_t align,
 
 	/* Sanity checks */
 	assert ( size != 0 );
-	assert ( ( align == 0 ) || ( ( align & ( align - 1 ) ) == 0 ) );
+	assert ( ( align != 0 ) && ( ( align & ( align - 1 ) ) == 0 ) );
 	valgrind_make_blocks_defined ( heap );
 	check_blocks ( heap );
 
 	/* Limit offset to requested alignment */
-	offset &= ( align ? ( align - 1 ) : 0 );
+	offset &= ( align - 1 );
 
 	/* Calculate offset of memory block */
 	actual_offset = ( offset & ~( heap->align - 1 ) );
@@ -711,11 +711,11 @@ void zfree ( void *ptr ) {
 void * malloc_phys_offset ( size_t size, size_t phys_align, size_t offset ) {
 	void * ptr;
 
+	assert ( phys_align != 0 );
 	ptr = heap_alloc_block ( &heap, size, phys_align, offset );
 	if ( ptr && size ) {
-		assert ( ( phys_align == 0 ) ||
-			 ( ( ( virt_to_phys ( ptr ) ^ offset ) &
-			     ( phys_align - 1 ) ) == 0 ) );
+		assert ( ( ( virt_to_phys ( ptr ) ^ offset ) &
+			   ( phys_align - 1 ) ) == 0 );
 		VALGRIND_MALLOCLIKE_BLOCK ( ptr, size, 0, 0 );
 	}
 	return ptr;
