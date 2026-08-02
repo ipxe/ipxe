@@ -216,6 +216,7 @@ static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
 	char *sep;
 	size_t base64_len;
 	size_t uri_len;
+	size_t check_len;
 	size_t len;
 	int rc;
 
@@ -228,25 +229,25 @@ static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
 	}
 
 	/* Calculate base64-encoded request length */
-	base64_len = ( base64_encoded_len ( ocsp->request.builder.len )
-		       + 1 /* NUL */ );
+	base64_len = base64_encoded_len ( ocsp->request.builder.len );
 
 	/* Allocate and construct the base64-encoded request */
-	base64 = malloc ( base64_len );
+	base64 = malloc ( base64_len + 1 /* NUL */ );
 	if ( ! base64 ) {
 		rc = -ENOMEM;
 		goto err_alloc_base64;
 	}
-	base64_encode ( ocsp->request.builder.data, ocsp->request.builder.len,
-			base64, base64_len );
+	check_len = base64_encode ( ocsp->request.builder.data,
+				    ocsp->request.builder.len,
+				    base64, ( base64_len + 1 /* NUL */ ) );
+	assert ( check_len == base64_len );
 
 	/* Calculate URI-encoded base64-encoded request length */
-	uri_len = ( uri_encode ( URI_PATH, base64, ( base64_len - 1 /* NUL */ ),
-				 NULL, 0 ) + 1 /* NUL */ );
+	uri_len = uri_encode ( URI_PATH, base64, base64_len, NULL, 0 );
 
 	/* Allocate and construct the URI string */
 	len = ( responder->uri.len + 1 /* possible "/" */ + uri_len );
-	ocsp->uri_string = zalloc ( len );
+	ocsp->uri_string = zalloc ( len + 1 /* NUL */ );
 	if ( ! ocsp->uri_string ) {
 		rc = -ENOMEM;
 		goto err_alloc_uri;
@@ -255,7 +256,10 @@ static int ocsp_uri_string ( struct ocsp_check *ocsp ) {
 	sep = &ocsp->uri_string[ responder->uri.len - 1 ];
 	if ( *sep != '/' )
 		*(++sep) = '/';
-	uri_encode ( URI_PATH, base64, base64_len, ( sep + 1 ), uri_len );
+	check_len = uri_encode ( URI_PATH, base64, base64_len,
+				 ( sep + 1 /* "/" */ ),
+				 ( uri_len + 1 /* NUL */ ) );
+	assert ( check_len == uri_len );
 	DBGC2 ( ocsp, "OCSP %p \"%s\" URI is %s\n",
 		ocsp, x509_name ( ocsp->cert ), ocsp->uri_string );
 
