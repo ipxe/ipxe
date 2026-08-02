@@ -34,6 +34,66 @@ FILE_SECBOOT ( PERMITTED );
  * This data structure encapsulates a long-lived I/O buffer.  The
  * buffer may be passed between multiple owners, queued for possible
  * retransmission, etc.
+ *
+ * The datapath model uses a zero-copy fast path for both transmit and
+ * receive directions.  Headers and footers are appended/prepended and
+ * stripped in situ as the buffer is passed between layers of the
+ * network stack.  Adding or stripping a header or footer is merely a
+ * pointer update: no existing data is ever moved.
+ *
+ * The buffer content is delineated by four pointers, which satisfy
+ * the invariant:
+ *
+ *     head <= data <= tail <= end
+ *
+ * The head and end pointers are set when the buffer is first
+ * allocated and are never changed.  The data and tail pointers
+ * represent the current data region within the buffer, and are
+ * modified by the accessor functions iob_push(), iob_pull(),
+ * iob_put(), iob_unput() etc.
+ *
+ * The current length of the data region may be obtained using
+ * iob_len().  The space currently between the head and data pointers
+ * is the available headroom and its length may be obtained using
+ * iob_headroom().  Similarly, the space currently between the tail
+ * and end pointers is the available tailroom and its length may be
+ * obtained using iob_tailroom().
+ *
+ * It is the responsibility of the allocator of the I/O buffer to
+ * ensure that sufficient headroom and tailroom exists for all
+ * subsequent users of the I/O buffer.  For example: a transmit buffer
+ * allocated by the TCP layer must ensure that there is sufficient
+ * headroom for the TCP headers, the network-layer (IPv4/IPv6)
+ * headers, and the longest possible link-layer header.  The lower
+ * layers are permitted to assume that sufficient headroom exists and
+ * may call iob_push() to prepend their headers without performing any
+ * further checks.
+ *
+ * On the receive datapath, I/O buffers are typically allocated by the
+ * device driver.  Some care must be taken to ensure that received
+ * buffers that end up being reflected and transmitted (e.g. responses
+ * to ARP requests) contain sufficient headroom.  For most devices,
+ * transmit and receive buffers are symmetric and so any receive
+ * buffer will always have sufficient headroom for this purpose.
+ * Devices that require additional transmit headers (such as the Asix
+ * USB NICs) must ensure that additional headroom is allocated in
+ * receive buffers to allow for this reflection.
+ *
+ * Received I/O buffers should always be treated as containing
+ * untrusted data.  Device drivers may assume that DMA-capable
+ * hardware will not report erroneous lengths (e.g. a received length
+ * greater than the original allocation length), but all other
+ * consumers must validate the buffer length before accessing its
+ * contents or stripping headers or footers.
+ *
+ * The accessor functions iob_push(), iob_pull(), iob_unput() etc
+ * include assertion checks but do not perform any runtime checks that
+ * the pointer invariant is maintained.  In particular, using
+ * iob_pull() or iob_unput() to strip a header without first using
+ * iob_len() to check the available length will result in an invariant
+ * violation that causes the iob_len() calculation to underflow and
+ * report an extremely large buffer length (which is then likely to
+ * cause a false positive for any subsequent buffer length checks).
  */
 struct io_buffer {
 	/** List of which this buffer is a member
