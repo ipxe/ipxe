@@ -38,6 +38,55 @@ FILE_SECBOOT ( PERMITTED );
  *
  * Dynamic memory allocation
  *
+ * Memory allocation via malloc() is provided using a simple
+ * free-block list in a fixed-size heap.
+ *
+ * The standard C semantics are supported.  Calling realloc() with a
+ * size of zero is a valid way to free a block.  Calling malloc() or
+ * realloc() with a size of zero will return a non-NULL value that can
+ * safely be passed to free() (meaning that callers can always treat a
+ * NULL return value as an error, without having to special-case a
+ * zero-length allocation).
+ *
+ * (The POSIX semantics of setting a global @c errno variable on
+ * allocation failure are not supported: callers should check for a
+ * NULL return value and then return -ENOMEM as per the usual iPXE
+ * error propagation conventions.)
+ *
+ * Memory allocation assumes that all input parameters are untrusted
+ * and must be checked.  In particular, buffer sizes are frequently
+ * derived from untrusted input obtained via the network (e.g. an HTTP
+ * Content-Length header).
+ *
+ * In contrast, memory deallocation assumes that the caller is always
+ * passing in a valid pointer value.
+ *
+ * The internal heap is relatively small.  Allocation is expected to
+ * sometimes fail in normal operation, and all callers must be
+ * prepared to handle it cleanly.  Device drivers attempting to
+ * allocate receive buffers to refill a receive ring can simply exit
+ * the refill loop and do nothing until the next refill opportunity.
+ * Other callers will generally have to treat allocation failure as
+ * fatal and cleanly terminate their operation (e.g. by closing a
+ * connection).
+ *
+ * The same internal heap supports both size-tracked allocations
+ * (using malloc()/free()) and known-size allocations (using
+ * malloc_phys()/free_phys(), where the caller must pass the original
+ * size when freeing the block).  The latter are typically used for
+ * I/O buffers, driver descriptor rings, and other hardware-facing
+ * structures.
+ *
+ * Depending upon the build platform, the underlying heap
+ * implementation may also be used to support external ("user")
+ * allocations using umalloc() and ufree().
+ *
+ * A cache discard mechanism exists to attempt to alleviate memory
+ * pressure by discarding cached information (such as packets held in
+ * a TCP out-of-order receive queue) when an allocation attempt would
+ * otherwise fail.  Code that holds pointers to discardable objects
+ * must be careful not to call any allocation functions.
+ *
  */
 
 /** A free block of memory */
