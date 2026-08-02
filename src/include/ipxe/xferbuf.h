@@ -3,7 +3,7 @@
 
 /** @file
  *
- * Data transfer buffer
+ * Data transfer buffers
  *
  */
 

@@ -36,8 +36,34 @@ FILE_SECBOOT ( PERMITTED );
 
 /** @file
  *
- * Data transfer buffer
+ * Data transfer buffers
  *
+ * Data transfer buffers provide an abstraction of an underlying
+ * storage buffer, with strictly bounds-checking accessors for reading
+ * and writing data and optional automatic resizing.  They are
+ * designed primarily to act as the ultimate sink for receiving I/O
+ * buffers containing downloaded data, after all protocol-level
+ * framing has been stripped.
+ *
+ * The underlying storage buffer may be backed by a malloc()
+ * allocation, a umalloc() allocation, a fixed-size buffer, a
+ * downloadable image's data, or a /dev/null-style void buffer.
+ *
+ * Consumers of data buffers pass an offset and length when reading
+ * from or writing to the buffer.  Any integer overflow will be
+ * reported as a failure (and no data will be read or written).
+ *
+ * Attempting to read beyond the end of a buffer will always fail.
+ * Attempting to write beyond the end of a buffer will automatically
+ * attempt to resize the buffer to accommodate the write (and will
+ * fail if this cannot be done).
+ *
+ * An object interface may choose to implement the xfer_buffer()
+ * interface method to provide another object with direct access to
+ * its own data buffer.  This is something of a layering violation,
+ * but is required to support the badly designed PeerDist protocol
+ * which fails to provide the AES initialisation vector until after
+ * the encrypted data has all been received.
  */
 
 /** Data delivery profiler */
