@@ -2670,6 +2670,37 @@ static int golan_crusoe_alloc_sq_uar ( struct golan *golan,
 }
 
 /*
+ * Linux calls mlx5_set_port_admin_status(UP) after opening mlx5e queues.
+ * Without this ACCESS_REG(PAOS) write the live VF reports admin=0/state=0
+ * even though iPXE's software netdev has been forced link-up.
+ */
+static int golan_crusoe_set_port_up ( struct golan *golan ) {
+	struct golan_cmd_layout *cmd;
+	u8 *in;
+	int rc;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ACCESS_REG, 0,
+			  GEN_MBOX, GEN_MBOX, 24, 24 );
+	/* access_register_in.register_id = MLX5_REG_PAOS (0x5006). */
+	( ( u8 * ) cmd->in )[10] = 0x50;
+	( ( u8 * ) cmd->in )[11] = 0x06;
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/*
+	 * paos_reg: local_port=1 at byte 1, admin_status=UP(1) in the low
+	 * nibble of byte 2, and ase=1 in the high bit of byte 4.
+	 */
+	in[1] = 1;
+	in[2] = 1;
+	in[4] = 0x80;
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX,
+				     "crusoe_set_port_up" );
+	printf ( "Crusoe mlx5e VF: ACCESS_REG PAOS up rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	return rc;
+}
+
+/*
  * Minimal Ethernet-netdev skeleton for Crusoe's mlx5Gen VF.
  *
  * This intentionally does not claim packet support yet.  It changes the
@@ -2684,6 +2715,8 @@ static int golan_crusoe_eth_open ( struct net_device *netdev ) {
 	if ( ( rc = golan_bring_up ( golan ) ) != 0 )
 		return rc;
 	if ( ( rc = golan_crusoe_setup_mlx5e_queues ( golan ) ) != 0 )
+		return rc;
+	if ( ( rc = golan_crusoe_set_port_up ( golan ) ) != 0 )
 		return rc;
 	/*
 	 * TX-isolation diagnostic: keep the accepted RQ/TIR/steering graph but
