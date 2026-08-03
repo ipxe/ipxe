@@ -399,12 +399,12 @@ int asn1_enter_bits ( struct asn1_cursor *cursor, unsigned int *unused ) {
 		return -EINVAL_BIT_STRING;
 	}
 	bit_string = cursor->data;
+	last = ( cursor->data + cursor->len - 1 );
 	cursor->data = &bit_string->data;
 	cursor->len -= offsetof ( typeof ( *bit_string ), data );
 	unused_bits = bit_string->unused;
 
 	/* Check validity of unused bits */
-	last = ( cursor->data + cursor->len - 1 );
 	if ( ( unused_bits >= 8 ) ||
 	     ( ( unused_bits > 0 ) && ( cursor->len == 0 ) ) ||
 	     ( ( *last & ( 0xffU >> ( 8 - unused_bits ) ) ) != 0 ) ) {
