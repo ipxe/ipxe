@@ -2987,6 +2987,12 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	in[16] = 0x10;
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
+	/*
+	 * sqc.tis_lst_sz is a 16-bit field at command input bytes 64..65.
+	 * Linux declares one TIS before filling tis_num_0 below.  Without
+	 * this, firmware accepts the SQ but its TIS list is logically empty.
+	 */
+	in[49] = 1;
 	golan_crusoe_put_be24 ( &in[61], tisn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
