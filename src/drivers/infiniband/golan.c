@@ -2574,7 +2574,7 @@ static struct ib_device_operations golan_ib_operations;
 #define GOLAN_CRUSOE_SQ_PAGES 16
 #define GOLAN_CRUSOE_SQ_WQES 64
 #define GOLAN_CRUSOE_RQ_STRIDE 64
-#define GOLAN_CRUSOE_SQ_STRIDE 128
+#define GOLAN_CRUSOE_SQ_STRIDE 64
 
 struct golan_crusoe_eth_seg {
 	u8 bytes[16];
@@ -2601,6 +2601,8 @@ struct golan_crusoe_mlx5e {
 	 * and blue-flame write target the same dedicated UAR.
 	 */
 	struct golan_uar sq_uar;
+	struct dma_mapping rq_wq_map;
+	struct dma_mapping rq_dbr_map;
 	struct dma_mapping sq_wq_map;
 	struct dma_mapping sq_dbr_map;
 	void *rq_wq;
@@ -2624,6 +2626,7 @@ struct golan_crusoe_mlx5e {
 
 static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan );
 static int golan_crusoe_post_rx ( struct golan *golan );
+static int golan_crusoe_refill_rx ( struct golan *golan, unsigned int idx );
 static unsigned int golan_crusoe_get_be24 ( const u8 *src );
 
 static int golan_crusoe_alloc_sq_uar ( struct golan *golan,
@@ -2758,14 +2761,10 @@ static int golan_crusoe_eth_open ( struct net_device *netdev ) {
 	 */
 	if ( ( rc = golan_crusoe_query_nic_vport_identity ( golan ) ) != 0 )
 		return rc;
-	/*
-	 * TX-isolation diagnostic: keep the accepted RQ/TIR/steering graph but
-	 * do not publish any RX WQEs before the first NOP.  If the SQ still
-	 * remains unconsumed, active RX state is not suppressing TX progress.
-	 */
-	printf ( "Crusoe mlx5e VF: RX posting skipped for TX isolation\n" );
+	if ( ( rc = golan_crusoe_post_rx ( golan ) ) != 0 )
+		return rc;
 	netdev_link_up ( netdev );
-	printf ( "Crusoe mlx5e VF: Ethernet netdev open; TX isolation active\n" );
+	printf ( "Crusoe mlx5e VF: Ethernet netdev open; coherent RX posted\n" );
 	return 0;
 }
 
@@ -2826,35 +2825,28 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	idx = ( mlx5e->sq_prod & ( GOLAN_CRUSOE_SQ_WQES - 1 ) );
 	if ( mlx5e->tx_iobufs[idx] )
 		return -ENOBUFS;
-
 	wqe = ( ( struct golan_crusoe_tx_wqe * )
 		( ( u8 * ) mlx5e->sq_wq +
 		  ( idx * GOLAN_CRUSOE_SQ_STRIDE ) ) );
 	memset ( wqe, 0, sizeof ( *wqe ) );
-	/*
-	 * Diagnostic NOP: one control segment, no Ethernet/data segments.  This
-	 * isolates SQ producer publication and the UAR doorbell from SEND layout.
-	 */
-	wqe->ctrl.opmod_idx_opcode = cpu_to_be32 ( mlx5e->sq_prod << 8 );
-	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 1 );
-	/* Request a CQE now that the CQ and DBR use coherent EFI DMA. */
+	wqe->ctrl.opmod_idx_opcode =
+		cpu_to_be32 ( ( mlx5e->sq_prod << 8 ) | GOLAN_SEND_OPCODE );
+	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 3 );
 	wqe->ctrl.fm_ce_se = GOLAN_WQE_CTRL_CQ_UPDATE;
+	wqe->data.byte_count = cpu_to_be32 ( iob_len ( iobuf ) );
+	wqe->data.lkey = cpu_to_be32 ( golan->mkey );
+	wqe->data.addr = cpu_to_be64 ( iob_dma ( iobuf ) );
 	mlx5e->tx_iobufs[idx] = iobuf;
 	mlx5e->sq_prod++;
 
 	wmb();
 	*( ( __be32 * ) mlx5e->sq_dbr ) = cpu_to_be32 ( mlx5e->sq_prod );
 	wmb();
-	/*
-	 * Match mlx5e_notify_hw() exactly: update DBR[0], order it before MMIO,
-	 * then copy only the first control qword to the BF mapping at 0x800.
-	 * Earlier diagnostics wrote extra DBR/BF slots; keep them out of this
-	 * test so duplicate notifications cannot mask the canonical path.
-	 */
+	/* Match mlx5e_notify_hw(): one DBR[0] update and one BF qword. */
 	writeq ( *( ( __be64 * ) &wqe->ctrl ),
 		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
 	if ( ! mlx5e->sq_probe_printed ) {
-		printf ( "Crusoe mlx5e VF: NOP ctrl raw d0=0x%x d1=0x%x d2=0x%x d3=0x%x mmio_qword=0x%llx\n",
+		printf ( "Crusoe mlx5e VF: SEND ctrl raw d0=0x%x d1=0x%x d2=0x%x d3=0x%x mmio_qword=0x%llx\n",
 			 *( ( u32 * ) &wqe->ctrl ),
 			 *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 4 ) ),
 			 *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 8 ) ),
@@ -2863,7 +2855,7 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
 		mlx5e->sq_probe_printed = 1;
 	}
-	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR0=%d exact-one-BF\n",
+	printf ( "Crusoe mlx5e VF: submitted SEND WQE idx=%d len=%zd SQ DBR0=%d exact-one-BF\n",
 		 idx, iob_len ( iobuf ),
 		 be32_to_cpu ( *( ( __be32 * ) mlx5e->sq_dbr ) ) );
 	return 0;
@@ -2879,6 +2871,7 @@ static void golan_crusoe_eth_poll ( struct net_device *netdev ) {
 	unsigned int qpn;
 	u16 wqe_counter;
 	u8 opcode;
+	size_t len;
 
 	if ( ! mlx5e )
 		return;
@@ -2919,6 +2912,23 @@ static void golan_crusoe_eth_poll ( struct net_device *netdev ) {
 				else
 					netdev_tx_complete ( netdev, iobuf );
 			}
+		} else if ( qpn == mlx5e->rqn ) {
+			idx = ( wqe_counter & ( GOLAN_CRUSOE_RX_WQES - 1 ) );
+			iobuf = mlx5e->rx_iobufs[idx];
+			mlx5e->rx_iobufs[idx] = NULL;
+			if ( iobuf ) {
+				len = be32_to_cpu ( cqe->byte_cnt );
+				if ( ( opcode == GOLAN_CQE_RESP_ERR ) ||
+				     ( len > iob_tailroom ( iobuf ) ) ) {
+					netdev_rx_err ( netdev, iobuf, -EIO );
+				} else {
+					iob_put ( iobuf, len );
+					netdev_rx ( netdev, iobuf );
+				}
+			}
+			if ( golan_crusoe_refill_rx ( golan, idx ) != 0 )
+				printf ( "Crusoe mlx5e VF: could not refill RX WQE %d\n",
+					 idx );
 		}
 		mlx5e->cq->next_idx++;
 		*( golan_cq->doorbell_record ) =
@@ -3095,12 +3105,13 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	if ( rc != 0 )
 		goto out;
 	cqn = cq->cqn;
-	rq_wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
 	dma_set_mask_64bit ( &golan->pci->dma );
+	rq_wq = dma_alloc ( &golan->pci->dma, &mlx5e->rq_wq_map,
+			     GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
 	sq_wq = dma_alloc ( &golan->pci->dma, &mlx5e->sq_wq_map,
 			     ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ),
 			     GOLAN_PAGE_SIZE );
-	rq_dbr = malloc_phys ( 8, 8 );
+	rq_dbr = dma_alloc ( &golan->pci->dma, &mlx5e->rq_dbr_map, 8, 8 );
 	sq_dbr = dma_alloc ( &golan->pci->dma, &mlx5e->sq_dbr_map, 8, 8 );
 	if ( ! rq_wq || ! sq_wq || ! rq_dbr || ! sq_dbr ) {
 		rc = -ENOMEM;
@@ -3154,13 +3165,15 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	in[28] = counter_set_id;
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
-	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( rq_dbr );
+	*( ( __be64 * ) &in[80] ) =
+		cpu_to_be64 ( dma ( &mlx5e->rq_dbr_map, rq_dbr ) );
 	/*
 	 * The posted descriptors start every 64 bytes, so advertise
 	 * log_wq_stride=6 and log_wq_sz=4 for the same 16-entry RQ.
 	 */
 	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00060004 );
-	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( rq_wq );
+	*( ( __be64 * ) &in[256] ) =
+		cpu_to_be64 ( dma ( &mlx5e->rq_wq_map, rq_wq ) );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_rq" );
 	printf ( "Crusoe mlx5e VF: explicit CREATE_RQ rc=%d status=0x%x syndrome=0x%x\n",
@@ -3348,12 +3361,12 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	if ( sq_dbr )
 		dma_free ( &mlx5e->sq_dbr_map, sq_dbr, 8 );
 	if ( rq_dbr )
-		free_phys ( rq_dbr, 8 );
+		dma_free ( &mlx5e->rq_dbr_map, rq_dbr, 8 );
 	if ( sq_wq )
 		dma_free ( &mlx5e->sq_wq_map, sq_wq,
 			   ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ) );
 	if ( rq_wq )
-		free_phys ( rq_wq, GOLAN_PAGE_SIZE );
+		dma_free ( &mlx5e->rq_wq_map, rq_wq, GOLAN_PAGE_SIZE );
 	if ( cq )
 		ib_destroy_cq ( ibdev, cq );
 	ibdev_put ( ibdev );
@@ -3368,33 +3381,44 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
  * iPXE-owned receive buffer; publishing the big-endian producer counter in
  * the RQ DBR makes the ready RQ eligible to DMA into those buffers.
  */
-static int __unused golan_crusoe_post_rx ( struct golan *golan ) {
+static int golan_crusoe_refill_rx ( struct golan *golan, unsigned int idx ) {
 	struct golan_crusoe_mlx5e *mlx5e = golan->crusoe_mlx5e;
 	struct golan_wqe_data_seg *wqe;
 	struct io_buffer *iobuf;
-	unsigned int i;
 
 	if ( ! mlx5e )
 		return -ENODEV;
+	if ( mlx5e->rx_iobufs[idx] )
+		return 0;
 
-	for ( i = 0 ; i < GOLAN_CRUSOE_RX_WQES ; i++ ) {
-		iobuf = alloc_iob ( ETH_FRAME_LEN );
-		if ( ! iobuf )
-			return -ENOMEM;
-		mlx5e->rx_iobufs[i] = iobuf;
-		wqe = ( ( void * ) ( ( u8 * ) mlx5e->rq_wq +
-				       ( i * GOLAN_CRUSOE_RQ_STRIDE ) ) );
-		memset ( wqe, 0, sizeof ( *wqe ) );
-		wqe->byte_count = cpu_to_be32 ( iob_tailroom ( iobuf ) );
-		wqe->lkey = cpu_to_be32 ( golan->mkey );
-		wqe->addr = VIRT_2_BE64_BUS ( iobuf->data );
-		mlx5e->rq_prod++;
-	}
+	iobuf = alloc_rx_iob ( ETH_FRAME_LEN, &golan->pci->dma );
+	if ( ! iobuf )
+		return -ENOMEM;
+	mlx5e->rx_iobufs[idx] = iobuf;
+	wqe = ( ( void * ) ( ( u8 * ) mlx5e->rq_wq +
+			       ( idx * GOLAN_CRUSOE_RQ_STRIDE ) ) );
+	memset ( wqe, 0, sizeof ( *wqe ) );
+	wqe->byte_count = cpu_to_be32 ( iob_tailroom ( iobuf ) );
+	wqe->lkey = cpu_to_be32 ( golan->mkey );
+	wqe->addr = cpu_to_be64 ( iob_dma ( iobuf ) );
+	mlx5e->rq_prod++;
 
 	wmb();
 	*( ( __be32 * ) mlx5e->rq_dbr ) = cpu_to_be32 ( mlx5e->rq_prod );
+	return 0;
+}
+
+static int golan_crusoe_post_rx ( struct golan *golan ) {
+	unsigned int i;
+	int rc;
+
+	for ( i = 0 ; i < GOLAN_CRUSOE_RX_WQES ; i++ ) {
+		if ( ( rc = golan_crusoe_refill_rx ( golan, i ) ) != 0 )
+			return rc;
+	}
 	printf ( "Crusoe mlx5e VF: posted %d RX WQEs; RQ DBR=%d\n",
-		 GOLAN_CRUSOE_RX_WQES, mlx5e->rq_prod );
+		 GOLAN_CRUSOE_RX_WQES,
+		 ( ( struct golan_crusoe_mlx5e * ) golan->crusoe_mlx5e )->rq_prod );
 	return 0;
 }
 
@@ -3409,6 +3433,7 @@ static int golan_crusoe_register_netdev ( struct golan *golan,
 
 	netdev_init ( netdev, &golan_crusoe_eth_operations );
 	netdev->dev = &golan->pci->dev;
+	netdev->dma = &golan->pci->dma;
 	*( ( struct golan ** ) netdev->priv ) = golan;
 	eth_random_addr ( netdev->hw_addr );
 	printf ( "Crusoe mlx5e VF: registering Ethernet netdev with temporary MAC %s\n",
