@@ -2679,6 +2679,8 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	u8 counter_set_id;
 	unsigned int transport_domain;
 	unsigned int tisn;
+	unsigned int rqn;
+	unsigned int sqn;
 	int rc;
 
 	ibdev = alloc_ibdev ( 0 );
@@ -2757,6 +2759,9 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	if ( rc != 0 )
 		goto out;
 
+	rqn = golan_crusoe_get_be24 ( & ( ( u8 * ) cmd->out )[9] );
+	printf ( "Crusoe mlx5e VF: explicit RQN=%d\n", rqn );
+
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_SQ, 0,
 			  GEN_MBOX, NO_MBOX, 280, 16 );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
@@ -2772,6 +2777,37 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_sq" );
 	printf ( "Crusoe mlx5e VF: explicit CREATE_SQ rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( rc != 0 )
+		goto out;
+
+	sqn = golan_crusoe_get_be24 ( & ( ( u8 * ) cmd->out )[9] );
+	printf ( "Crusoe mlx5e VF: explicit SQN=%d\n", sqn );
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_MODIFY_RQ, 0,
+			  GEN_MBOX, NO_MBOX, 272, 16 );
+	/* inline bytes 8..11 are current state plus RQN; RST is zero */
+	golan_crusoe_put_be24 ( & ( ( u8 * ) cmd->in )[9], rqn );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/* rqc.state at input byte 32, mailbox byte 16: RDY = 1 */
+	in[16] = 0x10;
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_modify_rq_ready" );
+	printf ( "Crusoe mlx5e VF: MODIFY_RQ ready rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( rc != 0 )
+		goto out;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_MODIFY_SQ, 0,
+			  GEN_MBOX, NO_MBOX, 272, 16 );
+	golan_crusoe_put_be24 ( & ( ( u8 * ) cmd->in )[9], sqn );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	in[16] = 0x10;
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_modify_sq_ready" );
+	printf ( "Crusoe mlx5e VF: MODIFY_SQ ready rc=%d status=0x%x syndrome=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
 
