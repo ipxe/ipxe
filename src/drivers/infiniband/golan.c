@@ -582,6 +582,44 @@ err_query_hca_cap:
 	return rc;
 }
 
+static int golan_crusoe_set_issi ( struct golan *golan )
+{
+	struct golan_cmd_layout *cmd;
+	u8 *outbox;
+	u8 *inline_in;
+	uint32_t supported_issi;
+	int rc;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_QUERY_ISSI, 0x0,
+			  NO_MBOX, GEN_MBOX, 16, 112 );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, GEN_MBOX,
+				     "golan_crusoe_query_issi" );
+	printf ( "Crusoe mlx5e VF: QUERY_ISSI rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( rc )
+		return rc;
+
+	/* supported_issi_dw0 is output byte 108; mailbox data starts at byte 16. */
+	outbox = ( u8 * ) GET_OUTBOX ( golan, GEN_MBOX );
+	supported_issi = be32_to_cpu ( * ( ( __be32 * ) ( outbox + 92 ) ) );
+	printf ( "Crusoe mlx5e VF: supported ISSI mask=0x%x\n", supported_issi );
+	if ( ! ( supported_issi & ( 1 << 1 ) ) )
+		return 0;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_SET_ISSI, 0x0,
+			  NO_MBOX, NO_MBOX, 16, 16 );
+	inline_in = ( u8 * ) cmd->in;
+	inline_in[10] = 0;
+	inline_in[11] = 1;
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
+				     "golan_crusoe_set_issi" );
+	printf ( "Crusoe mlx5e VF: SET_ISSI=1 rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	return rc;
+}
+
 static inline int golan_take_pages ( struct golan *golan, uint32_t pages, __be16 func_id ) {
 	uint32_t out_num_entries = 0;
 	int size_ibox = 0;
@@ -2478,6 +2516,11 @@ static inline int golan_bring_up(struct golan *golan)
 
 	if (( rc = golan_core_enable_hca(golan) ))
 		goto cmd_uninit;
+
+	if ( golan->pci->device == 0x101e ) {
+		if (( rc = golan_crusoe_set_issi ( golan ) ))
+			goto disable;
+	}
 
 	/* Query for need for boot pages */
 	if (( rc = golan_handle_pages(golan, GOLAN_BOOT_PAGES, GOLAN_PAGES_GIVE) ))
