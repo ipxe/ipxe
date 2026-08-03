@@ -2585,6 +2585,12 @@ struct golan_crusoe_tx_wqe {
 struct golan_crusoe_mlx5e {
 	struct ib_device *ibdev;
 	struct ib_completion_queue *cq;
+	/*
+	 * Linux gives Ethernet TX its own UAR allocation instead of sharing the
+	 * generic async/EQ page.  Keep that distinction here so the SQ context
+	 * and blue-flame write target the same dedicated UAR.
+	 */
+	struct golan_uar sq_uar;
 	void *rq_wq;
 	void *sq_wq;
 	void *rq_dbr;
@@ -2606,6 +2612,34 @@ struct golan_crusoe_mlx5e {
 
 static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan );
 static int golan_crusoe_post_rx ( struct golan *golan );
+static unsigned int golan_crusoe_get_be24 ( const u8 *src );
+
+static int golan_crusoe_alloc_sq_uar ( struct golan *golan,
+					struct golan_crusoe_mlx5e *mlx5e ) {
+	struct golan_cmd_layout *cmd;
+	struct golan_alloc_uar_mbox_out *out;
+	int rc;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ALLOC_UAR, 0,
+			  NO_MBOX, NO_MBOX,
+			  sizeof ( struct golan_alloc_uar_mbox_in ),
+			  sizeof ( struct golan_alloc_uar_mbox_out ) );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
+				     "crusoe_alloc_sq_uar" );
+	if ( rc != 0 )
+		return rc;
+	out = ( struct golan_alloc_uar_mbox_out * ) cmd->out;
+	mlx5e->sq_uar.index = ( be32_to_cpu ( out->uarn ) & 0xffffff );
+	mlx5e->sq_uar.phys =
+		( pci_bar_start ( golan->pci, GOLAN_HCA_BAR ) +
+		  ( mlx5e->sq_uar.index << GOLAN_PAGE_SHIFT ) );
+	mlx5e->sq_uar.virt =
+		( void * ) pci_ioremap ( golan->pci, mlx5e->sq_uar.phys,
+					GOLAN_PAGE_SIZE );
+	printf ( "Crusoe mlx5e VF: dedicated SQ UAR=%d virt=%p\n",
+		 mlx5e->sq_uar.index, mlx5e->sq_uar.virt );
+	return ( mlx5e->sq_uar.virt ? 0 : -ENOMEM );
+}
 
 /*
  * Minimal Ethernet-netdev skeleton for Crusoe's mlx5Gen VF.
@@ -2663,10 +2697,11 @@ static void golan_crusoe_query_sq_after_nop ( struct golan *golan,
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, GEN_MBOX,
 				     "crusoe_query_sq_after_nop" );
 	out = ( u8 * ) GET_OUTBOX ( golan, GEN_MBOX );
-	printf ( "Crusoe mlx5e VF: QUERY_SQ after NOP rc=%d status=0x%x syndrome=0x%x state=%d dbr_lo=0x%x hw=0x%x sw=0x%x\n",
+	printf ( "Crusoe mlx5e VF: QUERY_SQ after NOP rc=%d status=0x%x syndrome=0x%x state=%d uar=%d dbr_lo=0x%x hw=0x%x sw=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
 		 ( out[16] >> 4 ),
+		 golan_crusoe_get_be24 ( &out[77] ),
 		 be32_to_cpu ( *( ( __be32 * ) &out[84] ) ),
 		 be32_to_cpu ( *( ( __be32 * ) &out[88] ) ),
 		 be32_to_cpu ( *( ( __be32 * ) &out[92] ) ) );
@@ -2710,21 +2745,21 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	 * makes a duplicate harmless and tells us whether either register works.
 	 */
 	writeq ( *( ( __be64 * ) &wqe->ctrl ),
-		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
+		 mlx5e->sq_uar.virt + DB_BUFFER0_EVEN_OFFSET );
 	writeq ( *( ( __be64 * ) &wqe->ctrl ),
-		 golan->uar.virt + DB_BUFFER0_ODD_OFFSET );
+		 mlx5e->sq_uar.virt + DB_BUFFER0_ODD_OFFSET );
 	/*
 	 * Linux exposes four BF registers per UAR.  The first two are reserved
 	 * for non-fast-path users; Ethernet TX may use the fast-path pair.
 	 */
-	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xa00 );
-	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xb00 );
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), mlx5e->sq_uar.virt + 0xa00 );
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), mlx5e->sq_uar.virt + 0xb00 );
 	/*
 	 * Live Linux BF allocation shows log_bf_reg_size=9 on this VF, so
 	 * the remaining real slots are 0xc00 and 0xe00 (not 0xb00).
 	 */
-	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xc00 );
-	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xe00 );
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), mlx5e->sq_uar.virt + 0xc00 );
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), mlx5e->sq_uar.virt + 0xe00 );
 	if ( ! mlx5e->sq_probe_printed ) {
 		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
 		mlx5e->sq_probe_printed = 1;
@@ -2944,6 +2979,8 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	mlx5e = zalloc ( sizeof ( *mlx5e ) );
 	if ( ! mlx5e )
 		return -ENOMEM;
+	if ( ( rc = golan_crusoe_alloc_sq_uar ( golan, mlx5e ) ) != 0 )
+		goto out_state;
 
 	ibdev = alloc_ibdev ( 0 );
 	if ( ! ibdev ) {
@@ -3049,7 +3086,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	in[49] = 1;
 	golan_crusoe_put_be24 ( &in[61], tisn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
-	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
+	golan_crusoe_put_be24 ( &in[77], mlx5e->sq_uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( sq_dbr );
 	/*
 	 * Match Linux's active Ethernet TX SQ shape: 64-byte WQEBBs and
@@ -3193,8 +3230,8 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	mlx5e->flow_table_id = flow_table_id;
 	mlx5e->flow_group_id = flow_group_id;
 	golan->crusoe_mlx5e = mlx5e;
-	printf ( "Crusoe mlx5e VF: retained CQN=%d RQN=%d SQN=%d UAR=%d independent RQ/SQ rings and DBRs\n",
-		 cqn, rqn, sqn, golan->uar.index );
+	printf ( "Crusoe mlx5e VF: retained CQN=%d RQN=%d SQN=%d generic-UAR=%d SQ-UAR=%d independent RQ/SQ rings and DBRs\n",
+		 cqn, rqn, sqn, golan->uar.index, mlx5e->sq_uar.index );
 	return 0;
 
  out:
