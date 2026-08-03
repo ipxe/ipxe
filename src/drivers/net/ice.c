@@ -48,7 +48,7 @@ FILE_SECBOOT ( PERMITTED );
  * Used as the source address and promiscuous unicast destination
  * address in the "add switch rules" command.
  */
-static uint8_t ice_magic_mac[ETH_HLEN] = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x00 };
+static uint8_t ice_magic_mac[ETH_ALEN] = { 0x02, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 /******************************************************************************
  *
