@@ -171,6 +171,11 @@ static int nbi_process_segments ( struct image *image,
 	sh_off = NBI_LENGTH ( imgheader->length );
 	do {
 		/* Read segment header */
+		if ( ( sh_off + sizeof ( *sh ) ) > image->len ) {
+			DBGC ( image, "NBI %s segheader outside file\n",
+			       image->name );
+			return -ENOEXEC;
+		}
 		sh = ( image->data + sh_off );
 		if ( sh->length == 0 ) {
 			/* Avoid infinite loop? */
@@ -206,7 +211,8 @@ static int nbi_process_segments ( struct image *image,
 		/* Process this segment */
 		filesz = sh->imglength;
 		memsz = sh->memlength;
-		if ( ( offset + filesz ) > image->len ) {
+		if ( ( offset > image->len ) ||
+		     ( filesz > ( image->len - offset ) ) ) {
 			DBGC ( image, "NBI %s segment outside file\n",
 			       image->name );
 			return -ENOEXEC;
