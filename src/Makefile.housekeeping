@@ -488,9 +488,9 @@ CFLAGS		+= -g
 ifeq ($(CCTYPE),gcc)
 CFLAGS		+= -ffreestanding
 CFLAGS		+= -fno-common
-CFLAGS		+= -Wall -W -Wformat-nonliteral
+CFLAGS		+= -Wall -W -Wformat-nonliteral -Wshift-overflow=2
 CFLAGS		+= -Wno-array-bounds -Wno-dangling-pointer
-HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral
+HOST_CFLAGS	+= -Wall -W -Wformat-nonliteral -Wshift-overflow=2
 HOST_CFLAGS	+= -Wno-array-bounds -Wno-dangling-pointer
 endif
 CFLAGS		+= $(WORKAROUND_CFLAGS) $(EXTRA_CFLAGS)
