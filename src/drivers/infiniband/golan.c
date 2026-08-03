@@ -2650,6 +2650,95 @@ static int golan_crusoe_probe_raw_qp ( struct golan *golan ) {
 	return rc;
 }
 
+static void golan_crusoe_put_be24 ( u8 *dst, unsigned int value ) {
+	dst[0] = ( value >> 16 );
+	dst[1] = ( value >> 8 );
+	dst[2] = value;
+}
+
+/*
+ * Submit the smallest explicit mlx5e queue contexts Linux uses: one CQ and
+ * one page-backed cyclic RQ/SQ.  This is still command-only; no packets are
+ * posted.  It isolates whether the modern queue object model is accepted by
+ * the VF before adding TIS/TIR/steering and WQE processing.
+ */
+static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
+	struct ib_device *ibdev;
+	struct ib_completion_queue *cq = NULL;
+	struct golan_cmd_layout *cmd;
+	u8 *in;
+	void *wq = NULL;
+	void *dbr = NULL;
+	unsigned int cqn;
+	int rc;
+
+	ibdev = alloc_ibdev ( 0 );
+	if ( ! ibdev )
+		return -ENOMEM;
+	ibdev->op = &golan_ib_operations;
+	ibdev->dev = &golan->pci->dev;
+	ibdev->port = 1;
+	ibdev->ports = 1;
+	ib_set_drvdata ( ibdev, golan );
+
+	rc = ib_create_cq ( ibdev, 32, &golan_crusoe_raw_cq_operations, &cq );
+	if ( rc != 0 )
+		goto out;
+	cqn = cq->cqn;
+	wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	dbr = malloc_phys ( sizeof ( struct golan_qp_db ),
+			    sizeof ( struct golan_qp_db ) );
+	if ( ! wq || ! dbr ) {
+		rc = -ENOMEM;
+		goto out;
+	}
+	memset ( wq, 0, GOLAN_PAGE_SIZE );
+	memset ( dbr, 0, sizeof ( struct golan_qp_db ) );
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_RQ, 0,
+			  GEN_MBOX, NO_MBOX, 280, 16 );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/* mailbox offset = command input offset - 16-byte inline header */
+	golan_crusoe_put_be24 ( &in[25], cqn );
+	golan_crusoe_put_be24 ( &in[73], golan->pdn );
+	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
+	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
+	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( ( 6 << 16 ) | 3 );
+	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( wq );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_create_rq" );
+	printf ( "Crusoe mlx5e VF: explicit CREATE_RQ rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( rc != 0 )
+		goto out;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_SQ, 0,
+			  GEN_MBOX, NO_MBOX, 400, 16 );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	golan_crusoe_put_be24 ( &in[25], cqn );
+	golan_crusoe_put_be24 ( &in[73], golan->pdn );
+	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
+	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
+	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( ( 6 << 16 ) | 3 );
+	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( wq );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_create_sq" );
+	printf ( "Crusoe mlx5e VF: explicit CREATE_SQ rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+
+ out:
+	if ( dbr )
+		free_phys ( dbr, sizeof ( struct golan_qp_db ) );
+	if ( wq )
+		free_phys ( wq, GOLAN_PAGE_SIZE );
+	if ( cq )
+		ib_destroy_cq ( ibdev, cq );
+	ibdev_put ( ibdev );
+	return rc;
+}
+
 static int golan_crusoe_register_netdev ( struct golan *golan,
 					   struct golan_port *port ) {
 	struct net_device *netdev;
@@ -2904,6 +2993,7 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 
 	if ( pci->device == 0x101e ) {
 		golan_crusoe_probe_raw_qp ( golan );
+		golan_crusoe_probe_mlx5e_queues ( golan );
 		if ( ( rc = golan_crusoe_register_netdev ( golan,
 						      &golan->ports[0] ) ) != 0 )
 			goto err_golan_probe_register_netdev;
