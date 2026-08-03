@@ -3287,7 +3287,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
  * iPXE-owned receive buffer; publishing the big-endian producer counter in
  * the RQ DBR makes the ready RQ eligible to DMA into those buffers.
  */
-static int golan_crusoe_post_rx ( struct golan *golan ) {
+static int __unused golan_crusoe_post_rx ( struct golan *golan ) {
 	struct golan_crusoe_mlx5e *mlx5e = golan->crusoe_mlx5e;
 	struct golan_wqe_data_seg *wqe;
 	struct io_buffer *iobuf;
