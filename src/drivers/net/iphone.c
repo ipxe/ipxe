@@ -776,7 +776,7 @@ static void imux_rx_log ( struct imux *imux, struct imux_header *hdr,
 	 * then shuffle the message down within the buffer and append
 	 * a NUL terminator.
 	 */
-	msg_len = ( len - sizeof ( *hdr ) );
+	msg_len = ( len - sizeof ( *log ) );
 	level = log->level;
 	tmp = ( ( void * ) &log->level );
 	memmove ( tmp, &log->msg, msg_len );
