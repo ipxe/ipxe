@@ -2871,23 +2871,17 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	wmb();
 	*( ( __be32 * ) mlx5e->sq_dbr ) = cpu_to_be32 ( mlx5e->sq_prod );
 	wmb();
-	/*
-	 * Diagnostic: EFI common buffers should be coherent, but the live VF has
-	 * not consumed even Linux-shaped WQEs/DBRs.  Force all dirty CPU cache
-	 * lines to RAM before the blue-flame write so one canary can distinguish
-	 * stale common-buffer visibility from a remaining SQ/UAR mismatch.
-	 */
-	__asm__ __volatile__ ( "wbinvd" : : : "memory" );
-	wmb();
 	/* Match mlx5e_notify_hw(): one DBR[0] update and one BF qword. */
 	/*
-	 * Avoid any EFI/compiler ambiguity around a generic 64-bit MMIO helper:
-	 * publish the same blue-flame qword as its two ordered 32-bit halves.
+	 * Live Linux BF allocation on this VF exposes two non-WC mappings on
+	 * active UAR 16: +0x800 and +0xa00.  Prior real SEND canaries used only
+	 * the first mapping.  Keep the same qword and ordered 32-bit stores but
+	 * isolate the second Linux-visible BF register for this canary.
 	 */
 	writel ( *( ( u32 * ) &wqe->ctrl ),
-		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
+		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 0x200 );
 	writel ( *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 4 ) ),
-		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 4 );
+		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 0x204 );
 	if ( ! mlx5e->sq_probe_printed ) {
 		printf ( "Crusoe mlx5e VF: SEND ctrl raw d0=0x%x d1=0x%x d2=0x%x d3=0x%x mmio_qword=0x%llx\n",
 			 *( ( u32 * ) &wqe->ctrl ),
