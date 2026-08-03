@@ -1221,7 +1221,13 @@ static int golan_create_mkey(struct golan *golan)
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_create_mkey_cmd );
 	out = (struct golan_create_mkey_mbox_out *) ( cmd->out );
 
-	golan->mkey = ((be32_to_cpu(out->mkey) & 0xffffff) << 8);
+	/*
+	 * Linux combines the returned 24-bit MKey index with the requested
+	 * mkey_7_0 byte.  The old golan path requested zero in that byte, but
+	 * the Linux-shaped context requests 0xff; dropping it makes every WQE
+	 * use an LKey that does not name the MKey we just created.
+	 */
+	golan->mkey = ( ( be32_to_cpu ( out->mkey ) & 0xffffff ) << 8 ) | 0xff;
 	printf ( "Crusoe mlx5e VF: CREATE_MKEY returned mkey=0x%x\n",
 		 golan->mkey );
 	DBGC( golan , "%s: Got DMA Key for local access read/write (MKEY = 0x%x)\n",
