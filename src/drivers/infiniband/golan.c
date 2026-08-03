@@ -375,6 +375,35 @@ static inline int golan_set_hca_cap(struct golan *golan)
 	return rc;
 }
 
+/*
+ * The Crusoe 15b3:101e VF rejects golan's legacy capability edits, but Linux
+ * still performs a GENERAL_DEVICE SET_HCA_CAP before INIT_HCA.  Replay the
+ * complete current capability image unchanged first; this isolates whether
+ * the missing transition, rather than one of golan's old field mutations,
+ * is what leaves the Ethernet vport context empty.
+ */
+static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
+{
+	struct golan_cmd_layout *cmd;
+	int rc;
+
+	printf ( "Crusoe mlx5e VF: replaying current HCA capabilities\n" );
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_SET_HCA_CAP, 0x0,
+			  GEN_MBOX, NO_MBOX,
+			  sizeof ( struct golan_cmd_set_hca_cap_mbox_in ),
+			  sizeof ( struct golan_cmd_set_hca_cap_mbox_out ) );
+	memcpy ( ( struct golan_hca_cap * ) GET_INBOX ( golan, GEN_MBOX ),
+		 &golan->caps, sizeof ( golan->caps ) );
+
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "golan_crusoe_set_hca_cap_current" );
+	printf ( "Crusoe mlx5e VF: current SET_HCA_CAP rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	GOLAN_PRINT_RC_AND_CMD_STATUS;
+	return rc;
+}
+
 static inline int golan_qry_hca_cap(struct golan *golan)
 {
 	struct golan_cmd_layout	*cmd;
@@ -2299,13 +2328,9 @@ static inline int golan_bring_up(struct golan *golan)
 	if (( rc = golan_qry_hca_cap(golan) ))
 		goto pages;
 
-	/*
-	 * WIP: Crusoe's mlx5Gen VF rejects the PF-oriented capability mutation
-	 * with status 0x3/bad parameter.  Preserve the queried VF capabilities
-	 * and use the next bring-up failure to identify the next missing VF path.
-	 */
 	if ( golan->pci->device == 0x101e ) {
-		DBG ( "Crusoe mlx5 VF: preserving queried HCA capabilities\n" );
+		if (( rc = golan_crusoe_set_hca_cap_current ( golan ) ))
+			goto pages;
 	} else if (( rc = golan_set_hca_cap(golan) )) {
 		goto pages;
 	}
