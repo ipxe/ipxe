@@ -2561,6 +2561,19 @@ static inline void golan_bring_down ( struct golan *golan );
 static struct ib_device_operations golan_ib_operations;
 
 #define GOLAN_CRUSOE_RX_WQES 16
+#define GOLAN_CRUSOE_SQ_WQES 64
+#define GOLAN_CRUSOE_RQ_STRIDE 64
+#define GOLAN_CRUSOE_SQ_STRIDE 128
+
+struct golan_crusoe_eth_seg {
+	u8 bytes[16];
+};
+
+struct golan_crusoe_tx_wqe {
+	struct golan_wqe_ctrl_seg ctrl;
+	struct golan_crusoe_eth_seg eth;
+	struct golan_wqe_data_seg data;
+};
 
 /*
  * Persistent native Ethernet state.  The earlier command probe could share
@@ -2576,6 +2589,7 @@ struct golan_crusoe_mlx5e {
 	void *rq_dbr;
 	void *sq_dbr;
 	struct io_buffer *rx_iobufs[GOLAN_CRUSOE_RX_WQES];
+	struct io_buffer *tx_iobufs[GOLAN_CRUSOE_SQ_WQES];
 	unsigned int cqn;
 	unsigned int rqn;
 	unsigned int sqn;
@@ -2620,12 +2634,89 @@ static void golan_crusoe_eth_close ( struct net_device *netdev ) {
 	golan_bring_down ( golan );
 }
 
-static int golan_crusoe_eth_transmit ( struct net_device *netdev __unused,
-					struct io_buffer *iobuf __unused ) {
-	return -ENOTSUP;
+static int golan_crusoe_eth_transmit ( struct net_device *netdev,
+					struct io_buffer *iobuf ) {
+	struct golan *golan = *( ( struct golan ** ) netdev->priv );
+	struct golan_crusoe_mlx5e *mlx5e = golan->crusoe_mlx5e;
+	struct golan_crusoe_tx_wqe *wqe;
+	unsigned int idx;
+
+	if ( ! mlx5e )
+		return -ENODEV;
+	idx = ( mlx5e->sq_prod & ( GOLAN_CRUSOE_SQ_WQES - 1 ) );
+	if ( mlx5e->tx_iobufs[idx] )
+		return -ENOBUFS;
+
+	wqe = ( ( struct golan_crusoe_tx_wqe * )
+		( ( u8 * ) mlx5e->sq_wq +
+		  ( idx * GOLAN_CRUSOE_SQ_STRIDE ) ) );
+	memset ( wqe, 0, sizeof ( *wqe ) );
+	wqe->ctrl.opmod_idx_opcode =
+		cpu_to_be32 ( ( mlx5e->sq_prod << 8 ) | GOLAN_SEND_OPCODE );
+	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 3 );
+	wqe->ctrl.fm_ce_se = GOLAN_WQE_CTRL_CQ_UPDATE;
+	wqe->data.byte_count = cpu_to_be32 ( iob_len ( iobuf ) );
+	wqe->data.lkey = cpu_to_be32 ( golan->mkey );
+	wqe->data.addr = VIRT_2_BE64_BUS ( iobuf->data );
+	mlx5e->tx_iobufs[idx] = iobuf;
+	mlx5e->sq_prod++;
+
+	wmb();
+	*( ( __be32 * ) mlx5e->sq_dbr ) = cpu_to_be32 ( mlx5e->sq_prod );
+	wmb();
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt +
+		 ( ( mlx5e->sq_prod & 0x1 ) ? DB_BUFFER0_EVEN_OFFSET :
+		   DB_BUFFER0_ODD_OFFSET ) );
+	printf ( "Crusoe mlx5e VF: submitted TX WQE idx=%d len=%zd SQ DBR=%d\n",
+		 idx, iob_len ( iobuf ), mlx5e->sq_prod );
+	return 0;
 }
 
-static void golan_crusoe_eth_poll ( struct net_device *netdev __unused ) {
+static void golan_crusoe_eth_poll ( struct net_device *netdev ) {
+	struct golan *golan = *( ( struct golan ** ) netdev->priv );
+	struct golan_crusoe_mlx5e *mlx5e = golan->crusoe_mlx5e;
+	struct golan_completion_queue *golan_cq;
+	struct golan_cqe64 *cqe;
+	struct io_buffer *iobuf;
+	unsigned int idx;
+	unsigned int qpn;
+	u16 wqe_counter;
+	u8 opcode;
+
+	if ( ! mlx5e )
+		return;
+	golan_cq = ib_cq_get_drvdata ( mlx5e->cq );
+	while ( 1 ) {
+		cqe = &golan_cq->cqes[
+			mlx5e->cq->next_idx & ( mlx5e->cq->num_cqes - 1 ) ];
+		if ( ( ( cqe->op_own & GOLAN_CQE_OWNER_MASK ) !=
+		       ( ( mlx5e->cq->next_idx >>
+			   ilog2 ( mlx5e->cq->num_cqes ) ) & 1 ) ) ||
+		     ( ( cqe->op_own >> GOLAN_CQE_OPCODE_BIT ) ==
+		       GOLAN_CQE_OPCODE_NOT_VALID ) )
+			break;
+		rmb();
+		opcode = ( cqe->op_own >> GOLAN_CQE_OPCODE_BIT );
+		qpn = ( be32_to_cpu ( cqe->sop_drop_qpn ) & 0xffffff );
+		wqe_counter = be16_to_cpu ( cqe->wqe_counter );
+		printf ( "Crusoe mlx5e VF: CQE opcode=0x%x qpn=%d wqe=%d bytes=%d\n",
+			 opcode, qpn, wqe_counter,
+			 be32_to_cpu ( cqe->byte_cnt ) );
+		if ( qpn == mlx5e->sqn ) {
+			idx = ( wqe_counter & ( GOLAN_CRUSOE_SQ_WQES - 1 ) );
+			iobuf = mlx5e->tx_iobufs[idx];
+			mlx5e->tx_iobufs[idx] = NULL;
+			if ( iobuf ) {
+				if ( opcode == GOLAN_CQE_REQ_ERR )
+					netdev_tx_complete_err ( netdev, iobuf, -EIO );
+				else
+					netdev_tx_complete ( netdev, iobuf );
+			}
+		}
+		mlx5e->cq->next_idx++;
+		*( golan_cq->doorbell_record ) =
+			cpu_to_be32 ( mlx5e->cq->next_idx & 0xffffff );
+	}
 }
 
 static struct net_device_operations golan_crusoe_eth_operations = {
@@ -3048,7 +3139,8 @@ static int golan_crusoe_post_rx ( struct golan *golan ) {
 		if ( ! iobuf )
 			return -ENOMEM;
 		mlx5e->rx_iobufs[i] = iobuf;
-		wqe = ( ( struct golan_wqe_data_seg * ) mlx5e->rq_wq ) + i;
+		wqe = ( ( void * ) ( ( u8 * ) mlx5e->rq_wq +
+				       ( i * GOLAN_CRUSOE_RQ_STRIDE ) ) );
 		memset ( wqe, 0, sizeof ( *wqe ) );
 		wqe->byte_count = cpu_to_be32 ( iob_tailroom ( iobuf ) );
 		wqe->lkey = cpu_to_be32 ( golan->mkey );
