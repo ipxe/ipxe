@@ -2560,6 +2560,36 @@ static inline int golan_bring_up ( struct golan *golan );
 static inline void golan_bring_down ( struct golan *golan );
 static struct ib_device_operations golan_ib_operations;
 
+#define GOLAN_CRUSOE_RX_WQES 16
+
+/*
+ * Persistent native Ethernet state.  The earlier command probe could share
+ * one throwaway page and DBR because it never posted a packet.  Real traffic
+ * needs independent RQ/SQ rings and producer records that survive netdev
+ * open, plus the iobuf ownership needed to turn CQEs back into iPXE packets.
+ */
+struct golan_crusoe_mlx5e {
+	struct ib_device *ibdev;
+	struct ib_completion_queue *cq;
+	void *rq_wq;
+	void *sq_wq;
+	void *rq_dbr;
+	void *sq_dbr;
+	struct io_buffer *rx_iobufs[GOLAN_CRUSOE_RX_WQES];
+	unsigned int cqn;
+	unsigned int rqn;
+	unsigned int sqn;
+	unsigned int tisn;
+	unsigned int tirn;
+	unsigned int flow_table_id;
+	unsigned int flow_group_id;
+	u16 rq_prod;
+	u16 sq_prod;
+};
+
+static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan );
+static int golan_crusoe_post_rx ( struct golan *golan );
+
 /*
  * Minimal Ethernet-netdev skeleton for Crusoe's mlx5Gen VF.
  *
@@ -2574,8 +2604,12 @@ static int golan_crusoe_eth_open ( struct net_device *netdev ) {
 
 	if ( ( rc = golan_bring_up ( golan ) ) != 0 )
 		return rc;
+	if ( ( rc = golan_crusoe_setup_mlx5e_queues ( golan ) ) != 0 )
+		return rc;
+	if ( ( rc = golan_crusoe_post_rx ( golan ) ) != 0 )
+		return rc;
 	netdev_link_up ( netdev );
-	printf ( "Crusoe mlx5e VF: Ethernet netdev open; queue path pending\n" );
+	printf ( "Crusoe mlx5e VF: Ethernet netdev open; persistent RX posted\n" );
 	return 0;
 }
 
@@ -2614,7 +2648,7 @@ static struct ib_queue_pair_operations golan_crusoe_raw_qp_operations = {
  * and only add the raw Ethernet WQE format; if firmware rejects it, proceed
  * with explicit mlx5e queues.
  */
-static int golan_crusoe_probe_raw_qp ( struct golan *golan ) {
+static int __unused golan_crusoe_probe_raw_qp ( struct golan *golan ) {
 	struct ib_device *ibdev;
 	struct ib_completion_queue *cq = NULL;
 	struct ib_queue_pair *qp = NULL;
@@ -2718,13 +2752,16 @@ static u8 * golan_crusoe_mbox_payload_byte ( struct golan *golan,
  * posted.  It isolates whether the modern queue object model is accepted by
  * the VF before adding TIS/TIR/steering and WQE processing.
  */
-static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
+static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
+	struct golan_crusoe_mlx5e *mlx5e = golan->crusoe_mlx5e;
 	struct ib_device *ibdev;
 	struct ib_completion_queue *cq = NULL;
 	struct golan_cmd_layout *cmd;
 	u8 *in;
-	void *wq = NULL;
-	void *dbr = NULL;
+	void *rq_wq = NULL;
+	void *sq_wq = NULL;
+	void *rq_dbr = NULL;
+	void *sq_dbr = NULL;
 	unsigned int cqn;
 	u8 counter_set_id;
 	unsigned int transport_domain;
@@ -2736,9 +2773,17 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	unsigned int flow_group_id;
 	int rc;
 
-	ibdev = alloc_ibdev ( 0 );
-	if ( ! ibdev )
+	if ( mlx5e )
+		return 0;
+	mlx5e = zalloc ( sizeof ( *mlx5e ) );
+	if ( ! mlx5e )
 		return -ENOMEM;
+
+	ibdev = alloc_ibdev ( 0 );
+	if ( ! ibdev ) {
+		rc = -ENOMEM;
+		goto out_state;
+	}
 	ibdev->op = &golan_ib_operations;
 	ibdev->dev = &golan->pci->dev;
 	ibdev->port = 1;
@@ -2749,14 +2794,18 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	if ( rc != 0 )
 		goto out;
 	cqn = cq->cqn;
-	wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
-	dbr = malloc_phys ( 8, 8 );
-	if ( ! wq || ! dbr ) {
+	rq_wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	sq_wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	rq_dbr = malloc_phys ( 8, 8 );
+	sq_dbr = malloc_phys ( 8, 8 );
+	if ( ! rq_wq || ! sq_wq || ! rq_dbr || ! sq_dbr ) {
 		rc = -ENOMEM;
 		goto out;
 	}
-	memset ( wq, 0, GOLAN_PAGE_SIZE );
-	memset ( dbr, 0, 8 );
+	memset ( rq_wq, 0, GOLAN_PAGE_SIZE );
+	memset ( sq_wq, 0, GOLAN_PAGE_SIZE );
+	memset ( rq_dbr, 0, 8 );
+	memset ( sq_dbr, 0, 8 );
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ALLOC_Q_COUNTER,
 			  0, NO_MBOX, NO_MBOX, 16, 16 );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
@@ -2801,9 +2850,9 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	in[28] = counter_set_id;
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
-	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
+	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( rq_dbr );
 	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00040000 );
-	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( wq );
+	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( rq_wq );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_rq" );
 	printf ( "Crusoe mlx5e VF: explicit CREATE_RQ rc=%d status=0x%x syndrome=0x%x\n",
@@ -2824,9 +2873,9 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	golan_crusoe_put_be24 ( &in[61], tisn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
-	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
+	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( sq_dbr );
 	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00060001 );
-	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( wq );
+	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( sq_wq );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_sq" );
 	printf ( "Crusoe mlx5e VF: explicit CREATE_SQ rc=%d status=0x%x syndrome=0x%x\n",
@@ -2942,16 +2991,76 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	printf ( "Crusoe mlx5e VF: MODIFY_SQ ready rc=%d status=0x%x syndrome=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( rc != 0 )
+		goto out;
+
+	mlx5e->ibdev = ibdev;
+	mlx5e->cq = cq;
+	mlx5e->rq_wq = rq_wq;
+	mlx5e->sq_wq = sq_wq;
+	mlx5e->rq_dbr = rq_dbr;
+	mlx5e->sq_dbr = sq_dbr;
+	mlx5e->cqn = cqn;
+	mlx5e->rqn = rqn;
+	mlx5e->sqn = sqn;
+	mlx5e->tisn = tisn;
+	mlx5e->tirn = tirn;
+	mlx5e->flow_table_id = flow_table_id;
+	mlx5e->flow_group_id = flow_group_id;
+	golan->crusoe_mlx5e = mlx5e;
+	printf ( "Crusoe mlx5e VF: retained independent RQ/SQ rings and DBRs\n" );
+	return 0;
 
  out:
-	if ( dbr )
-		free_phys ( dbr, 8 );
-	if ( wq )
-		free_phys ( wq, GOLAN_PAGE_SIZE );
+	if ( sq_dbr )
+		free_phys ( sq_dbr, 8 );
+	if ( rq_dbr )
+		free_phys ( rq_dbr, 8 );
+	if ( sq_wq )
+		free_phys ( sq_wq, GOLAN_PAGE_SIZE );
+	if ( rq_wq )
+		free_phys ( rq_wq, GOLAN_PAGE_SIZE );
 	if ( cq )
 		ib_destroy_cq ( ibdev, cq );
 	ibdev_put ( ibdev );
+ out_state:
+	free ( mlx5e );
 	return rc;
+}
+
+/*
+ * Post a small initial RX fill.  A cyclic mlx5e RQ WQE is just one data
+ * segment for this one-fragment configuration.  Each descriptor points at an
+ * iPXE-owned receive buffer; publishing the big-endian producer counter in
+ * the RQ DBR makes the ready RQ eligible to DMA into those buffers.
+ */
+static int golan_crusoe_post_rx ( struct golan *golan ) {
+	struct golan_crusoe_mlx5e *mlx5e = golan->crusoe_mlx5e;
+	struct golan_wqe_data_seg *wqe;
+	struct io_buffer *iobuf;
+	unsigned int i;
+
+	if ( ! mlx5e )
+		return -ENODEV;
+
+	for ( i = 0 ; i < GOLAN_CRUSOE_RX_WQES ; i++ ) {
+		iobuf = alloc_iob ( ETH_FRAME_LEN );
+		if ( ! iobuf )
+			return -ENOMEM;
+		mlx5e->rx_iobufs[i] = iobuf;
+		wqe = ( ( struct golan_wqe_data_seg * ) mlx5e->rq_wq ) + i;
+		memset ( wqe, 0, sizeof ( *wqe ) );
+		wqe->byte_count = cpu_to_be32 ( iob_tailroom ( iobuf ) );
+		wqe->lkey = cpu_to_be32 ( golan->mkey );
+		wqe->addr = VIRT_2_BE64_BUS ( iobuf->data );
+		mlx5e->rq_prod++;
+	}
+
+	wmb();
+	*( ( __be32 * ) mlx5e->rq_dbr ) = cpu_to_be32 ( mlx5e->rq_prod );
+	printf ( "Crusoe mlx5e VF: posted %d RX WQEs; RQ DBR=%d\n",
+		 GOLAN_CRUSOE_RX_WQES, mlx5e->rq_prod );
+	return 0;
 }
 
 static int golan_crusoe_register_netdev ( struct golan *golan,
@@ -3207,8 +3316,6 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 	}
 
 	if ( pci->device == 0x101e ) {
-		golan_crusoe_probe_raw_qp ( golan );
-		golan_crusoe_probe_mlx5e_queues ( golan );
 		if ( ( rc = golan_crusoe_register_netdev ( golan,
 						      &golan->ports[0] ) ) != 0 )
 			goto err_golan_probe_register_netdev;
