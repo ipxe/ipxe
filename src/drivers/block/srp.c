@@ -467,21 +467,26 @@ static int srp_cmd ( struct srp_device *srpdev,
  */
 static int srp_rsp ( struct srp_device *srpdev,
 		     const void *data, size_t len ) {
-	const struct srp_rsp *rsp = data;
+	const struct srp_rsp *rsp;
 	struct srp_command *srpcmd;
 	struct scsi_rsp response;
+	const void *response_data;
+	const void *sense_data;
+	size_t response_data_len;
+	size_t sense_data_len;
+	size_t remaining;
 	ssize_t data_out_residual_count;
 	ssize_t data_in_residual_count;
 
-	/* Sanity check */
-	if ( ( len < sizeof ( *rsp ) ) ||
-	     ( len < ( sizeof ( *rsp ) +
-		       srp_rsp_response_data_len ( rsp ) +
-		       srp_rsp_sense_data_len ( rsp ) ) ) ) {
+	/* Parse response */
+	remaining = len;
+	if ( remaining < sizeof ( *rsp ) ) {
 		DBGC ( srpdev, "SRP %p RSP too short (%zd bytes)\n",
 		       srpdev, len );
 		return -EINVAL;
 	}
+	rsp = data;
+	remaining -= sizeof ( *rsp );
 	DBGC2 ( srpdev, "SRP %p tag %08x RSP stat %02x dores %08x dires "
 		"%08x valid %02x%s%s%s%s%s%s\n",
 		srpdev, ntohl ( rsp->tag.dwords[1] ), rsp->status,
@@ -493,6 +498,34 @@ static int srp_rsp ( struct srp_device *srpdev,
 		( ( rsp->valid & SRP_RSP_VALID_DOOVER ) ? " doover" : "" ),
 		( ( rsp->valid & SRP_RSP_VALID_SNSVALID ) ? " sns" : "" ),
 		( ( rsp->valid & SRP_RSP_VALID_RSPVALID ) ? " rsp" : "" ) );
+
+	/* Parse response data */
+	response_data_len = srp_rsp_response_data_len ( rsp );
+	if ( remaining < response_data_len ) {
+		DBGC ( srpdev, "SRP %p RSP overlength response data\n",
+		       srpdev );
+		return -EINVAL;
+	}
+	response_data = srp_rsp_response_data ( rsp );
+	if ( response_data ) {
+		DBGC2 ( srpdev, "SRP %p response data:\n", srpdev );
+		DBGC2_HDA ( srpdev, 0, response_data, response_data_len );
+	}
+	remaining -= response_data_len;
+
+	/* Parse sense data */
+	sense_data_len = srp_rsp_sense_data_len ( rsp );
+	if ( remaining < sense_data_len ) {
+		DBGC ( srpdev, "SRP %p RSP overlength sense data\n",
+		       srpdev );
+		return -EINVAL;
+	}
+	sense_data = srp_rsp_sense_data ( rsp );
+	if ( sense_data ) {
+		DBGC2 ( srpdev, "SRP %p sense data:\n", srpdev );
+		DBGC2_HDA ( srpdev, 0, sense_data, sense_data_len );
+	}
+	remaining -= sense_data_len;
 
 	/* Identify command by tag */
 	srpcmd = srp_find_tag ( srpdev, ntohl ( rsp->tag.dwords[1] ) );
@@ -519,8 +552,7 @@ static int srp_rsp ( struct srp_device *srpdev,
 	} else if ( rsp->valid & SRP_RSP_VALID_DIUNDER ) {
 		response.overrun = -(data_in_residual_count);
 	}
-	scsi_parse_sense ( srp_rsp_sense_data ( rsp ),
-			   srp_rsp_sense_data_len ( rsp ), &response.sense );
+	scsi_parse_sense ( sense_data, sense_data_len, &response.sense );
 
 	/* Report SCSI response */
 	scsi_response ( &srpcmd->scsi, &response );
