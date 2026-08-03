@@ -3449,14 +3449,20 @@ static int golan_crusoe_refill_rx ( struct golan *golan, unsigned int idx ) {
 	if ( mlx5e->rx_iobufs[idx] )
 		return 0;
 
-	iobuf = alloc_rx_iob ( ETH_FRAME_LEN, &golan->pci->dma );
+	iobuf = alloc_rx_iob ( 2048, &golan->pci->dma );
 	if ( ! iobuf )
 		return -ENOMEM;
 	mlx5e->rx_iobufs[idx] = iobuf;
 	wqe = ( ( void * ) ( ( u8 * ) mlx5e->rq_wq +
 			       ( idx * GOLAN_CRUSOE_RQ_STRIDE ) ) );
 	memset ( wqe, 0, sizeof ( *wqe ) );
-	wqe->byte_count = cpu_to_be32 ( iob_tailroom ( iobuf ) );
+	/*
+	 * Linux initializes cyclic mlx5e RX fragments with the hardware start
+	 * padding bit set in byte_count.  Without it the same address/LKey
+	 * tuple reaches the RQ as a different descriptor shape.
+	 */
+	wqe->byte_count = cpu_to_be32 ( iob_tailroom ( iobuf ) |
+					0x80000000U );
 	wqe->lkey = cpu_to_be32 ( golan->mkey );
 	wqe->addr = cpu_to_be64 ( iob_dma ( iobuf ) );
 	mlx5e->rq_prod++;
