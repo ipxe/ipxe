@@ -2233,14 +2233,29 @@ static inline int golan_bring_up(struct golan *golan)
 	if (( rc = golan_qry_hca_cap(golan) ))
 		goto pages;
 
-	if (( rc = golan_set_hca_cap(golan) ))
+	/*
+	 * WIP: Crusoe's mlx5Gen VF rejects the PF-oriented capability mutation
+	 * with status 0x3/bad parameter.  Preserve the queried VF capabilities
+	 * and use the next bring-up failure to identify the next missing VF path.
+	 */
+	if ( golan->pci->device == 0x101e ) {
+		DBG ( "Crusoe mlx5 VF: preserving queried HCA capabilities\n" );
+	} else if (( rc = golan_set_hca_cap(golan) )) {
 		goto pages;
+	}
 
 	if (( rc = golan_handle_pages(golan, GOLAN_INIT_PAGES, GOLAN_PAGES_GIVE) ))
 		goto pages;
 
-	if (( rc = golan_set_link_speed ( golan ) ))
+	/*
+	 * WIP: the legacy Mellanox utility link-speed path fails to initialize
+	 * on Crusoe's mlx5Gen VF before issuing a useful device command.
+	 */
+	if ( golan->pci->device == 0x101e ) {
+		DBG ( "Crusoe mlx5 VF: skipping link-speed programming\n" );
+	} else if (( rc = golan_set_link_speed ( golan ) )) {
 		goto pages_teardown;
+	}
 
 	//Reg Init?
 	if (( rc = golan_hca_init(golan) ))
@@ -2369,7 +2384,9 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 	}
 
 	if ( ! DEVICE_IS_CIB ( pci->device ) ) {
-		if ( init_mlx_utils ( & golan->utils, pci ) ) {
+		if ( pci->device == 0x101e ) {
+			DBG ( "Crusoe mlx5 VF: skipping post-bring-up mlx_utils init\n" );
+		} else if ( init_mlx_utils ( & golan->utils, pci ) ) {
 			rc = -1;
 			goto err_utils_init;
 		}
@@ -2643,6 +2660,12 @@ static struct pci_device_id golan_nics[] = {
 	PCI_ROM ( 0x15b3, 0x1019, "ConnectX-5EX", "ConnectX-5EX HCA driver, DevID 4121", 0 ),
 	PCI_ROM ( 0x15b3, 0x101b, "ConnectX-6", "ConnectX-6 HCA driver, DevID 4123", 0 ),
 	PCI_ROM ( 0x15b3, 0x101d, "ConnectX-6DX", "ConnectX-6DX HCA driver, DevID 4125", 0 ),
+	/*
+	 * WIP: Crusoe c1a.2x exposes this mlx5Gen VF.  The existing golan
+	 * bring-up reaches SET_HCA_CAP but does not yet create a netdevice.
+	 * Keep the ID here while the VF-specific bring-up path is prototyped.
+	 */
+	PCI_ROM ( 0x15b3, 0x101e, "mlx5Gen-VF", "Crusoe mlx5Gen Virtual Function (WIP)", 0 ),
 	PCI_ROM ( 0x15b3, 0x101f, "ConnectX-6Lx", "ConnectX-6LX HCA driver, DevID 4127", 0 ),
 	PCI_ROM ( 0x15b3, 0x1021, "ConnectX-7", "ConnectX-7 HCA driver, DevID 4129", 0 ),
 	PCI_ROM ( 0x15b3, 0xa2d2, "BlueField", "BlueField integrated ConnectX-5 network controller HCA driver, DevID 41682", 0 ),
