@@ -473,6 +473,45 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 	golan_crusoe_cap_set ( cap, 155, 5, selected_log_max_qp );
 	golan_crusoe_cap_set ( cap, 528, 2, 0 );
 	golan_crusoe_cap_set ( cap, 1168, 16, 0 );
+	if ( golan_crusoe_cap_get ( max_caps, 356, 1 ) )
+		golan_crusoe_cap_set ( cap, 356, 1, 0 );
+	if ( golan_crusoe_cap_get ( max_caps, 538, 1 ) )
+		golan_crusoe_cap_set ( cap, 538, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 497, 1 ) )
+		golan_crusoe_cap_set ( cap, 497, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 822, 1 ) )
+		golan_crusoe_cap_set ( cap, 822, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 821, 1 ) )
+		golan_crusoe_cap_set ( cap, 821, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 1552, 8 ) )
+		golan_crusoe_cap_set ( cap, 1552, 8,
+				      golan_crusoe_cap_get ( max_caps, 1552, 8 ) );
+	if ( golan_crusoe_cap_get ( max_caps, 325, 1 ) )
+		golan_crusoe_cap_set ( cap, 325, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 672, 1 ) )
+		golan_crusoe_cap_set ( cap, 672, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 614, 1 ) )
+		golan_crusoe_cap_set ( cap, 614, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 1800, 24 ) )
+		golan_crusoe_cap_set ( cap, 1800, 24,
+				      golan_crusoe_cap_get ( max_caps, 1800, 24 ) );
+	if ( golan_crusoe_cap_get ( cap, 929, 1 ) &&
+	     golan_crusoe_cap_get ( max_caps, 541, 1 ) )
+		golan_crusoe_cap_set ( cap, 541, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 7, 1 ) )
+		golan_crusoe_cap_set ( cap, 7, 1, 1 );
+	printf ( "Crusoe mlx5e VF: optional max dct=%d sync=%d unload=%d hotreset=%d ports=%d release=%d icm=%d mkey=%d msix=%d roce=%d abs=%d\n",
+		 golan_crusoe_cap_get ( max_caps, 538, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 497, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 822, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 821, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 1552, 8 ),
+		 golan_crusoe_cap_get ( max_caps, 325, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 672, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 614, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 1800, 24 ),
+		 golan_crusoe_cap_get ( max_caps, 541, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 7, 1 ) );
 	for ( i = 0 ; i < 8 ; i++ ) {
 		mailboxes[i].mblock.next =
 			( ( i + 1 ) < 8 ) ?
