@@ -524,7 +524,7 @@ static int x509_parse_key_usage ( struct x509_certificate *cert,
 	if ( len > sizeof ( usage->bits ) )
 		len = sizeof ( usage->bits );
 	for ( i = 0 ; i < len ; i++ ) {
-		usage->bits |= ( *(bytes++) << ( 8 * i ) );
+		usage->bits |= ( ( ( unsigned ) *(bytes++) ) << ( 8 * i ) );
 	}
 	DBGC2 ( cert, "X509 %p key usage is %08x\n", cert, usage->bits );
 
