@@ -498,9 +498,13 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 	if ( golan_crusoe_cap_get ( cap, 929, 1 ) &&
 	     golan_crusoe_cap_get ( max_caps, 541, 1 ) )
 		golan_crusoe_cap_set ( cap, 541, 1, 1 );
+	if ( golan_crusoe_cap_get ( max_caps, 1019, 5 ) )
+		golan_crusoe_cap_set ( cap, 1019, 5,
+				      ( golan_crusoe_cap_get ( max_caps, 1019, 5 ) < 7 ) ?
+				      golan_crusoe_cap_get ( max_caps, 1019, 5 ) : 7 );
 	if ( golan_crusoe_cap_get ( max_caps, 7, 1 ) )
 		golan_crusoe_cap_set ( cap, 7, 1, 1 );
-	printf ( "Crusoe mlx5e VF: optional max dct=%d sync=%d unload=%d hotreset=%d ports=%d release=%d icm=%d mkey=%d msix=%d roce=%d abs=%d\n",
+	printf ( "Crusoe mlx5e VF: optional max dct=%d sync=%d unload=%d hotreset=%d ports=%d release=%d icm=%d mkey=%d msix=%d roce=%d uc=%d abs=%d\n",
 		 golan_crusoe_cap_get ( max_caps, 538, 1 ),
 		 golan_crusoe_cap_get ( max_caps, 497, 1 ),
 		 golan_crusoe_cap_get ( max_caps, 822, 1 ),
@@ -511,6 +515,7 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 		 golan_crusoe_cap_get ( max_caps, 614, 1 ),
 		 golan_crusoe_cap_get ( max_caps, 1800, 24 ),
 		 golan_crusoe_cap_get ( max_caps, 541, 1 ),
+		 golan_crusoe_cap_get ( max_caps, 1019, 5 ),
 		 golan_crusoe_cap_get ( max_caps, 7, 1 ) );
 	for ( i = 0 ; i < 8 ; i++ ) {
 		mailboxes[i].mblock.next =
