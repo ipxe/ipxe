@@ -3284,8 +3284,8 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	/* inline bytes 8..11 are current state plus RQN; RST is zero */
 	golan_crusoe_put_be24 ( & ( ( u8 * ) cmd->in )[9], rqn );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
-	/* rqc.state at input byte 32, mailbox byte 16: RDY = 1 */
-	in[16] = 0x10;
+	/* rqc.state at input byte 33, mailbox byte 17: RDY = 1 */
+	in[17] = 0x10;
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_modify_rq_ready" );
 	printf ( "Crusoe mlx5e VF: MODIFY_RQ ready rc=%d status=0x%x syndrome=0x%x\n",
@@ -3377,7 +3377,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 			  GEN_MBOX, NO_MBOX, 272, 16 );
 	golan_crusoe_put_be24 ( & ( ( u8 * ) cmd->in )[9], sqn );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
-	in[16] = 0x10;
+	in[17] = 0x10;
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_modify_sq_ready" );
 	printf ( "Crusoe mlx5e VF: MODIFY_SQ ready rc=%d status=0x%x syndrome=0x%x\n",
