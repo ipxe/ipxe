@@ -54,7 +54,7 @@ enum {
 
 /* Yukon-2 */
 enum pci_dev_reg_1 {
-	PCI_Y2_PIG_ENA	 = 1<<31, /* Enable Plug-in-Go (YUKON-2) */
+	PCI_Y2_PIG_ENA	 = 1U<<31, /* Enable Plug-in-Go (YUKON-2) */
 	PCI_Y2_DLL_DIS	 = 1<<30, /* Disable PCI DLL (YUKON-2) */
 	PCI_SW_PWR_ON_RST= 1<<30, /* SW Power on Reset (Yukon-EX) */
 	PCI_Y2_PHY2_COMA = 1<<29, /* Set PHY 2 to Coma Mode (YUKON-2) */
@@ -70,7 +70,7 @@ enum pci_dev_reg_1 {
 };
 
 enum pci_dev_reg_2 {
-	PCI_VPD_WR_THR	= 0xffL<<24,	/* Bit 31..24:	VPD Write Threshold */
+	PCI_VPD_WR_THR	= 0xffUL<<24,	/* Bit 31..24:	VPD Write Threshold */
 	PCI_DEV_SEL	= 0x7fL<<17,	/* Bit 23..17:	EEPROM Device Select */
 	PCI_VPD_ROM_SZ	= 7L<<14,	/* Bit 16..14:	VPD ROM Size	*/
 
@@ -85,7 +85,7 @@ enum pci_dev_reg_2 {
 /*	PCI_OUR_REG_4		32 bit	Our Register 4 (Yukon-ECU only) */
 enum pci_dev_reg_4 {
 				/* (Link Training & Status State Machine) */
-	P_PEX_LTSSM_STAT_MSK	= 0x7fL<<25,	/* Bit 31..25:	PEX LTSSM Mask */
+	P_PEX_LTSSM_STAT_MSK	= 0x7fUL<<25,	/* Bit 31..25:	PEX LTSSM Mask */
 #define P_PEX_LTSSM_STAT(x)	((x << 25) & P_PEX_LTSSM_STAT_MSK)
 	P_PEX_LTSSM_L1_STAT	= 0x34,
 	P_PEX_LTSSM_DET_STAT	= 0x01,
@@ -108,7 +108,7 @@ enum pci_dev_reg_4 {
 /*	PCI_OUR_REG_5		32 bit	Our Register 5 (Yukon-ECU only) */
 enum pci_dev_reg_5 {
 					/* Bit 31..27:	for A3 & later */
-	P_CTL_DIV_CORE_CLK_ENA	= 1<<31, /* Divide Core Clock Enable */
+	P_CTL_DIV_CORE_CLK_ENA	= 1U<<31, /* Divide Core Clock Enable */
 	P_CTL_SRESET_VMAIN_AV	= 1<<30, /* Soft Reset for Vmain_av De-Glitch */
 	P_CTL_BYPASS_VMAIN_AV	= 1<<29, /* Bypass En. for Vmain_av De-Glitch */
 	P_CTL_TIM_VMAIN_AV_MSK	= 3<<27, /* Bit 28..27: Timer Vmain_av Mask */
@@ -343,7 +343,7 @@ enum {
 /*	B0_Y2_SP_EISR	32 bit	Enter ISR Reg */
 /*	B0_Y2_SP_LISR	32 bit	Leave ISR Reg */
 enum {
-	Y2_IS_HW_ERR	= 1<<31,	/* Interrupt HW Error */
+	Y2_IS_HW_ERR	= 1U<<31,	/* Interrupt HW Error */
 	Y2_IS_STAT_BMU	= 1<<30,	/* Status BMU Interrupt */
 	Y2_IS_ASF	= 1<<29,	/* ASF subsystem Interrupt */
 
@@ -446,7 +446,7 @@ enum {
 
 /* 	B2_GPIO */
 enum {
-	GLB_GPIO_CLK_DEB_ENA = 1<<31,	/* Clock Debug Enable */
+	GLB_GPIO_CLK_DEB_ENA = 1U<<31,	/* Clock Debug Enable */
 	GLB_GPIO_CLK_DBG_MSK = 0xf<<26, /* Clock Debug */
 
 	GLB_GPIO_INT_RST_D3_DIS = 1<<15, /* Disable Internal Reset After D3 to D0 */
@@ -650,7 +650,7 @@ enum {
 /*	Q_TEST				32 bit	Test Register */
 enum {
 	/* Transmit */
-	F_TX_CHK_AUTO_OFF = 1<<31, /* Tx checksum auto calc off (Yukon EX) */
+	F_TX_CHK_AUTO_OFF = 1U<<31, /* Tx checksum auto calc off (Yukon EX) */
 	F_TX_CHK_AUTO_ON  = 1<<30, /* Tx checksum auto calc off (Yukon EX) */
 
 	/* Receive */
@@ -757,7 +757,7 @@ enum {
 
 /* Rx BMU Control / Status Registers (Yukon-2) */
 enum {
-	BMU_IDLE	= 1<<31, /* BMU Idle State */
+	BMU_IDLE	= 1U<<31, /* BMU Idle State */
 	BMU_RX_TCP_PKT	= 1<<30, /* Rx TCP Packet (when RSS Hash enabled) */
 	BMU_RX_IP_PKT	= 1<<29, /* Rx IP  Packet (when RSS Hash enabled) */
 
@@ -1760,7 +1760,7 @@ enum {
 
 /*	TX_GMF_CTRL_T	32 bit	Tx GMAC FIFO Control/Test */
 enum {
-	TX_STFW_DIS	= 1<<31,/* Disable Store & Forward (Yukon-EC Ultra) */
+	TX_STFW_DIS	= 1U<<31,/* Disable Store & Forward (Yukon-EC Ultra) */
 	TX_STFW_ENA	= 1<<30,/* Enable  Store & Forward (Yukon-EC Ultra) */
 
 	TX_VLAN_TAG_ON	= 1<<25,/* enable  VLAN tagging */

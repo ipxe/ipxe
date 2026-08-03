@@ -726,7 +726,7 @@ struct golan_dealloc_pd_mbox_out {
 /* Memory key structures */
 #define GOLAN_IB_ACCESS_LOCAL_READ	(1 << 2)
 #define GOLAN_IB_ACCESS_LOCAL_WRITE	(1 << 3)
-#define GOLAN_MKEY_LEN64		(1 << 31)
+#define GOLAN_MKEY_LEN64		(1U << 31)
 #define GOLAN_CREATE_MKEY_SEG_QPN_BIT	8
 
 struct golan_mkey_seg {
@@ -967,7 +967,7 @@ enum {
 
 enum {
 	GOLAN_QP_LAT_SENSITIVE	= 1 << 28,
-	GOLAN_QP_ENABLE_SIG	= 1 << 31
+	GOLAN_QP_ENABLE_SIG	= 1U << 31
 };
 
 

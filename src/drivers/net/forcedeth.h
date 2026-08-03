@@ -211,7 +211,7 @@ struct ring_desc_ex {
 #define NV_TX_LATECOLLISION	(1<<28)
 #define NV_TX_UNDERFLOW		(1<<29)
 #define NV_TX_ERROR		(1<<30)
-#define NV_TX_VALID		(1<<31)
+#define NV_TX_VALID		(1U<<31)
 
 #define NV_TX2_LASTPACKET	(1<<29)
 #define NV_TX2_RETRYERROR	(1<<18)
@@ -223,7 +223,7 @@ struct ring_desc_ex {
 #define NV_TX2_UNDERFLOW	(1<<28)
 /* error and valid are the same for both */
 #define NV_TX2_ERROR		(1<<30)
-#define NV_TX2_VALID		(1<<31)
+#define NV_TX2_VALID		(1U<<31)
 #define NV_TX2_TSO		(1<<28)
 #define NV_TX2_TSO_SHIFT	14
 #define NV_TX2_TSO_MAX_SHIFT	14
@@ -244,7 +244,7 @@ struct ring_desc_ex {
 #define NV_RX_OVERFLOW		(1<<28)
 #define NV_RX_FRAMINGERR	(1<<29)
 #define NV_RX_ERROR		(1<<30)
-#define NV_RX_AVAIL		(1<<31)
+#define NV_RX_AVAIL		(1U<<31)
 #define NV_RX_ERROR_MASK	(NV_RX_ERROR1|NV_RX_ERROR2|NV_RX_ERROR3|NV_RX_ERROR4|NV_RX_CRCERR|NV_RX_OVERFLOW|NV_RX_FRAMINGERR)
 
 #define NV_RX2_CHECKSUMMASK	(0x1C000000)
@@ -262,7 +262,7 @@ struct ring_desc_ex {
 #define NV_RX2_FRAMINGERR	(1<<24)
 /* error and avail are the same for both */
 #define NV_RX2_ERROR		(1<<30)
-#define NV_RX2_AVAIL		(1<<31)
+#define NV_RX2_AVAIL		(1U<<31)
 #define NV_RX2_ERROR_MASK	(NV_RX2_ERROR1|NV_RX2_ERROR2|NV_RX2_ERROR3|NV_RX2_ERROR4|NV_RX2_CRCERR|NV_RX2_OVERFLOW|NV_RX2_FRAMINGERR)
 
 #define NV_RX3_VLAN_TAG_PRESENT (1<<16)
@@ -457,7 +457,7 @@ enum {
 #define NVREG_LINKSPEED_1000	50
 #define NVREG_LINKSPEED_MASK	(0xFFF)
 	NvRegUnknownSetupReg5 = 0x130,
-#define NVREG_UNKSETUP5_BIT31	(1<<31)
+#define NVREG_UNKSETUP5_BIT31	(1U<<31)
 	NvRegTxWatermark = 0x13c,
 #define NVREG_TX_WM_DESC1_DEFAULT	0x0200010
 #define NVREG_TX_WM_DESC2_3_DEFAULT	0x1e08000

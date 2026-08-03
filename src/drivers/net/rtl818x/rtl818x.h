@@ -81,7 +81,7 @@ struct rtl818x_csr {
 #define RTL818X_TX_CONF_DISREQQSIZE	(1 << 28)
 #define RTL818X_TX_CONF_PROBE_DTS	(1 << 29)
 #define RTL818X_TX_CONF_HW_SEQNUM	(1 << 30)
-#define RTL818X_TX_CONF_CW_MIN		(1 << 31)
+#define RTL818X_TX_CONF_CW_MIN		(1U << 31)
 	u32	RX_CONF;
 #define RTL818X_RX_CONF_MONITOR		(1 <<  0)
 #define RTL818X_RX_CONF_NICMAC		(1 <<  1)
@@ -97,7 +97,7 @@ struct rtl818x_csr {
 #define RTL818X_RX_CONF_RX_AUTORESETPHY	(1 << 28)
 #define RTL818X_RX_CONF_CSDM1		(1 << 29)
 #define RTL818X_RX_CONF_CSDM2		(1 << 30)
-#define RTL818X_RX_CONF_ONLYERLPKT	(1 << 31)
+#define RTL818X_RX_CONF_ONLYERLPKT	(1U << 31)
 	u32	INT_TIMEOUT;
 	u32	TBDA;
 	u8	EEPROM_CMD;
@@ -233,7 +233,7 @@ enum rtl818x_tx_desc_flags {
 	RTL818X_TX_DESC_FLAG_LS		= (1 << 28),
 	RTL818X_TX_DESC_FLAG_FS		= (1 << 29),
 	RTL818X_TX_DESC_FLAG_DMA	= (1 << 30),
-	RTL818X_TX_DESC_FLAG_OWN	= (1 << 31)
+	RTL818X_TX_DESC_FLAG_OWN	= (1U << 31)
 };
 
 struct rtl818x_tx_desc {
@@ -266,7 +266,7 @@ enum rtl818x_rx_desc_flags {
 	RTL818X_RX_DESC_FLAG_LS		= (1 << 28),
 	RTL818X_RX_DESC_FLAG_FS		= (1 << 29),
 	RTL818X_RX_DESC_FLAG_EOR	= (1 << 30),
-	RTL818X_RX_DESC_FLAG_OWN	= (1 << 31)
+	RTL818X_RX_DESC_FLAG_OWN	= (1U << 31)
 };
 
 struct rtl818x_rx_desc {

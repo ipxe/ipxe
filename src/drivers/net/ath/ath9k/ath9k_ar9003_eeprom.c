@@ -3597,7 +3597,7 @@ static void ar9003_hw_drive_strength_apply(struct ath_hw *ah)
 
 	reg = REG_READ(ah, AR_PHY_65NM_CH0_BIAS2);
 	reg &= ~0xffffffe0;
-	reg |= 0x5 << 29;
+	reg |= 0x5U << 29;
 	reg |= 0x5 << 26;
 	reg |= 0x5 << 23;
 	reg |= 0x5 << 20;
@@ -3610,7 +3610,7 @@ static void ar9003_hw_drive_strength_apply(struct ath_hw *ah)
 
 	reg = REG_READ(ah, AR_PHY_65NM_CH0_BIAS4);
 	reg &= ~0xff800000;
-	reg |= 0x5 << 29;
+	reg |= 0x5U << 29;
 	reg |= 0x5 << 26;
 	reg |= 0x5 << 23;
 	REG_WRITE(ah, AR_PHY_65NM_CH0_BIAS4, reg);

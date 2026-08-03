@@ -88,7 +88,7 @@ typedef U32     nx_reg_addr_t;
 #define NX_CDRP_SIGNATURE_MAKE(pcifn,version) \
 	( ((pcifn) & 0xff) |		      \
 	  (((version) & 0xff) << 8) |	      \
-	  (0xcafe << 16) )
+	  (0xcafeU << 16) )
 
 #define	NX_CDRP_CLEAR                       0x00000000
 #define	NX_CDRP_CMD_BIT                     0x80000000

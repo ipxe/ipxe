@@ -206,8 +206,8 @@ enum FrameStartHeader {
 };
 
 enum UpDownDesc {
-	upLastFrag = (1 << 31),
-	downLastFrag = (1 << 31),
+	upLastFrag = (1U << 31),
+	downLastFrag = (1U << 31),
 };
 
 enum UpPktStatus {

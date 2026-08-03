@@ -163,7 +163,7 @@ typedef enum {
 /* INT0				0x38, 32bit register */
 typedef enum {
 
-	INTR			= (1 << 31),
+	INTR			= (1U << 31),
 	PCSINT			= (1 << 28), 
 	LCINT			= (1 << 27),
 	APINT5			= (1 << 26),
@@ -192,7 +192,7 @@ typedef enum {
 
 typedef enum {
 
-	VAL3			= (1 << 31),   /* VAL bit for byte 3 */
+	VAL3			= (1U << 31),   /* VAL bit for byte 3 */
 	VAL2			= (1 << 23),   /* VAL bit for byte 2 */
 	VAL1			= (1 << 15),   /* VAL bit for byte 1 */
 	VAL0			= (1 << 7),    /* VAL bit for byte 0 */
@@ -417,7 +417,7 @@ typedef enum {
 /* AP_VALUE 			0x98, 32bit ragister */
 typedef enum {
 
-	AP_VAL_ACTIVE		= (1 << 31),
+	AP_VAL_ACTIVE		= (1U << 31),
 	AP_VAL_RD_CMD		= ( 1 << 29),
 	AP_ADDR			= (1 << 18)|(1 << 17)|(1 << 16), /* 18:16 */
 	AP_VAL			= (0xF << 0) | (0xF << 4) |( 0xF << 8) |
@@ -427,7 +427,7 @@ typedef enum {
 
 typedef enum {
 
-	DLY_INT_A_R3		= (1 << 31),
+	DLY_INT_A_R3		= (1U << 31),
 	DLY_INT_A_R2		= (1 << 30),
 	DLY_INT_A_R1		= (1 << 29),
 	DLY_INT_A_R0		= (1 << 28),
@@ -443,7 +443,7 @@ typedef enum {
 
 typedef enum {
 
-	DLY_INT_B_R3		= (1 << 31),
+	DLY_INT_B_R3		= (1U << 31),
 	DLY_INT_B_R2		= (1 << 30),
 	DLY_INT_B_R1		= (1 << 29),
 	DLY_INT_B_R0		= (1 << 28),
@@ -474,7 +474,7 @@ typedef enum {
 /* PHY_ ACCESS			0xD0, 32bit register */
 typedef enum {
 
-	PHY_CMD_ACTIVE		= (1 << 31),
+	PHY_CMD_ACTIVE		= (1U << 31),
 	PHY_WR_CMD		= (1 << 30),
 	PHY_RD_CMD		= (1 << 29),
 	PHY_RD_ERR		= (1 << 28),
@@ -490,7 +490,7 @@ typedef enum {
 
 /* PMAT0			0x190,	 32bit register */
 typedef enum {
-	PMR_ACTIVE		= (1 << 31),
+	PMR_ACTIVE		= (1U << 31),
 	PMR_WR_CMD		= (1 << 30),
 	PMR_RD_CMD		= (1 << 29),
 	PMR_BANK		= (1 <<28),
@@ -502,7 +502,7 @@ typedef enum {
 
 /* PMAT1			0x194,	 32bit register */
 typedef enum {
-	PMR_B3			= (0xF << 24) | (0xF <<28),/* 31:24 */
+	PMR_B3			= (0xF << 24) | (0xFU <<28),/* 31:24 */
 	PMR_B2			= (0xF << 16) |(0xF << 20),/* 23:16 */
 	PMR_B1			= (0xF << 8) | (0xF <<12), /* 15:8 */
 	PMR_B0			= (0xF << 0)|(0xF << 4),/* 7:0 */

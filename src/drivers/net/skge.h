@@ -222,7 +222,7 @@ enum {
 /*	B2_IRQM_MSK 	32 bit	IRQ Moderation Mask */
 enum {
 	IS_ALL_MSK	= 0xbffffffful,	/* All Interrupt bits */
-	IS_HW_ERR	= 1<<31,	/* Interrupt HW Error */
+	IS_HW_ERR	= 1U<<31,	/* Interrupt HW Error */
 					/* Bit 30:	reserved */
 	IS_PA_TO_RX1	= 1<<29,	/* Packet Arb Timeout Rx1 */
 	IS_PA_TO_RX2	= 1<<28,	/* Packet Arb Timeout Rx2 */
@@ -373,7 +373,7 @@ enum {
 /*	TxCtrl		Transmit Buffer Control Field */
 /*	RxCtrl		Receive  Buffer Control Field */
 enum {
-	BMU_OWN		= 1<<31, /* OWN bit: 0=host/1=BMU */
+	BMU_OWN		= 1U<<31, /* OWN bit: 0=host/1=BMU */
 	BMU_STF		= 1<<30, /* Start of Frame */
 	BMU_EOF		= 1<<29, /* End of Frame */
 	BMU_IRQ_EOB	= 1<<28, /* Req "End of Buffer" IRQ */
@@ -950,7 +950,7 @@ enum {
  * Receive Frame Status Encoding
  */
 enum {
-	XMR_FS_LEN	= 0x3fff<<18,	/* Bit 31..18:	Rx Frame Length */
+	XMR_FS_LEN	= 0x3fffU<<18,	/* Bit 31..18:	Rx Frame Length */
 	XMR_FS_LEN_SHIFT = 18,
 	XMR_FS_2L_VLAN	= 1<<17, /* Bit 17:	tagged wh 2Lev VLAN ID*/
 	XMR_FS_1_VLAN	= 1<<16, /* Bit 16:	tagged wh 1ev VLAN ID*/
@@ -1877,7 +1877,7 @@ enum {
 
 /* Receive Frame Status Encoding */
 enum {
-	GMR_FS_LEN	= 0xffff<<16, /* Bit 31..16:	Rx Frame Length */
+	GMR_FS_LEN	= 0xffffU<<16, /* Bit 31..16:	Rx Frame Length */
 	GMR_FS_LEN_SHIFT = 16,
 	GMR_FS_VLAN	= 1<<13, /* Bit 13:	VLAN Packet */
 	GMR_FS_JABBER	= 1<<12, /* Bit 12:	Jabber Packet */
@@ -2351,7 +2351,7 @@ enum {
 /*	XM_RX_CNT_EV	32 bit r/o	Rx Counter Event Register */
 /*	XM_RX_EV_MSK	32 bit r/w	Rx Counter Event Mask */
 enum {
-	XMR_MAX_SZ_OV	= 1<<31, /* Bit 31:	1024-MaxSize Rx Cnt Ov*/
+	XMR_MAX_SZ_OV	= 1U<<31, /* Bit 31:	1024-MaxSize Rx Cnt Ov*/
 	XMR_1023B_OV	= 1<<30, /* Bit 30:	512-1023Byte Rx Cnt Ov*/
 	XMR_511B_OV	= 1<<29, /* Bit 29:	256-511 Byte Rx Cnt Ov*/
 	XMR_255B_OV	= 1<<28, /* Bit 28:	128-255 Byte Rx Cnt Ov*/

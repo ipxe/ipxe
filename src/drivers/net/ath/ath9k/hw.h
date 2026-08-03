@@ -102,7 +102,7 @@ FILE_SECBOOT ( FORBIDDEN );
 #define SM(_v, _f)  (((_v) << _f##_S) & _f)
 #define MS(_v, _f)  (((_v) & _f) >> _f##_S)
 #define REG_RMW_FIELD(_a, _r, _f, _v) \
-	REG_RMW(_a, _r, (((_v) << _f##_S) & _f), (_f))
+	REG_RMW(_a, _r, ((((unsigned)(_v)) << _f##_S) & _f), (_f))
 #define REG_READ_FIELD(_a, _r, _f) \
 	(((REG_READ(_a, _r) & _f) >> _f##_S))
 #define REG_SET_BIT(_a, _r, _f) \

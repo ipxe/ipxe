@@ -23,7 +23,7 @@ struct rhine_descriptor {
 	uint32_t	next;
 } __attribute__ (( packed ));
 
-#define	RHINE_DES0_OWN		(1 << 31)	/*< Owned descriptor */
+#define	RHINE_DES0_OWN		(1U << 31)	/*< Owned descriptor */
 #define RHINE_DES1_IC		(1 << 23)	/*< Generate interrupt */
 #define	RHINE_TDES1_EDP		(1 << 22)	/*< End of packet */
 #define	RHINE_TDES1_STP		(1 << 21)	/*< Start of packet */

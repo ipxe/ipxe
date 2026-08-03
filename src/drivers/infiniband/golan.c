@@ -874,7 +874,7 @@ static int golan_create_mkey(struct golan *golan)
 
 	in->seg.flags			= GOLAN_IB_ACCESS_LOCAL_WRITE | GOLAN_IB_ACCESS_LOCAL_READ;
 	in->seg.flags_pd		= cpu_to_be32(golan->pdn | GOLAN_MKEY_LEN64);
-	in->seg.qpn_mkey7_0		= cpu_to_be32(0xffffff << GOLAN_CREATE_MKEY_SEG_QPN_BIT);
+	in->seg.qpn_mkey7_0		= cpu_to_be32(0xffffffU << GOLAN_CREATE_MKEY_SEG_QPN_BIT);
 
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX, __FUNCTION__);
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_create_mkey_cmd );
@@ -1495,7 +1495,7 @@ static int golan_post_send(struct ib_device *ibdev,
 
 	datagram		= &wqe->datagram;
 	datagram->key.qkey.qkey	= cpu_to_be32(av->qkey);
-	datagram->dqp_dct	= cpu_to_be32((1 << 31) | av->qpn);
+	datagram->dqp_dct	= cpu_to_be32((1U << 31) | av->qpn);
 	datagram->stat_rate_sl	= ((golan_rate(av->rate) << 4) | av->sl);
 	datagram->fl_mlid	= (ibdev->lid & 0x007f); /* take only the 7 low bits of the LID */
 	datagram->rlid		= cpu_to_be16(av->lid);

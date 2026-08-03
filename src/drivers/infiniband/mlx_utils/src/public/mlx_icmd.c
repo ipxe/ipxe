@@ -149,7 +149,7 @@ mlx_icmd_set_opcode(
 	MLX_CHECK_STATUS(utils, status, read_err, "failed to read icmd ctrl");
 
 #define MLX_ICMD_OPCODE_ALIGN 16
-#define MLX_ICMD_OPCODE_MASK 0xffff
+#define MLX_ICMD_OPCODE_MASK 0xffffU
 
 	buffer = buffer & ~(MLX_ICMD_OPCODE_MASK << MLX_ICMD_OPCODE_ALIGN);
 	buffer = buffer | (opcode << MLX_ICMD_OPCODE_ALIGN);
