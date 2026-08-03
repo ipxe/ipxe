@@ -2682,6 +2682,8 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	unsigned int rqn;
 	unsigned int sqn;
 	unsigned int tirn;
+	unsigned int flow_table_id;
+	unsigned int flow_group_id;
 	int rc;
 
 	ibdev = alloc_ibdev ( 0 );
@@ -2818,6 +2820,60 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
 		 tirn );
+	if ( rc != 0 )
+		goto out;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_FLOW_TABLE,
+			  0, GEN_MBOX, NO_MBOX, 64, 16 );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/* NIC_RX table type is zero; level/log_size zero gives one root entry. */
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_create_flow_table" );
+	flow_table_id = golan_crusoe_get_be24 (
+		& ( ( u8 * ) cmd->out )[9] );
+	printf ( "Crusoe mlx5e VF: CREATE_FLOW_TABLE rc=%d status=0x%x syndrome=0x%x table=%d\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
+		 flow_table_id );
+	if ( rc != 0 )
+		goto out;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_FLOW_GROUP,
+			  0, GEN_MBOX, NO_MBOX, 1024, 16 );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/* table_id at input byte 21; start/end flow index remain zero. */
+	golan_crusoe_put_be24 ( &in[5], flow_table_id );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_create_flow_group" );
+	flow_group_id = golan_crusoe_get_be24 (
+		& ( ( u8 * ) cmd->out )[9] );
+	printf ( "Crusoe mlx5e VF: CREATE_FLOW_GROUP rc=%d status=0x%x syndrome=0x%x group=%d\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
+		 flow_group_id );
+	if ( rc != 0 )
+		goto out;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX,
+			  GOLAN_CMD_OP_SET_FLOW_TABLE_ENTRY, 0,
+			  GEN_MBOX, NO_MBOX, 840, 16 );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/*
+	 * Match-all entry at flow index zero: flow_context.group_id at input
+	 * byte 68, action FWD_DEST at byte 79, one destination at byte 83,
+	 * and destination[0] type TIR plus live TIR ID at bytes 832..835.
+	 */
+	golan_crusoe_put_be24 ( &in[5], flow_table_id );
+	golan_crusoe_put_be24 ( &in[53], flow_group_id );
+	in[63] = 0x04;
+	in[67] = 0x01;
+	in[816] = 0x02;
+	golan_crusoe_put_be24 ( &in[817], tirn );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_set_flow_table_entry" );
+	printf ( "Crusoe mlx5e VF: SET_FLOW_TABLE_ENTRY rc=%d status=0x%x syndrome=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
 	if ( rc != 0 )
 		goto out;
 
