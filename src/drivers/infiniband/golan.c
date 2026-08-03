@@ -2561,6 +2561,7 @@ static inline void golan_bring_down ( struct golan *golan );
 static struct ib_device_operations golan_ib_operations;
 
 #define GOLAN_CRUSOE_RX_WQES 16
+#define GOLAN_CRUSOE_SQ_PAGES 16
 #define GOLAN_CRUSOE_SQ_WQES 64
 #define GOLAN_CRUSOE_RQ_STRIDE 64
 #define GOLAN_CRUSOE_SQ_STRIDE 128
@@ -2888,6 +2889,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	unsigned int tirn;
 	unsigned int flow_table_id;
 	unsigned int flow_group_id;
+	unsigned int i;
 	int rc;
 
 	if ( mlx5e )
@@ -2912,7 +2914,8 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 		goto out;
 	cqn = cq->cqn;
 	rq_wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
-	sq_wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	sq_wq = malloc_phys ( ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ),
+			      GOLAN_PAGE_SIZE );
 	rq_dbr = malloc_phys ( 8, 8 );
 	sq_dbr = malloc_phys ( 8, 8 );
 	if ( ! rq_wq || ! sq_wq || ! rq_dbr || ! sq_dbr ) {
@@ -2920,7 +2923,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 		goto out;
 	}
 	memset ( rq_wq, 0, GOLAN_PAGE_SIZE );
-	memset ( sq_wq, 0, GOLAN_PAGE_SIZE );
+	memset ( sq_wq, 0, ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ) );
 	memset ( rq_dbr, 0, 8 );
 	memset ( sq_dbr, 0, 8 );
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ALLOC_Q_COUNTER,
@@ -2986,7 +2989,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	printf ( "Crusoe mlx5e VF: explicit RQN=%d\n", rqn );
 
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_SQ, 0,
-			  GEN_MBOX, NO_MBOX, 280, 16 );
+			  GEN_MBOX, NO_MBOX, 400, 16 );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
 	in[16] = 0x10;
 	in[64] = 0x10;
@@ -3002,11 +3005,15 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( sq_dbr );
 	/*
-	 * log_wq_stride=6 (64-byte WQEBB) and log_wq_sz=4 make a
-	 * coherent small diagnostic SQ rather than the old two-WQEBB probe.
+	 * Match Linux's active Ethernet TX SQ shape: 64-byte WQEBBs and
+	 * log_wq_sz=10 (1024 WQEBBs) backed by 16 4K PAS pages.
 	 */
-	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00060004 );
-	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( sq_wq );
+	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x0006000a );
+	for ( i = 0 ; i < GOLAN_CRUSOE_SQ_PAGES ; i++ ) {
+		*( ( __be64 * ) &in[256 + ( i * sizeof ( __be64 ) )] ) =
+			VIRT_2_BE64_BUS ( ( ( u8 * ) sq_wq ) +
+					  ( i * GOLAN_PAGE_SIZE ) );
+	}
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_sq" );
 	printf ( "Crusoe mlx5e VF: explicit CREATE_SQ rc=%d status=0x%x syndrome=0x%x\n",
@@ -3149,7 +3156,8 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	if ( rq_dbr )
 		free_phys ( rq_dbr, 8 );
 	if ( sq_wq )
-		free_phys ( sq_wq, GOLAN_PAGE_SIZE );
+		free_phys ( sq_wq,
+			    ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ) );
 	if ( rq_wq )
 		free_phys ( rq_wq, GOLAN_PAGE_SIZE );
 	if ( cq )
