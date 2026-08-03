@@ -2903,9 +2903,6 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
 		mlx5e->sq_probe_printed = 1;
 	}
-	printf ( "Crusoe mlx5e VF: submitted SEND WQE idx=%d len=%zd SQ DBR0=%d exact-one-BF\n",
-		 idx, iob_len ( iobuf ),
-		 be32_to_cpu ( *( ( __be32 * ) mlx5e->sq_dbr ) ) );
 	return 0;
 }
 
@@ -2947,9 +2944,6 @@ static void golan_crusoe_eth_poll ( struct net_device *netdev ) {
 		opcode = ( cqe->op_own >> GOLAN_CQE_OPCODE_BIT );
 		qpn = ( be32_to_cpu ( cqe->sop_drop_qpn ) & 0xffffff );
 		wqe_counter = be16_to_cpu ( cqe->wqe_counter );
-		printf ( "Crusoe mlx5e VF: CQE opcode=0x%x qpn=%d wqe=%d bytes=%d\n",
-			 opcode, qpn, wqe_counter,
-			 be32_to_cpu ( cqe->byte_cnt ) );
 		if ( opcode == GOLAN_CQE_RESP_ERR ) {
 			struct golan_err_cqe *err =
 				( ( struct golan_err_cqe * ) cqe );
@@ -3998,11 +3992,6 @@ static int shomron_nodnic_is_supported ( struct pci_device *pci ) {
 
 static int golan_probe ( struct pci_device *pci ) {
 	int rc = -ENOTSUP;
-
-	if ( pci && ( pci->device == 0x101e ) ) {
-		printf ( "Crusoe mlx5e VF: waiting 60s for serial capture\n" );
-		mdelay ( 60000 );
-	}
 
 	DBG ( "%s: start\n", __FUNCTION__ );
 
