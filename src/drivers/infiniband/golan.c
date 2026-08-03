@@ -905,10 +905,26 @@ static inline int golan_set_access_reg ( struct golan *golan __attribute__ (( un
 	return 0;
 }
 
+static inline int golan_is_crusoe_mlx5e ( struct golan *golan )
+{
+	return ( golan->pci->device == 0x101e );
+}
+
+static inline size_t golan_mbox_arena_size ( struct golan *golan )
+{
+	/*
+	 * The native Ethernet VF path uses commands with up to eight mailbox
+	 * blocks.  Preserve the legacy one-page allocation for every existing
+	 * golan device.
+	 */
+	return ( golan_is_crusoe_mlx5e ( golan ) ?
+		 GOLAN_MBOX_ARENA_SIZE : GOLAN_PAGE_SIZE );
+}
+
 static inline void golan_cmd_uninit ( struct golan *golan )
 {
-	free_phys(golan->mboxes.outbox, GOLAN_MBOX_ARENA_SIZE);
-	free_phys(golan->mboxes.inbox, GOLAN_MBOX_ARENA_SIZE);
+	free_phys(golan->mboxes.outbox, golan_mbox_arena_size ( golan ));
+	free_phys(golan->mboxes.inbox, golan_mbox_arena_size ( golan ));
 	free_phys(golan->cmd.addr, GOLAN_PAGE_SIZE);
 }
 
@@ -928,11 +944,13 @@ static inline int golan_cmd_init ( struct golan *golan )
 		rc = -ENOMEM;
 		goto malloc_phys_failed;
 	}
-	if (!(golan->mboxes.inbox = malloc_phys(GOLAN_MBOX_ARENA_SIZE , GOLAN_PAGE_SIZE))) {
+	if (!(golan->mboxes.inbox = malloc_phys(golan_mbox_arena_size ( golan ),
+						 GOLAN_PAGE_SIZE))) {
 		rc = -ENOMEM;
 		goto malloc_phys_inbox_failed;
 	}
-	if (!(golan->mboxes.outbox = malloc_phys(GOLAN_MBOX_ARENA_SIZE , GOLAN_PAGE_SIZE))) {
+	if (!(golan->mboxes.outbox = malloc_phys(golan_mbox_arena_size ( golan ),
+						  GOLAN_PAGE_SIZE))) {
 		rc = -ENOMEM;
 		goto malloc_phys_outbox_failed;
 	}
@@ -952,7 +970,7 @@ static inline int golan_cmd_init ( struct golan *golan )
 	return 0;
 
 malloc_phys_outbox_failed:
-	free_phys(golan->mboxes.inbox, GOLAN_MBOX_ARENA_SIZE);
+	free_phys(golan->mboxes.inbox, golan_mbox_arena_size ( golan ));
 malloc_phys_inbox_failed:
 	free_phys(golan->cmd.addr, GOLAN_PAGE_SIZE);
 malloc_phys_failed:
@@ -1194,30 +1212,31 @@ static int golan_create_mkey(struct golan *golan)
 
 	in = (struct golan_create_mkey_mbox_in_data *)GET_INBOX(golan, GEN_MBOX);
 
-	/*
-	 * Match the working Linux mlx5e Ethernet MKey context byte-for-byte.
-	 * The old InfiniBand path left pcie_control/log2_page_size at zero and
-	 * shifted the unrestricted QPN field one byte left.  TX local reads can
-	 * still work with that shape, but the Crusoe VF reports LOCAL_PROT_ERR
-	 * when the Ethernet RQ tries to DMA into an RX buffer.
-	 */
-	in->seg.pcie_control		= 4;
 	in->seg.flags			= GOLAN_IB_ACCESS_LOCAL_WRITE | GOLAN_IB_ACCESS_LOCAL_READ;
 	in->seg.flags_pd		= cpu_to_be32(golan->pdn | GOLAN_MKEY_LEN64);
 	in->seg.qpn_mkey7_0		= cpu_to_be32(0xffffff << GOLAN_CREATE_MKEY_SEG_QPN_BIT);
-	in->seg.log2_page_size	= 0x40;
 
-	printf ( "Crusoe mlx5e VF: CREATE_MKEY pcie=%d flags=0x%x "
-		 "qpn=0x%x flags_pd=0x%x page=0x%x\n",
-		 in->seg.pcie_control, in->seg.flags,
-		 be32_to_cpu ( in->seg.qpn_mkey7_0 ),
-		 be32_to_cpu ( in->seg.flags_pd ),
-		 in->seg.log2_page_size );
+	if ( golan_is_crusoe_mlx5e ( golan ) ) {
+		/*
+		 * Match the working Linux mlx5e Ethernet MKey context.  The legacy
+		 * InfiniBand context leaves these bytes at zero; changing them for
+		 * existing golan devices would be an unrelated behavior change.
+		 */
+		in->seg.pcie_control = 4;
+		in->seg.log2_page_size = 0x40;
+		printf ( "Crusoe mlx5e VF: CREATE_MKEY pcie=%d flags=0x%x "
+			 "qpn=0x%x flags_pd=0x%x page=0x%x\n",
+			 in->seg.pcie_control, in->seg.flags,
+			 be32_to_cpu ( in->seg.qpn_mkey7_0 ),
+			 be32_to_cpu ( in->seg.flags_pd ),
+			 in->seg.log2_page_size );
+	}
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX, __FUNCTION__);
-	printf ( "Crusoe mlx5e VF: CREATE_MKEY rc=%d status=0x%x "
-		 "syndrome=0x%x\n", rc,
-		 ( ( struct golan_outbox_hdr * ) cmd->out )->status,
-		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( golan_is_crusoe_mlx5e ( golan ) )
+		printf ( "Crusoe mlx5e VF: CREATE_MKEY rc=%d status=0x%x "
+			 "syndrome=0x%x\n", rc,
+			 ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+			 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_create_mkey_cmd );
 	out = (struct golan_create_mkey_mbox_out *) ( cmd->out );
 
@@ -1228,8 +1247,9 @@ static int golan_create_mkey(struct golan *golan)
 	 * use an LKey that does not name the MKey we just created.
 	 */
 	golan->mkey = ( ( be32_to_cpu ( out->mkey ) & 0xffffff ) << 8 );
-	printf ( "Crusoe mlx5e VF: CREATE_MKEY returned mkey=0x%x\n",
-		 golan->mkey );
+	if ( golan_is_crusoe_mlx5e ( golan ) )
+		printf ( "Crusoe mlx5e VF: CREATE_MKEY returned mkey=0x%x\n",
+			 golan->mkey );
 	DBGC( golan , "%s: Got DMA Key for local access read/write (MKEY = 0x%x)\n",
 		   __FUNCTION__, golan->mkey);
 	return 0;
@@ -1311,18 +1331,30 @@ static int golan_create_cq(struct ib_device *ibdev,
 		goto err_create_cq;
 	}
 	golan_cq->size 			= sizeof(golan_cq->cqes[0]) * cq->num_cqes;
-	dma_set_mask_64bit ( &golan->pci->dma );
-	golan_cq->doorbell_record =
-		dma_alloc ( &golan->pci->dma, &golan_cq->doorbell_record_map,
-			    GOLAN_CQ_DB_RECORD_SIZE, GOLAN_CQ_DB_RECORD_SIZE );
+	if ( golan_is_crusoe_mlx5e ( golan ) ) {
+		dma_set_mask_64bit ( &golan->pci->dma );
+		golan_cq->doorbell_record =
+			dma_alloc ( &golan->pci->dma,
+				    &golan_cq->doorbell_record_map,
+				    GOLAN_CQ_DB_RECORD_SIZE,
+				    GOLAN_CQ_DB_RECORD_SIZE );
+	} else {
+		golan_cq->doorbell_record =
+			malloc_phys ( GOLAN_CQ_DB_RECORD_SIZE,
+				      GOLAN_CQ_DB_RECORD_SIZE );
+	}
 	if (!golan_cq->doorbell_record) {
 		rc = -ENOMEM;
 		goto err_create_cq_db_alloc;
 	}
 
-	golan_cq->cqes =
-		dma_alloc ( &golan->pci->dma, &golan_cq->cqes_map,
-			    GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	if ( golan_is_crusoe_mlx5e ( golan ) ) {
+		golan_cq->cqes =
+			dma_alloc ( &golan->pci->dma, &golan_cq->cqes_map,
+				    GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	} else {
+		golan_cq->cqes = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	}
 	if (!golan_cq->cqes) {
 		rc = -ENOMEM;
 		goto err_create_cq_cqe_alloc;
@@ -1343,14 +1375,23 @@ static int golan_create_cq(struct ib_device *ibdev,
 	in = (struct golan_create_cq_mbox_in_data *)GET_INBOX(golan, GEN_MBOX);
 
 	/* Fill the physical address of the page */
-	in->pas[0]		= cpu_to_be64 ( dma ( &golan_cq->cqes_map,
-						   golan_cq->cqes ) );
+	if ( golan_is_crusoe_mlx5e ( golan ) ) {
+		in->pas[0] = cpu_to_be64 ( dma ( &golan_cq->cqes_map,
+						 golan_cq->cqes ) );
+	} else {
+		in->pas[0] = VIRT_2_BE64_BUS ( golan_cq->cqes );
+	}
 	in->ctx.cqe_sz_flags	= GOLAN_CQE_SIZE_64 << 5;
 	in->ctx.log_sz_usr_page = cpu_to_be32(((ilog2(cq->num_cqes)) << 24) | golan->uar.index);
 	in->ctx.c_eqn		= cpu_to_be16(golan->eq.eqn);
-	in->ctx.db_record_addr	= cpu_to_be64 (
-		dma ( &golan_cq->doorbell_record_map,
-		      golan_cq->doorbell_record ) );
+	if ( golan_is_crusoe_mlx5e ( golan ) ) {
+		in->ctx.db_record_addr = cpu_to_be64 (
+			dma ( &golan_cq->doorbell_record_map,
+			      golan_cq->doorbell_record ) );
+	} else {
+		in->ctx.db_record_addr =
+			VIRT_2_BE64_BUS ( golan_cq->doorbell_record );
+	}
 
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX, __FUNCTION__);
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_create_cq_cmd );
@@ -1364,10 +1405,18 @@ static int golan_create_cq(struct ib_device *ibdev,
 	return 0;
 
 err_create_cq_cmd:
-	dma_free ( &golan_cq->cqes_map, golan_cq->cqes, GOLAN_PAGE_SIZE );
+	if ( golan_is_crusoe_mlx5e ( golan ) )
+		dma_free ( &golan_cq->cqes_map, golan_cq->cqes,
+			   GOLAN_PAGE_SIZE );
+	else
+		free_phys ( golan_cq->cqes, GOLAN_PAGE_SIZE );
 err_create_cq_cqe_alloc:
-	dma_free ( &golan_cq->doorbell_record_map,
-		   golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE );
+	if ( golan_is_crusoe_mlx5e ( golan ) )
+		dma_free ( &golan_cq->doorbell_record_map,
+			   golan_cq->doorbell_record,
+			   GOLAN_CQ_DB_RECORD_SIZE );
+	else
+		free_phys ( golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE );
 err_create_cq_db_alloc:
 	free ( golan_cq );
 err_create_cq:
@@ -1402,9 +1451,17 @@ static void golan_destroy_cq(struct ib_device *ibdev,
 	cq->cqn = 0;
 
 	ib_cq_set_drvdata(cq, NULL);
-	dma_free ( &golan_cq->cqes_map, golan_cq->cqes, GOLAN_PAGE_SIZE );
-	dma_free ( &golan_cq->doorbell_record_map,
-		   golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE );
+	if ( golan_is_crusoe_mlx5e ( golan ) ) {
+		dma_free ( &golan_cq->cqes_map, golan_cq->cqes,
+			   GOLAN_PAGE_SIZE );
+		dma_free ( &golan_cq->doorbell_record_map,
+			   golan_cq->doorbell_record,
+			   GOLAN_CQ_DB_RECORD_SIZE );
+	} else {
+		free_phys ( golan_cq->cqes, GOLAN_PAGE_SIZE );
+		free_phys ( golan_cq->doorbell_record,
+			    GOLAN_CQ_DB_RECORD_SIZE );
+	}
 	free(golan_cq);
 
 	DBGC (golan, "%s CQ number 0x%x was destroyed\n", __FUNCTION__, cqn);
