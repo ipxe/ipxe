@@ -3226,6 +3226,11 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	*( ( __be64 * ) &in[80] ) =
 		cpu_to_be64 ( dma ( &mlx5e->rq_dbr_map, rq_dbr ) );
 	/*
+	 * rqc.wq.pd is command-input bytes 88..91 (mailbox bytes 72..75).
+	 * Bind the RQ to the same PD as the MKey carried by its RX WQEs.
+	 */
+	golan_crusoe_put_be24 ( &in[73], golan->pdn );
+	/*
 	 * The posted descriptors start every 64 bytes, so advertise
 	 * log_wq_stride=6 and log_wq_sz=4 for the same 16-entry RQ.
 	 */
