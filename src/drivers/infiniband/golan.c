@@ -414,8 +414,12 @@ static void golan_crusoe_cap_set ( u8 *cap, unsigned int offset,
 static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 {
 	struct golan_cmd_layout *cmd;
+	struct golan_cmd_layout *query_cmd;
 	struct mbox *mailboxes;
 	u8 *cap;
+	u8 max_caps[ sizeof ( golan->caps ) ];
+	uint32_t max_log_max_qp;
+	uint32_t selected_log_max_qp;
 	unsigned int i;
 	int rc;
 
@@ -427,6 +431,23 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 	 * mailbox chain and use the current GENERAL_DEVICE image as the base.
 	 */
 	printf ( "Crusoe mlx5e VF: applying Linux baseline HCA capabilities\n" );
+	query_cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_QUERY_HCA_CAP,
+				0x0, NO_MBOX, GEN_MBOX,
+				sizeof ( struct golan_cmd_query_hca_cap_mbox_in ),
+				sizeof ( struct golan_cmd_query_hca_cap_mbox_out ) );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, GEN_MBOX,
+				     "golan_crusoe_query_max_hca_cap" );
+	if ( rc ) {
+		printf ( "Crusoe mlx5e VF: MAX HCA_CAP rc=%d status=0x%x syndrome=0x%x\n",
+			 rc, ( ( struct golan_outbox_hdr * ) query_cmd->out )->status,
+			 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) query_cmd->out )->syndrome ) );
+		return rc;
+	}
+	memcpy ( max_caps, GET_OUTBOX ( golan, GEN_MBOX ),
+		 sizeof ( max_caps ) );
+	max_log_max_qp = golan_crusoe_cap_get ( max_caps, 155, 5 );
+	selected_log_max_qp = ( max_log_max_qp < 18 ) ? max_log_max_qp : 18;
+
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_SET_HCA_CAP, 0x0,
 			  MEM_MBOX, NO_MBOX,
 			  ( 16 + 4096 ),
@@ -436,14 +457,20 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 	memcpy ( mailboxes[0].mblock.bdata, &golan->caps,
 		 sizeof ( golan->caps ) );
 	cap = mailboxes[0].mblock.bdata;
-	printf ( "Crusoe mlx5e VF: current pkey=%u log_max_qp=%u checksum=%u log_uar=%u\n",
+	printf ( "Crusoe mlx5e VF: current pkey=%d log_max_qp=%d checksum=%d log_uar=%d\n",
 		 golan_crusoe_cap_get ( cap, 400, 16 ),
 		 golan_crusoe_cap_get ( cap, 155, 5 ),
 		 golan_crusoe_cap_get ( cap, 528, 2 ),
 		 golan_crusoe_cap_get ( cap, 1168, 16 ) );
+	printf ( "Crusoe mlx5e VF: max pkey=%d log_max_qp=%d checksum=%d log_uar=%d selected_qp=%d\n",
+		 golan_crusoe_cap_get ( max_caps, 400, 16 ),
+		 max_log_max_qp,
+		 golan_crusoe_cap_get ( max_caps, 528, 2 ),
+		 golan_crusoe_cap_get ( max_caps, 1168, 16 ),
+		 selected_log_max_qp );
 	/* Linux handle_hca_cap(): 128 PKeys, profile-2 QPs, no checksum, 4K UAR. */
 	golan_crusoe_cap_set ( cap, 400, 16, 0 );
-	golan_crusoe_cap_set ( cap, 155, 5, 18 );
+	golan_crusoe_cap_set ( cap, 155, 5, selected_log_max_qp );
 	golan_crusoe_cap_set ( cap, 528, 2, 0 );
 	golan_crusoe_cap_set ( cap, 1168, 16, 0 );
 	for ( i = 0 ; i < 8 ; i++ ) {
