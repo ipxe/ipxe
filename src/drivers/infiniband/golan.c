@@ -1284,14 +1284,18 @@ static int golan_create_cq(struct ib_device *ibdev,
 		goto err_create_cq;
 	}
 	golan_cq->size 			= sizeof(golan_cq->cqes[0]) * cq->num_cqes;
-	golan_cq->doorbell_record 	= malloc_phys(GOLAN_CQ_DB_RECORD_SIZE,
-							GOLAN_CQ_DB_RECORD_SIZE);
+	dma_set_mask_64bit ( &golan->pci->dma );
+	golan_cq->doorbell_record =
+		dma_alloc ( &golan->pci->dma, &golan_cq->doorbell_record_map,
+			    GOLAN_CQ_DB_RECORD_SIZE, GOLAN_CQ_DB_RECORD_SIZE );
 	if (!golan_cq->doorbell_record) {
 		rc = -ENOMEM;
 		goto err_create_cq_db_alloc;
 	}
 
-	golan_cq->cqes = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
+	golan_cq->cqes =
+		dma_alloc ( &golan->pci->dma, &golan_cq->cqes_map,
+			    GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
 	if (!golan_cq->cqes) {
 		rc = -ENOMEM;
 		goto err_create_cq_cqe_alloc;
@@ -1312,11 +1316,14 @@ static int golan_create_cq(struct ib_device *ibdev,
 	in = (struct golan_create_cq_mbox_in_data *)GET_INBOX(golan, GEN_MBOX);
 
 	/* Fill the physical address of the page */
-	in->pas[0]		= VIRT_2_BE64_BUS( golan_cq->cqes );
+	in->pas[0]		= cpu_to_be64 ( dma ( &golan_cq->cqes_map,
+						   golan_cq->cqes ) );
 	in->ctx.cqe_sz_flags	= GOLAN_CQE_SIZE_64 << 5;
 	in->ctx.log_sz_usr_page = cpu_to_be32(((ilog2(cq->num_cqes)) << 24) | golan->uar.index);
 	in->ctx.c_eqn		= cpu_to_be16(golan->eq.eqn);
-	in->ctx.db_record_addr	= VIRT_2_BE64_BUS(golan_cq->doorbell_record);
+	in->ctx.db_record_addr	= cpu_to_be64 (
+		dma ( &golan_cq->doorbell_record_map,
+		      golan_cq->doorbell_record ) );
 
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX, __FUNCTION__);
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_create_cq_cmd );
@@ -1330,9 +1337,10 @@ static int golan_create_cq(struct ib_device *ibdev,
 	return 0;
 
 err_create_cq_cmd:
-	free_phys( golan_cq->cqes , GOLAN_PAGE_SIZE );
+	dma_free ( &golan_cq->cqes_map, golan_cq->cqes, GOLAN_PAGE_SIZE );
 err_create_cq_cqe_alloc:
-	free_phys(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
+	dma_free ( &golan_cq->doorbell_record_map,
+		   golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE );
 err_create_cq_db_alloc:
 	free ( golan_cq );
 err_create_cq:
@@ -1367,8 +1375,9 @@ static void golan_destroy_cq(struct ib_device *ibdev,
 	cq->cqn = 0;
 
 	ib_cq_set_drvdata(cq, NULL);
-	free_phys ( golan_cq->cqes , GOLAN_PAGE_SIZE );
-	free_phys(golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE);
+	dma_free ( &golan_cq->cqes_map, golan_cq->cqes, GOLAN_PAGE_SIZE );
+	dma_free ( &golan_cq->doorbell_record_map,
+		   golan_cq->doorbell_record, GOLAN_CQ_DB_RECORD_SIZE );
 	free(golan_cq);
 
 	DBGC (golan, "%s CQ number 0x%x was destroyed\n", __FUNCTION__, cqn);
@@ -2828,11 +2837,8 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	 */
 	wqe->ctrl.opmod_idx_opcode = cpu_to_be32 ( mlx5e->sq_prod << 8 );
 	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 1 );
-	/*
-	 * CQ-isolation diagnostic: do not request a completion.  QUERY_SQ's
-	 * hardware counter can still prove whether the VF fetched the NOP.
-	 */
-	wqe->ctrl.fm_ce_se = 0;
+	/* Request a CQE now that the CQ and DBR use coherent EFI DMA. */
+	wqe->ctrl.fm_ce_se = GOLAN_WQE_CTRL_CQ_UPDATE;
 	mlx5e->tx_iobufs[idx] = iobuf;
 	mlx5e->sq_prod++;
 

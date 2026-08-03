@@ -27,6 +27,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <byteswap.h>
 #include <errno.h>
 #include <ipxe/io.h>
+#include <ipxe/dma.h>
 #include <stdio.h>
 #include <unistd.h>
 #include "CIB_PRM.h"
@@ -210,6 +211,8 @@ struct golan_completion_queue {
 	struct golan_cqe64	*cqes;
 	int					size;
 	__be64		*doorbell_record;
+	struct dma_mapping	cqes_map;
+	struct dma_mapping	doorbell_record_map;
 };
 
 
