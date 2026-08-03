@@ -1392,6 +1392,7 @@ static int golan_qp_type_to_st(enum ib_queue_pair_type type)
 	case IB_QPT_GSI:
 		return GOLAN_QP_ST_QP1;
 	case IB_QPT_ETH:
+		return GOLAN_QP_ST_RAW_ETHERTYPE;
 	default:
 		return -EINVAL;
 	}
@@ -1562,6 +1563,7 @@ static int golan_create_qp(struct ib_device *ibdev,
 	case IB_QPT_UD:
 	case IB_QPT_SMI:
 	case IB_QPT_GSI:
+	case IB_QPT_ETH:
 		rc = golan_create_qp_aux(ibdev, qp, &qpn);
 		if (rc) {
 			DBG ( "%s Failed to create QP (rc = 0x%x)\n", __FUNCTION__, rc);
@@ -1570,7 +1572,6 @@ static int golan_create_qp(struct ib_device *ibdev,
 		qp->qpn = qpn;
 
 		break;
-	case IB_QPT_ETH:
 	case IB_QPT_RC:
 	default:
 		DBG ( "%s unsupported QP type (0x%x)\n", __FUNCTION__, qp->type);
@@ -2557,6 +2558,7 @@ static int golan_register_ibdev(struct golan_port *port)
 
 static inline int golan_bring_up ( struct golan *golan );
 static inline void golan_bring_down ( struct golan *golan );
+static struct ib_device_operations golan_ib_operations;
 
 /*
  * Minimal Ethernet-netdev skeleton for Crusoe's mlx5Gen VF.
@@ -2598,6 +2600,55 @@ static struct net_device_operations golan_crusoe_eth_operations = {
 	.transmit = golan_crusoe_eth_transmit,
 	.poll = golan_crusoe_eth_poll,
 };
+
+static struct ib_completion_queue_operations golan_crusoe_raw_cq_operations;
+
+static struct ib_queue_pair_operations golan_crusoe_raw_qp_operations = {
+	.alloc_iob = alloc_iob,
+};
+
+/*
+ * Before porting mlx5e SQ/RQ/TIS/TIR objects, test whether this VF accepts
+ * the much smaller raw-Ethernet QP path already represented by iPXE's IB
+ * abstraction.  If CREATE_QP succeeds, we can reuse existing CQ/WQE plumbing
+ * and only add the raw Ethernet WQE format; if firmware rejects it, proceed
+ * with explicit mlx5e queues.
+ */
+static int golan_crusoe_probe_raw_qp ( struct golan *golan ) {
+	struct ib_device *ibdev;
+	struct ib_completion_queue *cq = NULL;
+	struct ib_queue_pair *qp = NULL;
+	int rc;
+
+	ibdev = alloc_ibdev ( 0 );
+	if ( ! ibdev )
+		return -ENOMEM;
+	ibdev->op = &golan_ib_operations;
+	ibdev->dev = &golan->pci->dev;
+	ibdev->port = 1;
+	ibdev->ports = 1;
+	ib_set_drvdata ( ibdev, golan );
+
+	rc = ib_create_cq ( ibdev, 32, &golan_crusoe_raw_cq_operations,
+			     &cq );
+	printf ( "Crusoe mlx5e VF: raw Ethernet CREATE_CQ rc=%d\n", rc );
+	if ( rc != 0 )
+		goto out;
+
+	rc = ib_create_qp ( ibdev, IB_QPT_ETH, 8, cq, 8, cq,
+			     &golan_crusoe_raw_qp_operations,
+			     "crusoe-raw-eth-probe", &qp );
+	printf ( "Crusoe mlx5e VF: raw Ethernet CREATE_QP rc=%d qpn=0x%lx\n",
+		 rc, ( qp ? qp->qpn : 0UL ) );
+
+ out:
+	if ( qp )
+		ib_destroy_qp ( ibdev, qp );
+	if ( cq )
+		ib_destroy_cq ( ibdev, cq );
+	ibdev_put ( ibdev );
+	return rc;
+}
 
 static int golan_crusoe_register_netdev ( struct golan *golan,
 					   struct golan_port *port ) {
@@ -2852,6 +2903,7 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 	}
 
 	if ( pci->device == 0x101e ) {
+		golan_crusoe_probe_raw_qp ( golan );
 		if ( ( rc = golan_crusoe_register_netdev ( golan,
 						      &golan->ports[0] ) ) != 0 )
 			goto err_golan_probe_register_netdev;
