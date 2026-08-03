@@ -1956,7 +1956,7 @@ static int golan_crusoe_query_nic_vport_identity ( struct golan *golan ) {
 			  GOLAN_CMD_OP_QUERY_NIC_VPORT_CONTEXT, 0x0,
 			  GEN_MBOX, GEN_MBOX,
 			  sizeof ( struct golan_query_nic_vport_context_inbox ),
-			  sizeof ( struct golan_query_nic_vport_context_outbox ) );
+			  ( 16 + sizeof ( struct golan_query_nic_vport_context_outbox ) ) );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX,
 				     "crusoe_query_nic_vport_context" );
 	printf ( "Crusoe mlx5e VF P1: NIC context raw status=0x%x syndrome=0x%x\n",
@@ -1973,6 +1973,10 @@ static int golan_crusoe_query_nic_vport_identity ( struct golan *golan ) {
 	mac = &nic_out->permanent_address[2];
 	printf ( "Crusoe mlx5e VF P1: permanent MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
 	      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
+	if ( ! is_zero_ether_addr ( mac ) ) {
+		memcpy ( golan->crusoe_mac, mac, sizeof ( golan->crusoe_mac ) );
+		golan->crusoe_mac_valid = 1;
+	}
 	allowed_list_size = be16_to_cpu ( nic_out->allowed_list_size );
 	printf ( "Crusoe mlx5e VF P1: current UC list size=%d\n",
 	      allowed_list_size );
@@ -3446,9 +3450,15 @@ static int golan_crusoe_register_netdev ( struct golan *golan,
 	netdev->dev = &golan->pci->dev;
 	netdev->dma = &golan->pci->dma;
 	*( ( struct golan ** ) netdev->priv ) = golan;
-	eth_random_addr ( netdev->hw_addr );
-	printf ( "Crusoe mlx5e VF: registering Ethernet netdev with temporary MAC %s\n",
-		 eth_ntoa ( netdev->hw_addr ) );
+	if ( golan->crusoe_mac_valid ) {
+		memcpy ( netdev->hw_addr, golan->crusoe_mac, ETH_ALEN );
+		printf ( "Crusoe mlx5e VF: registering Ethernet netdev with firmware MAC %s\n",
+			 eth_ntoa ( netdev->hw_addr ) );
+	} else {
+		eth_random_addr ( netdev->hw_addr );
+		printf ( "Crusoe mlx5e VF: registering Ethernet netdev with temporary MAC %s\n",
+			 eth_ntoa ( netdev->hw_addr ) );
+	}
 
 	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
 		netdev_put ( netdev );

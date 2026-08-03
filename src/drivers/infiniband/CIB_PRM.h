@@ -611,8 +611,10 @@ struct golan_query_nic_vport_context_inbox {
 } __attribute ( ( packed ) );
 
 struct golan_query_nic_vport_context_outbox {
-	struct golan_outbox_hdr	hdr;
-	u8			rsvd0[8];
+	/*
+	 * GET_OUTBOX() addresses the external mailbox payload after the command
+	 * header, so this starts at nic_vport_context bit zero.
+	 */
 	u8			nic_vport_context_prefix[242];
 	__be16			allowed_list_size;
 	u8			permanent_address[8];

@@ -341,6 +341,8 @@ struct golan {
 	mlx_utils		*utils;
 	/* Driver-owned native Ethernet queue state for Crusoe's mlx5 VF. */
 	void				*crusoe_mlx5e;
+	u8				crusoe_mac[6];
+	int				crusoe_mac_valid;
 
 	struct golan_port		ports[GOLAN_MAX_PORTS];
 #define GOLAN_FW_AREAS_NUM 2
