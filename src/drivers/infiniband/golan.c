@@ -2669,12 +2669,22 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 
 	wmb();
 	*( ( __be32 * ) mlx5e->sq_dbr ) = cpu_to_be32 ( mlx5e->sq_prod );
+	*( ( ( __be32 * ) mlx5e->sq_dbr ) + 1 ) =
+		cpu_to_be32 ( mlx5e->sq_prod );
 	wmb();
-	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt +
-		 ( ( mlx5e->sq_prod & 0x1 ) ? DB_BUFFER0_EVEN_OFFSET :
-		   DB_BUFFER0_ODD_OFFSET ) );
-	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR=%d\n",
-		 idx, iob_len ( iobuf ), mlx5e->sq_prod );
+	/*
+	 * Diagnostic publication probe: write both blue-flame halves.  Existing
+	 * Golan and the native Mellanox Ethernet helper disagree on parity; a NOP
+	 * makes a duplicate harmless and tells us whether either register works.
+	 */
+	writeq ( *( ( __be64 * ) &wqe->ctrl ),
+		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
+	writeq ( *( ( __be64 * ) &wqe->ctrl ),
+		 golan->uar.virt + DB_BUFFER0_ODD_OFFSET );
+	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR0=%d DBR1=%d dual-BF\n",
+		 idx, iob_len ( iobuf ),
+		 be32_to_cpu ( *( ( __be32 * ) mlx5e->sq_dbr ) ),
+		 be32_to_cpu ( *( ( ( __be32 * ) mlx5e->sq_dbr ) + 1 ) ) );
 	return 0;
 }
 
