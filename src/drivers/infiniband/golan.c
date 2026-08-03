@@ -2722,11 +2722,13 @@ static void golan_crusoe_query_sq_after_nop ( struct golan *golan,
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, GEN_MBOX,
 				     "crusoe_query_sq_after_nop" );
 	out = ( u8 * ) GET_OUTBOX ( golan, GEN_MBOX );
-	printf ( "Crusoe mlx5e VF: QUERY_SQ after NOP rc=%d status=0x%x syndrome=0x%x state=%d uar=%d dbr_lo=0x%x hw=0x%x sw=0x%x\n",
+	printf ( "Crusoe mlx5e VF: QUERY_SQ after NOP rc=%d status=0x%x syndrome=0x%x state=%d pd=%d uar=%d dbr_hi=0x%x dbr_lo=0x%x hw=0x%x sw=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
 		 ( out[16] >> 4 ),
+		 golan_crusoe_get_be24 ( &out[73] ),
 		 golan_crusoe_get_be24 ( &out[77] ),
+		 be32_to_cpu ( *( ( __be32 * ) &out[80] ) ),
 		 be32_to_cpu ( *( ( __be32 * ) &out[84] ) ),
 		 be32_to_cpu ( *( ( __be32 * ) &out[88] ) ),
 		 be32_to_cpu ( *( ( __be32 * ) &out[92] ) ) );
@@ -2771,6 +2773,12 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	writeq ( *( ( __be64 * ) &wqe->ctrl ),
 		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
 	if ( ! mlx5e->sq_probe_printed ) {
+		printf ( "Crusoe mlx5e VF: NOP ctrl raw d0=0x%x d1=0x%x d2=0x%x d3=0x%x mmio_qword=0x%llx\n",
+			 *( ( u32 * ) &wqe->ctrl ),
+			 *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 4 ) ),
+			 *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 8 ) ),
+			 *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 12 ) ),
+			 ( unsigned long long ) *( ( u64 * ) &wqe->ctrl ) );
 		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
 		mlx5e->sq_probe_printed = 1;
 	}
@@ -3107,6 +3115,14 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 			VIRT_2_BE64_BUS ( ( ( u8 * ) sq_wq ) +
 					  ( i * GOLAN_PAGE_SIZE ) );
 	}
+	printf ( "Crusoe mlx5e VF: CREATE_SQ raw in_size=400" );
+	for ( i = 0 ; i < 30 ; i++ ) {
+		u32 raw = ( i < 4 ) ?
+			*( ( u32 * ) ( ( u8 * ) cmd->in + ( i * 4 ) ) ) :
+			*( ( u32 * ) ( in + ( ( i - 4 ) * 4 ) ) );
+		printf ( " d%d=0x%x", i, raw );
+	}
+	printf ( "\n" );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_sq" );
 	printf ( "Crusoe mlx5e VF: explicit CREATE_SQ rc=%d status=0x%x syndrome=0x%x\n",
