@@ -385,7 +385,6 @@ int asn1_enter_bits ( struct asn1_cursor *cursor, unsigned int *unused ) {
 	} __attribute__ (( packed )) *bit_string;
 	const uint8_t *last;
 	unsigned int unused_bits;
-	uint8_t unused_mask;
 	int rc;
 
 	/* Enter bit string */
@@ -405,11 +404,10 @@ int asn1_enter_bits ( struct asn1_cursor *cursor, unsigned int *unused ) {
 	unused_bits = bit_string->unused;
 
 	/* Check validity of unused bits */
-	unused_mask = ( 0xff >> ( 8 - unused_bits ) );
 	last = ( cursor->data + cursor->len - 1 );
 	if ( ( unused_bits >= 8 ) ||
 	     ( ( unused_bits > 0 ) && ( cursor->len == 0 ) ) ||
-	     ( ( *last & unused_mask ) != 0 ) ) {
+	     ( ( *last & ( 0xffU >> ( 8 - unused_bits ) ) ) != 0 ) ) {
 		DBGC ( cursor, "ASN1 %p invalid bit string:\n", cursor );
 		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
 		asn1_invalidate_cursor ( cursor );
