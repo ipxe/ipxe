@@ -2618,6 +2618,7 @@ static int golan_crusoe_alloc_sq_uar ( struct golan *golan,
 					struct golan_crusoe_mlx5e *mlx5e ) {
 	struct golan_cmd_layout *cmd;
 	struct golan_alloc_uar_mbox_out *out;
+	struct golan_uar fast_uar;
 	int rc;
 
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ALLOC_UAR, 0,
@@ -2626,6 +2627,30 @@ static int golan_crusoe_alloc_sq_uar ( struct golan *golan,
 			  sizeof ( struct golan_alloc_uar_mbox_out ) );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
 				     "crusoe_alloc_sq_uar" );
+	if ( rc != 0 )
+		return rc;
+	out = ( struct golan_alloc_uar_mbox_out * ) cmd->out;
+	fast_uar.index = ( be32_to_cpu ( out->uarn ) & 0xffffff );
+	fast_uar.phys =
+		( pci_bar_start ( golan->pci, GOLAN_HCA_BAR ) +
+		  ( fast_uar.index << GOLAN_PAGE_SHIFT ) );
+	fast_uar.virt =
+		( void * ) pci_ioremap ( golan->pci, fast_uar.phys,
+					GOLAN_PAGE_SIZE );
+	printf ( "Crusoe mlx5e VF: dedicated fast-path UAR=%d virt=%p\n",
+		 fast_uar.index, fast_uar.virt );
+
+	/*
+	 * Linux's mlx5e trace allocates one fast-path UAR and then a separate
+	 * write-combining UAR for the regular TX path.  Allocate the same third
+	 * page and bind this diagnostic SQ to it.
+	 */
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ALLOC_UAR, 0,
+			  NO_MBOX, NO_MBOX,
+			  sizeof ( struct golan_alloc_uar_mbox_in ),
+			  sizeof ( struct golan_alloc_uar_mbox_out ) );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
+				     "crusoe_alloc_sq_wc_uar" );
 	if ( rc != 0 )
 		return rc;
 	out = ( struct golan_alloc_uar_mbox_out * ) cmd->out;
@@ -2638,7 +2663,7 @@ static int golan_crusoe_alloc_sq_uar ( struct golan *golan,
 					GOLAN_PAGE_SIZE );
 	printf ( "Crusoe mlx5e VF: dedicated SQ UAR=%d virt=%p\n",
 		 mlx5e->sq_uar.index, mlx5e->sq_uar.virt );
-	return ( mlx5e->sq_uar.virt ? 0 : -ENOMEM );
+	return ( fast_uar.virt && mlx5e->sq_uar.virt ? 0 : -ENOMEM );
 }
 
 /*
