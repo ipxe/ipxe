@@ -30,6 +30,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <errno.h>
 #include <assert.h>
 #include <byteswap.h>
+#include <ipxe/ip.h>
 #include <ipxe/features.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/bitmap.h>
@@ -91,8 +92,7 @@ FEATURE ( FEATURE_PROTOCOL, "SLAM", DHCP_EB_FEATURE_SLAM, 1 );
 #define SLAM_DEFAULT_PORT 10000
 
 /** Default SLAM multicast IP address */
-#define SLAM_DEFAULT_MULTICAST_IP \
-	( ( 239 << 24 ) | ( 255 << 16 ) | ( 1 << 8 ) | ( 1 << 0 ) )
+#define SLAM_DEFAULT_MULTICAST_IP IPV4 ( 239, 255, 1, 1 )
 
 /** Default SLAM multicast port */
 #define SLAM_DEFAULT_MULTICAST_PORT 10000
@@ -712,7 +712,7 @@ static int slam_open ( struct interface *xfer, struct uri *uri ) {
 	static const struct sockaddr_in default_multicast = {
 		.sin_family = AF_INET,
 		.sin_port = htons ( SLAM_DEFAULT_MULTICAST_PORT ),
-		.sin_addr = { htonl ( SLAM_DEFAULT_MULTICAST_IP ) },
+		.sin_addr.s_addr = SLAM_DEFAULT_MULTICAST_IP,
 	};
 	struct slam_request *slam;
 	struct sockaddr_tcpip server;

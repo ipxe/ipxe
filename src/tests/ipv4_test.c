@@ -41,10 +41,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/test.h>
 #include "netdev_test.h"
 
-/** Define inline IPv4 address */
-#define IPV4(a,b,c,d) \
-	htonl ( ( (a) << 24 ) | ( (b) << 16 ) | ( (c) << 8 ) | (d) )
-
 /**
  * Report an inet_ntoa() test result
  *

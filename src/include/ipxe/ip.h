@@ -32,6 +32,13 @@ struct io_buffer;
 #define IP_TOS		0
 #define IP_TTL		64
 
+/** Construct a literal IPv4 address */
+#define IPV4( a, b, c, d )						\
+	htonl ( ( ( ( unsigned int ) (a) ) << 24 ) |			\
+		( ( ( unsigned int ) (b) ) << 16 ) |			\
+		( ( ( unsigned int ) (c) ) << 8 ) |			\
+		( ( ( unsigned int ) (d) ) << 0 ) )
+
 /** An IPv4 packet header */
 struct iphdr {
 	uint8_t  verhdrlen;

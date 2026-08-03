@@ -10,12 +10,13 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
+#include <ipxe/ip.h>
+
 /** PeerDist discovery port */
 #define PEERDIST_DISCOVERY_PORT 3702
 
 /** PeerDist discovery IPv4 address (239.255.255.250) */
-#define PEERDIST_DISCOVERY_IPV4 \
-	( ( 239 << 24 ) | ( 255 << 16 ) | ( 255 << 8 ) | ( 250 << 0 ) )
+#define PEERDIST_DISCOVERY_IPV4 IPV4 ( 239, 255, 255, 250 )
 
 /** PeerDist discovery IPv6 address (ff02::c) */
 #define PEERDIST_DISCOVERY_IPV6 \

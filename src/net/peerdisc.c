@@ -310,7 +310,7 @@ struct peerdisc_socket peerdisc_socket_ipv4 __peerdisc_socket = {
 		.sin = {
 			.sin_family = AF_INET,
 			.sin_port = htons ( PEERDIST_DISCOVERY_PORT ),
-			.sin_addr.s_addr = htonl ( PEERDIST_DISCOVERY_IPV4 ),
+			.sin_addr.s_addr = PEERDIST_DISCOVERY_IPV4,
 		},
 	},
 	.xfer = INTF_INIT ( peerdisc_socket_desc ),
