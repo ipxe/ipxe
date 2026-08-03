@@ -2592,7 +2592,6 @@ struct golan_crusoe_eth_seg {
 struct golan_crusoe_tx_wqe {
 	struct golan_wqe_ctrl_seg ctrl;
 	struct golan_crusoe_eth_seg eth;
-	u8 inline_data[16];
 	struct golan_wqe_data_seg data;
 };
 
@@ -2829,8 +2828,6 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	struct golan_crusoe_mlx5e *mlx5e = golan->crusoe_mlx5e;
 	struct golan_crusoe_tx_wqe *wqe;
 	unsigned int idx;
-	size_t inline_len;
-	size_t payload_len;
 
 	if ( ! mlx5e )
 		return -ENODEV;
@@ -2842,29 +2839,18 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 		  ( idx * GOLAN_CRUSOE_SQ_STRIDE ) ) );
 	memset ( wqe, 0, sizeof ( *wqe ) );
 	/*
-	 * mlx5e requires the Ethernet header inline in the WQE.  Keep the
-	 * smallest useful L2 shape: two bytes fit in eth.inline_hdr.start and
-	 * the remaining 16 bytes consume one WQEBB data slot.
+	 * A live Linux canary with skb_tx_mpwqe disabled publishes an ordinary
+	 * SEND with an all-zero Ethernet segment and one full-frame data
+	 * segment.  Keep this exact minimal shape instead of forcing inline
+	 * L2 bytes based on the default MPWQE path.
 	 */
-	inline_len = ( iob_len ( iobuf ) < 18 ) ? iob_len ( iobuf ) : 18;
-	*( ( __be16 * ) &wqe->eth.bytes[12] ) = cpu_to_be16 ( inline_len );
-	memcpy ( &wqe->eth.bytes[14], iobuf->data,
-		 ( inline_len < 2 ) ? inline_len : 2 );
-	if ( inline_len > 2 )
-		memcpy ( wqe->inline_data, ( ( u8 * ) iobuf->data + 2 ),
-			 inline_len - 2 );
-	payload_len = ( iob_len ( iobuf ) - inline_len );
 	wqe->ctrl.opmod_idx_opcode =
 		cpu_to_be32 ( ( mlx5e->sq_prod << 8 ) | GOLAN_SEND_OPCODE );
-	wqe->ctrl.qpn_ds =
-		cpu_to_be32 ( ( mlx5e->sqn << 8 ) | ( payload_len ? 4 : 3 ) );
+	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 3 );
 	wqe->ctrl.fm_ce_se = GOLAN_WQE_CTRL_CQ_UPDATE;
-	if ( payload_len ) {
-		wqe->data.byte_count = cpu_to_be32 ( payload_len );
-		wqe->data.lkey = cpu_to_be32 ( golan->mkey );
-		wqe->data.addr =
-			cpu_to_be64 ( iob_dma ( iobuf ) + inline_len );
-	}
+	wqe->data.byte_count = cpu_to_be32 ( iob_len ( iobuf ) );
+	wqe->data.lkey = cpu_to_be32 ( golan->mkey );
+	wqe->data.addr = cpu_to_be64 ( iob_dma ( iobuf ) );
 	mlx5e->tx_iobufs[idx] = iobuf;
 	mlx5e->sq_prod++;
 
