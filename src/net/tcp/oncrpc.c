@@ -45,6 +45,8 @@
  *
  */
 
+FILE_SECBOOT ( FORBIDDEN );
+
 /** Set most significant bit to 1. */
 #define SET_LAST_FRAME( x ) ( (x) | 1 << 31 )
 #define GET_FRAME_SIZE( x ) ( (x) & ~( 1 << 31 ) )
