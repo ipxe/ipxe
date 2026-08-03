@@ -2599,6 +2599,7 @@ struct golan_crusoe_mlx5e {
 	unsigned int flow_group_id;
 	u16 rq_prod;
 	u16 sq_prod;
+	int cq_probe_printed;
 };
 
 static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan );
@@ -2698,8 +2699,18 @@ static void golan_crusoe_eth_poll ( struct net_device *netdev ) {
 		       ( ( mlx5e->cq->next_idx >>
 			   ilog2 ( mlx5e->cq->num_cqes ) ) & 1 ) ) ||
 		     ( ( cqe->op_own >> GOLAN_CQE_OPCODE_BIT ) ==
-		       GOLAN_CQE_OPCODE_NOT_VALID ) )
+		       GOLAN_CQE_OPCODE_NOT_VALID ) ) {
+			if ( mlx5e->sq_prod && ! mlx5e->cq_probe_printed ) {
+				printf ( "Crusoe mlx5e VF: raw CQE0 op_own=0x%x qpn=0x%x wqe=0x%x bytes=0x%x next=%ld\n",
+					 cqe->op_own,
+					 be32_to_cpu ( cqe->sop_drop_qpn ),
+					 be16_to_cpu ( cqe->wqe_counter ),
+					 be32_to_cpu ( cqe->byte_cnt ),
+					 mlx5e->cq->next_idx );
+				mlx5e->cq_probe_printed = 1;
+			}
 			break;
+		}
 		rmb();
 		opcode = ( cqe->op_own >> GOLAN_CQE_OPCODE_BIT );
 		qpn = ( be32_to_cpu ( cqe->sop_drop_qpn ) & 0xffffff );
@@ -3104,7 +3115,8 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	mlx5e->flow_table_id = flow_table_id;
 	mlx5e->flow_group_id = flow_group_id;
 	golan->crusoe_mlx5e = mlx5e;
-	printf ( "Crusoe mlx5e VF: retained independent RQ/SQ rings and DBRs\n" );
+	printf ( "Crusoe mlx5e VF: retained CQN=%d RQN=%d SQN=%d UAR=%d independent RQ/SQ rings and DBRs\n",
+		 cqn, rqn, sqn, golan->uar.index );
 	return 0;
 
  out:
