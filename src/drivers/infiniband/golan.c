@@ -385,17 +385,39 @@ static inline int golan_set_hca_cap(struct golan *golan)
 static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 {
 	struct golan_cmd_layout *cmd;
+	struct mbox *mailboxes;
+	unsigned int i;
 	int rc;
 
-	printf ( "Crusoe mlx5e VF: replaying current HCA capabilities\n" );
+	/*
+	 * Modern set_hca_cap_in is 16 bytes of command header plus the complete
+	 * 4096-byte capability union.  The legacy golan command only supplied a
+	 * 256-byte capability payload in one mailbox block.  The 101e VF rejects
+	 * that short form with bad parameter, so build the full eight-block
+	 * mailbox chain while changing no capability bits yet.
+	 */
+	printf ( "Crusoe mlx5e VF: replaying current HCA capabilities in long mailbox\n" );
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_SET_HCA_CAP, 0x0,
-			  GEN_MBOX, NO_MBOX,
-			  sizeof ( struct golan_cmd_set_hca_cap_mbox_in ),
+			  MEM_MBOX, NO_MBOX,
+			  ( 16 + 4096 ),
 			  sizeof ( struct golan_cmd_set_hca_cap_mbox_out ) );
-	memcpy ( ( struct golan_hca_cap * ) GET_INBOX ( golan, GEN_MBOX ),
-		 &golan->caps, sizeof ( golan->caps ) );
+	mailboxes = GET_INBOX ( golan, MEM_MBOX );
+	memset ( mailboxes, 0, GOLAN_MBOX_ARENA_SIZE );
+	memcpy ( mailboxes[0].mblock.bdata, &golan->caps,
+		 sizeof ( golan->caps ) );
+	for ( i = 0 ; i < 8 ; i++ ) {
+		mailboxes[i].mblock.next =
+			( ( i + 1 ) < 8 ) ?
+			VIRT_2_BE64_BUS ( &mailboxes[i + 1] ) : 0;
+		mailboxes[i].mblock.block_num = cpu_to_be32 ( i );
+		mailboxes[i].mblock.token = cmd->token;
+		mailboxes[i].mblock.ctrl_sig =
+			~xor8_buf ( mailboxes[i].mblock.rsvd0,
+				     ( sizeof ( mailboxes[i].mblock ) -
+				       sizeof ( mailboxes[i].mblock.bdata ) - 2 ) );
+	}
 
-	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, MEM_MBOX, NO_MBOX,
 				     "golan_crusoe_set_hca_cap_current" );
 	printf ( "Crusoe mlx5e VF: current SET_HCA_CAP rc=%d status=0x%x syndrome=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
@@ -614,8 +636,8 @@ static inline int golan_set_access_reg ( struct golan *golan __attribute__ (( un
 
 static inline void golan_cmd_uninit ( struct golan *golan )
 {
-	free_phys(golan->mboxes.outbox, GOLAN_PAGE_SIZE);
-	free_phys(golan->mboxes.inbox, GOLAN_PAGE_SIZE);
+	free_phys(golan->mboxes.outbox, GOLAN_MBOX_ARENA_SIZE);
+	free_phys(golan->mboxes.inbox, GOLAN_MBOX_ARENA_SIZE);
 	free_phys(golan->cmd.addr, GOLAN_PAGE_SIZE);
 }
 
@@ -635,11 +657,11 @@ static inline int golan_cmd_init ( struct golan *golan )
 		rc = -ENOMEM;
 		goto malloc_phys_failed;
 	}
-	if (!(golan->mboxes.inbox = malloc_phys(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
+	if (!(golan->mboxes.inbox = malloc_phys(GOLAN_MBOX_ARENA_SIZE , GOLAN_PAGE_SIZE))) {
 		rc = -ENOMEM;
 		goto malloc_phys_inbox_failed;
 	}
-	if (!(golan->mboxes.outbox = malloc_phys(GOLAN_PAGE_SIZE , GOLAN_PAGE_SIZE))) {
+	if (!(golan->mboxes.outbox = malloc_phys(GOLAN_MBOX_ARENA_SIZE , GOLAN_PAGE_SIZE))) {
 		rc = -ENOMEM;
 		goto malloc_phys_outbox_failed;
 	}
@@ -659,7 +681,7 @@ static inline int golan_cmd_init ( struct golan *golan )
 	return 0;
 
 malloc_phys_outbox_failed:
-	free_phys(golan->mboxes.inbox, GOLAN_PAGE_SIZE);
+	free_phys(golan->mboxes.inbox, GOLAN_MBOX_ARENA_SIZE);
 malloc_phys_inbox_failed:
 	free_phys(golan->cmd.addr, GOLAN_PAGE_SIZE);
 malloc_phys_failed:
