@@ -2631,6 +2631,11 @@ static void golan_crusoe_eth_close ( struct net_device *netdev ) {
 	struct golan *golan = *( ( struct golan ** ) netdev->priv );
 
 	netdev_link_down ( netdev );
+	/*
+	 * golan_bring_down() tears down every firmware object.  Do not let a
+	 * later DHCP retry reuse the now-invalid explicit queue IDs.
+	 */
+	golan->crusoe_mlx5e = NULL;
 	golan_bring_down ( golan );
 }
 
@@ -2651,13 +2656,13 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 		( ( u8 * ) mlx5e->sq_wq +
 		  ( idx * GOLAN_CRUSOE_SQ_STRIDE ) ) );
 	memset ( wqe, 0, sizeof ( *wqe ) );
-	wqe->ctrl.opmod_idx_opcode =
-		cpu_to_be32 ( ( mlx5e->sq_prod << 8 ) | GOLAN_SEND_OPCODE );
-	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 3 );
+	/*
+	 * Diagnostic NOP: one control segment, no Ethernet/data segments.  This
+	 * isolates SQ producer publication and the UAR doorbell from SEND layout.
+	 */
+	wqe->ctrl.opmod_idx_opcode = cpu_to_be32 ( mlx5e->sq_prod << 8 );
+	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 1 );
 	wqe->ctrl.fm_ce_se = GOLAN_WQE_CTRL_CQ_UPDATE;
-	wqe->data.byte_count = cpu_to_be32 ( iob_len ( iobuf ) );
-	wqe->data.lkey = cpu_to_be32 ( golan->mkey );
-	wqe->data.addr = VIRT_2_BE64_BUS ( iobuf->data );
 	mlx5e->tx_iobufs[idx] = iobuf;
 	mlx5e->sq_prod++;
 
@@ -2667,7 +2672,7 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt +
 		 ( ( mlx5e->sq_prod & 0x1 ) ? DB_BUFFER0_EVEN_OFFSET :
 		   DB_BUFFER0_ODD_OFFSET ) );
-	printf ( "Crusoe mlx5e VF: submitted TX WQE idx=%d len=%zd SQ DBR=%d\n",
+	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR=%d\n",
 		 idx, iob_len ( iobuf ), mlx5e->sq_prod );
 	return 0;
 }
