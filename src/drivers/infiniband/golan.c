@@ -2656,6 +2656,12 @@ static void golan_crusoe_put_be24 ( u8 *dst, unsigned int value ) {
 	dst[2] = value;
 }
 
+static unsigned int golan_crusoe_get_be24 ( const u8 *src ) {
+	return ( ( ( unsigned int ) src[0] ) << 16 ) |
+	       ( ( ( unsigned int ) src[1] ) << 8 ) |
+	       src[2];
+}
+
 /*
  * Submit the smallest explicit mlx5e queue contexts Linux uses: one CQ and
  * one page-backed cyclic RQ/SQ.  This is still command-only; no packets are
@@ -2671,6 +2677,8 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	void *dbr = NULL;
 	unsigned int cqn;
 	u8 counter_set_id;
+	unsigned int transport_domain;
+	unsigned int tisn;
 	int rc;
 
 	ibdev = alloc_ibdev ( 0 );
@@ -2705,6 +2713,32 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	if ( rc != 0 )
 		goto out;
 
+	cmd = write_cmd ( golan, DEF_CMD_IDX,
+			  GOLAN_CMD_OP_ALLOC_TRANSPORT_DOMAIN, 0,
+			  NO_MBOX, NO_MBOX, 16, 16 );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
+				     "crusoe_alloc_transport_domain" );
+	transport_domain = golan_crusoe_get_be24 (
+		& ( ( u8 * ) cmd->out )[9] );
+	printf ( "Crusoe mlx5e VF: ALLOC_TRANSPORT_DOMAIN rc=%d status=0x%x id=%d\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 transport_domain );
+	if ( rc != 0 )
+		goto out;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_TIS, 0,
+			  GEN_MBOX, NO_MBOX, 192, 16 );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/* tisc.transport_domain: input byte 69, mailbox byte 53 */
+	golan_crusoe_put_be24 ( &in[53], transport_domain );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_create_tis" );
+	tisn = golan_crusoe_get_be24 ( & ( ( u8 * ) cmd->out )[9] );
+	printf ( "Crusoe mlx5e VF: CREATE_TIS rc=%d status=0x%x tisn=%d\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status, tisn );
+	if ( rc != 0 )
+		goto out;
+
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_RQ, 0,
 			  GEN_MBOX, NO_MBOX, 280, 16 );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
@@ -2729,6 +2763,7 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	in[16] = 0x10;
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
+	golan_crusoe_put_be24 ( &in[61], tisn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
