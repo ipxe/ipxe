@@ -2662,6 +2662,56 @@ static unsigned int golan_crusoe_get_be24 ( const u8 *src ) {
 	       src[2];
 }
 
+static unsigned int golan_crusoe_mbox_blocks ( size_t payload_len ) {
+	return ( ( payload_len + GOLAN_CMD_DATA_BLOCK_SIZE - 1 ) /
+		 GOLAN_CMD_DATA_BLOCK_SIZE );
+}
+
+static void golan_crusoe_init_mbox_chain ( struct golan *golan,
+					     unsigned int mailbox_idx,
+					     struct golan_cmd_layout *cmd,
+					     size_t payload_len ) {
+	struct mbox *mailboxes = GET_INBOX ( golan, mailbox_idx );
+	unsigned int blocks = golan_crusoe_mbox_blocks ( payload_len );
+	unsigned int i;
+
+	memset ( mailboxes, 0, ( blocks * sizeof ( *mailboxes ) ) );
+	for ( i = 0 ; i < blocks ; i++ ) {
+		mailboxes[i].mblock.next =
+			( ( i + 1 ) < blocks ) ?
+			VIRT_2_BE64_BUS ( &mailboxes[i + 1] ) : 0;
+		mailboxes[i].mblock.block_num = cpu_to_be32 ( i );
+		mailboxes[i].mblock.token = cmd->token;
+	}
+}
+
+static void golan_crusoe_sign_mbox_chain ( struct golan *golan,
+					     unsigned int mailbox_idx,
+					     size_t payload_len ) {
+	struct mbox *mailboxes = GET_INBOX ( golan, mailbox_idx );
+	unsigned int blocks = golan_crusoe_mbox_blocks ( payload_len );
+	unsigned int i;
+
+	for ( i = 0 ; i < blocks ; i++ ) {
+		mailboxes[i].mblock.ctrl_sig =
+			~xor8_buf ( mailboxes[i].mblock.rsvd0,
+				     ( sizeof ( mailboxes[i].mblock ) -
+				       sizeof ( mailboxes[i].mblock.bdata ) - 2 ) );
+		mailboxes[i].mblock.sig =
+			~xor8_buf ( &mailboxes[i].mblock,
+				     sizeof ( mailboxes[i].mblock ) - 1 );
+	}
+}
+
+static u8 * golan_crusoe_mbox_payload_byte ( struct golan *golan,
+					       unsigned int mailbox_idx,
+					       size_t offset ) {
+	struct mbox *mailboxes = GET_INBOX ( golan, mailbox_idx );
+
+	return &mailboxes[offset / GOLAN_CMD_DATA_BLOCK_SIZE].mblock.bdata[
+		offset % GOLAN_CMD_DATA_BLOCK_SIZE];
+}
+
 /*
  * Submit the smallest explicit mlx5e queue contexts Linux uses: one CQ and
  * one page-backed cyclic RQ/SQ.  This is still command-only; no packets are
@@ -2839,11 +2889,13 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 		goto out;
 
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_FLOW_GROUP,
-			  0, GEN_MBOX, NO_MBOX, 1024, 16 );
-	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+			  0, MEM_MBOX, NO_MBOX, 1024, 16 );
+	golan_crusoe_init_mbox_chain ( golan, MEM_MBOX, cmd, ( 1024 - 16 ) );
+	in = ( u8 * ) GET_INBOX ( golan, MEM_MBOX );
 	/* table_id at input byte 21; start/end flow index remain zero. */
 	golan_crusoe_put_be24 ( &in[5], flow_table_id );
-	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+	golan_crusoe_sign_mbox_chain ( golan, MEM_MBOX, ( 1024 - 16 ) );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, MEM_MBOX, NO_MBOX,
 				     "crusoe_create_flow_group" );
 	flow_group_id = golan_crusoe_get_be24 (
 		& ( ( u8 * ) cmd->out )[9] );
@@ -2856,8 +2908,9 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 
 	cmd = write_cmd ( golan, DEF_CMD_IDX,
 			  GOLAN_CMD_OP_SET_FLOW_TABLE_ENTRY, 0,
-			  GEN_MBOX, NO_MBOX, 840, 16 );
-	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+			  MEM_MBOX, NO_MBOX, 840, 16 );
+	golan_crusoe_init_mbox_chain ( golan, MEM_MBOX, cmd, ( 840 - 16 ) );
+	in = ( u8 * ) GET_INBOX ( golan, MEM_MBOX );
 	/*
 	 * Match-all entry at flow index zero: flow_context.group_id at input
 	 * byte 68, action FWD_DEST at byte 79, one destination at byte 83,
@@ -2867,9 +2920,11 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	golan_crusoe_put_be24 ( &in[53], flow_group_id );
 	in[63] = 0x04;
 	in[67] = 0x01;
-	in[816] = 0x02;
-	golan_crusoe_put_be24 ( &in[817], tirn );
-	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+	*golan_crusoe_mbox_payload_byte ( golan, MEM_MBOX, 816 ) = 0x02;
+	golan_crusoe_put_be24 (
+		golan_crusoe_mbox_payload_byte ( golan, MEM_MBOX, 817 ), tirn );
+	golan_crusoe_sign_mbox_chain ( golan, MEM_MBOX, ( 840 - 16 ) );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, MEM_MBOX, NO_MBOX,
 				     "crusoe_set_flow_table_entry" );
 	printf ( "Crusoe mlx5e VF: SET_FLOW_TABLE_ENTRY rc=%d status=0x%x syndrome=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
