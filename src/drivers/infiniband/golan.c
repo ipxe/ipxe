@@ -2719,11 +2719,17 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	 */
 	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xa00 );
 	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xb00 );
+	/*
+	 * Live Linux BF allocation shows log_bf_reg_size=9 on this VF, so
+	 * the remaining real slots are 0xc00 and 0xe00 (not 0xb00).
+	 */
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xc00 );
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xe00 );
 	if ( ! mlx5e->sq_probe_printed ) {
 		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
 		mlx5e->sq_probe_printed = 1;
 	}
-	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR0=%d DBR1=%d quad-BF\n",
+	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR0=%d DBR1=%d six-BF\n",
 		 idx, iob_len ( iobuf ),
 		 be32_to_cpu ( *( ( __be32 * ) mlx5e->sq_dbr ) ),
 		 be32_to_cpu ( *( ( ( __be32 * ) mlx5e->sq_dbr ) + 1 ) ) );
