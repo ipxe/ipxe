@@ -2699,11 +2699,13 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 			  GEN_MBOX, NO_MBOX, 280, 16 );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
 	/* mailbox offset = command input offset - 16-byte inline header */
+	in[28] = 2;
+	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
-	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( ( 6 << 16 ) | 3 );
+	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00040000 );
 	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( wq );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_rq" );
@@ -2714,13 +2716,15 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 		goto out;
 
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_SQ, 0,
-			  GEN_MBOX, NO_MBOX, 400, 16 );
+			  GEN_MBOX, NO_MBOX, 280, 16 );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	in[16] = 0x10;
+	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
-	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( ( 6 << 16 ) | 3 );
+	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00060001 );
 	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( wq );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_sq" );
