@@ -2670,6 +2670,7 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	void *wq = NULL;
 	void *dbr = NULL;
 	unsigned int cqn;
+	u8 counter_set_id;
 	int rc;
 
 	ibdev = alloc_ibdev ( 0 );
@@ -2694,11 +2695,22 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	}
 	memset ( wq, 0, GOLAN_PAGE_SIZE );
 	memset ( dbr, 0, sizeof ( struct golan_qp_db ) );
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ALLOC_Q_COUNTER,
+			  0, NO_MBOX, NO_MBOX, 16, 16 );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
+				     "crusoe_alloc_q_counter" );
+	counter_set_id = ( ( u8 * ) cmd->out )[11];
+	printf ( "Crusoe mlx5e VF: ALLOC_Q_COUNTER rc=%d status=0x%x id=%d\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 counter_set_id );
+	if ( rc != 0 )
+		goto out;
 
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_RQ, 0,
 			  GEN_MBOX, NO_MBOX, 280, 16 );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
 	/* mailbox offset = command input offset - 16-byte inline header */
+	in[28] = counter_set_id;
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );

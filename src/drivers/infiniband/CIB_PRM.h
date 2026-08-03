@@ -161,6 +161,7 @@ enum {
 	/* Ethernet NIC vport commands used by the Crusoe VF probe. */
 	GOLAN_CMD_OP_QUERY_VPORT_STATE		= 0x750,
 	GOLAN_CMD_OP_QUERY_NIC_VPORT_CONTEXT	= 0x754,
+	GOLAN_CMD_OP_ALLOC_Q_COUNTER		= 0x771,
 
 	GOLAN_CMD_OP_ALLOC_PD			= 0x800,
 	GOLAN_CMD_OP_DEALLOC_PD			= 0x801,
