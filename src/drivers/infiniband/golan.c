@@ -2843,8 +2843,14 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	*( ( __be32 * ) mlx5e->sq_dbr ) = cpu_to_be32 ( mlx5e->sq_prod );
 	wmb();
 	/* Match mlx5e_notify_hw(): one DBR[0] update and one BF qword. */
-	writeq ( *( ( __be64 * ) &wqe->ctrl ),
-		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
+	/*
+	 * Avoid any EFI/compiler ambiguity around a generic 64-bit MMIO helper:
+	 * publish the same blue-flame qword as its two ordered 32-bit halves.
+	 */
+	writel ( *( ( u32 * ) &wqe->ctrl ),
+		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
+	writel ( *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 4 ) ),
+		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 4 );
 	if ( ! mlx5e->sq_probe_printed ) {
 		printf ( "Crusoe mlx5e VF: SEND ctrl raw d0=0x%x d1=0x%x d2=0x%x d3=0x%x mmio_qword=0x%llx\n",
 			 *( ( u32 * ) &wqe->ctrl ),
