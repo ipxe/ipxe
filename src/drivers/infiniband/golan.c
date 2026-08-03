@@ -413,6 +413,24 @@ static void golan_crusoe_cap_set ( u8 *cap, unsigned int offset,
  */
 static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 {
+	static const uint32_t linux_general_cap_words[] = {
+		0x950f72, 0x2e0080a0, 0x204040, 0x159535ae,
+		0x51820f0f, 0xd0205710, 0x18201603, 0xf503d816,
+		0xd0d0c004, 0x4638c6a0, 0x4208401, 0xe791,
+		0x7ff8, 0x141f032, 0x10001e, 0xd1b00100,
+		0x3f2f19c4, 0xafdffbff, 0xc678140, 0xc21d09f0,
+		0x40000, 0x25000, 0x1ff00, 0xf0000000,
+		0x1504e48c, 0xd8013790, 0x80fd18e6, 0x171017b7,
+		0xb14b7, 0x60604e9, 0xf0d1390, 0x74b096b,
+		0xfb180a05, 0x300011, 0x2, 0x1c005830,
+		0xe0, 0x0, 0xe8030000, 0x40420f00,
+		0x0, 0x1000000, 0x8f041000, 0xa0800000,
+		0x300, 0x6f988000, 0x40000400, 0x8001600,
+		0x6000100, 0x2000, 0x26000000, 0x0,
+		0x9800, 0x7000000, 0x656500, 0xdc00,
+		0x23, 0x0, 0x18, 0x118cc18,
+		0x0, 0x0, 0x1f0000a0, 0xffe7c9ff,
+	};
 	struct golan_cmd_layout *cmd;
 	struct golan_cmd_layout *query_cmd;
 	struct mbox *mailboxes;
@@ -517,6 +535,9 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 		 golan_crusoe_cap_get ( max_caps, 541, 1 ),
 		 golan_crusoe_cap_get ( max_caps, 1019, 5 ),
 		 golan_crusoe_cap_get ( max_caps, 7, 1 ) );
+	memcpy ( cap, linux_general_cap_words,
+		 sizeof ( linux_general_cap_words ) );
+	printf ( "Crusoe mlx5e VF: replaying exact Linux GENERAL_DEVICE payload\n" );
 	for ( i = 0 ; i < 8 ; i++ ) {
 		mailboxes[i].mblock.next =
 			( ( i + 1 ) < 8 ) ?
