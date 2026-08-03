@@ -103,6 +103,48 @@ FILE_SECBOOT ( PERMITTED );
  *
  *     return -EACCES_INCORRECT_TARGET_USERNAME;
  *
+ *
+ * Code that may need to undo actions if an error occurs should use a
+ * structured goto approach, where the code to perform the undo action
+ * appears before the corresponding error label in the error-handling
+ * code path.  For example:
+ *
+ *     if ( ( rc = try_thing() ) != 0 )
+ *         goto err_thing;
+ *     ...
+ *     return 0;
+ *     ...
+ *     undo_thing();
+ *    err_thing:
+ *     ...
+ *     return rc;
+ *
+ * This pattern is designed to allow for clean composition of multiple
+ * potential undoing code blocks.  For example:
+ *
+ *     if ( ( rc = try_thing1() ) != 0 )
+ *         goto err_thing1;
+ *     if ( ( rc = try_thing2() ) != 0 )
+ *         goto err_thing2;
+ *     ...
+ *     return 0;
+ *     ...
+ *     undo_thing2();
+ *    err_thing2:
+ *     undo_thing1();
+ *    err_thing1:
+ *     ...
+ *     return rc;
+ *
+ * The error labels should generally appear in reverse order, and the
+ * code to perform the undoing action should always appear immediately
+ * before its corresponding error label.  Importantly, this code
+ * before the label should be included even if it is provably
+ * unreachable, so that future code changes cannot accidentally forget
+ * to include it.  (The unreachable code will be eliminated by the
+ * compiler, though many analysis tools will irritatingly complain
+ * about it.)
+ *
  */
 
 /* Get definitions for platform-specific error codes */
