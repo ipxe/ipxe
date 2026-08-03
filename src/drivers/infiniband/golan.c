@@ -2970,7 +2970,9 @@ static void golan_crusoe_eth_poll ( struct net_device *netdev ) {
 				else
 					netdev_tx_complete ( netdev, iobuf );
 			}
-		} else if ( qpn == mlx5e->rqn ) {
+		} else if ( ( qpn == mlx5e->rqn ) ||
+			    ( opcode == GOLAN_CQE_RESP_SEND ) ||
+			    ( opcode == GOLAN_CQE_RESP_ERR ) ) {
 			idx = ( wqe_counter & ( GOLAN_CRUSOE_RX_WQES - 1 ) );
 			iobuf = mlx5e->rx_iobufs[idx];
 			mlx5e->rx_iobufs[idx] = NULL;
