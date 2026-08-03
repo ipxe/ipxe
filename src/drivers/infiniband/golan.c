@@ -527,6 +527,9 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 			~xor8_buf ( mailboxes[i].mblock.rsvd0,
 				     ( sizeof ( mailboxes[i].mblock ) -
 				       sizeof ( mailboxes[i].mblock.bdata ) - 2 ) );
+		mailboxes[i].mblock.sig =
+			~xor8_buf ( &mailboxes[i].mblock,
+				     sizeof ( mailboxes[i].mblock ) - 1 );
 	}
 
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, MEM_MBOX, NO_MBOX,
