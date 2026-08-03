@@ -1948,6 +1948,7 @@ static int golan_crusoe_query_nic_vport_identity ( struct golan *golan ) {
 	struct golan_query_vport_state_outbox *state_out;
 	const u8 *mac;
 	unsigned int allowed_list_size;
+	unsigned int i;
 	int rc;
 
 	printf ( "Crusoe mlx5e VF P1: QUERY_NIC_VPORT_CONTEXT start\n" );
@@ -1965,6 +1966,10 @@ static int golan_crusoe_query_nic_vport_identity ( struct golan *golan ) {
 
 	nic_out = ( struct golan_query_nic_vport_context_outbox * )
 		GET_OUTBOX ( golan, GEN_MBOX );
+	printf ( "Crusoe mlx5e VF P1: NIC context bytes 240..319" );
+	for ( i = 240 ; i < 320 ; i++ )
+		printf ( " %02x", ( ( u8 * ) nic_out )[i] );
+	printf ( "\n" );
 	mac = &nic_out->permanent_address[2];
 	printf ( "Crusoe mlx5e VF P1: permanent MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
 	      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
