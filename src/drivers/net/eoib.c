@@ -180,14 +180,14 @@ struct cache_discarder eoib_discarder __cache_discarder ( CACHE_EXPENSIVE ) = {
 };
 
 /**
- * Find destination address vector
+ * Fill in destination address vector
  *
  * @v eoib		EoIB device
  * @v mac		Ethernet MAC
- * @ret av		Address vector, or NULL to send as broadcast
+ * @v av		Address vector to fill in
  */
-static struct ib_address_vector * eoib_tx_av ( struct eoib_device *eoib,
-					       const uint8_t *mac ) {
+static void eoib_tx_av ( struct eoib_device *eoib, const uint8_t *mac,
+			 struct ib_address_vector *av ) {
 	struct ib_device *ibdev = eoib->ibdev;
 	struct eoib_peer *peer;
 	int rc;
@@ -198,7 +198,7 @@ static struct ib_address_vector * eoib_tx_av ( struct eoib_device *eoib,
 	if ( is_multicast_ether_addr ( mac ) ) {
 		DBGCP ( eoib, "EoIB %s %s TX multicast\n",
 			eoib->name, eth_ntoa ( mac ) );
-		return NULL;
+		goto multicast;
 	}
 
 	/* If we have no peer cache entry, then create one and send
@@ -209,7 +209,7 @@ static struct ib_address_vector * eoib_tx_av ( struct eoib_device *eoib,
 		DBGC ( eoib, "EoIB %s %s TX unknown\n",
 		       eoib->name, eth_ntoa ( mac ) );
 		eoib_create_peer ( eoib, mac );
-		return NULL;
+		goto no_peer;
 	}
 
 	/* If we have not yet recorded a received GID and QPN for this
@@ -218,27 +218,40 @@ static struct ib_address_vector * eoib_tx_av ( struct eoib_device *eoib,
 	if ( ! peer->av.gid_present ) {
 		DBGCP ( eoib, "EoIB %s %s TX not yet recorded\n",
 			eoib->name, eth_ntoa ( mac ) );
-		return NULL;
+		goto no_gid_qpn;
 	}
+
+	/* Peer cache entries may be freed by the cache discarder when
+	 * we call a function that allocates memory.  Create a local
+	 * copy of the address vector.
+	 */
+	memcpy ( av, &peer->av, sizeof ( *av ) );
 
 	/* If we have not yet resolved a path to this peer, then send
 	 * this packet as a broadcast.
 	 */
-	if ( ( rc = ib_resolve_path ( ibdev, &peer->av ) ) != 0 ) {
+	if ( ( rc = ib_resolve_path ( ibdev, av ) ) != 0 ) {
 		DBGCP ( eoib, "EoIB %s %s TX not yet resolved\n",
 			eoib->name, eth_ntoa ( mac ) );
-		return NULL;
+		goto not_resolved;
 	}
 
 	/* Force use of GRH even for local destinations */
-	peer->av.gid_present = 1;
+	av->gid_present = 1;
 
 	/* We have a fully resolved peer: send this packet as a
 	 * unicast.
 	 */
 	DBGCP ( eoib, "EoIB %s %s TX " IB_GID_FMT " QPN %#lx\n", eoib->name,
-		eth_ntoa ( mac ), IB_GID_ARGS ( &peer->av.gid ), peer->av.qpn );
-	return &peer->av;
+		eth_ntoa ( mac ), IB_GID_ARGS ( &av->gid ), av->qpn );
+	return;
+
+ multicast:
+ no_peer:
+ no_gid_qpn:
+ not_resolved:
+	/* Send as broadcast */
+	memcpy ( av, &eoib->broadcast, sizeof ( *av ) );
 }
 
 /**
@@ -246,7 +259,7 @@ static struct ib_address_vector * eoib_tx_av ( struct eoib_device *eoib,
  *
  * @v eoib		EoIB device
  * @v mac		Ethernet MAC
- * @v lid		Infiniband LID
+ * @v av		Address vector
  */
 static void eoib_rx_av ( struct eoib_device *eoib, const uint8_t *mac,
 			 const struct ib_address_vector *av ) {
@@ -277,20 +290,20 @@ static void eoib_rx_av ( struct eoib_device *eoib, const uint8_t *mac,
 		qpn = eoib->gateway.qpn;
 	}
 
-	/* Do nothing if peer cache entry is complete and correct */
-	if ( ( peer->av.lid == av->lid ) && ( peer->av.qpn == qpn ) ) {
+	/* Update peer cache entry */
+	if ( ( peer->av.qpn == qpn ) &&
+	     ( memcmp ( &peer->av.gid, gid, sizeof ( *gid ) ) == 0 ) ) {
 		DBGCP ( eoib, "EoIB %s %s RX unchanged\n",
 			eoib->name, eth_ntoa ( mac ) );
-		return;
+	} else {
+		DBGC ( eoib, "EoIB %s %s RX " IB_GID_FMT " QPN %#lx\n",
+		       eoib->name, eth_ntoa ( mac ), IB_GID_ARGS ( gid ),
+		       qpn );
 	}
-
-	/* Update peer cache entry */
 	peer->av.qpn = qpn;
 	peer->av.qkey = eoib->broadcast.qkey;
 	peer->av.gid_present = 1;
 	memcpy ( &peer->av.gid, gid, sizeof ( peer->av.gid ) );
-	DBGC ( eoib, "EoIB %s %s RX " IB_GID_FMT " QPN %#lx\n", eoib->name,
-	       eth_ntoa ( mac ), IB_GID_ARGS ( &peer->av.gid ), peer->av.qpn );
 }
 
 /****************************************************************************
@@ -312,7 +325,7 @@ static int eoib_transmit ( struct net_device *netdev,
 	struct eoib_device *eoib = netdev->priv;
 	struct eoib_header *eoib_hdr;
 	struct ethhdr *ethhdr;
-	struct ib_address_vector *av;
+	struct ib_address_vector av;
 	size_t zlen;
 
 	/* Sanity checks */
@@ -321,7 +334,7 @@ static int eoib_transmit ( struct net_device *netdev,
 
 	/* Look up destination address vector */
 	ethhdr = iobuf->data;
-	av = eoib_tx_av ( eoib, ethhdr->h_dest );
+	eoib_tx_av ( eoib, ethhdr->h_dest, &av );
 
 	/* Prepend EoIB header */
 	eoib_hdr = iob_push ( iobuf, sizeof ( *eoib_hdr ) );
@@ -334,17 +347,14 @@ static int eoib_transmit ( struct net_device *netdev,
 	if ( iob_len ( iobuf ) < zlen )
 		iob_pad ( iobuf, zlen );
 
-	/* If we have no unicast address then send as a broadcast,
-	 * with a duplicate sent to the gateway if applicable.
+	/* If this is being sent as a broadcast (for any reason), then
+	 * send a duplicate to the gateway, if applicable
 	 */
-	if ( ! av ) {
-		av = &eoib->broadcast;
-		if ( eoib_has_gateway ( eoib ) )
-			eoib->duplicate ( eoib, iobuf );
-	}
+	if ( ( av.qpn == IB_QPN_BROADCAST ) && eoib_has_gateway ( eoib ) )
+		eoib->duplicate ( eoib, iobuf );
 
 	/* Post send work queue entry */
-	return ib_post_send ( eoib->ibdev, eoib->qp, av, iobuf );
+	return ib_post_send ( eoib->ibdev, eoib->qp, &av, iobuf );
 }
 
 /**
