@@ -2719,6 +2719,13 @@ static int golan_crusoe_eth_open ( struct net_device *netdev ) {
 	if ( ( rc = golan_crusoe_set_port_up ( golan ) ) != 0 )
 		return rc;
 	/*
+	 * Read the same vport state immediately after PAOS.  A successful
+	 * ACCESS_REG completion only proves the command was accepted; this
+	 * distinguishes a real hardware-state transition from a no-op write.
+	 */
+	if ( ( rc = golan_crusoe_query_nic_vport_identity ( golan ) ) != 0 )
+		return rc;
+	/*
 	 * TX-isolation diagnostic: keep the accepted RQ/TIR/steering graph but
 	 * do not publish any RX WQEs before the first NOP.  If the SQ still
 	 * remains unconsumed, active RX state is not suppressing TX progress.
