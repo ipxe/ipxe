@@ -591,8 +591,17 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 	/* Calculate number of pages */
 	pages = ( ( len + EFI_PAGE_SIZE - 1 ) / EFI_PAGE_SIZE );
 
+	/*
+	 * Crusoe mlx5 VF diagnostic: Linux's working SQ/DBR mappings are above
+	 * 4 GiB, while AllocateAnyPages consistently returns sub-4-GiB common
+	 * buffers in iPXE.  Ask EFI for the highest available common buffer so
+	 * the native-driver canary can isolate address range without changing
+	 * SQ bytes or doorbell publication.
+	 */
+	addr = ( VOID * ) ~0UL;
+
 	/* Allocate (page-aligned) buffer */
-	if ( ( efirc = pci_io->AllocateBuffer ( pci_io, AllocateAnyPages,
+	if ( ( efirc = pci_io->AllocateBuffer ( pci_io, AllocateMaxAddress,
 						EfiBootServicesData, pages,
 						&addr, 0 ) ) != 0 ) {
 		rc = -EEFI ( efirc );
