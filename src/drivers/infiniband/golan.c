@@ -2708,6 +2708,11 @@ static int shomron_nodnic_is_supported ( struct pci_device *pci ) {
 static int golan_probe ( struct pci_device *pci ) {
 	int rc = -ENOTSUP;
 
+	if ( pci && ( pci->device == 0x101e ) ) {
+		printf ( "Crusoe mlx5e VF: waiting 15s for serial capture\n" );
+		mdelay ( 15000 );
+	}
+
 	DBG ( "%s: start\n", __FUNCTION__ );
 
 	if ( ! pci ) {
