@@ -2875,13 +2875,11 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	/*
 	 * Live Linux BF allocation on this VF exposes two non-WC mappings on
 	 * active UAR 16: +0x800 and +0xa00.  Prior real SEND canaries used only
-	 * the first mapping.  Keep the same qword and ordered 32-bit stores but
-	 * isolate the second Linux-visible BF register for this canary.
+	 * the first mapping.  Keep the second Linux-visible BF register and now
+	 * match Linux's one raw 64-bit store exactly instead of split dwords.
 	 */
-	writel ( *( ( u32 * ) &wqe->ctrl ),
-		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 0x200 );
-	writel ( *( ( u32 * ) ( ( u8 * ) &wqe->ctrl + 4 ) ),
-		  golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 0x204 );
+	writeq ( *( ( u64 * ) &wqe->ctrl ),
+		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 0x200 );
 	if ( ! mlx5e->sq_probe_printed ) {
 		printf ( "Crusoe mlx5e VF: SEND ctrl raw d0=0x%x d1=0x%x d2=0x%x d3=0x%x mmio_qword=0x%llx\n",
 			 *( ( u32 * ) &wqe->ctrl ),
