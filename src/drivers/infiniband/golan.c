@@ -2769,7 +2769,7 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	 * test so duplicate notifications cannot mask the canonical path.
 	 */
 	writeq ( *( ( __be64 * ) &wqe->ctrl ),
-		 mlx5e->sq_uar.virt + DB_BUFFER0_EVEN_OFFSET );
+		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
 	if ( ! mlx5e->sq_probe_printed ) {
 		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
 		mlx5e->sq_probe_printed = 1;
@@ -3095,7 +3095,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	in[49] = 1;
 	golan_crusoe_put_be24 ( &in[61], tisn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
-	golan_crusoe_put_be24 ( &in[77], mlx5e->sq_uar.index );
+	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( sq_dbr );
 	/*
 	 * Match Linux's active Ethernet TX SQ shape: 64-byte WQEBBs and
@@ -3239,7 +3239,7 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	mlx5e->flow_table_id = flow_table_id;
 	mlx5e->flow_group_id = flow_group_id;
 	golan->crusoe_mlx5e = mlx5e;
-	printf ( "Crusoe mlx5e VF: retained CQN=%d RQN=%d SQN=%d generic-UAR=%d SQ-UAR=%d independent RQ/SQ rings and DBRs\n",
+	printf ( "Crusoe mlx5e VF: retained CQN=%d RQN=%d SQN=%d bound-UAR=%d allocated-SQ-UAR=%d independent RQ/SQ rings and DBRs\n",
 		 cqn, rqn, sqn, golan->uar.index, mlx5e->sq_uar.index );
 	return 0;
 
