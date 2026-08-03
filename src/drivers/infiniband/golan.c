@@ -2923,6 +2923,16 @@ static void golan_crusoe_eth_poll ( struct net_device *netdev ) {
 		printf ( "Crusoe mlx5e VF: CQE opcode=0x%x qpn=%d wqe=%d bytes=%d\n",
 			 opcode, qpn, wqe_counter,
 			 be32_to_cpu ( cqe->byte_cnt ) );
+		if ( opcode == GOLAN_CQE_RESP_ERR ) {
+			struct golan_err_cqe *err =
+				( ( struct golan_err_cqe * ) cqe );
+
+			printf ( "Crusoe mlx5e VF: RX error syndrome=0x%x vendor=0x%x hw=0x%x srqn=0x%x swqe=0x%x\n",
+				 err->syndrome, err->vendor_err_synd,
+				 err->hw_syndrom,
+				 be32_to_cpu ( err->srqn ),
+				 be32_to_cpu ( err->s_wqe_opcode_qpn ) );
+		}
 		if ( qpn == mlx5e->sqn ) {
 			idx = ( wqe_counter & ( GOLAN_CRUSOE_SQ_WQES - 1 ) );
 			iobuf = mlx5e->tx_iobufs[idx];
