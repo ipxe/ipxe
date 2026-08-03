@@ -1204,7 +1204,7 @@ static int golan_create_mkey(struct golan *golan)
 	in->seg.pcie_control		= 4;
 	in->seg.flags			= GOLAN_IB_ACCESS_LOCAL_WRITE | GOLAN_IB_ACCESS_LOCAL_READ;
 	in->seg.flags_pd		= cpu_to_be32(golan->pdn | GOLAN_MKEY_LEN64);
-	in->seg.qpn_mkey7_0		= cpu_to_be32(0x00ffffff);
+	in->seg.qpn_mkey7_0		= cpu_to_be32(0xffffff << GOLAN_CREATE_MKEY_SEG_QPN_BIT);
 	in->seg.log2_page_size	= 0x40;
 
 	printf ( "Crusoe mlx5e VF: CREATE_MKEY pcie=%d flags=0x%x "
@@ -1227,7 +1227,7 @@ static int golan_create_mkey(struct golan *golan)
 	 * the Linux-shaped context requests 0xff; dropping it makes every WQE
 	 * use an LKey that does not name the MKey we just created.
 	 */
-	golan->mkey = ( ( be32_to_cpu ( out->mkey ) & 0xffffff ) << 8 ) | 0xff;
+	golan->mkey = ( ( be32_to_cpu ( out->mkey ) & 0xffffff ) << 8 );
 	printf ( "Crusoe mlx5e VF: CREATE_MKEY returned mkey=0x%x\n",
 		 golan->mkey );
 	DBGC( golan , "%s: Got DMA Key for local access read/write (MKEY = 0x%x)\n",
