@@ -481,7 +481,7 @@ static int ocsp_parse_responder_id ( struct ocsp_check *ocsp,
  */
 static int ocsp_parse_cert_id ( struct ocsp_check *ocsp,
 				const struct asn1_cursor *raw ) {
-	static struct asn1_cursor algorithm = {
+	struct asn1_cursor algorithm = {
 		.data = ocsp_algorithm_id,
 		.len = sizeof ( ocsp_algorithm_id ),
 	};
