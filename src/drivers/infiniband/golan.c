@@ -2871,6 +2871,14 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	wmb();
 	*( ( __be32 * ) mlx5e->sq_dbr ) = cpu_to_be32 ( mlx5e->sq_prod );
 	wmb();
+	/*
+	 * Diagnostic: EFI common buffers should be coherent, but the live VF has
+	 * not consumed even Linux-shaped WQEs/DBRs.  Force all dirty CPU cache
+	 * lines to RAM before the blue-flame write so one canary can distinguish
+	 * stale common-buffer visibility from a remaining SQ/UAR mismatch.
+	 */
+	__asm__ __volatile__ ( "wbinvd" : : : "memory" );
+	wmb();
 	/* Match mlx5e_notify_hw(): one DBR[0] update and one BF qword. */
 	/*
 	 * Avoid any EFI/compiler ambiguity around a generic 64-bit MMIO helper:
