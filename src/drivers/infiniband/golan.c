@@ -2663,12 +2663,13 @@ static void golan_crusoe_query_sq_after_nop ( struct golan *golan,
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, GEN_MBOX,
 				     "crusoe_query_sq_after_nop" );
 	out = ( u8 * ) GET_OUTBOX ( golan, GEN_MBOX );
-	printf ( "Crusoe mlx5e VF: QUERY_SQ after NOP rc=%d status=0x%x syndrome=0x%x state=%d hw=0x%x sw=0x%x\n",
+	printf ( "Crusoe mlx5e VF: QUERY_SQ after NOP rc=%d status=0x%x syndrome=0x%x state=%d dbr_lo=0x%x hw=0x%x sw=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
 		 ( out[16] >> 4 ),
 		 be32_to_cpu ( *( ( __be32 * ) &out[84] ) ),
-		 be32_to_cpu ( *( ( __be32 * ) &out[88] ) ) );
+		 be32_to_cpu ( *( ( __be32 * ) &out[88] ) ),
+		 be32_to_cpu ( *( ( __be32 * ) &out[92] ) ) );
 }
 
 static int golan_crusoe_eth_transmit ( struct net_device *netdev,
@@ -2712,11 +2713,17 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
 	writeq ( *( ( __be64 * ) &wqe->ctrl ),
 		 golan->uar.virt + DB_BUFFER0_ODD_OFFSET );
+	/*
+	 * Linux exposes four BF registers per UAR.  The first two are reserved
+	 * for non-fast-path users; Ethernet TX may use the fast-path pair.
+	 */
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xa00 );
+	writeq ( *( ( __be64 * ) &wqe->ctrl ), golan->uar.virt + 0xb00 );
 	if ( ! mlx5e->sq_probe_printed ) {
 		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
 		mlx5e->sq_probe_printed = 1;
 	}
-	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR0=%d DBR1=%d dual-BF\n",
+	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR0=%d DBR1=%d quad-BF\n",
 		 idx, iob_len ( iobuf ),
 		 be32_to_cpu ( *( ( __be32 * ) mlx5e->sq_dbr ) ),
 		 be32_to_cpu ( *( ( ( __be32 * ) mlx5e->sq_dbr ) + 1 ) ) );
