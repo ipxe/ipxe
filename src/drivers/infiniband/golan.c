@@ -1205,10 +1205,10 @@ static int golan_create_mkey(struct golan *golan)
 	in->seg.flags			= GOLAN_IB_ACCESS_LOCAL_WRITE | GOLAN_IB_ACCESS_LOCAL_READ;
 	in->seg.flags_pd		= cpu_to_be32(golan->pdn | GOLAN_MKEY_LEN64);
 	in->seg.qpn_mkey7_0		= cpu_to_be32(0x00ffffff);
-	in->seg.log2_page_size	= 4;
+	in->seg.log2_page_size	= 0x40;
 
-	printf ( "Crusoe mlx5e VF: CREATE_MKEY pcie=%u flags=0x%x "
-		 "qpn=0x%x flags_pd=0x%x page=%u\n",
+	printf ( "Crusoe mlx5e VF: CREATE_MKEY pcie=%d flags=0x%x "
+		 "qpn=0x%x flags_pd=0x%x page=0x%x\n",
 		 in->seg.pcie_control, in->seg.flags,
 		 be32_to_cpu ( in->seg.qpn_mkey7_0 ),
 		 be32_to_cpu ( in->seg.flags_pd ),
