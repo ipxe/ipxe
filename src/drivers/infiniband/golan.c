@@ -2764,7 +2764,11 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	 */
 	wqe->ctrl.opmod_idx_opcode = cpu_to_be32 ( mlx5e->sq_prod << 8 );
 	wqe->ctrl.qpn_ds = cpu_to_be32 ( ( mlx5e->sqn << 8 ) | 1 );
-	wqe->ctrl.fm_ce_se = GOLAN_WQE_CTRL_CQ_UPDATE;
+	/*
+	 * CQ-isolation diagnostic: do not request a completion.  QUERY_SQ's
+	 * hardware counter can still prove whether the VF fetched the NOP.
+	 */
+	wqe->ctrl.fm_ce_se = 0;
 	mlx5e->tx_iobufs[idx] = iobuf;
 	mlx5e->sq_prod++;
 
