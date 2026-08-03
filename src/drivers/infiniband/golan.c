@@ -2968,7 +2968,11 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( rq_dbr );
-	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00040000 );
+	/*
+	 * log_wq_stride=4 (16-byte receive data segment) and log_wq_sz=4
+	 * describe the 16 descriptors that golan_crusoe_post_rx() publishes.
+	 */
+	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00040004 );
 	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( rq_wq );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_rq" );
@@ -2997,7 +3001,11 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( sq_dbr );
-	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00060001 );
+	/*
+	 * log_wq_stride=6 (64-byte WQEBB) and log_wq_sz=4 make a
+	 * coherent small diagnostic SQ rather than the old two-WQEBB probe.
+	 */
+	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00060004 );
 	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( sq_wq );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
 				     "crusoe_create_sq" );
