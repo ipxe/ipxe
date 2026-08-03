@@ -156,6 +156,9 @@ enum {
 	GOLAN_CMD_OP_QUERY_HCA_VPORT_CONTEXT	= 0x762,
 	GOLAN_CMD_OP_QUERY_HCA_VPORT_GID		= 0x764,
 	GOLAN_CMD_OP_QUERY_HCA_VPORT_PKEY	= 0x765,
+	/* Ethernet NIC vport commands used by the Crusoe VF probe. */
+	GOLAN_CMD_OP_QUERY_VPORT_STATE		= 0x750,
+	GOLAN_CMD_OP_QUERY_NIC_VPORT_CONTEXT	= 0x754,
 
 	GOLAN_CMD_OP_ALLOC_PD			= 0x800,
 	GOLAN_CMD_OP_DEALLOC_PD			= 0x801,
@@ -578,6 +581,46 @@ struct golan_query_hca_vport_context_outbox {
 	struct golan_outbox_hdr	hdr;
 	u8			rsvd[8];
 	struct golan_query_hca_vport_context_data context_data;
+} __attribute ( ( packed ) );
+
+/*
+ * Minimal mlx5 Ethernet vport layouts for the Crusoe 15b3:101e identity
+ * probe.  query_nic_vport_context_out places permanent_address at bit
+ * offset 0x7a0 within nic_vport_context; Linux copies bytes 2..7.
+ */
+struct golan_query_nic_vport_context_inbox {
+	struct golan_inbox_hdr	hdr;
+	__be16			other_vport	: 1;
+	__be16			rsvd1		: 15;
+	__be16			vport_number;
+	u8			rsvd2[4];
+} __attribute ( ( packed ) );
+
+struct golan_query_nic_vport_context_outbox {
+	struct golan_outbox_hdr	hdr;
+	u8			rsvd0[8];
+	u8			nic_vport_context_prefix[242];
+	__be16			allowed_list_size;
+	u8			permanent_address[8];
+	u8			rsvd1[4];
+	u8			current_uc_mac_address[16][8];
+} __attribute ( ( packed ) );
+
+struct golan_query_vport_state_inbox {
+	struct golan_inbox_hdr	hdr;
+	__be16			other_vport	: 1;
+	__be16			rsvd1		: 15;
+	__be16			vport_number;
+	u8			rsvd2[4];
+} __attribute ( ( packed ) );
+
+struct golan_query_vport_state_outbox {
+	struct golan_outbox_hdr	hdr;
+	u8			rsvd0[4];
+	__be16			max_tx_speed;
+	u8			rsvd1;
+	u8			admin_state	: 4;
+	u8			state		: 4;
 } __attribute ( ( packed ) );
 
 struct golan_query_hca_vport_gid_inbox {

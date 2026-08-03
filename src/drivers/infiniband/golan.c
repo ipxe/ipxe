@@ -1605,6 +1605,72 @@ err_query_vport_context_cmd:
 	return rc;
 }
 
+/*
+ * Identity-only Ethernet VF probe.  This deliberately does not register a
+ * netdev or create queues; it answers whether the VF permits the same NIC
+ * vport MAC/link queries used by Linux mlx5_core.
+ */
+static int golan_crusoe_query_nic_vport_identity ( struct golan *golan ) {
+	struct golan_cmd_layout *cmd;
+	struct golan_query_nic_vport_context_outbox *nic_out;
+	struct golan_query_vport_state_outbox *state_out;
+	const u8 *mac;
+	unsigned int allowed_list_size;
+	int rc;
+
+	printf ( "Crusoe mlx5e VF P1: QUERY_NIC_VPORT_CONTEXT start\n" );
+	cmd = write_cmd ( golan, DEF_CMD_IDX,
+			  GOLAN_CMD_OP_QUERY_NIC_VPORT_CONTEXT, 0x0,
+			  GEN_MBOX, GEN_MBOX,
+			  sizeof ( struct golan_query_nic_vport_context_inbox ),
+			  sizeof ( struct golan_query_nic_vport_context_outbox ) );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX,
+				     "crusoe_query_nic_vport_context" );
+	printf ( "Crusoe mlx5e VF P1: NIC context raw status=0x%x syndrome=0x%x\n",
+		 ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	GOLAN_CHECK_RC_AND_CMD_STATUS ( out );
+
+	nic_out = ( struct golan_query_nic_vport_context_outbox * )
+		GET_OUTBOX ( golan, GEN_MBOX );
+	mac = &nic_out->permanent_address[2];
+	printf ( "Crusoe mlx5e VF P1: permanent MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
+	      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
+	allowed_list_size = be16_to_cpu ( nic_out->allowed_list_size );
+	printf ( "Crusoe mlx5e VF P1: current UC list size=%d\n",
+	      allowed_list_size );
+	if ( allowed_list_size ) {
+		mac = &nic_out->current_uc_mac_address[0][2];
+		printf ( "Crusoe mlx5e VF P1: current UC MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
+		      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
+	}
+
+	printf ( "Crusoe mlx5e VF P1: QUERY_VPORT_STATE start\n" );
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_QUERY_VPORT_STATE,
+			  0x0, GEN_MBOX, GEN_MBOX,
+			  sizeof ( struct golan_query_vport_state_inbox ),
+			  sizeof ( struct golan_query_vport_state_outbox ) );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX,
+				     "crusoe_query_vport_state" );
+	printf ( "Crusoe mlx5e VF P1: vport state raw status=0x%x syndrome=0x%x\n",
+		 ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	GOLAN_CHECK_RC_AND_CMD_STATUS ( out );
+
+	state_out = ( struct golan_query_vport_state_outbox * )
+		GET_OUTBOX ( golan, GEN_MBOX );
+	printf ( "Crusoe mlx5e VF P1: vport raw speed=%02x%02x flags=%02x state=%d admin=%d max_tx_speed=%d\n",
+	      ( ( u8 * ) &state_out->max_tx_speed )[0],
+	      ( ( u8 * ) &state_out->max_tx_speed )[1],
+	      ( ( u8 * ) state_out )[15],
+	      state_out->state, state_out->admin_state,
+	      be16_to_cpu ( state_out->max_tx_speed ) );
+
+ out:
+	printf ( "Crusoe mlx5e VF P1: identity probe rc=%d\n", rc );
+	return rc;
+}
+
 
 static int golan_query_vport_gid ( struct ib_device *ibdev ) {
 	struct golan *golan = ib_get_drvdata( ibdev );
@@ -2384,6 +2450,8 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 	}
 
 	if ( ! DEVICE_IS_CIB ( pci->device ) ) {
+		if ( pci->device == 0x101e )
+			golan_crusoe_query_nic_vport_identity ( golan );
 		if ( pci->device == 0x101e ) {
 			DBG ( "Crusoe mlx5 VF: skipping post-bring-up mlx_utils init\n" );
 		} else if ( init_mlx_utils ( & golan->utils, pci ) ) {
