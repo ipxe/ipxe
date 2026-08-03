@@ -28,6 +28,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/iobuf.h>
 #include <ipxe/dma.h>
 #include <ipxe/netdevice.h>
+#include <ipxe/efi/efi_pci.h>
 #include "flexboot_nodnic.h"
 #include <ipxe/ethernet.h>
 #include <ipxe/if_ether.h>
@@ -2860,12 +2861,37 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 	/* Match mlx5e_notify_hw(): one DBR[0] update and one BF qword. */
 	/*
 	 * Live Linux BF allocation on this VF exposes two non-WC mappings on
-	 * active UAR 16: +0x800 and +0xa00.  Prior real SEND canaries used only
-	 * the first mapping.  Keep the second Linux-visible BF register and now
-	 * match Linux's one raw 64-bit store exactly instead of split dwords.
+	 * active UAR 16: +0x800 and +0xa00.  A fresh live TX-SQ trace proves
+	 * the ordinary Linux queue actively uses the first mapping (+0x800).
+	 * Keep that exact offset while changing only the UEFI access path.
 	 */
-	writeq ( *( ( u64 * ) &wqe->ctrl ),
-		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET + 0x200 );
+	{
+		struct efi_pci_device *efipci =
+			container_of ( golan->pci, struct efi_pci_device, pci );
+		uint64_t bf_qword = *( ( u64 * ) &wqe->ctrl );
+		uint64_t bf_offset =
+			( golan->uar.phys -
+			  pci_bar_start ( golan->pci, GOLAN_HCA_BAR ) +
+			  DB_BUFFER0_EVEN_OFFSET );
+		EFI_STATUS efirc;
+
+		/*
+		 * The command queue proves raw BAR0 stores work for the interface
+		 * segment, but the UAR page is the one remaining MMIO boundary.
+		 * Route this one exact Linux-style qword through the UEFI PCI I/O
+		 * protocol so firmware, not our direct mapping, performs the BAR
+		 * transaction.
+		 */
+		efirc = efipci->io->Mem.Write ( efipci->io,
+						 EfiPciIoWidthUint64,
+						 GOLAN_HCA_BAR, bf_offset,
+						 1, &bf_qword );
+		printf ( "Crusoe mlx5e VF: EFI PCI BF write offset=0x%llx status=0x%llx\n",
+			 ( unsigned long long ) bf_offset,
+			 ( unsigned long long ) efirc );
+		if ( efirc != 0 )
+			return -EEFI ( efirc );
+	}
 	if ( ! mlx5e->sq_probe_printed ) {
 		printf ( "Crusoe mlx5e VF: SEND ctrl raw d0=0x%x d1=0x%x d2=0x%x d3=0x%x mmio_qword=0x%llx\n",
 			 *( ( u32 * ) &wqe->ctrl ),
