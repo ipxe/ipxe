@@ -2677,10 +2677,11 @@ static int golan_crusoe_alloc_sq_uar ( struct golan *golan,
 static int golan_crusoe_set_port_up ( struct golan *golan ) {
 	struct golan_cmd_layout *cmd;
 	u8 *in;
+	u8 *out;
 	int rc;
 
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ACCESS_REG, 0,
-			  GEN_MBOX, GEN_MBOX, 24, 24 );
+			  GEN_MBOX, GEN_MBOX, 32, 32 );
 	/* access_register_in.register_id = MLX5_REG_PAOS (0x5006). */
 	( ( u8 * ) cmd->in )[10] = 0x50;
 	( ( u8 * ) cmd->in )[11] = 0x06;
@@ -2697,6 +2698,29 @@ static int golan_crusoe_set_port_up ( struct golan *golan ) {
 	printf ( "Crusoe mlx5e VF: ACCESS_REG PAOS up rc=%d status=0x%x syndrome=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( rc != 0 )
+		return rc;
+
+	/*
+	 * PAOS is a 16-byte register, so ACCESS_REG is 16 bytes of command
+	 * header plus 16 bytes of register data.  Read it back through the
+	 * same interface instead of inferring PAOS state from VPORT_STATE.
+	 */
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ACCESS_REG, 1,
+			  GEN_MBOX, GEN_MBOX, 32, 32 );
+	( ( u8 * ) cmd->in )[10] = 0x50;
+	( ( u8 * ) cmd->in )[11] = 0x06;
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	memset ( in, 0, 16 );
+	in[1] = 1;
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX,
+				     "crusoe_read_port_paos" );
+	out = ( u8 * ) GET_OUTBOX ( golan, GEN_MBOX );
+	printf ( "Crusoe mlx5e VF: ACCESS_REG PAOS read rc=%d status=0x%x syndrome=0x%x local=%d admin=%d oper=%d ase=%d\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
+		 out[1], ( out[2] & 0xf ), ( out[3] & 0xf ),
+		 ( ( out[4] >> 7 ) & 1 ) );
 	return rc;
 }
 
