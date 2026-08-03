@@ -2699,7 +2699,6 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 			  GEN_MBOX, NO_MBOX, 280, 16 );
 	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
 	/* mailbox offset = command input offset - 16-byte inline header */
-	in[28] = 2;
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
