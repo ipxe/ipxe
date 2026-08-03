@@ -555,40 +555,67 @@ static int fcpcmd_recv_rsp ( struct fcp_command *fcpcmd,
 			     struct xfer_metadata *meta __unused ) {
 	struct fcp_device *fcpdev = fcpcmd->fcpdev;
 	struct scsi_cmd *command = &fcpcmd->command;
-	struct fcp_rsp *rsp = iobuf->data;
+	struct fcp_rsp *rsp;
 	struct scsi_rsp response;
+	void *response_data;
+	void *sense_data;
+	size_t response_data_len;
+	size_t sense_data_len;
+	size_t remaining;
 	int rc;
 
-	/* Sanity check */
-	if ( ( iob_len ( iobuf ) < sizeof ( *rsp ) ) ||
-	     ( iob_len ( iobuf ) < ( sizeof ( *rsp ) +
-				     fcp_rsp_response_data_len ( rsp ) +
-				     fcp_rsp_sense_data_len ( rsp ) ) ) ) {
+	/* Parse response */
+	remaining = iob_len ( iobuf );
+	if ( remaining < sizeof ( *rsp ) ) {
 		DBGC ( fcpdev, "FCP %p xchg %04x received invalid response "
 		       "IU:\n", fcpdev, fcpcmd->xchg_id );
 		DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
 		rc = -EPROTO;
 		goto done;
 	}
+	rsp = iobuf->data;
+	remaining -= sizeof ( *rsp );
 	DBGC2 ( fcpdev, "FCP %p xchg %04x RSP stat %02x resid %08x flags %02x"
 		"%s%s%s%s\n", fcpdev, fcpcmd->xchg_id, rsp->status,
 		ntohl ( rsp->residual ), rsp->flags,
 		( ( rsp->flags & FCP_RSP_RESPONSE_LEN_VALID ) ? " resp" : "" ),
 		( ( rsp->flags & FCP_RSP_SENSE_LEN_VALID ) ? " sense" : "" ),
 		( ( rsp->flags & FCP_RSP_RESIDUAL_OVERRUN ) ? " over" : "" ),
-		( ( rsp->flags & FCP_RSP_RESIDUAL_UNDERRUN ) ? " under" : "" ));
-	if ( fcp_rsp_response_data ( rsp ) ) {
+		( ( rsp->flags & FCP_RSP_RESIDUAL_UNDERRUN ) ? " under" : ""));
+
+	/* Parse response data */
+	response_data_len = fcp_rsp_response_data_len ( rsp );
+	if ( remaining < response_data_len ) {
+		DBGC ( fcpdev, "FCP %p xchg %04x received overlength "
+		       "response data:\n", fcpdev, fcpcmd->xchg_id );
+		DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
+		rc = -EPROTO;
+		goto done;
+	}
+	response_data = fcp_rsp_response_data ( rsp );
+	if ( response_data ) {
 		DBGC2 ( fcpdev, "FCP %p xchg %04x response data:\n",
 			fcpdev, fcpcmd->xchg_id );
-		DBGC2_HDA ( fcpdev, 0, fcp_rsp_response_data ( rsp ),
-			    fcp_rsp_response_data_len ( rsp ) );
+		DBGC2_HDA ( fcpdev, 0, response_data, response_data_len );
 	}
-	if ( fcp_rsp_sense_data ( rsp ) ) {
+	remaining -= response_data_len;
+
+	/* Parse sense data */
+	sense_data_len = fcp_rsp_sense_data_len ( rsp );
+	if ( remaining < sense_data_len ) {
+		DBGC ( fcpdev, "FCP %p xchg %04x received overlength "
+		       "sense data:\n", fcpdev, fcpcmd->xchg_id );
+		DBGC_HDA ( fcpdev, 0, iobuf->data, iob_len ( iobuf ) );
+		rc = -EPROTO;
+		goto done;
+	}
+	sense_data = fcp_rsp_sense_data ( rsp );
+	if ( sense_data ) {
 		DBGC2 ( fcpdev, "FCP %p xchg %04x sense data:\n",
 			fcpdev, fcpcmd->xchg_id );
-		DBGC2_HDA ( fcpdev, 0, fcp_rsp_sense_data ( rsp ),
-			    fcp_rsp_sense_data_len ( rsp ) );
+		DBGC2_HDA ( fcpdev, 0, sense_data, sense_data_len );
 	}
+	remaining -= sense_data_len;
 
 	/* Check for locally-detected command underrun */
 	if ( ( rsp->status == 0 ) &&
@@ -611,8 +638,7 @@ static int fcpcmd_recv_rsp ( struct fcp_command *fcpcmd,
 		if ( rsp->flags & FCP_RSP_RESIDUAL_UNDERRUN )
 			response.overrun = -response.overrun;
 	}
-	scsi_parse_sense ( fcp_rsp_sense_data ( rsp ),
-			   fcp_rsp_sense_data_len ( rsp ), &response.sense );
+	scsi_parse_sense ( sense_data, sense_data_len, &response.sense );
 
 	/* Free buffer before sending response, to minimise
 	 * out-of-memory errors.
