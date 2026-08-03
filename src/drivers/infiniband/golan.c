@@ -2682,10 +2682,14 @@ static int golan_crusoe_eth_open ( struct net_device *netdev ) {
 		return rc;
 	if ( ( rc = golan_crusoe_setup_mlx5e_queues ( golan ) ) != 0 )
 		return rc;
-	if ( ( rc = golan_crusoe_post_rx ( golan ) ) != 0 )
-		return rc;
+	/*
+	 * TX-isolation diagnostic: keep the accepted RQ/TIR/steering graph but
+	 * do not publish any RX WQEs before the first NOP.  If the SQ still
+	 * remains unconsumed, active RX state is not suppressing TX progress.
+	 */
+	printf ( "Crusoe mlx5e VF: RX posting skipped for TX isolation\n" );
 	netdev_link_up ( netdev );
-	printf ( "Crusoe mlx5e VF: Ethernet netdev open; persistent RX posted\n" );
+	printf ( "Crusoe mlx5e VF: Ethernet netdev open; TX isolation active\n" );
 	return 0;
 }
 
