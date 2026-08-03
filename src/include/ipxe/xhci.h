@@ -589,12 +589,8 @@ struct xhci_trb_set_tr_dequeue_pointer {
 struct xhci_trb_transfer {
 	/** Transfer TRB pointer */
 	uint64_t transfer;
-	/** Residual transfer length */
-	uint16_t residual;
-	/** Reserved */
-	uint8_t reserved;
-	/** Completion code */
-	uint8_t code;
+	/** Completion status */
+	uint32_t cmplt;
 	/** Flags */
 	uint8_t flags;
 	/** Type */
@@ -607,6 +603,12 @@ struct xhci_trb_transfer {
 
 /** A transfer event transfer request block */
 #define XHCI_TRB_TRANSFER XHCI_TRB_TYPE ( 32 )
+
+/** Completion code */
+#define XHCI_CMPLT_CODE( cmplt ) ( (cmplt) >> 24 )
+
+/** Residual bytes not transferred */
+#define XHCI_CMPLT_RESIDUAL( cmplt ) ( (cmplt) & 0xffffff )
 
 /** A command completion event transfer request block */
 struct xhci_trb_complete {

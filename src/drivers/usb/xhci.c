@@ -1598,6 +1598,8 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	struct xhci_slot *slot;
 	struct xhci_endpoint *endpoint;
 	struct io_buffer *iobuf;
+	uint32_t cmplt;
+	unsigned int code;
 	int rc;
 
 	/* Profile transfer events */
@@ -1628,14 +1630,18 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	/* Unmap I/O buffer */
 	iob_unmap ( iobuf );
 
+	/* Parse completion */
+	cmplt = le32_to_cpu ( trb->cmplt );
+	code = XHCI_CMPLT_CODE ( cmplt );
+
 	/* Check for errors */
-	if ( ! ( ( trb->code == XHCI_CMPLT_SUCCESS ) ||
-		 ( trb->code == XHCI_CMPLT_SHORT ) ) ) {
+	if ( ! ( ( code == XHCI_CMPLT_SUCCESS ) ||
+		 ( code == XHCI_CMPLT_SHORT ) ) ) {
 
 		/* Construct error */
-		rc = -ECODE ( trb->code );
+		rc = -ECODE ( code );
 		DBGC ( xhci, "XHCI %s slot %d ctx %d failed (code %d): %s\n",
-		       xhci->name, slot->id, endpoint->ctx, trb->code,
+		       xhci->name, slot->id, endpoint->ctx, code,
 		       strerror ( rc ) );
 		DBGC_HDA ( xhci, 0, trb, sizeof ( *trb ) );
 
@@ -1649,7 +1655,7 @@ static void xhci_transfer ( struct xhci_device *xhci,
 	}
 
 	/* Record actual transfer size */
-	iob_unput ( iobuf, le16_to_cpu ( trb->residual ) );
+	iob_unput ( iobuf, XHCI_CMPLT_RESIDUAL ( cmplt ) );
 
 	/* Sanity check (for successful completions only) */
 	assert ( xhci_ring_consumed ( &endpoint->ring ) ==
