@@ -2685,7 +2685,7 @@ static int golan_crusoe_set_port_up ( struct golan *golan ) {
 	/* access_register_in.register_id = MLX5_REG_PAOS (0x5006). */
 	( ( u8 * ) cmd->in )[10] = 0x50;
 	( ( u8 * ) cmd->in )[11] = 0x06;
-	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	in = GET_INBOX ( golan, GEN_MBOX )->mblock.bdata;
 	/*
 	 * paos_reg: local_port=1 at byte 1, admin_status=UP(1) in the low
 	 * nibble of byte 2, and ase=1 in the high bit of byte 4.
@@ -2710,12 +2710,12 @@ static int golan_crusoe_set_port_up ( struct golan *golan ) {
 			  GEN_MBOX, GEN_MBOX, 32, 32 );
 	( ( u8 * ) cmd->in )[10] = 0x50;
 	( ( u8 * ) cmd->in )[11] = 0x06;
-	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	in = GET_INBOX ( golan, GEN_MBOX )->mblock.bdata;
 	memset ( in, 0, 16 );
 	in[1] = 1;
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, GEN_MBOX,
 				     "crusoe_read_port_paos" );
-	out = ( u8 * ) GET_OUTBOX ( golan, GEN_MBOX );
+	out = GET_OUTBOX ( golan, GEN_MBOX )->mblock.bdata;
 	printf ( "Crusoe mlx5e VF: ACCESS_REG PAOS read rc=%d status=0x%x syndrome=0x%x local=%d admin=%d oper=%d ase=%d\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
