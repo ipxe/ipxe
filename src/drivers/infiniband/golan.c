@@ -2712,8 +2712,6 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	in[28] = counter_set_id;
 	in[64] = 0x10;
 	golan_crusoe_put_be24 ( &in[25], cqn );
-	golan_crusoe_put_be24 ( &in[73], golan->pdn );
-	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
 	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( dbr );
 	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x00040000 );
 	*( ( __be64 * ) &in[256] ) = VIRT_2_BE64_BUS ( wq );
