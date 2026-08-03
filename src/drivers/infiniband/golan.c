@@ -2681,6 +2681,7 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	unsigned int tisn;
 	unsigned int rqn;
 	unsigned int sqn;
+	unsigned int tirn;
 	int rc;
 
 	ibdev = alloc_ibdev ( 0 );
@@ -2797,6 +2798,26 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 	printf ( "Crusoe mlx5e VF: MODIFY_RQ ready rc=%d status=0x%x syndrome=0x%x\n",
 		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
 		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
+	if ( rc != 0 )
+		goto out;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_CREATE_TIR, 0,
+			  GEN_MBOX, NO_MBOX, 272, 16 );
+	in = ( u8 * ) GET_INBOX ( golan, GEN_MBOX );
+	/*
+	 * Direct TIR: default disp_type is direct.  tirc.inline_rqn is
+	 * input byte 61 (mailbox byte 45); transport_domain is input byte
+	 * 69 (mailbox byte 53).
+	 */
+	golan_crusoe_put_be24 ( &in[45], rqn );
+	golan_crusoe_put_be24 ( &in[53], transport_domain );
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX,
+				     "crusoe_create_tir" );
+	tirn = golan_crusoe_get_be24 ( & ( ( u8 * ) cmd->out )[9] );
+	printf ( "Crusoe mlx5e VF: CREATE_TIR rc=%d status=0x%x syndrome=0x%x tirn=%d\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
+		 tirn );
 	if ( rc != 0 )
 		goto out;
 
