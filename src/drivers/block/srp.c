@@ -29,6 +29,7 @@
  */
 
 FILE_LICENCE ( BSD2 );
+FILE_SECBOOT ( FORBIDDEN );
 
 #include <stdlib.h>
 #include <string.h>
