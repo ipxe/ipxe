@@ -2555,6 +2555,75 @@ static int golan_register_ibdev(struct golan_port *port)
 	return 0;
 }
 
+static inline int golan_bring_up ( struct golan *golan );
+static inline void golan_bring_down ( struct golan *golan );
+
+/*
+ * Minimal Ethernet-netdev skeleton for Crusoe's mlx5Gen VF.
+ *
+ * This intentionally does not claim packet support yet.  It changes the
+ * object model from the legacy golan IPoIB wrapper to a native Ethernet
+ * netdev so subsequent queue work has the right iPXE interface and so a live
+ * canary can prove that the VF no longer appears as IPoIB.
+ */
+static int golan_crusoe_eth_open ( struct net_device *netdev ) {
+	struct golan *golan = *( ( struct golan ** ) netdev->priv );
+	int rc;
+
+	if ( ( rc = golan_bring_up ( golan ) ) != 0 )
+		return rc;
+	netdev_link_up ( netdev );
+	printf ( "Crusoe mlx5e VF: Ethernet netdev open; queue path pending\n" );
+	return 0;
+}
+
+static void golan_crusoe_eth_close ( struct net_device *netdev ) {
+	struct golan *golan = *( ( struct golan ** ) netdev->priv );
+
+	netdev_link_down ( netdev );
+	golan_bring_down ( golan );
+}
+
+static int golan_crusoe_eth_transmit ( struct net_device *netdev __unused,
+					struct io_buffer *iobuf __unused ) {
+	return -ENOTSUP;
+}
+
+static void golan_crusoe_eth_poll ( struct net_device *netdev __unused ) {
+}
+
+static struct net_device_operations golan_crusoe_eth_operations = {
+	.open = golan_crusoe_eth_open,
+	.close = golan_crusoe_eth_close,
+	.transmit = golan_crusoe_eth_transmit,
+	.poll = golan_crusoe_eth_poll,
+};
+
+static int golan_crusoe_register_netdev ( struct golan *golan,
+					   struct golan_port *port ) {
+	struct net_device *netdev;
+	int rc;
+
+	netdev = alloc_etherdev ( sizeof ( struct golan * ) );
+	if ( ! netdev )
+		return -ENOMEM;
+
+	netdev_init ( netdev, &golan_crusoe_eth_operations );
+	netdev->dev = &golan->pci->dev;
+	*( ( struct golan ** ) netdev->priv ) = golan;
+	eth_random_addr ( netdev->hw_addr );
+	printf ( "Crusoe mlx5e VF: registering Ethernet netdev with temporary MAC %s\n",
+		 eth_ntoa ( netdev->hw_addr ) );
+
+	if ( ( rc = register_netdev ( netdev ) ) != 0 ) {
+		netdev_put ( netdev );
+		return rc;
+	}
+
+	port->netdev = netdev;
+	return 0;
+}
+
 static inline void golan_bring_down(struct golan *golan)
 {
 	DBGC(golan, "%s: start\n", __FUNCTION__);
@@ -2781,6 +2850,15 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 			goto err_utils_init;
 		}
 	}
+
+	if ( pci->device == 0x101e ) {
+		if ( ( rc = golan_crusoe_register_netdev ( golan,
+						      &golan->ports[0] ) ) != 0 )
+			goto err_golan_probe_register_netdev;
+		golan_bring_down ( golan );
+		return 0;
+	}
+
 	/* Allocate Infiniband devices */
 	for (i = 0; i < golan->caps.num_ports; ++i) {
 		ibdev = alloc_ibdev( 0 );
@@ -2808,6 +2886,10 @@ static int golan_probe_normal ( struct pci_device *pci ) {
 	golan_bring_down ( golan );
 
 	return 0;
+
+	err_golan_probe_register_netdev:
+		golan_bring_down ( golan );
+		goto err_golan_bringup;
 
 	i = golan->caps.num_ports;
 err_golan_probe_register_ibdev:
@@ -2839,6 +2921,17 @@ static void golan_remove_normal ( struct pci_device *pci ) {
 	int i;
 
 	DBGC(golan, "%s\n", __FUNCTION__);
+
+	if ( pci->device == 0x101e ) {
+		if ( golan->ports[0].netdev ) {
+			unregister_netdev ( golan->ports[0].netdev );
+			netdev_put ( golan->ports[0].netdev );
+		}
+		iounmap ( golan->iseg );
+		golan_free_fw_areas ( golan );
+		free ( golan );
+		return;
+	}
 
 	for ( i = ( golan->caps.num_ports - 1 ) ; i >= 0 ; i-- ) {
 		port = &golan->ports[i];
