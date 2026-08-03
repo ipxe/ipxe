@@ -375,17 +375,47 @@ static inline int golan_set_hca_cap(struct golan *golan)
 	return rc;
 }
 
+static uint32_t golan_crusoe_cap_get ( const u8 *cap, unsigned int offset,
+				       unsigned int width )
+{
+	uint32_t value = 0;
+	unsigned int i;
+
+	for ( i = 0 ; i < width ; i++ ) {
+		value <<= 1;
+		value |= ( cap[ ( offset + i ) / 8 ] >>
+			   ( 7 - ( ( offset + i ) % 8 ) ) ) & 1;
+	}
+	return value;
+}
+
+static void golan_crusoe_cap_set ( u8 *cap, unsigned int offset,
+				    unsigned int width, uint32_t value )
+{
+	unsigned int i;
+
+	for ( i = 0 ; i < width ; i++ ) {
+		unsigned int bit = offset + i;
+		u8 mask = ( 1 << ( 7 - ( bit % 8 ) ) );
+
+		if ( value & ( 1U << ( width - 1 - i ) ) )
+			cap[ bit / 8 ] |= mask;
+		else
+			cap[ bit / 8 ] &= ~mask;
+	}
+}
+
 /*
- * The Crusoe 15b3:101e VF rejects golan's legacy capability edits, but Linux
- * still performs a GENERAL_DEVICE SET_HCA_CAP before INIT_HCA.  Replay the
- * complete current capability image unchanged first; this isolates whether
- * the missing transition, rather than one of golan's old field mutations,
- * is what leaves the Ethernet vport context empty.
+ * The Crusoe 15b3:101e VF rejects both golan's legacy capability edit and a
+ * full-size unchanged replay.  Linux copies current GENERAL_DEVICE caps, then
+ * rewrites a small required profile before INIT_HCA.  Keep the modern 4096
+ * byte command shape and apply only Linux's unconditional x86/4K mutations.
  */
 static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 {
 	struct golan_cmd_layout *cmd;
 	struct mbox *mailboxes;
+	u8 *cap;
 	unsigned int i;
 	int rc;
 
@@ -394,9 +424,9 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 	 * 4096-byte capability union.  The legacy golan command only supplied a
 	 * 256-byte capability payload in one mailbox block.  The 101e VF rejects
 	 * that short form with bad parameter, so build the full eight-block
-	 * mailbox chain while changing no capability bits yet.
+	 * mailbox chain and use the current GENERAL_DEVICE image as the base.
 	 */
-	printf ( "Crusoe mlx5e VF: replaying current HCA capabilities in long mailbox\n" );
+	printf ( "Crusoe mlx5e VF: applying Linux baseline HCA capabilities\n" );
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_SET_HCA_CAP, 0x0,
 			  MEM_MBOX, NO_MBOX,
 			  ( 16 + 4096 ),
@@ -405,6 +435,17 @@ static inline int golan_crusoe_set_hca_cap_current ( struct golan *golan )
 	memset ( mailboxes, 0, GOLAN_MBOX_ARENA_SIZE );
 	memcpy ( mailboxes[0].mblock.bdata, &golan->caps,
 		 sizeof ( golan->caps ) );
+	cap = mailboxes[0].mblock.bdata;
+	printf ( "Crusoe mlx5e VF: current pkey=%u log_max_qp=%u checksum=%u log_uar=%u\n",
+		 golan_crusoe_cap_get ( cap, 400, 16 ),
+		 golan_crusoe_cap_get ( cap, 155, 5 ),
+		 golan_crusoe_cap_get ( cap, 528, 2 ),
+		 golan_crusoe_cap_get ( cap, 1168, 16 ) );
+	/* Linux handle_hca_cap(): 128 PKeys, profile-2 QPs, no checksum, 4K UAR. */
+	golan_crusoe_cap_set ( cap, 400, 16, 0 );
+	golan_crusoe_cap_set ( cap, 155, 5, 18 );
+	golan_crusoe_cap_set ( cap, 528, 2, 0 );
+	golan_crusoe_cap_set ( cap, 1168, 16, 0 );
 	for ( i = 0 ; i < 8 ; i++ ) {
 		mailboxes[i].mblock.next =
 			( ( i + 1 ) < 8 ) ?
