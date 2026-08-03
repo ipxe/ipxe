@@ -1194,9 +1194,18 @@ static int golan_create_mkey(struct golan *golan)
 
 	in = (struct golan_create_mkey_mbox_in_data *)GET_INBOX(golan, GEN_MBOX);
 
+	/*
+	 * Match the working Linux mlx5e Ethernet MKey context byte-for-byte.
+	 * The old InfiniBand path left pcie_control/log2_page_size at zero and
+	 * shifted the unrestricted QPN field one byte left.  TX local reads can
+	 * still work with that shape, but the Crusoe VF reports LOCAL_PROT_ERR
+	 * when the Ethernet RQ tries to DMA into an RX buffer.
+	 */
+	in->seg.pcie_control		= 4;
 	in->seg.flags			= GOLAN_IB_ACCESS_LOCAL_WRITE | GOLAN_IB_ACCESS_LOCAL_READ;
 	in->seg.flags_pd		= cpu_to_be32(golan->pdn | GOLAN_MKEY_LEN64);
-	in->seg.qpn_mkey7_0		= cpu_to_be32(0xffffff << GOLAN_CREATE_MKEY_SEG_QPN_BIT);
+	in->seg.qpn_mkey7_0		= cpu_to_be32(0x00ffffff);
+	in->seg.log2_page_size	= 4;
 
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX, __FUNCTION__);
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_create_mkey_cmd );
