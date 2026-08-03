@@ -2687,14 +2687,13 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 		goto out;
 	cqn = cq->cqn;
 	wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
-	dbr = malloc_phys ( sizeof ( struct golan_qp_db ),
-			    sizeof ( struct golan_qp_db ) );
+	dbr = malloc_phys ( 8, 8 );
 	if ( ! wq || ! dbr ) {
 		rc = -ENOMEM;
 		goto out;
 	}
 	memset ( wq, 0, GOLAN_PAGE_SIZE );
-	memset ( dbr, 0, sizeof ( struct golan_qp_db ) );
+	memset ( dbr, 0, 8 );
 	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_ALLOC_Q_COUNTER,
 			  0, NO_MBOX, NO_MBOX, 16, 16 );
 	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, NO_MBOX,
@@ -2745,7 +2744,7 @@ static int golan_crusoe_probe_mlx5e_queues ( struct golan *golan ) {
 
  out:
 	if ( dbr )
-		free_phys ( dbr, sizeof ( struct golan_qp_db ) );
+		free_phys ( dbr, 8 );
 	if ( wq )
 		free_phys ( wq, GOLAN_PAGE_SIZE );
 	if ( cq )
