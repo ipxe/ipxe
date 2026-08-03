@@ -212,7 +212,7 @@ static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
  err_add_to_physmap:
 	for ( i-- ; ( signed int ) i >= 0 ; i-- ) {
 		remove.domid = DOMID_SELF;
-		add.gpfn = ( ( mmio_phys / PAGE_SIZE ) + i );
+		remove.gpfn = ( ( mmio_phys / PAGE_SIZE ) + i );
 		xenmem_remove_from_physmap ( &hvm->xen, &remove );
 	}
 	iounmap ( mmio );
