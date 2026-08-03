@@ -2601,6 +2601,7 @@ struct golan_crusoe_mlx5e {
 	u16 rq_prod;
 	u16 sq_prod;
 	int cq_probe_printed;
+	int sq_probe_printed;
 };
 
 static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan );
@@ -2639,6 +2640,35 @@ static void golan_crusoe_eth_close ( struct net_device *netdev ) {
 	 */
 	golan->crusoe_mlx5e = NULL;
 	golan_bring_down ( golan );
+}
+
+/*
+ * Ask firmware whether the first NOP changed SQ state or counters.  A ready
+ * SQ with unchanged counters means the doorbell was not consumed; an error
+ * state/counter advance means the device saw the WQE and rejected it.
+ */
+static void golan_crusoe_query_sq_after_nop ( struct golan *golan,
+					       struct golan_crusoe_mlx5e *mlx5e ) {
+	struct golan_cmd_layout *cmd;
+	u8 *in;
+	u8 *out;
+	int rc;
+
+	cmd = write_cmd ( golan, DEF_CMD_IDX, GOLAN_CMD_OP_QUERY_SQ, 0,
+			  NO_MBOX, GEN_MBOX, 16, 272 );
+	in = ( u8 * ) cmd->in;
+	in[9] = ( mlx5e->sqn >> 16 );
+	in[10] = ( mlx5e->sqn >> 8 );
+	in[11] = mlx5e->sqn;
+	rc = send_command_and_wait ( golan, DEF_CMD_IDX, NO_MBOX, GEN_MBOX,
+				     "crusoe_query_sq_after_nop" );
+	out = ( u8 * ) GET_OUTBOX ( golan, GEN_MBOX );
+	printf ( "Crusoe mlx5e VF: QUERY_SQ after NOP rc=%d status=0x%x syndrome=0x%x state=%d hw=0x%x sw=0x%x\n",
+		 rc, ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ),
+		 ( out[16] >> 4 ),
+		 be32_to_cpu ( *( ( __be32 * ) &out[84] ) ),
+		 be32_to_cpu ( *( ( __be32 * ) &out[88] ) ) );
 }
 
 static int golan_crusoe_eth_transmit ( struct net_device *netdev,
@@ -2682,6 +2712,10 @@ static int golan_crusoe_eth_transmit ( struct net_device *netdev,
 		 golan->uar.virt + DB_BUFFER0_EVEN_OFFSET );
 	writeq ( *( ( __be64 * ) &wqe->ctrl ),
 		 golan->uar.virt + DB_BUFFER0_ODD_OFFSET );
+	if ( ! mlx5e->sq_probe_printed ) {
+		golan_crusoe_query_sq_after_nop ( golan, mlx5e );
+		mlx5e->sq_probe_printed = 1;
+	}
 	printf ( "Crusoe mlx5e VF: submitted NOP WQE idx=%d len=%zd SQ DBR0=%d DBR1=%d dual-BF\n",
 		 idx, iob_len ( iobuf ),
 		 be32_to_cpu ( *( ( __be32 * ) mlx5e->sq_dbr ) ),
