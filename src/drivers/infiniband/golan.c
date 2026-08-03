@@ -1207,11 +1207,23 @@ static int golan_create_mkey(struct golan *golan)
 	in->seg.qpn_mkey7_0		= cpu_to_be32(0x00ffffff);
 	in->seg.log2_page_size	= 4;
 
+	printf ( "Crusoe mlx5e VF: CREATE_MKEY pcie=%u flags=0x%x "
+		 "qpn=0x%x flags_pd=0x%x page=%u\n",
+		 in->seg.pcie_control, in->seg.flags,
+		 be32_to_cpu ( in->seg.qpn_mkey7_0 ),
+		 be32_to_cpu ( in->seg.flags_pd ),
+		 in->seg.log2_page_size );
 	rc = send_command_and_wait(golan, DEF_CMD_IDX, GEN_MBOX, NO_MBOX, __FUNCTION__);
+	printf ( "Crusoe mlx5e VF: CREATE_MKEY rc=%d status=0x%x "
+		 "syndrome=0x%x\n", rc,
+		 ( ( struct golan_outbox_hdr * ) cmd->out )->status,
+		 be32_to_cpu ( ( ( struct golan_outbox_hdr * ) cmd->out )->syndrome ) );
 	GOLAN_CHECK_RC_AND_CMD_STATUS( err_create_mkey_cmd );
 	out = (struct golan_create_mkey_mbox_out *) ( cmd->out );
 
 	golan->mkey = ((be32_to_cpu(out->mkey) & 0xffffff) << 8);
+	printf ( "Crusoe mlx5e VF: CREATE_MKEY returned mkey=0x%x\n",
+		 golan->mkey );
 	DBGC( golan , "%s: Got DMA Key for local access read/write (MKEY = 0x%x)\n",
 		   __FUNCTION__, golan->mkey);
 	return 0;
