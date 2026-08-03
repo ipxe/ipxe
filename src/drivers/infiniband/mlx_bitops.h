@@ -85,7 +85,8 @@ typedef unsigned char pseudo_bit_t;
  */
 
 #define MLX_ASSEMBLE_1( _structure_st, _index, _field, _value )		     \
-	( (_value) << MLX_DWORD_BIT_OFFSET ( _structure_st, _index, _field ) )
+	( ( ( unsigned int ) (_value) ) <<				     \
+	  MLX_DWORD_BIT_OFFSET ( _structure_st, _index, _field ) )
 
 #define MLX_ASSEMBLE_2( _structure_st, _index, _field, _value, ... )	     \
 	( MLX_ASSEMBLE_1 ( _structure_st, _index, _field, _value ) |	     \

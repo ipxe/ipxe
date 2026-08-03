@@ -59,7 +59,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 #define MEMMAP_TAG( start, count, include_start, include_length,	\
 		    ignore, scale )					\
-	( ( (start) << 16 ) | ( ( (count) - 1 ) << 24 ) |		\
+	( ( (start) << 16 ) | ( ( (count) - 1U ) << 24 ) |		\
 	  ( (ignore) << 10 ) | ( (include_length) << 9 ) |		\
 	  ( (include_start) << 8 ) | (scale) )
 

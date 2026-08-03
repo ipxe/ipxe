@@ -216,12 +216,18 @@ struct des_generator {
 		       INV3, BIT3, INV2, BIT2, INV1, BIT1, INV0, BIT0 )	\
 	{								\
 		.permutation = (PERMUTATION),				\
-		.seed = ( ( (INV0) << 31 ) | ( (BIT0) << 28 ) |		\
-			  ( (INV1) << 27 ) | ( (BIT1) << 24 ) |		\
-			  ( (INV2) << 23 ) | ( (BIT2) << 20 ) |		\
-			  ( (INV3) << 19 ) | ( (BIT3) << 16 ) |		\
-			  ( (INV4) << 15 ) | ( (BIT4) << 12 ) |		\
-			  ( (INV5) << 11 ) | ( (BIT5) <<  8 ) |		\
+		.seed = ( ( ( ( unsigned int ) (INV0) ) << 31 ) |	\
+			  ( ( ( unsigned int ) (BIT0) ) << 28 ) |	\
+			  ( ( ( unsigned int ) (INV1) ) << 27 ) |	\
+			  ( ( ( unsigned int ) (BIT1) ) << 24 ) |	\
+			  ( ( ( unsigned int ) (INV2) ) << 23 ) |	\
+			  ( ( ( unsigned int ) (BIT2) ) << 20 ) |	\
+			  ( ( ( unsigned int ) (INV3) ) << 19 ) |	\
+			  ( ( ( unsigned int ) (BIT3) ) << 16 ) |	\
+			  ( ( ( unsigned int ) (INV4) ) << 15 ) |	\
+			  ( ( ( unsigned int ) (BIT4) ) << 12 ) |	\
+			  ( ( ( unsigned int ) (INV5) ) << 11 ) |	\
+			  ( ( ( unsigned int ) (BIT5) ) <<  8 ) |	\
 			  ( ( uint32_t ) sizeof (PERMUTATION) - 1 ) |	\
 			  (OFFSET) ),					\
 	}

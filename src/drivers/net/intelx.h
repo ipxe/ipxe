@@ -109,7 +109,7 @@ FILE_SECBOOT ( PERMITTED );
 #define INTELX_MAXFRS_MFS(len)	( (len) << 16 )	/**< Maximum frame size */
 #define INTELX_MAXFRS_MFS_DEFAULT \
 	INTELX_MAXFRS_MFS ( ETH_FRAME_LEN + 4 /* VLAN */ + 4 /* CRC */ )
-#define INTELX_MAXFRS_MFS_MASK	INTELX_MAXFRS_MFS ( 0xffff )
+#define INTELX_MAXFRS_MFS_MASK	INTELX_MAXFRS_MFS ( 0xffffU )
 
 /** Link Status Register */
 #define INTELX_LINKS 0x042a4UL

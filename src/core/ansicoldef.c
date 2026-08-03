@@ -43,7 +43,8 @@ FILE_SECBOOT ( PERMITTED );
  * @v rgb		24-bit RGB value (or ANSICOL_NO_RGB)
  * @ret ansicol		ANSI colour definition
  */
-#define ANSICOL_DEFINE( basic, rgb ) ( ( (basic) << 28 ) | (rgb) )
+#define ANSICOL_DEFINE( basic, rgb ) \
+	( ( ( ( unsigned int ) (basic) ) << 28 ) | (rgb) )
 
 /**
  * Extract basic colour from ANSI colour definition

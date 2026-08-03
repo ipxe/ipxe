@@ -37,9 +37,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 /** Xsigo resource types */
 enum xsigo_resource_type {
 	/** Virtual Ethernet resource type */
-	XSIGO_RESOURCE_XVE = ( 1 << 6 ),
+	XSIGO_RESOURCE_XVE = ( 1U << 6 ),
 	/** Absence-of-high-availability "resource" type */
-	XSIGO_RESOURCE_NO_HA = ( 1 << 4 ),
+	XSIGO_RESOURCE_NO_HA = ( 1U << 4 ),
 };
 
 /** A Xsigo server identifier */
@@ -216,7 +216,7 @@ enum xsmp_session_type {
 /** XSMP boot flags */
 enum xsmp_session_boot {
 	/** PXE boot */
-	XSMP_BOOT_PXE = ( 1 << 0 ),
+	XSMP_BOOT_PXE = ( 1U << 0 ),
 };
 
 /** XSMP virtual Ethernet channel adapter parameters */
@@ -338,13 +338,13 @@ enum xsmp_xve_code {
 /** XSMP virtual Ethernet update bitmask */
 enum xsmp_xve_update {
 	/** Update MTU */
-	XSMP_XVE_UPDATE_MTU = ( 1 << 2 ),
+	XSMP_XVE_UPDATE_MTU = ( 1U << 2 ),
 	/** Update administrative state */
-	XSMP_XVE_UPDATE_STATE = ( 1 << 6 ),
+	XSMP_XVE_UPDATE_STATE = ( 1U << 6 ),
 	/** Update gateway to mark as down */
-	XSMP_XVE_UPDATE_GW_DOWN = ( 1 << 30 ),
+	XSMP_XVE_UPDATE_GW_DOWN = ( 1U << 30 ),
 	/** Update gateway information */
-	XSMP_XVE_UPDATE_GW_CHANGE = ( 1 << 31 ),
+	XSMP_XVE_UPDATE_GW_CHANGE = ( 1U << 31 ),
 };
 
 /** XSMP virtual Ethernet modes */

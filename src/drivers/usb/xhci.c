@@ -2166,7 +2166,7 @@ static void xhci_configure_endpoint_input ( struct xhci_device *xhci,
 
 	/* Populate slot context */
 	slot_ctx = ( input + xhci_input_context_offset ( xhci, XHCI_CTX_SLOT ));
-	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( ( XHCI_CTX_END - 1 ),
+	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( ( XHCI_CTX_END - 1U ),
 							( slot->ports ? 1 : 0 ),
 							slot->psiv, 0 ) );
 	slot_ctx->ports = slot->ports;
@@ -2232,7 +2232,7 @@ xhci_deconfigure_endpoint_input ( struct xhci_device *xhci __unused,
 
 	/* Populate slot context */
 	slot_ctx = ( input + xhci_input_context_offset ( xhci, XHCI_CTX_SLOT ));
-	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( ( XHCI_CTX_END - 1 ),
+	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( ( XHCI_CTX_END - 1U ),
 							0, 0, 0 ) );
 }
 
@@ -2287,7 +2287,7 @@ static void xhci_evaluate_context_input ( struct xhci_device *xhci,
 
 	/* Populate slot context */
 	slot_ctx = ( input + xhci_input_context_offset ( xhci, XHCI_CTX_SLOT ));
-	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( ( XHCI_CTX_END - 1 ),
+	slot_ctx->info = cpu_to_le32 ( XHCI_SLOT_INFO ( ( XHCI_CTX_END - 1U ),
 							0, 0, 0 ) );
 
 	/* Populate endpoint context */

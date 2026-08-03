@@ -59,8 +59,8 @@ struct imgheader {
 #define NBI_LENGTH(len) ( NBI_NONVENDOR_LENGTH(len) + NBI_VENDOR_LENGTH(len) )
 
 /* Interpretation of the "flags" fields */
-#define	NBI_PROGRAM_RETURNS(flags)	( (flags) & ( 1 << 8 ) )
-#define	NBI_LINEAR_EXEC_ADDR(flags)	( (flags) & ( 1 << 31 ) )
+#define	NBI_PROGRAM_RETURNS(flags)	( (flags) & ( 1U << 8 ) )
+#define	NBI_LINEAR_EXEC_ADDR(flags)	( (flags) & ( 1U << 31 ) )
 
 /** NBI header length */
 #define NBI_HEADER_LENGTH	512
@@ -88,7 +88,7 @@ struct segheader {
 #define NBI_LOADADDR_AFTER		0x01
 #define NBI_LOADADDR_END		0x02
 #define NBI_LOADADDR_BEFORE		0x03
-#define NBI_LAST_SEGHEADER(flags)	( (flags) & ( 1 << 2 ) )
+#define NBI_LAST_SEGHEADER(flags)	( (flags) & ( 1U << 2 ) )
 
 /* Define a type for passing info to a loaded program */
 struct ebinfo {

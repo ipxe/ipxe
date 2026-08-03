@@ -78,7 +78,7 @@ static int usb_settings_fetch ( struct settings *settings __unused,
 	int rc;
 
 	/* Extract parameters from tag */
-	tag_direction = ( ( setting->tag & ( 1 << 31 ) ) ? +1 : -1 );
+	tag_direction = ( ( setting->tag & ( 1U << 31 ) ) ? +1 : -1 );
 	tag_busdev = ( ( setting->tag >> 16 ) & 0x7fff );
 	tag_offset = ( ( setting->tag >> 8 ) & 0xff );
 	tag_len = ( ( setting->tag >> 0 ) & 0xff );

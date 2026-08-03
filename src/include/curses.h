@@ -144,7 +144,7 @@ extern WINDOW _stdscr;
 #define A_STANDOUT	WA_STANDOUT
 #define A_UNDERLINE	WA_UNDERLINE
 
-#define A_ATTRIBUTES	( 0xffff << ATTRS_SHIFT )
+#define A_ATTRIBUTES	( 0xffffU << ATTRS_SHIFT )
 #define A_CHARTEXT	( 0xff )
 #define A_COLOUR	( 0xff << CPAIR_SHIFT )
 #define A_COLOR		A_COLOUR
