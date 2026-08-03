@@ -295,10 +295,11 @@ void pci_msix_dump ( struct pci_msix *msix, unsigned int vector ) {
 	address_lo = readl ( base + PCI_MSIX_ADDRESS_LO );
 	data = readl ( base + PCI_MSIX_DATA );
 	ctrl = readl ( base + PCI_MSIX_CONTROL );
-	pba = readl ( msix->pba );
+	pba = readl ( msix->pba + PCI_MSIX_PBA_OFFSET ( vector ) );
 	address = ( ( ( ( uint64_t ) address_hi ) << 32 ) | address_lo );
 	DBGC ( msix, "MSI-X %p vector %d %#08x => %#08lx%s%s\n",
 	       msix, vector, data, address,
 	       ( ( ctrl & PCI_MSIX_CONTROL_MASK ) ? " (masked)" : "" ),
-	       ( ( pba & ( 1 << vector ) ) ? " (pending)" : "" ) );
+	       ( ( pba & PCI_MSIX_PBA_MASK ( vector ) ) ?
+		 " (pending)" : "" ) );
 }

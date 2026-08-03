@@ -31,6 +31,12 @@ FILE_SECBOOT ( PERMITTED );
 #define PCI_MSIX_CONTROL 0xc
 #define PCI_MSIX_CONTROL_MASK 0x00000001	/**< Vector is masked */
 
+/** MSI-X pending bit array register offset */
+#define PCI_MSIX_PBA_OFFSET(n) ( 4 * ( (n) / 32 ) )
+
+/** MSI-X pending bit array register mask */
+#define PCI_MSIX_PBA_MASK(n) ( 1U << ( (n) % 32 ) )
+
 /** PCI MSI-X capability */
 struct pci_msix {
 	/** Capability offset */
