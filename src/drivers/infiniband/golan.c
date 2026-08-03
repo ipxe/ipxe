@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_smc.h>
 #include <ipxe/iobuf.h>
+#include <ipxe/dma.h>
 #include <ipxe/netdevice.h>
 #include "flexboot_nodnic.h"
 #include <ipxe/ethernet.h>
@@ -2591,6 +2592,8 @@ struct golan_crusoe_mlx5e {
 	 * and blue-flame write target the same dedicated UAR.
 	 */
 	struct golan_uar sq_uar;
+	struct dma_mapping sq_wq_map;
+	struct dma_mapping sq_dbr_map;
 	void *rq_wq;
 	void *sq_wq;
 	void *rq_dbr;
@@ -3019,10 +3022,12 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 		goto out;
 	cqn = cq->cqn;
 	rq_wq = malloc_phys ( GOLAN_PAGE_SIZE, GOLAN_PAGE_SIZE );
-	sq_wq = malloc_phys ( ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ),
-			      GOLAN_PAGE_SIZE );
+	dma_set_mask_64bit ( &golan->pci->dma );
+	sq_wq = dma_alloc ( &golan->pci->dma, &mlx5e->sq_wq_map,
+			     ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ),
+			     GOLAN_PAGE_SIZE );
 	rq_dbr = malloc_phys ( 8, 8 );
-	sq_dbr = malloc_phys ( 8, 8 );
+	sq_dbr = dma_alloc ( &golan->pci->dma, &mlx5e->sq_dbr_map, 8, 8 );
 	if ( ! rq_wq || ! sq_wq || ! rq_dbr || ! sq_dbr ) {
 		rc = -ENOMEM;
 		goto out;
@@ -3108,7 +3113,8 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	golan_crusoe_put_be24 ( &in[61], tisn );
 	golan_crusoe_put_be24 ( &in[73], golan->pdn );
 	golan_crusoe_put_be24 ( &in[77], golan->uar.index );
-	*( ( __be64 * ) &in[80] ) = VIRT_2_BE64_BUS ( sq_dbr );
+	*( ( __be64 * ) &in[80] ) =
+		cpu_to_be64 ( dma ( &mlx5e->sq_dbr_map, sq_dbr ) );
 	/*
 	 * Match Linux's active Ethernet TX SQ shape: 64-byte WQEBBs and
 	 * log_wq_sz=10 (1024 WQEBBs) backed by 16 4K PAS pages.
@@ -3116,8 +3122,9 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 	*( ( __be32 * ) &in[96] ) = cpu_to_be32 ( 0x0006000a );
 	for ( i = 0 ; i < GOLAN_CRUSOE_SQ_PAGES ; i++ ) {
 		*( ( __be64 * ) &in[256 + ( i * sizeof ( __be64 ) )] ) =
-			VIRT_2_BE64_BUS ( ( ( u8 * ) sq_wq ) +
-					  ( i * GOLAN_PAGE_SIZE ) );
+			cpu_to_be64 ( dma ( &mlx5e->sq_wq_map,
+					     ( ( u8 * ) sq_wq ) +
+					     ( i * GOLAN_PAGE_SIZE ) ) );
 	}
 	printf ( "Crusoe mlx5e VF: CREATE_SQ raw in_size=400" );
 	for ( i = 0 ; i < 30 ; i++ ) {
@@ -3265,12 +3272,12 @@ static int golan_crusoe_setup_mlx5e_queues ( struct golan *golan ) {
 
  out:
 	if ( sq_dbr )
-		free_phys ( sq_dbr, 8 );
+		dma_free ( &mlx5e->sq_dbr_map, sq_dbr, 8 );
 	if ( rq_dbr )
 		free_phys ( rq_dbr, 8 );
 	if ( sq_wq )
-		free_phys ( sq_wq,
-			    ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ) );
+		dma_free ( &mlx5e->sq_wq_map, sq_wq,
+			   ( GOLAN_CRUSOE_SQ_PAGES * GOLAN_PAGE_SIZE ) );
 	if ( rq_wq )
 		free_phys ( rq_wq, GOLAN_PAGE_SIZE );
 	if ( cq )
