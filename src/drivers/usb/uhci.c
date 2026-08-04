@@ -850,7 +850,9 @@ static int uhci_endpoint_stream ( struct usb_endpoint *ep,
 
 	/* Calculate number of descriptors */
 	len = iob_len ( iobuf );
-	count = ( ( ( len + ring->mtu - 1 ) / ring->mtu ) + ( zlp ? 1 : 0 ) );
+	count = ( ( len + ring->mtu - 1 ) / ring->mtu );
+	if ( zlp || ( count == 0 ) )
+		count++;
 
 	/* Enqueue transfer */
 	if ( ( rc = uhci_enqueue ( ring, iobuf, count ) ) != 0 )
@@ -862,7 +864,7 @@ static int uhci_endpoint_stream ( struct usb_endpoint *ep,
 			( input ? USB_PID_IN : USB_PID_OUT ) );
 
 	/* Describe zero-length packet, if applicable */
-	if ( zlp )
+	if ( len && zlp )
 		uhci_describe ( ring, NULL, 0, USB_PID_OUT );
 
 	/* Sanity check */
