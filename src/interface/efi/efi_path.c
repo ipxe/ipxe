@@ -118,6 +118,7 @@ struct efi_path_setting {
  * @v next		Next element in device path, or NULL if at end
  */
 EFI_DEVICE_PATH_PROTOCOL * efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path ) {
+	size_t len;
 
 	/* Check for non-existent device path */
 	if ( ! path )
@@ -127,11 +128,13 @@ EFI_DEVICE_PATH_PROTOCOL * efi_path_next ( EFI_DEVICE_PATH_PROTOCOL *path ) {
 	if ( path->Type == END_DEVICE_PATH_TYPE )
 		return NULL;
 
+	/* Treat an invalid length as ending the device path */
+	len = ( ( path->Length[1] << 8 ) | path->Length[0] );
+	if ( len < sizeof ( *path ) )
+		return NULL;
+
 	/* Move to next component of the device path */
-	path = ( ( ( void * ) path ) +
-		 /* There's this amazing new-fangled thing known as
-		  * a UINT16, but who wants to use one of those? */
-		 ( ( path->Length[1] << 8 ) | path->Length[0] ) );
+	path = ( ( ( void * ) path ) + len );
 
 	return path;
 }
