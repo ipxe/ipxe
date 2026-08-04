@@ -336,7 +336,7 @@ int intelxl_admin_command ( struct intelxl_nic *intelxl ) {
 	for ( i = 0 ; i < INTELXL_ADMIN_MAX_WAIT_MS ; i++ ) {
 
 		/* If response is not complete, delay 1ms and retry */
-		if ( ! ( cmd->flags & INTELXL_ADMIN_FL_DD ) ) {
+		if ( ! ( cmd->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_DD ) ) ) {
 			mdelay ( 1 );
 			continue;
 		}
@@ -847,7 +847,7 @@ void intelxl_poll_admin ( struct net_device *netdev ) {
 		buf = &admin->buf[ admin->index % INTELXL_ADMIN_NUM_DESC ];
 
 		/* Stop if descriptor is not yet completed */
-		if ( ! ( evt->flags & INTELXL_ADMIN_FL_DD ) )
+		if ( ! ( evt->flags & cpu_to_le16 ( INTELXL_ADMIN_FL_DD ) ) )
 			return;
 		DBGC2 ( intelxl, "INTELXL %p admin event %#x:\n",
 			intelxl, admin->index );

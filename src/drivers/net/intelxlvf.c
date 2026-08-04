@@ -244,7 +244,7 @@ static void intelxlvf_admin_link ( struct net_device *netdev,
 	struct intelxl_nic *intelxl = netdev->priv;
 
 	DBGC ( intelxl, "INTELXL %p link %#02x speed %#02x\n", intelxl,
-	       link->status, link->speed );
+	       link->status, le32_to_cpu ( link->speed ) );
 
 	/* Update network device */
 	if ( link->status ) {
