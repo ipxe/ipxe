@@ -99,7 +99,8 @@ static int elf_segment ( struct image *image, const Elf_Ehdr *ehdr,
 		return 0;
 
 	/* Check segment lies within image */
-	if ( ( phdr->p_offset + phdr->p_filesz ) > image->len ) {
+	if ( ( image->len < phdr->p_offset ) ||
+	     ( ( image->len - phdr->p_offset ) < phdr->p_filesz ) ) {
 		DBGC ( image, "ELF %s segment outside image\n", image->name );
 		return -ENOEXEC;
 	}
