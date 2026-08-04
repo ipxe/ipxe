@@ -49,7 +49,7 @@ const wchar_t *efi_cmdline;
 size_t efi_cmdline_len;
 
 /** Internal copy of the command line */
-static char *efi_cmdline_copy;
+static void *efi_cmdline_copy;
 
 /**
  * Free command line image
@@ -81,6 +81,7 @@ static struct image efi_cmdline_image = {
  * @ret rc		Return status code
  */
 static int efi_cmdline_init ( void ) {
+	wchar_t *wcmdline;
 	char *cmdline;
 	size_t len;
 	int rc;
@@ -91,15 +92,21 @@ static int efi_cmdline_init ( void ) {
 		return 0;
 	}
 
-	/* Allocate ASCII copy of command line */
-	len = ( ( efi_cmdline_len / sizeof ( efi_cmdline[0] ) ) + 1 /* NUL */ );
-	efi_cmdline_copy = malloc ( len );
+	/* Create wNUL-terminated copy of command line */
+	len = ( efi_cmdline_len + 1 /* possible half CHAR16 */
+		+ 2 /* wNUL */ );
+	efi_cmdline_copy = zalloc ( len );
 	if ( ! efi_cmdline_copy ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
+	memcpy ( efi_cmdline_copy, efi_cmdline, efi_cmdline_len );
+	wcmdline = efi_cmdline_copy;
+
+	/* Convert to ASCII in situ */
+	snprintf ( efi_cmdline_copy, len, "%ls", wcmdline );
 	cmdline = efi_cmdline_copy;
-	snprintf ( cmdline, len, "%ls", efi_cmdline );
+	wcmdline = NULL;
 	DBGC ( colour, "CMDLINE found command line \"%s\"\n", cmdline );
 
 	/* Mark command line as consumed */
