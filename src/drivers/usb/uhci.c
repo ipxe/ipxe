@@ -338,7 +338,7 @@ static void uhci_describe ( struct uhci_ring *ring, void *data,
 			    UHCI_CONTROL_LEN ( frag_len ) );
 		desc->control = cpu_to_le32 ( control );
 		if ( data )
-			desc->data = virt_to_phys ( data );
+			desc->data = cpu_to_le32 ( virt_to_phys ( data ) );
 		wmb();
 		desc->status = UHCI_STATUS_ACTIVE;
 
