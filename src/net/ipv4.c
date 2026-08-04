@@ -167,8 +167,9 @@ static int ipv4_add_static ( struct net_device *netdev, struct in_addr address,
 		remaining--;
 		masklen = ( ( width + 7 ) / 8 );
 
-		/* Check remaining length */
-		if ( ( masklen + sizeof ( gateway ) ) > remaining ) {
+		/* Check remaining length and mask validity */
+		if ( ( ( masklen + sizeof ( gateway ) ) > remaining ) ||
+		     ( width > 32 ) ) {
 			DBGC ( netdev, "IPv4 invalid static route:\n" );
 			DBGC_HDA ( netdev, 0, routes, len );
 			return -EINVAL;
