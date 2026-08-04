@@ -267,6 +267,7 @@ static int efi_pxe_ip_filter ( struct efi_pxe *pxe, EFI_IP_ADDRESS *ip ) {
 		struct in6_addr in6;
 	} *u = container_of ( ip, typeof ( *u ), ip );
 	size_t addr_len = pxe->net->net_addr_len;
+	unsigned int max;
 	unsigned int i;
 
 	/* Match everything, if applicable */
@@ -298,7 +299,8 @@ static int efi_pxe_ip_filter ( struct efi_pxe *pxe, EFI_IP_ADDRESS *ip ) {
 	}
 
 	/* Match explicit addresses, if applicable */
-	for ( i = 0 ; i < filter->IpCnt ; i++ ) {
+	max = ( sizeof ( filter->IpList ) / sizeof ( filter->IpList[0] ) );
+	for ( i = 0 ; ( ( i < filter->IpCnt ) && ( i < max ) ) ; i++ ) {
 		if ( memcmp ( ip, &filter->IpList[i], addr_len ) == 0 )
 			return 1;
 	}
@@ -1285,14 +1287,18 @@ efi_pxe_set_ip_filter ( EFI_PXE_BASE_CODE_PROTOCOL *base,
 			EFI_PXE_BASE_CODE_IP_FILTER *filter ) {
 	struct efi_pxe *pxe = container_of ( base, struct efi_pxe, base );
 	EFI_PXE_BASE_CODE_MODE *mode = &pxe->mode;
+	unsigned int max;
 	unsigned int i;
 
 	DBGC ( pxe, "PXE %s SET IP FILTER %02x",
 	       pxe->name, filter->Filters );
-	for ( i = 0 ; i < filter->IpCnt ; i++ ) {
+	max = ( sizeof ( filter->IpList ) / sizeof ( filter->IpList[0] ) );
+	for ( i = 0 ; ( ( i < filter->IpCnt ) && ( i < max ) ) ; i++ ) {
 		DBGC ( pxe, " %s",
 		       efi_pxe_ip_ntoa ( pxe, &filter->IpList[i] ) );
 	}
+	if ( filter->IpCnt > max )
+		DBGC ( pxe, " (invalid count %d)", filter->IpCnt );
 	DBGC ( pxe, "\n" );
 
 	/* Update filter */
