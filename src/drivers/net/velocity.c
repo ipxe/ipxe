@@ -566,7 +566,7 @@ static void velocity_poll_rx ( struct velocity_nic *vlc ) {
 		rx_idx = ( vlc->rx_cons % VELOCITY_RXDESC_NUM );
 		desc = &vlc->rx_ring[rx_idx];
 
-		des0 = cpu_to_le32 ( desc->des0 );
+		des0 = le32_to_cpu ( desc->des0 );
 
 		/* Return if descriptor still in use */
 		if ( des0 & VELOCITY_DES0_OWN )
