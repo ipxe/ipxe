@@ -38,6 +38,8 @@ FILE_SECBOOT ( PERMITTED );
  *
  * Dynamic memory allocation
  *
+ * @anchor malloc
+ *
  * Memory allocation via malloc() is provided using a simple
  * free-block list in a fixed-size heap.
  *

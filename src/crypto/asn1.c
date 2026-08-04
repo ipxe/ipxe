@@ -40,6 +40,8 @@ FILE_SECBOOT ( PERMITTED );
  *
  * ASN.1 encoding
  *
+ * @anchor asn1parse
+ *
  * The ASN.1 parsing helper functions are designed to be safe to use
  * on untrusted input, including malformed input.  Any parsing error
  * will cause the function to invalidate the cursor by setting its

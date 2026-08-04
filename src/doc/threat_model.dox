@@ -1,0 +1,148 @@
+/** @page threat_model Threat model
+
+@section overview Overview
+
+iPXE is a network-capable bootloader, generally operating at ring 0
+(or equivalent) with all memory protections disabled.  All data
+originating from the network should be considered to be untrusted and
+potentially malicious.
+
+Under UEFI, iPXE operates before ExitBootServices() is called.  An
+exploit against iPXE can therefore potentially produce a Secure Boot
+compromise, requiring all existing binaries to be revoked (by
+incrementing the SBAT generation in include/ipxe/sbat.h for the
+official binaries that are signed via the iPXE shim).
+
+@subsection threats Threats
+
+The primary threat category is traffic originating from a network
+peer.  All code on the receive datapath must carefully validate
+received lengths and contents during parsing.
+
+iPXE includes its own cryptographic stack (covering TLS, CMS, X.509,
+etc).  This stack is used for iPXE's own security (HTTPS connections
+and code-signing verification) but is entirely unrelated to UEFI
+Secure Boot since iPXE defers all Secure Boot decisions to the
+platform's own LoadImage() and StartImage() calls.  A compromise
+within iPXE's cryptographic stack would be a compromise of iPXE's
+security, but would not be a Secure Boot exploit (unless it also
+allowed for e.g. arbitrary code execution or an out-of-bounds write).
+
+@subsection secboot UEFI Secure Boot
+
+Files may be annotated with FILE_SECBOOT() declarations to indicate
+whether or not they are permitted to be included in a UEFI Secure Boot
+build.  The absence of a marker is taken to prohibit inclusion.
+
+Exclusion from a UEFI Secure Boot build does not indicate that a file
+is outside the scope of the threat model, but does generally indicate
+that it is a lower priority.
+
+There are some files that are explicitly marked as FORBIDDEN, for
+various reasons:
+
+  - Some files are intrinsically insecure by design.  For example, the
+    GDB debugging stub allows a remote device to read and write
+    arbitrary host memory locations.
+
+  - Some files are excluded by policy.  For example, the direct kernel
+    loading capability in image/lkrn.c is marked as FORBIDDEN to
+    ensure that iPXE's policy of delegating Secure Boot decisions to
+    the platform firmware's LoadImage() and StartImage() is respected.
+
+  - Some obsolete cryptographic algorithms such as MD4 and MD5 are
+    excluded to prevent their accidental inclusion via configuration
+    changes.
+
+  - Some third-party code such as the 802.11 stack has previously been
+    reviewed and found to contain multiple security holes (mostly
+    failing to check return values for memory allocation or other
+    failures), and is excluded by agreement with Microsoft.  Files in
+    this category need not be reviewed for security issues: they are
+    already known to contain holes and a full rewrite is required
+    before it becomes worthwhile to raise individual issues.
+
+@subsection exclusions Exclusions
+
+Malicious locally attached hardware is explicitly outside the scope of
+iPXE's threat model.  DMA-capable hardware is assumed to have write
+access to all of host memory (i.e. an IOMMU is not assumed to be
+present).  Device drivers are therefore not required to exhaustively
+defend against incorrect or inconsistent values written by DMA-capable
+hardware, since it is assumed that any such hardware could already
+crash the system (or overwrite iPXE's code) without any further
+assistance.
+
+DMA-incapable hardware (such as USB devices) are on the edge of the
+threat model.  It is assumed that an attacker with physical access to
+attach new hardware also has the ability to take full control of the
+system anyway (e.g. by disabling UEFI Secure Boot).  That said, USB
+device drivers should generally guard against misbehaving USB or other
+DMA-incapable hardware, since that hardware would not otherwise be
+able to crash the system.
+
+Under UEFI, other boot services code running on the same system is
+similarly on the edge of the threat model.  If UEFI Secure Boot is
+enabled, then any other code running on the same system must itself be
+part of a signed binary (or be part of the platform firmware), and so
+is by definition already at least as privileged as iPXE itself.  That
+said, iPXE components that interact via UEFI protocols should be
+written defensively, since experience shows that UEFI firmware code
+quality is generally quite poor, especially in closed-source vendor
+firmware that does not simply use the upstream EDK2 components.
+
+Infiniband local networks are generally regarded as being within the
+trust boundary, not least because iPXE includes support for remote DMA
+access.  (For this reason, Infiniband device drivers are excluded from
+a Secure Boot build.)
+
+iPXE generally transfers control to whatever payload it boots at the
+same privilege level held by iPXE itself (i.e. ring 0 or equivalent).
+There are therefore some classes of defect that are simply not
+interesting.  For example, a malformed NBI image could potentially be
+able to exploit a bug in arch/x86/image/nbi.c, but this would be
+utterly pointless since the exploit cannot do anything that a
+well-formed NBI image could not do simply by allowing itself to be
+executed.
+
+@subsection notes Notes
+
+There are several recurring patterns and helper functions used in iPXE
+that any security reviewer should be familiar with:
+
+  - Dynamic memory allocation via malloc() (or any other allocator
+    such as realloc(), umalloc(), dma_alloc(), etc) is expected to be
+    safe against malicious parameters (such as excessive allocation
+    sizes), and all callers are expected to handle allocation failures
+    gracefully.  The comments in core/malloc.c provide some of the
+    @ref malloc "internal details".
+
+  - Assertions via assert() are non-terminating and are no-ops in
+    production builds.  See the documentation for @ref assert for more
+    details.
+
+  - Errors are generally expected to be caught (unless explicitly
+    ignored) and propagated to the caller.  Error handling code should
+    use the @ref composable_errors "composable structured goto"
+    pattern where relevant.
+
+  - I/O buffers are used extensively to hold transmitted and received
+    packet data.  The documentation for struct @ref io_buffer
+    describes the semantics and caveats for manipulating these
+    buffers safely.
+
+  - @ref xferbuf "Data transfer buffers" are often used to provide a
+    bounds-checking abstraction around long-term host storage.  The
+    comments in core/xferbuf.c describe the semantics.
+
+  - ASN.1 parsing is handled by an extremely paranoid set of @ref
+    asn1parse "helper functions" that should be safe to use on any
+    untrusted input.
+
+  - The non-standard ssnprintf() variation of the standard snprintf()
+    C library function is often used to assemble content from a
+    sequence of formatted strings, in a way that is designed to be
+    safe against buffer size underflow.  See the documentation for
+    @ref ssnprintf for more details.
+
+*/

@@ -38,6 +38,8 @@ FILE_SECBOOT ( PERMITTED );
  *
  * Data transfer buffers
  *
+ * @anchor xferbuf
+ *
  * Data transfer buffers provide an abstraction of an underlying
  * storage buffer, with strictly bounds-checking accessors for reading
  * and writing data and optional automatic resizing.  They are

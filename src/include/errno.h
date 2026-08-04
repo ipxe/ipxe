@@ -103,6 +103,7 @@ FILE_SECBOOT ( PERMITTED );
  *
  *     return -EACCES_INCORRECT_TARGET_USERNAME;
  *
+ * @anchor composable_errors
  *
  * Code that may need to undo actions if an error occurs should use a
  * structured goto approach, where the code to perform the undo action
