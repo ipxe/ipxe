@@ -406,6 +406,8 @@ union fip_descriptor {
 struct fip_descriptors {
 	/** Descriptors, indexed by type */
 	union fip_descriptor *desc[FIP_NUM_DESCRIPTOR_TYPES];
+	/** Descriptor lengths, indexed by type */
+	size_t len[FIP_NUM_DESCRIPTOR_TYPES];
 };
 
 /**
@@ -416,10 +418,17 @@ struct fip_descriptors {
  * @v finder		Descriptor finder
  */
 #define FIP_DESCRIPTOR( type, name )					\
+	static inline __attribute__ (( always_inline ))	size_t		\
+	fip_ ## name ## _len ( struct fip_descriptors *descs ) {	\
+		return (descs)->len[type];				\
+	}								\
 	static inline __attribute__ (( always_inline ))			\
 	typeof ( ( ( union fip_descriptor * ) NULL )->name ) *		\
 	fip_ ## name ( struct fip_descriptors *descs ) {		\
-		return &(descs->desc[type]->name);			\
+		typeof ( ( ( union fip_descriptor * ) NULL )->name )	\
+			*ptr = &((descs)->desc[type]->name);		\
+		size_t len = fip_ ## name ## _len (descs);		\
+		return ( ( len >= sizeof ( *ptr ) ) ? ptr : NULL );	\
 	}
 FIP_DESCRIPTOR ( FIP_PRIORITY, priority );
 FIP_DESCRIPTOR ( FIP_MAC_ADDRESS, mac_address );

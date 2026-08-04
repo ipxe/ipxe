@@ -496,7 +496,7 @@ static int fcoe_fip_parse ( struct fcoe_port *fcoe, struct fip_header *fiphdr,
 	/* Parse descriptor list */
 	memset ( descs, 0, sizeof ( *descs ) );
 	for ( desc_offset = 0 ;
-	      desc_offset <= ( descs_len - sizeof ( desc->common ) ) ;
+	      ( desc_offset + sizeof ( desc->common ) ) <= descs_len ;
 	      desc_offset += desc_len ) {
 
 		/* Find descriptor and validate length */
@@ -518,8 +518,10 @@ static int fcoe_fip_parse ( struct fcoe_port *fcoe, struct fip_header *fiphdr,
 		if ( ( desc_type > FIP_RESERVED ) &&
 		     ( desc_type < FIP_NUM_DESCRIPTOR_TYPES ) ) {
 			/* Use only the first instance of a descriptor */
-			if ( descs->desc[desc_type] == NULL )
+			if ( descs->desc[desc_type] == NULL ) {
 				descs->desc[desc_type] = desc;
+				descs->len[desc_type] = desc_len;
+			}
 			continue;
 		}
 
@@ -916,7 +918,7 @@ static int fcoe_fip_rx ( struct io_buffer *iobuf,
 			 const void *ll_dest,
 			 const void *ll_source __unused,
 			 unsigned int flags __unused ) {
-	struct fip_header *fiphdr = iobuf->data;
+	struct fip_header *fiphdr;
 	struct fip_descriptors descs;
 	struct fip_handler *handler;
 	struct fcoe_port *fcoe;
@@ -943,6 +945,15 @@ static int fcoe_fip_rx ( struct io_buffer *iobuf,
 		rc = -ENOTCONN;
 		goto done;
 	}
+
+	/* Sanity check */
+	if ( iob_len ( iobuf ) < sizeof ( *fiphdr ) ) {
+		DBGC ( fcoe, "FCoE %s received under-length FIP packet (%zd "
+		       "bytes)\n", fcoe->netdev->name, iob_len ( iobuf ) );
+		rc = -EINVAL_UNDERLENGTH;
+		goto done;
+	}
+	fiphdr = iobuf->data;
 
 	/* Parse FIP packet */
 	if ( ( rc = fcoe_fip_parse ( fcoe, fiphdr, iob_len ( iobuf ),
