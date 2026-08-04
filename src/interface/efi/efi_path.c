@@ -200,6 +200,7 @@ int efi_path_check ( EFI_DEVICE_PATH_PROTOCOL *path, size_t max ) {
 		len = ( ( ( void * ) next ) - ( ( void * ) path ) );
 		if ( remaining < len )
 			return -EINVAL;
+		remaining -= len;
 	}
 
 	return 0;
