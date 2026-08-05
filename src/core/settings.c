@@ -998,19 +998,29 @@ static int numeric_setting_value ( int is_signed, const void *raw, size_t len,
 int fetch_numeric_setting ( struct settings *settings,
 			    const struct setting *setting,
 			    unsigned long *value, int is_signed ) {
-	unsigned long tmp;
+	void *raw;
+	int raw_len;
 	int len;
 
 	/* Avoid returning uninitialised data on error */
 	*value = 0;
 
 	/* Fetch raw (network-ordered, variable-length) setting */
-	len = fetch_raw_setting ( settings, setting, &tmp, sizeof ( tmp ) );
-	if ( len < 0 )
-		return len;
+	raw_len = fetch_raw_setting_copy ( settings, setting, &raw );
+	if ( raw_len < 0 ) {
+		len = raw_len;
+		goto err_fetch_copy;
+	}
 
 	/* Extract numeric value */
-	return numeric_setting_value ( is_signed, &tmp, len, value );
+	len = numeric_setting_value ( is_signed, raw, raw_len, value );
+	if ( len < 0 )
+		goto err_value;
+
+ err_value:
+	free ( raw );
+ err_fetch_copy:
+	return len;
 }
 
 /**
