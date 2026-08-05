@@ -110,10 +110,14 @@ You are very welcome to use AI to help you understand the issue that
 you are experiencing but do not, under any circumstances, submit text
 or code that an AI has generated.
 
-Any AI-generated submissions will result in the submitting user being
-instantly and permanently banned from interacting with this or any
-related projects.  There will be no additional warnings, and there is
-no way to appeal against this ban.
+A limited exception to this blanket prohibition exists for reporting
+potential security vulnerabilities, as documented in the [security
+policy](SECURITY.md).
+
+Any other AI-generated submissions will result in the submitting user
+being instantly and permanently banned from interacting with this or
+any related projects.  There will be no additional warnings, and there
+is no way to appeal against this ban.
 
 
 [crypto]: https://ipxe.org/crypto
