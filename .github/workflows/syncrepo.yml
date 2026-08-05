@@ -1,0 +1,20 @@
+name: Sync Repo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+
+  sync:
+    name: Sync
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Sync
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh repo sync "${{ github.repository }}"
