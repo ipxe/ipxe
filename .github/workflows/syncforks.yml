@@ -1,0 +1,48 @@
+name: Sync Forks
+
+on:
+  push:
+    branches:
+      - master
+      - synctest
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  sync:
+    name: Sync
+    runs-on: ubuntu-latest
+    if: vars.SYNC_FORKS
+    strategy:
+      fail-fast: false
+      matrix:
+        fork: ${{ fromJSON ( vars.SYNC_FORKS ) }}
+    env:
+      workflow_url: >-
+        ${{ github.server_url }}/${{ matrix.fork.owner }}/${{ ''
+        }}${{ matrix.fork.repository }}/actions/workflows/syncrepo.yml
+    environment:
+      name: syncforks
+      url: ${{ env.workflow_url }}
+
+    steps:
+
+      - name: Get token
+        id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.WORKFLOW_DISPATCHER_ID }}
+          private-key: ${{ secrets.WORKFLOW_DISPATCHER_KEY }}
+          owner: ${{ matrix.fork.owner }}
+          repositories: ${{ matrix.fork.repository }}
+
+      - name: Dispatch
+        env:
+          GH_REPO: ${{ matrix.fork.owner }}/${{ matrix.fork.repository }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          gh workflow run syncrepo.yml
+          echo "Results at ${{ env.workflow_url }}"
