@@ -539,7 +539,8 @@ static int ucode_parse_amd ( struct image *image, size_t start,
 	/* Count number of equivalence table entries */
 	offset = sizeof ( *hdr );
 	equiv = ( image->data + start + offset );
-	for ( count = 0 ; offset < ( sizeof ( *hdr ) + hdr->len ) ;
+	for ( count = 0 ;
+	      ( offset + sizeof ( *equiv ) ) <= ( sizeof ( *hdr ) + hdr->len );
 	      count++, offset += sizeof ( *equiv ) ) {
 		if ( ! equiv[count].signature )
 			break;
