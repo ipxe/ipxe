@@ -1002,7 +1002,14 @@ int vmbus_poll ( struct vmbus_device *vmdev ) {
 		       "bytes)\n", vmdev->dev.name, header_len );
 		return -EINVAL;
 	}
-	len = ( ( le16_to_cpu ( header->qlen ) * 8 ) - header_len );
+	len = ( le16_to_cpu ( header->qlen ) * 8 );
+	if ( len < header_len ) {
+		DBGC ( vmdev, "VMBUS %s received underlength packet (%zd "
+		       "bytes with %zd-byte header)\n",
+		       vmdev->dev.name, len, header_len );
+		return -EINVAL;
+	}
+	len -= header_len;
 	footer_len = sizeof ( struct vmbus_packet_footer );
 	ring_len = ( header_len + len + footer_len );
 	if ( ring_len > vmdev->mtu ) {
