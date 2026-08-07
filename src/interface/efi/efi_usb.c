@@ -109,9 +109,9 @@ static int efi_usb_mtu ( struct efi_usb_interface *usbintf,
 	}
 
 	/* Locate and copy cached endpoint descriptor */
-	for_each_interface_descriptor ( desc, usbdev->config, interface ) {
-		if ( ( desc->header.type == USB_ENDPOINT_DESCRIPTOR ) &&
-		     ( desc->endpoint == endpoint ) )
+	for_each_interface_descriptor ( desc, usbdev->config, interface,
+					USB_ENDPOINT_DESCRIPTOR ) {
+		if ( desc->endpoint == endpoint )
 			return USB_ENDPOINT_MTU ( le16_to_cpu ( desc->sizes ) );
 	}
 
@@ -932,9 +932,9 @@ efi_usb_get_endpoint_descriptor ( EFI_USB_IO_PROTOCOL *usbio, UINT8 index,
 	}
 
 	/* Locate and copy cached endpoint descriptor */
-	for_each_interface_descriptor ( desc, usbdev->config, interface ) {
-		if ( ( desc->header.type == USB_ENDPOINT_DESCRIPTOR ) &&
-		     ( index-- == 0 ) ) {
+	for_each_interface_descriptor ( desc, usbdev->config, interface,
+					USB_ENDPOINT_DESCRIPTOR ) {
+		if ( index-- == 0 ) {
 			memcpy ( efidesc, desc, sizeof ( *efidesc ) );
 			return 0;
 		}

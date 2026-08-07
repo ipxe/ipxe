@@ -134,18 +134,12 @@ static int usbio_interface ( struct usbio_device *usbio,
 
 	/* Iterate over all interface descriptors looking for a match */
 	config = usbio->config;
-	for_each_config_descriptor ( interface, config ) {
-
-		/* Skip non-interface descriptors */
-		if ( interface->header.type != USB_INTERFACE_DESCRIPTOR )
-			continue;
+	for_each_config_descriptor ( interface, config,
+				     USB_INTERFACE_DESCRIPTOR ) {
 
 		/* Iterate over all endpoint descriptors looking for a match */
-		for_each_interface_descriptor ( endpoint, config, interface ) {
-
-			/* Skip non-endpoint descriptors */
-			if ( endpoint->header.type != USB_ENDPOINT_DESCRIPTOR )
-				continue;
+		for_each_interface_descriptor ( endpoint, config, interface,
+						USB_ENDPOINT_DESCRIPTOR ) {
 
 			/* Check endpoint address */
 			if ( endpoint->endpoint != ep->address )

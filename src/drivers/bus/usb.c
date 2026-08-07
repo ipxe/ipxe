@@ -123,10 +123,9 @@ usb_interface_association_descriptor ( struct usb_configuration_descriptor
 	struct usb_interface_association_descriptor *desc;
 
 	/* Find a matching interface association descriptor */
-	for_each_config_descriptor ( desc, config ) {
-		if ( ( desc->header.type ==
-		       USB_INTERFACE_ASSOCIATION_DESCRIPTOR ) &&
-		     ( desc->first == first ) )
+	for_each_config_descriptor ( desc, config,
+				     USB_INTERFACE_ASSOCIATION_DESCRIPTOR ) {
+		if ( desc->first == first )
 			return desc;
 	}
 	return NULL;
@@ -146,9 +145,8 @@ usb_interface_descriptor ( struct usb_configuration_descriptor *config,
 	struct usb_interface_descriptor *desc;
 
 	/* Find a matching interface descriptor */
-	for_each_config_descriptor ( desc, config ) {
-		if ( ( desc->header.type == USB_INTERFACE_DESCRIPTOR ) &&
-		     ( desc->interface == interface ) &&
+	for_each_config_descriptor ( desc, config, USB_INTERFACE_DESCRIPTOR ) {
+		if ( ( desc->interface == interface ) &&
 		     ( desc->alternate == alternate ) )
 			return desc;
 	}
@@ -173,9 +171,9 @@ usb_endpoint_descriptor ( struct usb_configuration_descriptor *config,
 	unsigned int direction = ( type & USB_DIR_IN );
 
 	/* Find a matching endpoint descriptor */
-	for_each_interface_descriptor ( desc, config, interface ) {
-		if ( ( desc->header.type == USB_ENDPOINT_DESCRIPTOR ) &&
-		     ( ( desc->attributes &
+	for_each_interface_descriptor ( desc, config, interface,
+					USB_ENDPOINT_DESCRIPTOR ) {
+		if ( ( ( desc->attributes &
 			 USB_ENDPOINT_ATTR_TYPE_MASK ) == attributes ) &&
 		     ( ( desc->endpoint & USB_DIR_IN ) == direction ) &&
 		     ( index-- == 0 ) )
@@ -201,7 +199,8 @@ usb_endpoint_companion_descriptor ( struct usb_configuration_descriptor *config,
 			       struct usb_endpoint_companion_descriptor,
 			       header );
 	return ( ( usb_is_within_config ( config, &descx->header ) &&
-		   descx->header.type == USB_ENDPOINT_COMPANION_DESCRIPTOR )
+		   ( descx->header.len >= sizeof ( *descx ) ) &&
+		   ( descx->header.type == USB_ENDPOINT_COMPANION_DESCRIPTOR ) )
 		 ? descx : NULL );
 }
 

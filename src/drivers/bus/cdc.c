@@ -46,9 +46,9 @@ cdc_union_descriptor ( struct usb_configuration_descriptor *config,
 		       struct usb_interface_descriptor *interface ) {
 	struct cdc_union_descriptor *desc;
 
-	for_each_interface_descriptor ( desc, config, interface ) {
-		if ( ( desc->header.type == USB_CS_INTERFACE_DESCRIPTOR ) &&
-		     ( desc->subtype == CDC_SUBTYPE_UNION ) )
+	for_each_interface_descriptor ( desc, config, interface,
+					USB_CS_INTERFACE_DESCRIPTOR ) {
+		if ( desc->subtype == CDC_SUBTYPE_UNION )
 			return desc;
 	}
 	return NULL;

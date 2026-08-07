@@ -383,22 +383,32 @@ usb_is_within_config ( struct usb_configuration_descriptor *config,
 }
 
 /** Iterate over all configuration descriptors */
-#define for_each_config_descriptor( desc, config )			   \
+#define for_each_config_descriptor( desc, config, typeval )		   \
 	for ( desc = container_of ( &(config)->header,			   \
 				    typeof ( *desc ), header ) ;	   \
-	      usb_is_within_config ( (config), &desc->header ) ;	   \
+	      ( usb_is_within_config ( (config), &desc->header ) &&	   \
+		( desc->header.len >= sizeof ( desc->header ) ) ) ;	   \
 	      desc = container_of ( usb_next_descriptor ( &desc->header ), \
-				    typeof ( *desc ), header ) )
+				    typeof ( *desc ), header ) )	   \
+		if ( ( desc->header.len < sizeof ( *desc ) ) ||		   \
+		     ( desc->header.type != (typeval) ) )		   \
+			continue;					   \
+		else
 
 /** Iterate over all configuration descriptors within an interface descriptor */
-#define for_each_interface_descriptor( desc, config, interface )	   \
+#define for_each_interface_descriptor( desc, config, interface, typeval )  \
 	for ( desc = container_of ( usb_next_descriptor ( &(interface)->   \
 							  header ),	   \
 				    typeof ( *desc ), header ) ;	   \
 	      ( usb_is_within_config ( (config), &desc->header ) &&	   \
+		( desc->header.len >= sizeof ( desc->header ) ) &&	   \
 		( desc->header.type != USB_INTERFACE_DESCRIPTOR ) ) ;	   \
 	      desc = container_of ( usb_next_descriptor ( &desc->header ), \
-				    typeof ( *desc ), header ) )
+				    typeof ( *desc ), header ) )	   \
+		if ( ( desc->header.len < sizeof ( *desc ) ) ||		   \
+		     ( desc->header.type != (typeval) ) )		   \
+			continue;					   \
+		else
 
 /** A USB endpoint */
 struct usb_endpoint {
