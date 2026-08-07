@@ -106,7 +106,7 @@ static void fc_ns_query_close ( struct fc_ns_query *query, int rc ) {
 static int fc_ns_query_deliver ( struct fc_ns_query *query,
 				 struct io_buffer *iobuf,
 				 struct xfer_metadata *meta __unused ) {
-	union fc_ns_response *resp = iobuf->data;
+	union fc_ns_response *resp;
 	struct fc_port_id *peer_port_id;
 	int rc;
 
@@ -117,6 +117,7 @@ static int fc_ns_query_deliver ( struct fc_ns_query *query,
 		rc = -EINVAL;
 		goto done;
 	}
+	resp = iobuf->data;
 
 	/* Handle response */
 	switch ( ntohs ( resp->ct.code ) ) {

@@ -1411,7 +1411,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		    struct sockaddr_tcpip *st_src,
 		    struct sockaddr_tcpip *st_dest __unused,
 		    uint16_t pshdr_csum ) {
-	struct tcp_header *tcphdr = iobuf->data;
+	struct tcp_header *tcphdr;
 	struct tcp_connection *tcp;
 	struct tcp_options options;
 	size_t hlen;
@@ -1436,6 +1436,7 @@ static int tcp_rx ( struct io_buffer *iobuf,
 		rc = -EINVAL;
 		goto discard;
 	}
+	tcphdr = iobuf->data;
 	hlen = ( ( tcphdr->hlen & TCP_MASK_HLEN ) / 16 ) * 4;
 	if ( hlen < sizeof ( *tcphdr ) ) {
 		DBG ( "TCP header too short at %zd bytes (min %zd bytes)\n",

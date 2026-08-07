@@ -102,7 +102,7 @@ int eth_push ( struct net_device *netdev __unused, struct io_buffer *iobuf,
 int eth_pull ( struct net_device *netdev __unused, struct io_buffer *iobuf,
 	       const void **ll_dest, const void **ll_source,
 	       uint16_t *net_proto, unsigned int *flags ) {
-	struct ethhdr *ethhdr = iobuf->data;
+	struct ethhdr *ethhdr;
 	uint16_t *llc_proto;
 
 	/* Sanity check.  While in theory we could receive a one-byte
@@ -115,6 +115,7 @@ int eth_pull ( struct net_device *netdev __unused, struct io_buffer *iobuf,
 		      iob_len ( iobuf ) );
 		return -EINVAL;
 	}
+	ethhdr = iobuf->data;
 
 	/* Strip off Ethernet header */
 	iob_pull ( iobuf, sizeof ( *ethhdr ) );

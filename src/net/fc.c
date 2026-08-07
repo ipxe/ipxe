@@ -858,7 +858,7 @@ static struct fc_exchange * fc_port_demux ( struct fc_port *port,
  */
 static int fc_port_deliver ( struct fc_port *port, struct io_buffer *iobuf,
 			     struct xfer_metadata *meta ) {
-	struct fc_frame_header *fchdr = iobuf->data;
+	struct fc_frame_header *fchdr;
 	unsigned int xchg_id;
 	struct fc_exchange *xchg;
 	int rc;
@@ -870,6 +870,7 @@ static int fc_port_deliver ( struct fc_port *port, struct io_buffer *iobuf,
 		rc = -EINVAL;
 		goto err_sanity;
 	}
+	fchdr = iobuf->data;
 
 	/* Verify local port ID */
 	if ( ( memcmp ( &fchdr->d_id, &port->port_id,

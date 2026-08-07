@@ -140,8 +140,12 @@ int icmp_tx_echo_request ( struct io_buffer *iobuf,
 static int icmp_tx_echo_reply ( struct io_buffer *iobuf,
 				struct sockaddr_tcpip *st_dest,
 				struct icmp_echo_protocol *echo_protocol ) {
-	struct icmp_echo *echo = iobuf->data;
+	struct icmp_echo *echo;
 	int rc;
+
+	/* Sanity check: should have already been checked by receiver */
+	assert ( iob_len ( iobuf ) >= sizeof ( *echo ) );
+	echo = iobuf->data;
 
 	/* Set type */
 	echo->icmp.type = echo_protocol->reply;
@@ -166,7 +170,7 @@ static int icmp_tx_echo_reply ( struct io_buffer *iobuf,
 int icmp_rx_echo_request ( struct io_buffer *iobuf,
 			   struct sockaddr_tcpip *st_src,
 			   struct icmp_echo_protocol *echo_protocol ) {
-	struct icmp_echo *echo = iobuf->data;
+	struct icmp_echo *echo;
 	int rc;
 
 	/* Sanity check */
@@ -177,6 +181,7 @@ int icmp_rx_echo_request ( struct io_buffer *iobuf,
 		free_iob ( iobuf );
 		return -EINVAL;
 	}
+	echo = iobuf->data;
 	DBGC ( icmpcol ( st_src ), "ICMP RX echo request id %04x seq %04x\n",
 	       ntohs ( echo->ident ), ntohs ( echo->sequence ) );
 
@@ -196,7 +201,7 @@ int icmp_rx_echo_request ( struct io_buffer *iobuf,
  */
 int icmp_rx_echo_reply ( struct io_buffer *iobuf,
 			 struct sockaddr_tcpip *st_src ) {
-	struct icmp_echo *echo = iobuf->data;
+	struct icmp_echo *echo;
 	int rc;
 
 	/* Sanity check */
@@ -207,6 +212,7 @@ int icmp_rx_echo_reply ( struct io_buffer *iobuf,
 		free_iob ( iobuf );
 		return -EINVAL;
 	}
+	echo = iobuf->data;
 	DBGC ( icmpcol ( st_src ), "ICMP RX echo reply id %04x seq %04x\n",
 	       ntohs ( echo->ident ), ntohs ( echo->sequence ) );
 

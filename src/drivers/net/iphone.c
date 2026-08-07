@@ -807,16 +807,17 @@ static void imux_rx_syn ( struct imux *imux ) {
  * @v iobuf		I/O buffer
  */
 static void imux_rx_tcp ( struct imux *imux, struct io_buffer *iobuf ) {
-	struct imux_header_tcp *tcp = iobuf->data;
+	struct imux_header_tcp *tcp;
 	size_t len = iob_len ( iobuf );
 	int rc;
 
 	/* Sanity check */
 	if ( len < sizeof ( *tcp ) ) {
 		DBGC ( imux, "IMUX %p malformed TCP message:\n", imux );
-		DBGC_HDA ( imux, 0, tcp, len );
+		DBGC_HDA ( imux, 0, iobuf->data, len );
 		goto error;
 	}
+	tcp = iobuf->data;
 
 	/* Ignore unexpected packets */
 	if ( tcp->tcp.dest != htons ( imux->port ) ) {
@@ -867,7 +868,7 @@ static void imux_rx_tcp ( struct imux *imux, struct io_buffer *iobuf ) {
 static void imux_in_complete ( struct usb_endpoint *ep,
 			       struct io_buffer *iobuf, int rc ) {
 	struct imux *imux = container_of ( ep, struct imux, usbnet.in );
-	struct imux_header *hdr = iobuf->data;
+	struct imux_header *hdr;
 	size_t len = iob_len ( iobuf );
 
 	/* Ignore packets cancelled when the endpoint closes */
@@ -884,9 +885,10 @@ static void imux_in_complete ( struct usb_endpoint *ep,
 	/* Sanity check */
 	if ( len < sizeof ( *hdr ) ) {
 		DBGC ( imux, "IMUX %p malformed message:\n", imux );
-		DBGC_HDA ( imux, 0, hdr, len );
+		DBGC_HDA ( imux, 0, iobuf->data, len );
 		goto drop;
 	}
+	hdr = iobuf->data;
 
 	/* Record input sequence */
 	imux->in_seq = ntohs ( hdr->in_seq );

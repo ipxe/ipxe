@@ -844,7 +844,7 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 		       struct xfer_metadata *meta ) {
 	struct settings *parent = netdev_settings ( dhcpv6->netdev );
 	struct sockaddr_in6 *src = ( ( struct sockaddr_in6 * ) meta->src );
-	struct dhcpv6_header *dhcphdr = iobuf->data;
+	struct dhcpv6_header *dhcphdr;
 	struct dhcpv6_option_list options;
 	const union dhcpv6_any_option *option;
 	int rc;
@@ -857,6 +857,7 @@ static int dhcpv6_rx ( struct dhcpv6_session *dhcpv6,
 		rc = -EINVAL;
 		goto done;
 	}
+	dhcphdr = iobuf->data;
 	assert ( src != NULL );
 	assert ( src->sin6_family == AF_INET6 );
 	DBGC ( dhcpv6, "DHCPv6 %s received %s from %s\n",

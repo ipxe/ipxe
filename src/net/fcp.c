@@ -508,7 +508,7 @@ static int fcpcmd_recv_xfer_rdy ( struct fcp_command *fcpcmd,
 				  struct io_buffer *iobuf,
 				  struct xfer_metadata *meta __unused ) {
 	struct fcp_device *fcpdev = fcpcmd->fcpdev;
-	struct fcp_xfer_rdy *xfer_rdy = iobuf->data;
+	struct fcp_xfer_rdy *xfer_rdy;
 	int rc;
 
 	/* Sanity checks */
@@ -519,6 +519,7 @@ static int fcpcmd_recv_xfer_rdy ( struct fcp_command *fcpcmd,
 		rc = -EPROTO;
 		goto done;
 	}
+	xfer_rdy = iobuf->data;
 	if ( ntohl ( xfer_rdy->offset ) != fcpcmd->offset ) {
 		/* We do not advertise out-of-order delivery */
 		DBGC ( fcpdev, "FCP %p xchg %04x cannot support out-of-order "

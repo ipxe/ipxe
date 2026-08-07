@@ -651,7 +651,7 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		     const void *ll_dest __unused,
 		     const void *ll_source __unused,
 		     unsigned int flags __unused ) {
-	struct ipv6_header *iphdr = iobuf->data;
+	struct ipv6_header *iphdr;
 	union ipv6_extension_header *ext;
 	union {
 		struct sockaddr_in6 sin6;
@@ -676,12 +676,12 @@ static int ipv6_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 
 	/* Sanity check the IPv6 header */
 	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
-		DBGC ( ipv6col ( &iphdr->src ), "IPv6 packet too short at %zd "
-		       "bytes (min %zd bytes)\n", iob_len ( iobuf ),
-		       sizeof ( *iphdr ) );
+		DBGC ( netdev, "IPv6 packet too short at %zd bytes (min %zd "
+		       "bytes)\n", iob_len ( iobuf ), sizeof ( *iphdr ) );
 		rc = -EINVAL_LEN;
 		goto err_header;
 	}
+	iphdr = iobuf->data;
 	if ( ( iphdr->ver_tc_label & htonl ( IPV6_MASK_VER ) ) !=
 	     htonl ( IPV6_VER ) ) {
 		DBGC ( ipv6col ( &iphdr->src ), "IPv6 version %#08x not "

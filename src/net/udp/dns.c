@@ -669,9 +669,9 @@ static void dns_timer_expired ( struct retry_timer *timer, int fail ) {
 static int dns_xfer_deliver ( struct dns_request *dns,
 			      struct io_buffer *iobuf,
 			      struct xfer_metadata *meta __unused ) {
-	struct dns_header *response = iobuf->data;
 	struct dns_header *query = &dns->buf.query;
 	unsigned int qtype = dns->question->qtype;
+	struct dns_header *response;
 	struct dns_name buf;
 	union dns_rr *rr;
 	int offset;
@@ -688,6 +688,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 		rc = -EINVAL;
 		goto done;
 	}
+	response = iobuf->data;
 
 	/* Check response ID matches query ID */
 	if ( response->id != query->id ) {

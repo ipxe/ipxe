@@ -159,9 +159,9 @@ int fc_els_tx ( struct fc_els *els, const void *data, size_t len ) {
 static int fc_els_rx ( struct fc_els *els,
 		       struct io_buffer *iobuf,
 		       struct xfer_metadata *meta ) {
-	struct fc_els_frame_common *frame = iobuf->data;
 	struct sockaddr_fc *src = ( ( struct sockaddr_fc * ) meta->src );
 	struct sockaddr_fc *dest = ( ( struct sockaddr_fc * ) meta->dest );
+	struct fc_els_frame_common *frame;
 	size_t len = iob_len ( iobuf );
 	int rc;
 
@@ -169,10 +169,11 @@ static int fc_els_rx ( struct fc_els *els,
 	if ( len < sizeof ( *frame ) ) {
 		DBGC ( els, FCELS_FMT " received underlength frame:\n",
 		       FCELS_ARGS ( els ) );
-		DBGC_HDA ( els, 0, frame, len );
+		DBGC_HDA ( els, 0, iobuf->data, len );
 		rc = -EINVAL;
 		goto done;
 	}
+	frame = iobuf->data;
 	if ( ! src ) {
 		DBGC ( els, FCELS_FMT " received frame missing source "
 		       "address:\n", FCELS_ARGS ( els ) );
@@ -493,7 +494,7 @@ static int fc_els_flogi_tx ( struct fc_els *els ) {
  * @ret rc		Return status code
  */
 static int fc_els_flogi_rx ( struct fc_els *els, void *data, size_t len ) {
-	struct fc_login_frame *flogi = data;
+	struct fc_login_frame *flogi;
 	int has_fabric;
 	int rc;
 
@@ -504,6 +505,7 @@ static int fc_els_flogi_rx ( struct fc_els *els, void *data, size_t len ) {
 		DBGC_HDA ( els, 0, data, len );
 		return -EINVAL;
 	}
+	flogi = data;
 
 	/* Extract parameters */
 	has_fabric = ( flogi->common.flags & htons ( FC_LOGIN_F_PORT ) );
@@ -633,7 +635,7 @@ static int fc_els_plogi_tx ( struct fc_els *els ) {
  * @ret rc		Return status code
  */
 static int fc_els_plogi_rx ( struct fc_els *els, void *data, size_t len ) {
-	struct fc_login_frame *plogi = data;
+	struct fc_login_frame *plogi;
 	struct fc_peer *peer;
 	int rc;
 
@@ -645,6 +647,7 @@ static int fc_els_plogi_rx ( struct fc_els *els, void *data, size_t len ) {
 		rc = -EINVAL;
 		goto err_sanity;
 	}
+	plogi = data;
 	if ( ! fc_link_ok ( &els->port->link ) ) {
 		DBGC ( els, FCELS_FMT " received while port link is down\n",
 		       FCELS_ARGS ( els ) );
@@ -815,7 +818,7 @@ static void fc_els_logo_logout ( struct fc_els *els,
  */
 static int fc_els_logo_rx_request ( struct fc_els *els, void *data,
 				    size_t len ) {
-	struct fc_logout_request_frame *logo = data;
+	struct fc_logout_request_frame *logo;
 	int rc;
 
 	/* Sanity check */
@@ -825,6 +828,7 @@ static int fc_els_logo_rx_request ( struct fc_els *els, void *data,
 		DBGC_HDA ( els, 0, data, len );
 		return -EINVAL;
 	}
+	logo = data;
 
 	DBGC ( els, FCELS_FMT " has port %s as %s\n", FCELS_ARGS ( els ),
 	       fc_ntoa ( &logo->port_wwn ), fc_id_ntoa ( &logo->port_id ) );
@@ -1009,7 +1013,7 @@ int fc_els_prli_rx ( struct fc_els *els,
 	struct {
 		struct fc_prli_frame frame;
 		uint8_t param[descriptor->param_len];
-	} __attribute__ (( packed )) *prli = data;
+	} __attribute__ (( packed )) *prli;
 	struct fc_ulp *ulp;
 	int rc;
 
@@ -1021,6 +1025,7 @@ int fc_els_prli_rx ( struct fc_els *els,
 		rc = -EINVAL;
 		goto err_sanity;
 	}
+	prli = data;
 
 	DBGC ( els, FCELS_FMT " has parameters:\n", FCELS_ARGS ( els ) );
 	DBGC_HDA ( els, 0, prli->param, sizeof ( prli->param ) );
@@ -1095,14 +1100,15 @@ int fc_els_prli_detect ( struct fc_els *els __unused,
 	const struct {
 		struct fc_prli_frame frame;
 		uint8_t param[descriptor->param_len];
-	} __attribute__ (( packed )) *prli = data;
-
-	/* Check for PRLI */
-	if ( prli->frame.command != FC_ELS_PRLI )
-		return -EINVAL;
+	} __attribute__ (( packed )) *prli;
 
 	/* Check for sufficient length to contain service parameter page */
 	if ( len < sizeof ( *prli ) )
+		return -EINVAL;
+	prli = data;
+
+	/* Check for PRLI */
+	if ( prli->frame.command != FC_ELS_PRLI )
 		return -EINVAL;
 
 	/* Check for upper-layer protocol type */
@@ -1282,13 +1288,21 @@ static int fc_els_echo_rx_request ( struct fc_els *els, void *data,
  */
 static int fc_els_echo_rx_response ( struct fc_els *els, void *data,
 				     size_t len ) {
-	struct fc_echo_request_frame *echo = data;
+	struct fc_echo_request_frame *echo;
 
 	DBGC ( els, FCELS_FMT "\n", FCELS_ARGS ( els ) );
 
+	/* Sanity check */
+	if ( len != sizeof ( *echo ) ) {
+		DBGC ( els, FCELS_FMT " received underlength echo response\n",
+		       FCELS_ARGS ( els ) );
+		DBGC_HDA ( els, 0, data, len );
+		return -EIO;
+	}
+	echo = data;
+
 	/* Check response is correct */
-	if ( ( len != sizeof ( *echo ) ) ||
-	     ( echo->magic != htonl ( FC_ECHO_MAGIC ) ) ) {
+	if ( echo->magic != htonl ( FC_ECHO_MAGIC ) ) {
 		DBGC ( els, FCELS_FMT " received bad echo response\n",
 		       FCELS_ARGS ( els ) );
 		DBGC_HDA ( els, 0, data, len );

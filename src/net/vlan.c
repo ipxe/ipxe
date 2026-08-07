@@ -233,7 +233,7 @@ struct net_device * vlan_find ( struct net_device *trunk, unsigned int tag ) {
 static int vlan_rx ( struct io_buffer *iobuf, struct net_device *trunk,
 		     const void *ll_dest, const void *ll_source,
 		     unsigned int flags __unused ) {
-	struct vlan_header *vlanhdr = iobuf->data;
+	struct vlan_header *vlanhdr;
 	struct net_device *netdev;
 	struct ll_protocol *ll_protocol;
 	uint8_t ll_dest_copy[ETH_ALEN];
@@ -248,6 +248,7 @@ static int vlan_rx ( struct io_buffer *iobuf, struct net_device *trunk,
 		rc = -EINVAL;
 		goto err_sanity;
 	}
+	vlanhdr = iobuf->data;
 
 	/* Identify VLAN device */
 	tag = VLAN_TAG ( ntohs ( vlanhdr->tci ) );

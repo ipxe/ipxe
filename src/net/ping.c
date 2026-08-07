@@ -102,13 +102,14 @@ static int ping_port_available ( int port ) {
  * @ret rc		Return status code
  */
 int ping_rx ( struct io_buffer *iobuf, struct sockaddr_tcpip *st_src ) {
-	struct icmp_echo *echo = iobuf->data;
+	struct icmp_echo *echo;
 	struct ping_connection *ping;
 	struct xfer_metadata meta;
 	int rc;
 
 	/* Sanity check: should already have been checked by ICMP layer */
 	assert ( iob_len ( iobuf ) >= sizeof ( *echo ) );
+	echo = iobuf->data;
 
 	/* Identify connection */
 	ping = ping_demux ( ntohs ( echo->ident ) );

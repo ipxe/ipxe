@@ -285,7 +285,7 @@ static int aoecmd_tx ( struct aoe_command *aoecmd ) {
 static int aoecmd_rx ( struct aoe_command *aoecmd, struct io_buffer *iobuf,
 		       const void *ll_source ) {
 	struct aoe_device *aoedev = aoecmd->aoedev;
-	struct aoehdr *aoehdr = iobuf->data;
+	struct aoehdr *aoehdr;
 	int rc;
 
 	/* Sanity check */
@@ -296,6 +296,7 @@ static int aoecmd_rx ( struct aoe_command *aoecmd, struct io_buffer *iobuf,
 		rc = -EINVAL;
 		goto done;
 	}
+	aoehdr = iobuf->data;
 	if ( ( ntohs ( aoehdr->major ) != aoedev->major ) ||
 	     ( aoehdr->minor != aoedev->minor ) ) {
 		DBGC ( aoedev, "AoE %s/%08x received response for incorrect "
@@ -876,7 +877,7 @@ static int aoe_rx ( struct io_buffer *iobuf,
 		    const void *ll_dest __unused,
 		    const void *ll_source,
 		    unsigned int flags __unused ) {
-	struct aoehdr *aoehdr = iobuf->data;
+	struct aoehdr *aoehdr;
 	struct aoe_command *aoecmd;
 	int rc;
 
@@ -887,6 +888,7 @@ static int aoe_rx ( struct io_buffer *iobuf,
 		rc = -EINVAL;
 		goto err_sanity;
 	}
+	aoehdr = iobuf->data;
 	if ( ( aoehdr->ver_flags & AOE_VERSION_MASK ) != AOE_VERSION ) {
 		DBG ( "AoE received packet for unsupported protocol version "
 		      "%02x\n", ( aoehdr->ver_flags & AOE_VERSION_MASK ) );

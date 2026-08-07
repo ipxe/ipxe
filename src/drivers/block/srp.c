@@ -335,7 +335,7 @@ static int srp_login ( struct srp_device *srpdev, union srp_port_id *initiator,
  */
 static int srp_login_rsp ( struct srp_device *srpdev,
 			   const void *data, size_t len ) {
-	const struct srp_login_rsp *login_rsp = data;
+	const struct srp_login_rsp *login_rsp;
 
 	/* Sanity check */
 	if ( len < sizeof ( *login_rsp ) ) {
@@ -343,6 +343,7 @@ static int srp_login_rsp ( struct srp_device *srpdev,
 		       srpdev, len );
 		return -EINVAL;
 	}
+	login_rsp = data;
 	DBGC ( srpdev, "SRP %p tag %08x LOGIN_RSP:\n",
 	       srpdev, ntohl ( login_rsp->tag.dwords[1] ) );
 	DBGC_HDA ( srpdev, 0, data, len );
@@ -367,7 +368,7 @@ static int srp_login_rsp ( struct srp_device *srpdev,
  */
 static int srp_login_rej ( struct srp_device *srpdev,
 			   const void *data, size_t len ) {
-	const struct srp_login_rej *login_rej = data;
+	const struct srp_login_rej *login_rej;
 	uint32_t reason;
 
 	/* Sanity check */
@@ -376,6 +377,7 @@ static int srp_login_rej ( struct srp_device *srpdev,
 		       srpdev, len );
 		return -EINVAL;
 	}
+	login_rej = data;
 	reason = ntohl ( login_rej->reason );
 	DBGC ( srpdev, "SRP %p tag %08x LOGIN_REJ reason %08x:\n",
 	       srpdev, ntohl ( login_rej->tag.dwords[1] ), reason );
@@ -656,7 +658,7 @@ static int srpdev_scsi_command ( struct srp_device *srpdev,
 static int srpdev_deliver ( struct srp_device *srpdev,
 			    struct io_buffer *iobuf,
 			    struct xfer_metadata *meta __unused ) {
-	struct srp_common *common = iobuf->data;
+	struct srp_common *common;
 	int ( * type ) ( struct srp_device *srp, const void *data, size_t len );
 	int rc;
 
@@ -667,6 +669,7 @@ static int srpdev_deliver ( struct srp_device *srpdev,
 		rc = -EINVAL;
 		goto err;
 	}
+	common = iobuf->data;
 
 	/* Determine IU type */
 	switch ( common->type ) {

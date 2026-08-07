@@ -635,7 +635,7 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 		     const void *ll_dest __unused,
 		     const void *ll_source __unused,
 		     unsigned int flags ) {
-	struct iphdr *iphdr = iobuf->data;
+	struct iphdr *iphdr;
 	size_t hdrlen;
 	size_t len;
 	union {
@@ -660,10 +660,11 @@ static int ipv4_rx ( struct io_buffer *iobuf,
 
 	/* Sanity check the IPv4 header */
 	if ( iob_len ( iobuf ) < sizeof ( *iphdr ) ) {
-		DBGC ( iphdr->src, "IPv4 packet too short at %zd bytes (min "
+		DBGC ( netdev, "IPv4 packet too short at %zd bytes (min "
 		       "%zd bytes)\n", iob_len ( iobuf ), sizeof ( *iphdr ) );
 		goto err_header;
 	}
+	iphdr = iobuf->data;
 	if ( ( iphdr->verhdrlen & IP_MASK_VER ) != IP_VER ) {
 		DBGC ( iphdr->src, "IPv4 version %#02x not supported\n",
 		       iphdr->verhdrlen );

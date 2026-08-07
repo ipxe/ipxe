@@ -136,7 +136,7 @@ static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 		    const void *ll_dest __unused,
 		    const void *ll_source __unused,
 		    unsigned int flags __unused ) {
-	struct arphdr *arphdr = iobuf->data;
+	struct arphdr *arphdr;
 	struct arp_net_protocol *arp_net_protocol;
 	struct net_protocol *net_protocol;
 	struct ll_protocol *ll_protocol;
@@ -144,7 +144,12 @@ static int arp_rx ( struct io_buffer *iobuf, struct net_device *netdev,
 	int rc;
 
 	/* Sanity check */
-	if ( ( len < sizeof ( *arphdr ) ) || ( len < arp_len ( arphdr ) ) ) {
+	if ( len < sizeof ( *arphdr ) ) {
+		rc = -EINVAL;
+		goto done;
+	}
+	arphdr = iobuf->data;
+	if ( len < arp_len ( arphdr ) ) {
 		rc = -EINVAL;
 		goto done;
 	}

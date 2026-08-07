@@ -720,7 +720,7 @@ static int tftp_process_option ( struct tftp_request *tftp,
  * @ret rc		Return status code
  */
 static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
-	struct tftp_oack *oack = buf;
+	struct tftp_oack *oack;
 	char *end = buf + len;
 	char *name;
 	char *value;
@@ -734,6 +734,7 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
 		rc = -EINVAL;
 		goto done;
 	}
+	oack = buf;
 
 	/* Process each option in turn */
 	for ( name = oack->data ; name < end ; name = next ) {
@@ -797,7 +798,7 @@ static int tftp_rx_oack ( struct tftp_request *tftp, void *buf, size_t len ) {
  */
 static int tftp_rx_data ( struct tftp_request *tftp,
 			  struct io_buffer *iobuf ) {
-	struct tftp_data *data = iobuf->data;
+	struct tftp_data *data;
 	struct xfer_metadata meta;
 	unsigned int block;
 	off_t offset;
@@ -811,6 +812,7 @@ static int tftp_rx_data ( struct tftp_request *tftp,
 		rc = -EINVAL;
 		goto done;
 	}
+	data = iobuf->data;
 
 	/* Calculate block number */
 	block = ( ( bitmap_first_gap ( &tftp->bitmap ) + 1 ) & ~0xffff );
@@ -899,7 +901,7 @@ static int tftp_errcode_to_rc ( unsigned int errcode ) {
  * @ret rc		Return status code
  */
 static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
-	struct tftp_error *error = buf;
+	struct tftp_error *error;
 	int rc;
 
 	/* Sanity check */
@@ -908,6 +910,7 @@ static int tftp_rx_error ( struct tftp_request *tftp, void *buf, size_t len ) {
 		       "length %zd\n", tftp, len );
 		return -EINVAL;
 	}
+	error = buf;
 
 	DBGC ( tftp, "TFTP %p received ERROR packet with code %d, message "
 	       "\"%s\"\n", tftp, ntohs ( error->errcode ), error->errmsg );
@@ -933,7 +936,7 @@ static int tftp_rx ( struct tftp_request *tftp,
 		     struct io_buffer *iobuf,
 		     struct xfer_metadata *meta ) {
 	struct sockaddr_tcpip *st_src;
-	struct tftp_common *common = iobuf->data;
+	struct tftp_common *common;
 	size_t len = iob_len ( iobuf );
 	int rc = -EINVAL;
 
@@ -946,6 +949,7 @@ static int tftp_rx ( struct tftp_request *tftp,
 		       "%zd\n", tftp, len );
 		goto done;
 	}
+	common = iobuf->data;
 	if ( ! meta->src ) {
 		DBGC ( tftp, "TFTP %p received packet without source port\n",
 		       tftp );

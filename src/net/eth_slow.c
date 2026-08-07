@@ -284,13 +284,14 @@ static int eth_slow_rx ( struct io_buffer *iobuf,
 			 const void *ll_dest __unused,
 			 const void *ll_source __unused,
 			 unsigned int flags __unused ) {
-	union eth_slow_packet *eth_slow = iobuf->data;
+	union eth_slow_packet *eth_slow;
 
 	/* Sanity checks */
 	if ( iob_len ( iobuf ) < sizeof ( *eth_slow ) ) {
 		free_iob ( iobuf );
 		return -EINVAL;
 	}
+	eth_slow = iobuf->data;
 
 	/* Strip any trailing padding */
 	iob_unput ( iobuf, ( iob_len ( iobuf ) - sizeof ( *eth_slow ) ) );

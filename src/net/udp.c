@@ -258,7 +258,7 @@ static int udp_rx ( struct io_buffer *iobuf,
 		    struct net_device *netdev __unused,
 		    struct sockaddr_tcpip *st_src,
 		    struct sockaddr_tcpip *st_dest, uint16_t pshdr_csum ) {
-	struct udp_header *udphdr = iobuf->data;
+	struct udp_header *udphdr;
 	struct udp_connection *udp;
 	struct xfer_metadata meta;
 	size_t ulen;
@@ -269,10 +269,10 @@ static int udp_rx ( struct io_buffer *iobuf,
 	if ( iob_len ( iobuf ) < sizeof ( *udphdr ) ) {
 		DBG ( "UDP packet too short at %zd bytes (min %zd bytes)\n",
 		      iob_len ( iobuf ), sizeof ( *udphdr ) );
-		
 		rc = -EINVAL;
 		goto done;
 	}
+	udphdr = iobuf->data;
 	ulen = ntohs ( udphdr->len );
 	if ( ulen < sizeof ( *udphdr ) ) {
 		DBG ( "UDP length too short at %zd bytes "
