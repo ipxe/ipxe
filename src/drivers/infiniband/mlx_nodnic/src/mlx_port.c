@@ -259,8 +259,8 @@ nodnic_port_allocate_dbr_dma (
 		IN mlx_uint32	dbr_addr_low_ofst,
 		IN mlx_uint32	dbr_addr_high_ofst,
 		IN void	**dbr_addr,
-		IN mlx_size	size,
-		IN void	**map
+		IN mlx_dma	*dbr_mapping,
+		IN mlx_size	size
 		)
 {
 	mlx_status status = MLX_SUCCESS;
@@ -276,16 +276,17 @@ nodnic_port_allocate_dbr_dma (
 	status = mlx_memory_alloc_dma(device_priv->utils,
 					size,
 					NODNIC_MEMORY_ALIGN,
-					(void **)dbr_addr
+					(void **)dbr_addr,
+					dbr_mapping
 					);
 	MLX_FATAL_CHECK_STATUS(status, alloc_db_record_err,
 				"doorbell record dma allocation error");
 
 	status = mlx_memory_map_dma(device_priv->utils,
 					(void *)(*dbr_addr),
+					dbr_mapping,
 					size,
-					&nodnic_db->doorbell_physical,
-					map//nodnic_ring->map
+					&nodnic_db->doorbell_physical
 					);
 	MLX_FATAL_CHECK_STATUS(status, map_db_record_err,
 				"doorbell record map dma error");
@@ -307,10 +308,10 @@ nodnic_port_allocate_dbr_dma (
 	return status;
 
 set_err:
-	mlx_memory_ummap_dma(device_priv->utils, *map);
+	mlx_memory_ummap_dma(device_priv->utils, dbr_mapping);
 map_db_record_err:
 	mlx_memory_free_dma(device_priv->utils, size,
-		(void **)dbr_addr);
+		(void **)dbr_addr, dbr_mapping);
 alloc_db_record_err:
 invalid_parm:
 	return status;
@@ -344,8 +345,9 @@ nodnic_port_cq_dbr_dma_init(
 			port_priv->port_offset + NODNIC_PORT_ARM_CQ_DBR_ADDR_LOW_OFFSET,
 			port_priv->port_offset + NODNIC_PORT_ARM_CQ_DBR_ADDR_HIGH_OFFSET,
 			(void **)&port_priv->arm_cq_doorbell_record ,
-			sizeof(nodnic_arm_cq_db),
-			(void **)&((*cq)->arm_cq_doorbell.map));
+			&port_priv->arm_cq_doorbell_mapping ,
+			sizeof(nodnic_arm_cq_db)
+			);
 	MLX_FATAL_CHECK_STATUS(status, alloc_dbr_dma_err,
 				"failed to allocate doorbell record dma");
 	return status;
@@ -381,15 +383,17 @@ nodnic_port_create_cq(
 	(*cq)->cq_size = cq_size;
 	status = mlx_memory_alloc_dma(device_priv->utils,
 			(*cq)->cq_size, NODNIC_MEMORY_ALIGN,
-				&(*cq)->cq_virt);
+				&(*cq)->cq_virt,
+				&(*cq)->cq_mapping
+				);
 	MLX_FATAL_CHECK_STATUS(status, dma_alloc_err,
 				"cq allocation error");
 
 	status = mlx_memory_map_dma(device_priv->utils,
 						(*cq)->cq_virt,
+						&(*cq)->cq_mapping,
 						(*cq)->cq_size,
-						&(*cq)->cq_physical,
-						&(*cq)->map);
+						&(*cq)->cq_physical);
 	MLX_FATAL_CHECK_STATUS(status, cq_map_err,
 				"cq map error");
 
@@ -411,10 +415,12 @@ nodnic_port_create_cq(
 	return status;
 dma_set_addr_high_err:
 dma_set_addr_low_err:
-	mlx_memory_ummap_dma(device_priv->utils, (*cq)->map);
+	mlx_memory_ummap_dma(device_priv->utils, &(*cq)->cq_mapping);
 cq_map_err:
 	mlx_memory_free_dma(device_priv->utils, (*cq)->cq_size,
-			(void **)&((*cq)->cq_virt));
+			(void **)&((*cq)->cq_virt),
+			&(*cq)->cq_mapping
+			);
 dma_alloc_err:
 	mlx_memory_free(device_priv->utils, (void **)cq);
 alloc_err:
@@ -439,23 +445,27 @@ nodnic_port_destroy_cq(
 
 	if ( device_priv->device_cap.support_bar_cq_ctrl ){
 			status = mlx_memory_ummap_dma(device_priv->utils,
-					cq->arm_cq_doorbell.map);
+					&cq->arm_cq_doorbell.mapping);
 			if( status != MLX_SUCCESS){
 				MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
 			}
 
 			status = mlx_memory_free_dma(device_priv->utils,
 					sizeof(nodnic_arm_cq_db),
-					(void **)&(port_priv->arm_cq_doorbell_record));
+					(void **)&(port_priv->arm_cq_doorbell_record),
+					&(port_priv->arm_cq_doorbell_mapping)
+					);
 			if( status != MLX_SUCCESS){
 				MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
 			}
 		}
 
-	mlx_memory_ummap_dma(device_priv->utils, cq->map);
+	mlx_memory_ummap_dma(device_priv->utils, &cq->cq_mapping);
 
 	mlx_memory_free_dma(device_priv->utils, cq->cq_size,
-			(void **)&(cq->cq_virt));
+			(void **)&(cq->cq_virt),
+			&cq->cq_mapping
+			);
 
 	mlx_memory_free(device_priv->utils, (void **)&cq);
 invalid_parm:
@@ -482,8 +492,8 @@ nodnic_port_allocate_ring_db_dma (
 			nodnic_ring->offset + NODNIC_RING_DBR_ADDR_LOW_OFFSET,
 			nodnic_ring->offset + NODNIC_RING_DBR_ADDR_HIGH_OFFSET,
 			(void **)&nodnic_db->qp_doorbell_record,
-			sizeof(nodnic_qp_db),
-			(void **)&nodnic_ring->map );
+			&nodnic_db->mapping,
+			sizeof(nodnic_qp_db));
 	MLX_FATAL_CHECK_STATUS(status, alloc_dbr_dma_err,
 			"failed to allocate doorbell record dma");
 
@@ -628,29 +638,31 @@ nodnic_port_create_qp(
 
 	status = mlx_memory_alloc_dma(device_priv->utils,
 			send_wq_size, NODNIC_MEMORY_ALIGN,
-			(void*)&(*qp)->send.wqe_virt);
+			(void*)&(*qp)->send.wqe_virt,
+			&(*qp)->send.nodnic_ring.mapping);
 	MLX_FATAL_CHECK_STATUS(status, send_alloc_err,
 				"send wq allocation error");
 
 	status = mlx_memory_alloc_dma(device_priv->utils,
 				receive_wq_size, NODNIC_MEMORY_ALIGN,
-				&(*qp)->receive.wqe_virt);
+				&(*qp)->receive.wqe_virt,
+				&(*qp)->receive.nodnic_ring.mapping);
 	MLX_FATAL_CHECK_STATUS(status, receive_alloc_err,
 				"receive wq allocation error");
 
 	status = mlx_memory_map_dma(device_priv->utils,
 						(*qp)->send.wqe_virt,
+						&(*qp)->send.nodnic_ring.mapping,
 						send_wq_size,
-						&(*qp)->send.nodnic_ring.wqe_physical,
-						&(*qp)->send.nodnic_ring.map);
+						&(*qp)->send.nodnic_ring.wqe_physical);
 	MLX_FATAL_CHECK_STATUS(status, send_map_err,
 				"send wq map error");
 
 	status = mlx_memory_map_dma(device_priv->utils,
 						(*qp)->receive.wqe_virt,
+						&(*qp)->receive.nodnic_ring.mapping,
 						receive_wq_size,
-						&(*qp)->receive.nodnic_ring.wqe_physical,
-						&(*qp)->receive.nodnic_ring.map);
+						&(*qp)->receive.nodnic_ring.wqe_physical);
 	MLX_FATAL_CHECK_STATUS(status, receive_map_err,
 				"receive wq map error");
 
@@ -704,16 +716,18 @@ nodnic_port_create_qp(
 	return status;
 write_recv_addr_err:
 write_send_addr_err:
-	mlx_memory_ummap_dma(device_priv->utils, (*qp)->receive.nodnic_ring.map);
+	mlx_memory_ummap_dma(device_priv->utils, &(*qp)->receive.nodnic_ring.mapping);
 rx_pi_dma_alloc_err:
 receive_map_err:
-	mlx_memory_ummap_dma(device_priv->utils, (*qp)->send.nodnic_ring.map);
+	mlx_memory_ummap_dma(device_priv->utils, &(*qp)->send.nodnic_ring.mapping);
 send_map_err:
 	mlx_memory_free_dma(device_priv->utils, receive_wq_size,
-			&((*qp)->receive.wqe_virt));
+			&((*qp)->receive.wqe_virt),
+			&((*qp)->receive.nodnic_ring.mapping));
 receive_alloc_err:
 	mlx_memory_free_dma(device_priv->utils, send_wq_size,
-			(void **)&((*qp)->send.wqe_virt));
+			(void **)&((*qp)->send.wqe_virt),
+			&((*qp)->send.nodnic_ring.mapping));
 send_alloc_err:
 invalid_type:
 	mlx_memory_free(device_priv->utils, (void **)qp);
@@ -733,26 +747,27 @@ nodnic_port_destroy_qp(
 	nodnic_device_priv *device_priv = port_priv->device;
 
 	status = mlx_memory_ummap_dma(device_priv->utils,
-			qp->receive.nodnic_ring.map);
+			&qp->receive.nodnic_ring.mapping);
 	if( status != MLX_SUCCESS){
 		MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
 	}
 
-	status = mlx_memory_ummap_dma(device_priv->utils, qp->send.nodnic_ring.map);
+	status = mlx_memory_ummap_dma(device_priv->utils, &qp->send.nodnic_ring.mapping);
 	if( status != MLX_SUCCESS){
 		MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
 	}
 
 	if ( device_priv->device_cap.support_rx_pi_dma ){
 		status = mlx_memory_ummap_dma(device_priv->utils,
-					qp->receive.nodnic_ring.recv_doorbell.map);
+					&qp->receive.nodnic_ring.recv_doorbell.mapping);
 		if( status != MLX_SUCCESS){
 			MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
 		}
 
 		status = mlx_memory_free_dma(device_priv->utils,
 				sizeof(nodnic_qp_db),
-				(void **)&(qp->receive.nodnic_ring.recv_doorbell.qp_doorbell_record));
+				(void **)&(qp->receive.nodnic_ring.recv_doorbell.qp_doorbell_record),
+				&(qp->receive.nodnic_ring.recv_doorbell.mapping));
 		if( status != MLX_SUCCESS){
 			MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
 		}
@@ -760,14 +775,15 @@ nodnic_port_destroy_qp(
 
 	if ( device_priv->device_cap.support_uar_tx_db || ! device_priv->uar.offset){
 		status = mlx_memory_ummap_dma(device_priv->utils,
-					qp->send.nodnic_ring.send_doorbell.map);
+					&qp->send.nodnic_ring.send_doorbell.mapping);
 		if( status != MLX_SUCCESS){
 			MLX_DEBUG_ERROR(device_priv, "mlx_memory_ummap_dma failed (Status = %d)\n", status);
 		}
 
 		status = mlx_memory_free_dma(device_priv->utils,
 				sizeof(nodnic_qp_db),
-				(void **)&(qp->send.nodnic_ring.send_doorbell.qp_doorbell_record));
+				(void **)&(qp->send.nodnic_ring.send_doorbell.qp_doorbell_record),
+				&(qp->send.nodnic_ring.send_doorbell.mapping));
 		if( status != MLX_SUCCESS){
 			MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
 		}
@@ -775,13 +791,15 @@ nodnic_port_destroy_qp(
 
 	status = mlx_memory_free_dma(device_priv->utils,
 			qp->receive.nodnic_ring.wq_size,
-			(void **)&(qp->receive.wqe_virt));
+			(void **)&(qp->receive.wqe_virt),
+			&qp->receive.nodnic_ring.mapping);
 	if( status != MLX_SUCCESS){
 		MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
 	}
 	status = mlx_memory_free_dma(device_priv->utils,
 			qp->send.nodnic_ring.wq_size,
-			(void **)&(qp->send.wqe_virt));
+			(void **)&(qp->send.wqe_virt),
+			&qp->send.nodnic_ring.mapping);
 	if( status != MLX_SUCCESS){
 		MLX_DEBUG_ERROR(device_priv, "mlx_memory_free_dma failed (Status = %d)\n", status);
 	}
@@ -931,15 +949,16 @@ nodnic_port_allocate_eq(
 	status = mlx_memory_alloc_dma(device_priv->utils,
 								port_priv->eq.eq_size,
 								NODNIC_MEMORY_ALIGN,
-								&port_priv->eq.eq_virt);
+								&port_priv->eq.eq_virt,
+								&port_priv->eq.mapping);
 	MLX_FATAL_CHECK_STATUS(status, alloc_err,
 							"eq allocation error");
 
 	status = mlx_memory_map_dma(device_priv->utils,
 							port_priv->eq.eq_virt,
+							&port_priv->eq.mapping,
 							port_priv->eq.eq_size,
-							&port_priv->eq.eq_physical,
-							&port_priv->eq.map);
+							&port_priv->eq.eq_physical);
 	MLX_FATAL_CHECK_STATUS(status, map_err,
 								"eq map error");
 
@@ -955,11 +974,12 @@ nodnic_port_allocate_eq(
 				"failed to set eq addr high");
 	return status;
 set_err:
-	mlx_memory_ummap_dma(device_priv->utils, port_priv->eq.map);
+	mlx_memory_ummap_dma(device_priv->utils, &port_priv->eq.mapping);
 map_err:
 	mlx_memory_free_dma(device_priv->utils,
 			port_priv->eq.eq_size,
-			(void **)&(port_priv->eq.eq_virt));
+			(void **)&(port_priv->eq.eq_virt),
+			&port_priv->eq.mapping);
 alloc_err:
 bad_param:
 	return status;
@@ -978,11 +998,12 @@ nodnic_port_free_eq(
 	}
 
 	device_priv = port_priv->device;
-	mlx_memory_ummap_dma(device_priv->utils, port_priv->eq.map);
+	mlx_memory_ummap_dma(device_priv->utils, &port_priv->eq.mapping);
 
 	mlx_memory_free_dma(device_priv->utils,
 			port_priv->eq.eq_size,
-			(void **)&(port_priv->eq.eq_virt));
+			(void **)&(port_priv->eq.eq_virt),
+			&port_priv->eq.mapping);
 
 bad_param:
 	return status;
