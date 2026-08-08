@@ -440,13 +440,13 @@ static void tls_close_alert ( struct tls_connection *tls, int rc ) {
  ******************************************************************************
  */
 
-/** Classic TLS pre-master secret random data */
+/** Classic pre-master secret random data */
 struct tls_classic_pre_master_random {
 	/** Random bytes */
 	uint8_t bytes[46];
 } __attribute__ (( packed ));
 
-/** A classic TLS pre-master secret */
+/** A classic pre-master secret */
 struct tls_classic_pre_master_secret {
 	/** Highest supported protocol version */
 	uint16_t version;
@@ -455,7 +455,7 @@ struct tls_classic_pre_master_secret {
 } __attribute__ (( packed ));
 
 /**
- * Agree shared secret
+ * Agree classic pre-master secret
  *
  * @v exchange		Key exchange algorithm
  * @v private		Private key
@@ -480,7 +480,7 @@ tls_classic_pre_master_agree ( struct exchange_algorithm *exchange __unused,
 	return 0;
 }
 
-/** Classic TLS pre-master secret key exchange algorithm */
+/** Classic pre-master secret key exchange algorithm */
 static struct exchange_algorithm tls_classic_pre_master_algorithm = {
 	.name = "classic pre-master",
 	.privsize = sizeof ( struct tls_classic_pre_master_random ),
@@ -489,6 +489,174 @@ static struct exchange_algorithm tls_classic_pre_master_algorithm = {
 	.share = exchange_null_share,
 	.agree = tls_classic_pre_master_agree,
 };
+
+/******************************************************************************
+ *
+ * Key agreement
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Share public key
+ *
+ * @v tls		TLS connection
+ * @v public		Public key to fill in
+ * @v len		Length of public key
+ * @ret rc		Return status code
+ */
+static int tls_key_share ( struct tls_connection *tls, void *public,
+			   size_t len ) {
+	struct secure_channel *channel = &tls->channel;
+	struct exchange_algorithm *exchange = tls->key.exchange;
+	size_t pubsize = exchange->pubsize;
+	int rc;
+
+	/* Check key length */
+	if ( pubsize != len ) {
+		DBGC ( tls, "TLS %p wrong public %s key size (%zd bytes)\n",
+		       tls, exchange->name, len );
+		return -EINVAL_KEY_EXCHANGE;
+	}
+
+	/* Share public key */
+	if ( ( rc = channel_key_share ( channel, exchange, public ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not share public %s key: %s\n",
+		       tls, exchange->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Agree shared secret
+ *
+ * @v tls		TLS connection
+ * @v partner		Partner public key
+ * @v len		Length of partner public key
+ * @ret rc		Return status code
+ */
+static int tls_key_agree ( struct tls_connection *tls, const void *partner,
+			   size_t len ) {
+	struct secure_channel *channel = &tls->channel;
+	struct exchange_algorithm *exchange = tls->key.exchange;
+	size_t pubsize = exchange->pubsize;
+	uint8_t *tmp;
+	size_t pad_len;
+	int rc;
+
+	/* Allocate space for potentially padded partner key */
+	tmp = zalloc ( pubsize );
+	if ( ! tmp ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Validate partner key */
+	if ( len > pubsize ) {
+		DBGC ( tls, "TLS %p overlength partner %s key:\n",
+		       tls, exchange->name );
+		DBGC_HDA ( tls, 0, partner, len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_partner;
+	}
+
+	/* TLSv1.2 and earlier may require zero-padding for FFDHE keys */
+	pad_len = ( pubsize - len );
+	if ( pad_len && ( ! tls_keysize_is_variable ( tls, exchange ) ) ) {
+		DBGC ( tls, "TLS %p underlength partner %s key:\n",
+		       tls, exchange->name );
+		DBGC_HDA ( tls, 0, partner, len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_pad;
+	}
+	memcpy ( ( tmp + pad_len ), partner, len );
+
+	/* Agree shared secret */
+	if ( ( rc = channel_key_agree ( channel, exchange, tmp ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not agree shared %s key: %s\n",
+		       tls, exchange->name, strerror ( rc ) );
+		goto err_agree;
+	}
+
+ err_agree:
+ err_pad:
+ err_partner:
+	zfree ( tmp );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Encrypt (and implicitly bind) shared secret
+ *
+ * @v tls		TLS connection
+ * @v builder		ASN.1 builder
+ * @ret rc		Return status code
+ */
+static int tls_key_encrypt ( struct tls_connection *tls,
+			     struct asn1_builder *builder ) {
+	struct secure_channel *channel = &tls->channel;
+	struct exchange_algorithm *exchange = tls->key.exchange;
+	struct x509_certificate *cert;
+	struct pubkey_algorithm *pubkey;
+	int rc;
+
+	/* Identify server certificate */
+	cert = x509_first ( tls->server.chain );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p has no server certificate\n", tls );
+		return rc;
+	}
+	pubkey = cert->subject.public_key.algorithm->pubkey;
+
+	/* Encrypt (and implicitly bind) shared secret */
+	if ( ( rc = channel_bind_encrypt ( channel, cert, exchange, pubkey,
+					   builder ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not encrypt %s key: %s\n",
+		       tls, exchange->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Build shareable key
+ *
+ * @v tls		TLS connection
+ * @v builder		ASN.1 builder
+ * @ret rc		Return status code
+ */
+static int tls_key_build ( struct tls_connection *tls,
+			   struct asn1_builder *builder ) {
+	struct exchange_algorithm *exchange = tls->key.exchange;
+	size_t pubsize = exchange->pubsize;
+	int rc;
+
+	/* Share or encrypt as applicable */
+	if ( pubsize ) {
+
+		/* Allocate space for public key */
+		if ( ( rc = asn1_grow ( builder, pubsize ) ) != 0 )
+			return rc;
+
+		/* Share public key */
+		if ( ( rc = tls_key_share ( tls, builder->data,
+					    pubsize ) ) != 0 ) {
+			return rc;
+		}
+
+	} else {
+
+		/* Encrypt (and implicitly bind) shared secret */
+		if ( ( rc = tls_key_encrypt ( tls, builder ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
+}
 
 /******************************************************************************
  *
@@ -898,174 +1066,6 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 
 /******************************************************************************
  *
- * Secure channel management
- *
- ******************************************************************************
- */
-
-/**
- * Share public key
- *
- * @v tls		TLS connection
- * @v public		Public key to fill in
- * @v len		Length of public key
- * @ret rc		Return status code
- */
-static int tls_key_share ( struct tls_connection *tls, void *public,
-			   size_t len ) {
-	struct secure_channel *channel = &tls->channel;
-	struct exchange_algorithm *exchange = tls->key.exchange;
-	size_t pubsize = exchange->pubsize;
-	int rc;
-
-	/* Check key length */
-	if ( pubsize != len ) {
-		DBGC ( tls, "TLS %p wrong public %s key size (%zd bytes)\n",
-		       tls, exchange->name, len );
-		return -EINVAL_KEY_EXCHANGE;
-	}
-
-	/* Share public key */
-	if ( ( rc = channel_key_share ( channel, exchange, public ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not share public %s key: %s\n",
-		       tls, exchange->name, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Agree shared secret
- *
- * @v tls		TLS connection
- * @v partner		Partner public key
- * @v len		Length of partner public key
- * @ret rc		Return status code
- */
-static int tls_key_agree ( struct tls_connection *tls, const void *partner,
-			   size_t len ) {
-	struct secure_channel *channel = &tls->channel;
-	struct exchange_algorithm *exchange = tls->key.exchange;
-	size_t pubsize = exchange->pubsize;
-	uint8_t *tmp;
-	size_t pad_len;
-	int rc;
-
-	/* Allocate space for potentially padded partner key */
-	tmp = zalloc ( pubsize );
-	if ( ! tmp ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-
-	/* Validate partner key */
-	if ( len > pubsize ) {
-		DBGC ( tls, "TLS %p overlength partner %s key:\n",
-		       tls, exchange->name );
-		DBGC_HDA ( tls, 0, partner, len );
-		rc = -EINVAL_KEY_EXCHANGE;
-		goto err_partner;
-	}
-
-	/* TLSv1.2 and earlier may require zero-padding for FFDHE keys */
-	pad_len = ( pubsize - len );
-	if ( pad_len && ( ! tls_keysize_is_variable ( tls, exchange ) ) ) {
-		DBGC ( tls, "TLS %p underlength partner %s key:\n",
-		       tls, exchange->name );
-		DBGC_HDA ( tls, 0, partner, len );
-		rc = -EINVAL_KEY_EXCHANGE;
-		goto err_pad;
-	}
-	memcpy ( ( tmp + pad_len ), partner, len );
-
-	/* Agree shared secret */
-	if ( ( rc = channel_key_agree ( channel, exchange, tmp ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not agree shared %s key: %s\n",
-		       tls, exchange->name, strerror ( rc ) );
-		goto err_agree;
-	}
-
- err_agree:
- err_pad:
- err_partner:
-	zfree ( tmp );
- err_alloc:
-	return rc;
-}
-
-/**
- * Encrypt (and implicitly bind) shared secret
- *
- * @v tls		TLS connection
- * @v builder		ASN.1 builder
- * @ret rc		Return status code
- */
-static int tls_key_encrypt ( struct tls_connection *tls,
-			     struct asn1_builder *builder ) {
-	struct secure_channel *channel = &tls->channel;
-	struct exchange_algorithm *exchange = tls->key.exchange;
-	struct x509_certificate *cert;
-	struct pubkey_algorithm *pubkey;
-	int rc;
-
-	/* Identify server certificate */
-	cert = x509_first ( tls->server.chain );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p has no server certificate\n", tls );
-		return rc;
-	}
-	pubkey = cert->subject.public_key.algorithm->pubkey;
-
-	/* Encrypt (and implicitly bind) shared secret */
-	if ( ( rc = channel_bind_encrypt ( channel, cert, exchange, pubkey,
-					   builder ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not encrypt %s key: %s\n",
-		       tls, exchange->name, strerror ( rc ) );
-		return rc;
-	}
-
-	return 0;
-}
-
-/**
- * Build shareable key
- *
- * @v tls		TLS connection
- * @v builder		ASN.1 builder
- * @ret rc		Return status code
- */
-static int tls_key_build ( struct tls_connection *tls,
-			   struct asn1_builder *builder ) {
-	struct exchange_algorithm *exchange = tls->key.exchange;
-	size_t pubsize = exchange->pubsize;
-	int rc;
-
-	/* Share or encrypt as applicable */
-	if ( pubsize ) {
-
-		/* Allocate space for public key */
-		if ( ( rc = asn1_grow ( builder, pubsize ) ) != 0 )
-			return rc;
-
-		/* Share public key */
-		if ( ( rc = tls_key_share ( tls, builder->data,
-					    pubsize ) ) != 0 ) {
-			return rc;
-		}
-
-	} else {
-
-		/* Encrypt (and implicitly bind) shared secret */
-		if ( ( rc = tls_key_encrypt ( tls, builder ) ) != 0 )
-			return rc;
-	}
-
-	return 0;
-}
-
-/******************************************************************************
- *
  * Secure channel operations
  *
  ******************************************************************************
@@ -1395,6 +1395,9 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		return -ENOTSUP_CIPHER;
 	}
 
+	/* Set (or clear) key exchange algorithm */
+	tls->key.exchange = suite->exchange->exchange;
+
 	/* Set key schedule digest algorithm */
 	digest = ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ?
 		   suite->handshake : &md5_sha1_algorithm );
@@ -1493,7 +1496,7 @@ tls_find_signature_hash ( unsigned int code ) {
 
 /******************************************************************************
  *
- * Ephemeral key exchange
+ * Named groups
  *
  ******************************************************************************
  */
@@ -1543,89 +1546,10 @@ tls_find_param_group ( const void *dh_p, size_t dh_p_len, const void *dh_g,
 	return NULL;
 }
 
-/**
- * Transmit Client Key Exchange record using public key exchange
- *
- * @v tls		TLS connection
- * @ret rc		Return status code
- */
-static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
-	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
-	struct x509_certificate *cert;
-	struct {
-		uint16_t version;
-		uint8_t random[46];
-	} __attribute__ (( packed )) pre_master_secret;
-	struct asn1_cursor cursor = {
-		.data = &pre_master_secret,
-		.len = sizeof ( pre_master_secret ),
-	};
-	struct asn1_builder builder = { NULL, 0 };
-	int rc;
-
-	/* Generate pre-master secret */
-	pre_master_secret.version = htons ( TLS_VERSION_MAX );
-	channel_ephemeral_label ( &tls->channel, "tls classic pre-master",
-				  pre_master_secret.random,
-				  sizeof ( pre_master_secret.random ) );
-	tls_set_kdf_master ( tls, &pre_master_secret,
-			     sizeof ( pre_master_secret ) );
-
-	/* Identify server certificate */
-	cert = x509_first ( tls->server.chain );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p has no server certificate\n", tls );
-		rc = -ENOENT_CERT;
-		goto err_cert;
-	}
-
-	/* Encrypt pre-master secret using server's public key */
-	if ( ( rc = pubkey_encrypt ( pubkey, &cert->subject.public_key.raw,
-				     &cursor, &builder ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not encrypt pre-master secret: %s\n",
-		       tls, strerror ( rc ) );
-		goto err_encrypt;
-	}
-
-	/* Construct Client Key Exchange record */
-	{
-		struct {
-			uint32_t type_length;
-			uint16_t encrypted_pre_master_secret_len;
-		} __attribute__ (( packed )) header;
-
-		header.type_length =
-			( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-			  htonl ( builder.len + sizeof ( header ) -
-				  sizeof ( header.type_length ) ) );
-		header.encrypted_pre_master_secret_len = htons ( builder.len );
-
-		if ( ( rc = asn1_prepend_raw ( &builder, &header,
-					       sizeof ( header ) ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not construct Client Key "
-			       "Exchange: %s\n", tls, strerror ( rc ) );
-			goto err_prepend;
-		}
-	}
-
-	/* Transmit Client Key Exchange record */
-	if ( ( rc = tls_send_handshake ( tls, builder.data,
-					 builder.len ) ) != 0 ) {
-		goto err_send;
-	}
-
- err_send:
- err_prepend:
- err_encrypt:
-	zfree ( builder.data );
- err_cert:
-	return rc;
-}
-
 /** Public key exchange algorithm */
 struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 	.name = "pubkey",
+	.exchange = &tls_classic_pre_master_algorithm,
 };
 
 /**
@@ -1640,7 +1564,6 @@ struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 static int tls_parse_dhe ( struct tls_connection *tls,
 			   const void *data, size_t len,
 			   struct tls_key_exchange_parameters *params ) {
-	struct tls_key_schedule *key = &tls->key;
 	struct tls_named_group *group;
 	const struct {
 		uint16_t len;
@@ -1692,55 +1615,6 @@ static int tls_parse_dhe ( struct tls_connection *tls,
 	return 0;
 }
 
-/**
- * Transmit Client Key Exchange record using DHE key exchange
- *
- * @v tls		TLS connection
- * @ret rc		Return status code
- */
-static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct tls_named_group *group = key->group;
-	struct exchange_algorithm *exchange = group->exchange;
-	size_t pubsize = exchange->pubsize;
-	struct {
-		uint32_t type_length;
-		uint16_t dh_xs_len;
-		uint8_t dh_xs[pubsize];
-	} __attribute__ (( packed )) *key_xchg;
-	int rc;
-
-	/* Allocate space */
-	key_xchg = malloc ( sizeof ( *key_xchg ) );
-	if ( ! key_xchg ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-
-	/* Generate Client Key Exchange record */
-	key_xchg->type_length =
-		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-		  htonl ( sizeof ( *key_xchg ) -
-			  sizeof ( key_xchg->type_length ) ) );
-	key_xchg->dh_xs_len = htons ( sizeof ( key_xchg->dh_xs ) );
-	if ( ( rc = channel_key_share ( &tls->channel, exchange,
-					key_xchg->dh_xs ) ) != 0 ) {
-		goto err_share;
-	}
-
-	/* Transmit Client Key Exchange record */
-	if ( ( rc = tls_send_handshake ( tls, key_xchg,
-					 sizeof ( *key_xchg ) ) ) !=0 ) {
-		goto err_send_handshake;
-	}
-
- err_send_handshake:
- err_share:
-	zfree ( key_xchg );
- err_alloc:
-	return rc;
-}
-
 /** Ephemeral Diffie-Hellman key exchange algorithm */
 struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 	.name = "dhe",
@@ -1760,7 +1634,6 @@ struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 static int tls_parse_ecdhe ( struct tls_connection *tls,
 			     const void *data, size_t len,
 			     struct tls_key_exchange_parameters *params ) {
-	struct tls_key_schedule *key = &tls->key;
 	struct tls_named_group *group;
 	const struct {
 		uint8_t curve_type;
@@ -1796,44 +1669,6 @@ static int tls_parse_ecdhe ( struct tls_connection *tls,
 	tls->key.exchange = group->exchange;
 	params->partner = ecdh->public;
 	params->partner_len = ecdh->public_len;
-
-	return 0;
-}
-
-/**
- * Transmit Client Key Exchange record using ECDHE key exchange
- *
- * @v tls		TLS connection
- * @ret rc		Return status code
- */
-static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct tls_named_group *group = key->group;
-	struct exchange_algorithm *exchange = group->exchange;
-	size_t pubsize = exchange->pubsize;
-	struct {
-		uint32_t type_length;
-		uint8_t public_len;
-		uint8_t public[pubsize];
-	} __attribute__ (( packed )) key_xchg;
-	int rc;
-
-	/* Generate Client Key Exchange record */
-	key_xchg.type_length =
-		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-		  htonl ( sizeof ( key_xchg ) -
-			  sizeof ( key_xchg.type_length ) ) );
-	key_xchg.public_len = sizeof ( key_xchg.public );
-	if ( ( rc = channel_key_share ( &tls->channel, exchange,
-					key_xchg.public ) ) != 0 ) {
-		return rc;
-	}
-
-	/* Transmit Client Key Exchange record */
-	if ( ( rc = tls_send_handshake ( tls, &key_xchg,
-					 sizeof ( key_xchg ) ) ) !=0 ) {
-		return rc;
-	}
 
 	return 0;
 }
@@ -2177,22 +2012,43 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct tls_cipher_suite *suite = cipherspec->suite;
-
 	struct {
 		uint32_t type_length;
 		uint8_t key_len[suite->exchange->len_len];
 		uint8_t key[0];
 	} __attribute__ (( packed )) key_xchg;
 	struct asn1_builder builder = { NULL, 0 };
+	size_t len;
+	int i;
 	int rc;
 
+	/* Build shareable key */
+	if ( ( rc = tls_key_build ( tls, &builder ) ) != 0 )
+		goto err_build;
+	len = builder.len;
 
+	/* Construct record header */
+	key_xchg.type_length =
+		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
+		  htonl ( len + sizeof ( key_xchg ) -
+			  sizeof ( key_xchg.type_length ) ) );
+	for ( i = ( sizeof ( key_xchg.key_len ) - 1 ) ; i >= 0 ; i-- ) {
+		key_xchg.key_len[i] = ( len & 0xff );
+		len >>= 8;
+	}
 
-	/* Transmit Client Key Exchange record via key exchange algorithm */
-	if ( ( rc = suite->exchange->client ( tls ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not exchange keys: %s\n",
-		       tls, strerror ( rc ) );
-		return rc;
+	/* Prepend record header (as raw data in ASN.1 builder) */
+	if ( ( rc = asn1_prepend_raw ( &builder, &key_xchg,
+				       sizeof ( key_xchg ) ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not construct Client Key "
+			       "Exchange: %s\n", tls, strerror ( rc ) );
+			goto err_prepend;
+	}
+
+	/* Transmit Client Key Exchange record */
+	if ( ( rc = tls_send_handshake ( tls, builder.data,
+					 builder.len ) ) != 0 ) {
+		goto err_send;
 	}
 
 	/* Generate master secret */
@@ -2206,7 +2062,11 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 		return rc;
 	}
 
-	return 0;
+ err_send:
+ err_prepend:
+ err_build:
+	free ( builder.data );
+	return rc;
 }
 
 /**
