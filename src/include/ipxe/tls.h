@@ -410,8 +410,8 @@ struct tls_key_schedule {
 	 * derivation.
 	 */
 	struct digest_algorithm *digest;
-	/** Named key exchange group (or NULL if using key transport) */
-	struct tls_named_group *group;
+	/** Key exchange algorithm */
+	struct exchange_algorithm *exchange;
 	/** Dynamically-allocated storage */
 	void *dynamic;
 	/** Handshake running transcript digest context */
