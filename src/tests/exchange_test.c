@@ -56,7 +56,8 @@ void exchange_okx ( struct exchange_test *test, const char *file,
 	/* Sanity checks */
 	okx ( test->private_len == exchange->privsize, file, line );
 	okx ( test->partner_len == exchange->pubsize, file, line );
-	okx ( test->public_len == exchange->pubsize, file, line );
+	okx ( ( ( test->public_len == 0 ) ||
+		( test->public_len == exchange->pubsize ) ), file, line );
 	okx ( ( ( test->shared_len == 0 ) ||
 		( test->shared_len == exchange->sharedsize ) ), file, line );
 
@@ -71,8 +72,10 @@ void exchange_okx ( struct exchange_test *test, const char *file,
 	      file, line );
 	DBGC ( test, "KEX %s public key:\n", exchange->name );
 	DBGC_HDA ( test, 0, actual->public, exchange->pubsize );
-	okx ( memcmp ( actual->public, test->public, exchange->pubsize ) == 0,
-	      file, line );
+	if ( test->public_len ) {
+		okx ( memcmp ( actual->public, test->public,
+			       exchange->pubsize ) == 0, file, line );
+	}
 
 	/* Verify calculation of shared secret */
 	DBGC ( test, "KEX %s partner key:\n", exchange->name );

@@ -38,6 +38,9 @@ struct exchange_test {
 /** Define inline expected public key */
 #define PUBLIC(...) { __VA_ARGS__ }
 
+/** Define inline absence of expected public key */
+#define PUBLIC_UNSPECIFIED PUBLIC()
+
 /** Define inline expected shared secret */
 #define SHARED(...) { __VA_ARGS__ }
 
