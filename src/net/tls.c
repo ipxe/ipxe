@@ -607,7 +607,7 @@ static int tls_key_encrypt ( struct tls_connection *tls,
 	cert = x509_first ( tls->server.chain );
 	if ( ! cert ) {
 		DBGC ( tls, "TLS %p has no server certificate\n", tls );
-		return rc;
+		return -ENOENT_CERT;
 	}
 	pubkey = cert->subject.public_key.algorithm->pubkey;
 
@@ -1060,6 +1060,78 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
 	key += iv_size;
 
 	assert ( ( key_block + total ) == key );
+
+	return 0;
+}
+
+/******************************************************************************
+ *
+ * Pre-shared keys
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Save pre-shared key
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_psk_save ( struct tls_connection *tls ) {
+	struct secure_channel *channel = &tls->channel;
+	struct tls_session *session = tls->session;
+	int rc;
+
+	/* Save pre-shared key to session */
+	if ( ( rc = channel_save ( channel, &session->psk.psid ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not save: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Record new session ID, if provided */
+	if ( tls->session_id_len ) {
+		session->id_len = tls->session_id_len;
+		memcpy ( session->id, tls->session_id,
+			 sizeof ( session->id ) );
+	}
+
+	/* Record (and consume) new session ticket, if provided */
+	if ( tls->new_session_ticket_len ) {
+		zfree ( session->ticket );
+		session->ticket = tls->new_session_ticket;
+		session->ticket_len = tls->new_session_ticket_len;
+		tls->new_session_ticket = NULL;
+		tls->new_session_ticket_len = 0;
+	}
+
+	return 0;
+}
+
+/**
+ * Resume pre-shared key
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_psk_resume ( struct tls_connection *tls ) {
+	struct tls_session *session = tls->session;
+	struct secure_channel *channel = &tls->channel;
+	int rc;
+
+	DBGC ( tls, "TLS %p resuming session ID:\n", tls );
+	DBGC_HDA ( tls, 0, session->id, session->id_len );
+
+	/* Resume channel */
+	if ( ( rc = channel_resume ( channel, &session->psk.psid ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not resume: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Generate keys */
+	if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
+		return rc;
 
 	return 0;
 }
@@ -2175,7 +2247,7 @@ static int tls_send_change_cipher ( struct tls_connection *tls ) {
  */
 static int tls_send_finished ( struct tls_connection *tls ) {
 	struct digest_algorithm *digest = tls->key.digest;
-	struct tls_key_schedule *key = &tls->key;
+	struct secure_channel *channel = &tls->channel;
 	struct {
 		uint32_t type_length;
 		uint8_t verify_data[ sizeof ( tls->verify.client ) ];
@@ -2184,8 +2256,8 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 	int rc;
 
 	/* Fail unless bound identity has been validated */
-	if ( ! ( key->bound &&
-		 x509_is_valid ( key->bound, tls->server.root ) ) ) {
+	if ( ! ( channel->props.bound &&
+		 x509_is_valid ( channel->props.bound, tls->server.root ) ) ) {
 		DBGC ( tls, "TLS %p bound identity is not valid\n", tls );
 		return -EPERM_BOUND;
 	}
@@ -2500,10 +2572,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 			tls->session_id_len ) == 0 ) ) {
 
 		/* Session ID match: reuse master secret */
-		DBGC ( tls, "TLS %p resuming session ID:\n", tls );
-		DBGC_HDA ( tls, 0, tls->session_id, tls->session_id_len );
-		tls_resume_secret ( tls );
-		if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
+		if ( ( rc = tls_psk_resume ( tls ) ) != 0 )
 			return rc;
 
 	} else {
@@ -2962,7 +3031,7 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
 static int tls_new_finished ( struct tls_connection *tls,
 			      const void *data, size_t len ) {
 	struct tls_session *session = tls->session;
-	struct tls_key_schedule *key = &tls->key;
+	struct secure_channel *channel = &tls->channel;
 	struct digest_algorithm *digest = tls->key.digest;
 	const struct {
 		uint8_t verify_data[ sizeof ( tls->verify.server ) ];
@@ -2971,7 +3040,8 @@ static int tls_new_finished ( struct tls_connection *tls,
 	uint8_t digest_out[ digest->digestsize ];
 
 	/* Sanity checks */
-	if ( ! ( digest->digestsize && key->keyed && key->bound ) ) {
+	if ( ! ( digest->digestsize && channel->props.keyed &&
+		 channel->props.bound ) ) {
 		DBGC ( tls, "TLS %p received premature Finished\n", tls );
 		DBGC_HDA ( tls, 0, data, len );
 		return -EINVAL_FINISHED;
@@ -3005,21 +3075,9 @@ static int tls_new_finished ( struct tls_connection *tls,
 	}
 
 	/* Record session ID, ticket, and master secret, if applicable */
-	if ( x509_is_valid ( key->bound, tls->server.root ) &&
+	if ( x509_is_valid ( channel->props.bound, tls->server.root ) &&
 	     ( tls->session_id_len || tls->new_session_ticket_len ) ) {
-		tls_generate_resumption_master ( tls );
-		if ( tls->session_id_len ) {
-			session->id_len = tls->session_id_len;
-			memcpy ( session->id, tls->session_id,
-				 sizeof ( session->id ) );
-		}
-		if ( tls->new_session_ticket_len ) {
-			zfree ( session->ticket );
-			session->ticket = tls->new_session_ticket;
-			session->ticket_len = tls->new_session_ticket_len;
-			tls->new_session_ticket = NULL;
-			tls->new_session_ticket_len = 0;
-		}
+		tls_psk_save ( tls );
 	}
 
 	/* Move to end of session's connection list and allow other
