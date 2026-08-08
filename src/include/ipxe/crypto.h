@@ -460,9 +460,15 @@ extern int pubkey_null_verify ( struct pubkey_algorithm *pubkey,
 extern int pubkey_null_match ( struct pubkey_algorithm *pubkey,
 			       const struct asn1_cursor *private_key,
 			       const struct asn1_cursor *public_key );
+extern int exchange_null_share ( struct exchange_algorithm *exchange,
+				 const void *private, void *public );
+extern int exchange_null_agree ( struct exchange_algorithm *exchange,
+				 const void *private, const void *partner,
+				 void *shared );
 
 extern struct digest_algorithm digest_null;
 extern struct cipher_algorithm cipher_null;
 extern struct pubkey_algorithm pubkey_null;
+extern struct exchange_algorithm exchange_null;
 
 #endif /* _IPXE_CRYPTO_H */

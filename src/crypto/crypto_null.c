@@ -149,3 +149,25 @@ struct pubkey_algorithm pubkey_null = {
 	.verify = pubkey_null_verify,
 	.match = pubkey_null_match,
 };
+
+int exchange_null_share ( struct exchange_algorithm *exchange __unused,
+			  const void *private __unused,
+			  void *public __unused ) {
+	return -ENOTTY;
+}
+
+int exchange_null_agree ( struct exchange_algorithm *exchange __unused,
+			  const void *private __unused,
+			  const void *partner __unused,
+			  void *shared __unused ) {
+	return -ENOTTY;
+}
+
+struct exchange_algorithm exchange_null = {
+	.name = "null",
+	.privsize = 0,
+	.pubsize = 0,
+	.sharedsize = 0,
+	.share = exchange_null_share,
+	.agree = exchange_null_agree,
+};
