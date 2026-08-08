@@ -1622,6 +1622,7 @@ tls_find_param_group ( const void *dh_p, size_t dh_p_len, const void *dh_g,
 struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 	.name = "pubkey",
 	.exchange = &tls_classic_pre_master_algorithm,
+	.len_len = sizeof ( uint16_t ),
 };
 
 /**
@@ -2108,13 +2109,14 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 		key_xchg.key_len[i] = ( len & 0xff );
 		len >>= 8;
 	}
+	assert ( len == 0 );
 
 	/* Prepend record header (as raw data in ASN.1 builder) */
 	if ( ( rc = asn1_prepend_raw ( &builder, &key_xchg,
 				       sizeof ( key_xchg ) ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not construct Client Key "
-			       "Exchange: %s\n", tls, strerror ( rc ) );
-			goto err_prepend;
+		       "Exchange: %s\n", tls, strerror ( rc ) );
+		goto err_prepend;
 	}
 
 	/* Transmit Client Key Exchange record */
