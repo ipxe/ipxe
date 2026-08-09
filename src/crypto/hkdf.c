@@ -100,6 +100,10 @@ void hkdf_expand ( struct digest_algorithm *digest, const void *prk,
 	uint8_t index = 0;
 	size_t frag_len;
 
+	/* Sanity check */
+	assert ( len <= ( digestsize * 0xff /* max index */ ) );
+
+	/* Construct output keying material */
 	while ( len ) {
 
 		/* Calculate T(n) */
