@@ -28,16 +28,22 @@ FILE_SECBOOT ( PERMITTED );
  * intermediate value.
  *
  * Relaxed Montgomery multiplication will produce a result in the
- * range t < (1+m/k)N, where m is this maximum multiple of the field
- * prime, and k is the constant in R > kN representing the leading
- * zero padding in the big integer representation of the field prime.
- * We choose to set k=m so that multiplications will always produce a
- * result in the range t < 2N.
+ * range t < (1+(m^2)/k)N, where m is this maximum multiple of the
+ * field prime, and k is the constant in R > kN representing the
+ * leading zero padding in the big integer representation of the field
+ * prime.  We choose to set k=m^2 so that multiplications will always
+ * produce a result in the range t < 2N.
+ *
+ * A lower value of k would be possible, at the cost of having to keep
+ * track of the field prime multiples used at each multiplication
+ * input (rather than keeping track only of a single global maximum).
+ * This would gain nothing in practice: any value of k below around
+ * 2^32 will end up requiring just a single extra big integer element.
  *
  * This is expressed as the base-two logarithm of the multiple
  * (rounded up), to simplify compile-time calculations.
  */
-#define WEIERSTRASS_MAX_MULTIPLE_LOG2 5 /* maximum reached is mod 20N */
+#define WEIERSTRASS_MAX_MULT_LOG2 5 /* maximum reached is mod 20N */
 
 /**
  * Determine number of elements in scalar values for a Weierstrass curve
@@ -47,7 +53,7 @@ FILE_SECBOOT ( PERMITTED );
  */
 #define weierstrass_size( len )						\
 	bigint_required_size ( (len) +					\
-			       ( ( WEIERSTRASS_MAX_MULTIPLE_LOG2 + 7 )	\
+			       ( ( 2 * WEIERSTRASS_MAX_MULT_LOG2 + 7 )	\
 				 / 8 ) )
 
 /**
