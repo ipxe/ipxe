@@ -486,18 +486,18 @@ void x25519_multiply ( const union x25519_oct258 *multiplicand,
 	 *         = step2(low 256 bits) + step2(high 11 bits) * 38    (mod p)
 	 *
 	 * There are 6 bits in the constant value 38.  The step 3
-	 * multiplication product will therefore have 11+6=19 bits,
+	 * multiplication product will therefore have 11+6=17 bits,
 	 * and the step 3 result (after the addition) will therefore
 	 * have 257 bits.
 	 *
 	 * A loose upper bound for the step 3 result (after the
 	 * addition) is given by:
 	 *
-	 *   step3 < ( 2^256 - 1 ) + ( 2^19 - 1 )
-	 *         < ( 2^257 - 2^256 - 1 ) + ( 2^19 - 1 )
-	 *         < ( 2^257 - 76 ) - 2^256 + 2^19 + 74
-	 *         < 4 * ( 2^255 - 19 ) - 2^256 + 2^19 + 74
-	 *         < 4p - 2^256 + 2^19 + 74
+	 *   step3 < ( 2^256 - 1 ) + ( 2^17 - 1 )
+	 *         < ( 2^257 - 2^256 - 1 ) + ( 2^17 - 1 )
+	 *         < ( 2^257 - 76 ) - 2^256 + 2^17 + 74
+	 *         < 4 * ( 2^255 - 19 ) - 2^256 + 2^17 + 74
+	 *         < 4p - 2^256 + 2^17 + 74
 	 *
 	 * and so the step 3 result is strictly less than 4p, and
 	 * therefore lies within the range [0,4p-1].
