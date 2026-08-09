@@ -820,6 +820,7 @@ void x25519_key ( const struct x25519_value *base,
 	/* Clamp scalar as required by RFC7748 */
 	memcpy ( tmp, scalar, sizeof ( *tmp ) );
 	tmp->raw[0] &= 0xf8;
+	tmp->raw[31] &= 0x7f;
 	tmp->raw[31] |= 0x40;
 
 	/* Multiply elliptic curve point */
