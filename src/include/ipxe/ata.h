@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <ipxe/interface.h>
+#include <ipxe/xferbuf.h>
 
 /** @file
  *
@@ -168,28 +169,10 @@ struct ata_identity {
 struct ata_cmd {
 	/** ATA command block */
 	struct ata_cb cb;
-	/** Data-out buffer (may be NULL)
-	 *
-	 * If non-NULL, this buffer must be ata_command::cb::count
-	 * sectors in size.
-	 */
-	void *data_out;
-	/** Data-out buffer length
-	 *
-	 * Must be zero if @c data_out is NULL
-	 */
-	size_t data_out_len;
-	/** Data-in buffer (may be NULL)
-	 *
-	 * If non-NULL, this buffer must be ata_command::cb::count
-	 * sectors in size.
-	 */
-	void *data_in;
-	/** Data-in buffer length
-	 *
-	 * Must be zero if @c data_in is NULL
-	 */
-	size_t data_in_len;
+	/** Data-out buffer */
+	struct xfer_buffer data_out;
+	/** Data-in buffer */
+	struct xfer_buffer data_in;
 };
 
 extern int ata_command ( struct interface *control, struct interface *data,

@@ -107,8 +107,9 @@ struct aoe_command_type {
 	 * @v aoecmd		AoE command
 	 * @v data		Command IU
 	 * @v len		Length of command IU
+	 * @ret rc		Return status code
 	 */
-	void ( * cmd ) ( struct aoe_command *aoecmd, void *data, size_t len );
+	int ( * cmd ) ( struct aoe_command *aoecmd, void *data, size_t len );
 	/**
 	 * Handle AoE response IU
 	 *
@@ -249,8 +250,10 @@ static int aoecmd_tx ( struct aoe_command *aoecmd ) {
 	/* Create outgoing I/O buffer */
 	cmd_len = aoecmd->type->cmd_len ( aoecmd );
 	iobuf = alloc_iob ( MAX_LL_HEADER_LEN + cmd_len );
-	if ( ! iobuf )
-		return -ENOMEM;
+	if ( ! iobuf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 	iob_reserve ( iobuf, MAX_LL_HEADER_LEN );
 	aoehdr = iob_put ( iobuf, cmd_len );
 
@@ -260,18 +263,27 @@ static int aoecmd_tx ( struct aoe_command *aoecmd ) {
 	aoehdr->major = htons ( aoedev->major );
 	aoehdr->minor = aoedev->minor;
 	aoehdr->tag = htonl ( aoecmd->tag );
-	aoecmd->type->cmd ( aoecmd, iobuf->data, iob_len ( iobuf ) );
+	if ( ( rc = aoecmd->type->cmd ( aoecmd, iobuf->data,
+					iob_len ( iobuf ) ) ) != 0 ) {
+		goto err_cmd;
+	}
 
 	/* Send packet */
-	if ( ( rc = net_tx ( iobuf, netdev, &aoe_protocol, aoedev->target,
-			     netdev->ll_addr ) ) != 0 ) {
+	if ( ( rc = net_tx ( iob_disown ( iobuf ), netdev, &aoe_protocol,
+			     aoedev->target, netdev->ll_addr ) ) != 0 ) {
 		DBGC ( aoedev, "AoE %s/%08x could not transmit: %s\n",
 		       aoedev_name ( aoedev ), aoecmd->tag,
 		       strerror ( rc ) );
-		return rc;
+		goto err_tx;
 	}
 
 	return 0;
+
+ err_tx:
+ err_cmd:
+	free_iob ( iobuf );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -357,7 +369,7 @@ static size_t aoecmd_ata_cmd_len ( struct aoe_command *aoecmd ) {
 	struct ata_cmd *command = &aoecmd->command;
 
 	return ( sizeof ( struct aoehdr ) + sizeof ( struct aoeata ) +
-		 command->data_out_len );
+		 command->data_out.len );
 }
 
 /**
@@ -366,25 +378,27 @@ static size_t aoecmd_ata_cmd_len ( struct aoe_command *aoecmd ) {
  * @v aoecmd		AoE command
  * @v data		Command IU
  * @v len		Length of command IU
+ * @ret rc		Return status code
  */
-static void aoecmd_ata_cmd ( struct aoe_command *aoecmd,
-			     void *data, size_t len ) {
+static int aoecmd_ata_cmd ( struct aoe_command *aoecmd,
+			    void *data, size_t len ) {
 	struct aoe_device *aoedev = aoecmd->aoedev;
 	struct ata_cmd *command = &aoecmd->command;
 	struct aoehdr *aoehdr = data;
 	struct aoeata *aoeata = &aoehdr->payload[0].ata;
+	int rc;
 
 	/* Sanity check */
 	static_assert ( AOE_FL_DEV_HEAD == ATA_DEV_SLAVE );
 	assert ( len == ( sizeof ( *aoehdr ) + sizeof ( *aoeata ) +
-			  command->data_out_len ) );
+			  command->data_out.len ) );
 
 	/* Build IU */
 	aoehdr->command = AOE_CMD_ATA;
 	memset ( aoeata, 0, sizeof ( *aoeata ) );
 	aoeata->aflags = ( ( command->cb.lba48 ? AOE_FL_EXTENDED : 0 ) |
 			   ( command->cb.device & ATA_DEV_SLAVE ) |
-			   ( command->data_out_len ? AOE_FL_WRITE : 0 ) );
+			   ( command->data_out.len ? AOE_FL_WRITE : 0 ) );
 	aoeata->err_feat = command->cb.err_feat.bytes.cur;
 	aoeata->count = command->cb.count.native;
 	aoeata->cmd_stat = command->cb.cmd_stat;
@@ -392,17 +406,25 @@ static void aoecmd_ata_cmd ( struct aoe_command *aoecmd,
 	if ( ! command->cb.lba48 )
 		aoeata->lba.bytes[3] |=
 			( command->cb.device & ATA_DEV_MASK );
-	memcpy ( aoeata->data, command->data_out, command->data_out_len );
-
 	DBGC2 ( aoedev, "AoE %s/%08x ATA cmd %02x:%02x:%02x:%02x:%08llx",
 		aoedev_name ( aoedev ), aoecmd->tag, aoeata->aflags,
 		aoeata->err_feat, aoeata->count, aoeata->cmd_stat,
 		aoeata->lba.u64 );
-	if ( command->data_out_len )
-		DBGC2 ( aoedev, " out %04zx", command->data_out_len );
-	if ( command->data_in_len )
-		DBGC2 ( aoedev, " in %04zx", command->data_in_len );
+	if ( command->data_out.len )
+		DBGC2 ( aoedev, " out %04zx", command->data_out.len );
+	if ( command->data_in.len )
+		DBGC2 ( aoedev, " in %04zx", command->data_in.len );
 	DBGC2 ( aoedev, "\n" );
+
+	/* Copy data-out (if any) to command IU */
+	if ( ( rc = xferbuf_read ( &command->data_out, 0, aoeata->data,
+				   command->data_out.len ) ) != 0 ) {
+		DBGC ( aoedev, "AoE %s/%08x could not read data-out: %s\n",
+		       aoedev_name ( aoedev ), aoecmd->tag, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -421,6 +443,7 @@ static int aoecmd_ata_rsp ( struct aoe_command *aoecmd, const void *data,
 	const struct aoehdr *aoehdr = data;
 	const struct aoeata *aoeata = &aoehdr->payload[0].ata;
 	size_t data_len;
+	int rc;
 
 	/* Sanity check */
 	if ( len < ( sizeof ( *aoehdr ) + sizeof ( *aoeata ) ) ) {
@@ -444,15 +467,20 @@ static int aoecmd_ata_rsp ( struct aoe_command *aoecmd, const void *data,
 	/* Check data-in length is sufficient.  (There may be trailing
 	 * garbage due to Ethernet minimum-frame-size padding.)
 	 */
-	if ( data_len < command->data_in_len ) {
+	if ( data_len < command->data_in.len ) {
 		DBGC ( aoedev, "AoE %s/%08x data-in underrun (received %zd, "
 		       "expected %zd)\n", aoedev_name ( aoedev ), aoecmd->tag,
-		       data_len, command->data_in_len );
+		       data_len, command->data_in.len );
 		return -ERANGE;
 	}
 
 	/* Copy out data payload */
-	memcpy ( command->data_in, aoeata->data, command->data_in_len );
+	if ( ( rc = xferbuf_write ( &command->data_in, 0, aoeata->data,
+				    command->data_in.len ) ) != 0 ) {
+		DBGC ( aoedev, "AoE %s/%08x could not write data-in: %s\n",
+		       aoedev_name ( aoedev ), aoecmd->tag, strerror ( rc ) );
+		return rc;
+	}
 
 	return 0;
 }
@@ -480,9 +508,10 @@ static size_t aoecmd_cfg_cmd_len ( struct aoe_command *aoecmd __unused ) {
  * @v aoecmd		AoE command
  * @v data		Command IU
  * @v len		Length of command IU
+ * @ret rc		Return status code
  */
-static void aoecmd_cfg_cmd ( struct aoe_command *aoecmd,
-			     void *data, size_t len ) {
+static int aoecmd_cfg_cmd ( struct aoe_command *aoecmd,
+			    void *data, size_t len ) {
 	struct aoe_device *aoedev = aoecmd->aoedev;
 	struct aoehdr *aoehdr = data;
 	struct aoecfg *aoecfg = &aoehdr->payload[0].cfg;
@@ -493,9 +522,10 @@ static void aoecmd_cfg_cmd ( struct aoe_command *aoecmd,
 	/* Build IU */
 	aoehdr->command = AOE_CMD_CONFIG;
 	memset ( aoecfg, 0, sizeof ( *aoecfg ) );
-
 	DBGC ( aoedev, "AoE %s/%08x CONFIG cmd\n",
 	       aoedev_name ( aoedev ), aoecmd->tag );
+
+	return 0;
 }
 
 /**
