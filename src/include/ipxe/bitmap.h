@@ -36,6 +36,15 @@ typedef unsigned long bitmap_block_t;
  */
 #define BITMAP_MASK( bit ) ( 1UL << ( (bit) % BITMAP_BLKSIZE ) )
 
+/**
+ * Number of blocks in the bitmap
+ *
+ * @v length		Length of the bitmap, in bits
+ * @ret blocks		Number of blocks
+ */
+#define BITMAP_BLOCKS( length ) ( ( (length) / BITMAP_BLKSIZE ) +	\
+				  ( !! ( (length) % BITMAP_BLKSIZE ) ) )
+
 /** A bitmap */
 struct bitmap {
 	/** Bitmap data */

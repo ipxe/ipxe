@@ -46,8 +46,8 @@ int bitmap_resize ( struct bitmap *bitmap, unsigned int new_length ) {
 	size_t new_size;
 	bitmap_block_t *new_blocks;
 
-	old_num_blocks = BITMAP_INDEX ( bitmap->length + BITMAP_BLKSIZE - 1 );
-	new_num_blocks = BITMAP_INDEX ( new_length + BITMAP_BLKSIZE - 1 );
+	old_num_blocks = BITMAP_BLOCKS ( bitmap->length );
+	new_num_blocks = BITMAP_BLOCKS ( new_length );
 
 	if ( old_num_blocks != new_num_blocks ) {
 		new_size = ( new_num_blocks * sizeof ( bitmap->blocks[0] ) );
