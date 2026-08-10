@@ -678,7 +678,7 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 	size_t answer_offset;
 	size_t next_offset;
 	size_t rdlength;
-	size_t name_len;
+	int name_len;
 	int rc;
 
 	/* Sanity check */
@@ -816,6 +816,11 @@ static int dns_xfer_deliver ( struct dns_request *dns,
 			       dns, dns_name ( &buf ) );
 			dns->search.offset = dns->search.len;
 			name_len = dns_copy ( &buf, &dns->name );
+			if ( name_len < 0 ) {
+				rc = name_len;
+				dns_done ( dns, rc );
+				goto done;
+			}
 			dns->offset = ( offsetof ( typeof ( dns->buf ), name ) +
 					name_len - 1 /* Strip root label */ );
 			if ( ( rc = dns_question ( dns ) ) != 0 ) {
