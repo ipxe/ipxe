@@ -550,6 +550,7 @@ static void tls_clear_digest ( struct tls_connection *tls ) {
 	key->dynamic = NULL;
 	key->handshake = NULL;
 	key->kdf = NULL;
+	key->kdfsize = 0;
 
 	/* Key schedule no longer contains any shared secret */
 	tls_clear_binding ( tls );
@@ -589,6 +590,7 @@ static int tls_set_digest ( struct tls_connection *tls,
 	key->handshake = dynamic;		dynamic += digest->ctxsize;
 	key->kdf = dynamic;			dynamic += kdfsize;
 	assert ( ( key->dynamic + total ) == dynamic );
+	key->kdfsize = kdfsize;
 
 	/* Store digest algorithm */
 	key->digest = digest;
@@ -802,8 +804,7 @@ static void tls_set_kdf_master ( struct tls_connection *tls,
  */
 static int tls_share_ephemeral ( struct tls_connection *tls, void *public ) {
 	struct tls_key_schedule *key = &tls->key;
-	struct tls_named_group *group = key->group;
-	struct exchange_algorithm *exchange = group->exchange;
+	struct exchange_algorithm *exchange = key->exchange;
 	size_t privsize = exchange->privsize;
 	struct {
 		uint8_t private[privsize];
@@ -826,7 +827,7 @@ static int tls_share_ephemeral ( struct tls_connection *tls, void *public ) {
 }
 
 /**
- * Agree ephemeral public key (i.e. pre-master secret)
+ * Agree ephemeral shared secret (i.e. pre-master secret)
  *
  * @v tls		TLS connection
  * @v partner		Partner public key
@@ -838,8 +839,7 @@ static int tls_agree_ephemeral ( struct tls_connection *tls,
 				 const void *partner, size_t partner_len,
 				 int strip ) {
 	struct tls_key_schedule *key = &tls->key;
-	struct tls_named_group *group = key->group;
-	struct exchange_algorithm *exchange = group->exchange;
+	struct exchange_algorithm *exchange = key->exchange;
 	size_t privsize = exchange->privsize;
 	size_t pubsize = exchange->pubsize;
 	size_t sharedsize = exchange->sharedsize;
@@ -1575,33 +1575,22 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
 	struct tls_key_schedule *key = &tls->key;
 	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
 	struct x509_certificate *cert;
-	struct {
-		uint16_t version;
-		uint8_t random[46];
-	} __attribute__ (( packed )) pre_master_secret;
-	struct asn1_cursor cursor = {
-		.data = &pre_master_secret,
-		.len = sizeof ( pre_master_secret ),
-	};
+	struct asn1_cursor cursor;
 	struct asn1_builder builder = { NULL, 0 };
 	int rc;
 
+	/* Select classic key transport algorithm */
+	tls->key.exchange = &tls_classic_pre_master_algorithm;
+	assert ( is_key_transport ( tls->key.exchange ) );
+
 	/* Generate pre-master secret */
-	pre_master_secret.version = htons ( TLS_VERSION_MAX );
-	tls_ephemeral_label ( tls, "classic pre-master",
-			      &pre_master_secret.random,
-			      sizeof ( pre_master_secret.random ) );
-	tls_set_kdf_master ( tls, &pre_master_secret,
-			     sizeof ( pre_master_secret ) );
+	if ( ( rc = tls_agree_ephemeral ( tls, NULL, 0, 0 ) ) != 0 )
+		goto err_agree;
 
-	/* Key derivation function secret has been overwritten with a
-	 * value that was not derived from its previous value, and so
-	 * is no longer bound to the server's identity.
-	 */
-	tls_clear_binding ( tls );
-
-	/* Key schedule now contains shared secret key material */
-	key->keyed = 1;
+	/* Pre-master secret will be the current KDF secret */
+	cursor.data = key->kdf;
+	cursor.len = tls->key.exchange->sharedsize;
+	assert ( cursor.len <= key->kdfsize );
 
 	/* Identify server certificate */
 	cert = x509_first ( tls->server.chain );
@@ -1658,6 +1647,7 @@ static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
  err_encrypt:
 	zfree ( builder.data );
  err_cert:
+ err_agree:
 	return rc;
 }
 
@@ -1679,7 +1669,6 @@ struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 static int tls_new_server_key_exchange_dhe ( struct tls_connection *tls,
 					     const void *data, size_t len ) {
 	struct tls_named_group *group;
-	struct exchange_algorithm *exchange;
 	const struct {
 		uint16_t len;
 		uint8_t data[0];
@@ -1725,9 +1714,9 @@ static int tls_new_server_key_exchange_dhe ( struct tls_connection *tls,
 		DBGC_HDA ( tls, 0, data, len );
 		return -ENOTSUP_GROUP;
 	}
-	tls->key.group = group;
-	exchange = group->exchange;
-	DBGC ( tls, "TLS %p using named group %s\n", tls, exchange->name );
+	tls->key.exchange = group->exchange;
+	DBGC ( tls, "TLS %p using named group %s\n",
+	       tls, tls->key.exchange->name );
 
 	/* Generate pre-master secret */
 	if ( ( rc = tls_agree_ephemeral ( tls, dh_ys->data,
@@ -1750,8 +1739,7 @@ static int tls_new_server_key_exchange_dhe ( struct tls_connection *tls,
  */
 static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
 	struct tls_key_schedule *key = &tls->key;
-	struct tls_named_group *group = key->group;
-	struct exchange_algorithm *exchange = group->exchange;
+	struct exchange_algorithm *exchange = key->exchange;
 	size_t pubsize = exchange->pubsize;
 	struct {
 		uint32_t type_length;
@@ -1807,7 +1795,6 @@ struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 static int tls_new_server_key_exchange_ecdhe ( struct tls_connection *tls,
 					       const void *data, size_t len ) {
 	struct tls_named_group *group;
-	struct exchange_algorithm *exchange;
 	const struct {
 		uint8_t curve_type;
 		uint16_t named_group;
@@ -1841,9 +1828,9 @@ static int tls_new_server_key_exchange_ecdhe ( struct tls_connection *tls,
 		DBGC_HDA ( tls, 0, data, len );
 		return -ENOTSUP_GROUP;
 	}
-	tls->key.group = group;
-	exchange = group->exchange;
-	DBGC ( tls, "TLS %p using named group %s\n", tls, exchange->name );
+	tls->key.exchange = group->exchange;
+	DBGC ( tls, "TLS %p using named group %s\n",
+	       tls, tls->key.exchange->name );
 
 	/* Generate pre-master secret */
 	if ( ( rc = tls_agree_ephemeral ( tls, ecdh->public,
@@ -1866,8 +1853,7 @@ static int tls_new_server_key_exchange_ecdhe ( struct tls_connection *tls,
  */
 static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 	struct tls_key_schedule *key = &tls->key;
-	struct tls_named_group *group = key->group;
-	struct exchange_algorithm *exchange = group->exchange;
+	struct exchange_algorithm *exchange = key->exchange;
 	size_t pubsize = exchange->pubsize;
 	struct {
 		uint32_t type_length;

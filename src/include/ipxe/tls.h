@@ -376,8 +376,8 @@ struct tls_key_schedule {
 	 * derivation.
 	 */
 	struct digest_algorithm *digest;
-	/** Named key exchange group */
-	struct tls_named_group *group;
+	/** Key exchange algorithm */
+	struct exchange_algorithm *exchange;
 	/** Schedule holds secret key material
 	 *
 	 * This flag is set when shared secret key material is
@@ -457,8 +457,10 @@ struct tls_key_schedule {
 	void *dynamic;
 	/** Handshake running transcript digest context */
 	void *handshake;
-	/** Key derivation function master secret */
+	/** Key derivation function secret */
 	void *kdf;
+	/** Length of key derivation function secret */
+	size_t kdfsize;
 	/** Ephemeral master secret */
 	uint8_t ephemeral[SHA256_DIGEST_SIZE];
 };
@@ -596,6 +598,8 @@ struct tls_connection {
 
 /** RX I/O buffer alignment */
 #define TLS_RX_ALIGN 16
+
+extern struct exchange_algorithm tls_classic_pre_master_algorithm;
 
 extern struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm;
 extern struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm;

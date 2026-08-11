@@ -406,6 +406,11 @@ exchange_agree ( struct exchange_algorithm *exchange, const void *private,
 }
 
 static inline __attribute__ (( always_inline )) int
+is_key_transport ( struct exchange_algorithm *exchange ) {
+	return ( exchange->pubsize == 0 );
+}
+
+static inline __attribute__ (( always_inline )) int
 elliptic_is_infinity ( struct elliptic_curve *curve, const void *point ) {
 	return curve->is_infinity ( curve, point );
 }
