@@ -456,6 +456,7 @@ FILE_SECBOOT ( PERMITTED );
 #define ERRFILE_ffdhe		      ( ERRFILE_OTHER | 0x006b0000 )
 #define ERRFILE_cbc		      ( ERRFILE_OTHER | 0x006c0000 )
 #define ERRFILE_channel		      ( ERRFILE_OTHER | 0x006d0000 )
+#define ERRFILE_tlskey		      ( ERRFILE_OTHER | 0x006e0000 )
 
 /** @} */
 
