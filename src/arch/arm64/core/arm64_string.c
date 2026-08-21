@@ -229,7 +229,7 @@ void arm64_memmove_forwards ( void *dest, const void *src, size_t len ) {
 				 "=&r" ( discard_src ),
 				 "=&r" ( discard_data )
 			       : "r" ( dest + len ), "0" ( dest ), "1" ( src )
-			       : "memory" );
+			       : "memory", "cc" );
 }
 
 /**

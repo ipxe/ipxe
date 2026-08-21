@@ -196,7 +196,8 @@ bigint_grow_raw ( const uint32_t *source0, unsigned int source_size,
 				 "=m" ( *dest )
 			       : "l" ( source_end ),
 				 "l" ( dest_end ),
-				 "0" ( source0 ), "1" ( dest0 ) );
+				 "0" ( source0 ), "1" ( dest0 )
+			       : "cc" );
 }
 
 /**
@@ -227,7 +228,8 @@ bigint_shrink_raw ( const uint32_t *source0, unsigned int source_size __unused,
 				 "=&l" ( discard_source_i ),
 				 "=m" ( *dest )
 			       : "l" ( dest_end ),
-				 "0" ( source0 ), "1" ( dest0 ) );
+				 "0" ( source0 ), "1" ( dest0 )
+			       : "cc" );
 }
 
 /**
