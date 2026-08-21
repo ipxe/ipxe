@@ -266,7 +266,7 @@ int http_connect ( struct interface *xfer, struct uri *uri ) {
 		assert ( conn->uri->host != NULL );
 
 		/* Reuse connection, if possible */
-		if ( ( scheme == conn->scheme ) &&
+		if ( 0 && ( scheme == conn->scheme ) &&
 		     ( strcmp ( uri->host, conn->uri->host ) == 0 ) &&
 		     ( port == uri_port ( conn->uri, scheme->port ) ) ) {
 
