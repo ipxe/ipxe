@@ -21,7 +21,7 @@ profile_timestamp ( void ) {
 	uint64_t cycles;
 
 	/* Read timestamp counter */
-	__asm__ ( "stckf %0" : "=Q" ( cycles ) );
+	__asm__ ( "stckf %0" : "=Q" ( cycles ) : : "cc" );
 	return cycles;
 }
 

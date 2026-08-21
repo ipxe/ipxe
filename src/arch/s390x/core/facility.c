@@ -46,7 +46,7 @@ int facility_is_installed ( unsigned int facility ) {
 	memset ( &facilities, 0, sizeof ( facilities ) );
 	max = ( ( sizeof ( facilities.mask ) /
 		  sizeof ( facilities.mask[0] ) ) - 1 );
-	__asm__ ( "stfle %0" : "=R" ( facilities ), "+r" ( max ) );
+	__asm__ ( "stfle %0" : "=R" ( facilities ), "+r" ( max ) : : "cc" );
 	DBGC ( &facilities, "FACILITY %016llx:%016llx:%016llx:%016llx\n",
 	       facilities.mask[0], facilities.mask[1], facilities.mask[2],
 	       facilities.mask[3] );

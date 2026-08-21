@@ -63,7 +63,7 @@ static inline unsigned long tod_ticks ( void ) {
 	union tod_extended tod;
 
 	/* Read clock */
-	__asm__ ( "stcke %0" : "=R" ( tod ) );
+	__asm__ ( "stcke %0" : "=R" ( tod ) : : "cc" );
 	return tod.ticks;
 }
 

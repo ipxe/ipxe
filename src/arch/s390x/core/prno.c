@@ -69,7 +69,8 @@ static int prno_entropy_enable ( void ) {
 		    "=a" ( dummy2 ),
 		    "=m" ( params )
 		  : "0" ( PRNO_FN_QUERY ),
-		    "1" ( &params ) );
+		    "1" ( &params )
+		  : "cc" );
 	if ( ! prno_is_supported ( &params.supported, PRNO_FN_TRNG ) ) {
 		DBGC ( colour, "PRNO does not support TRNG (%016llx:%016llx)\n",
 		       params.supported.mask[0], params.supported.mask[1] );
@@ -111,7 +112,8 @@ static int prno_get_noise ( noise_sample_t *noise ) {
 		    "+a" ( raw ),
 		    "+a" ( conditioned ),
 		    "=m" ( *noise )
-		  : "0" ( PRNO_FN_TRNG ) );
+		  : "0" ( PRNO_FN_TRNG )
+		  : "cc" );
 
 	return 0;
 }

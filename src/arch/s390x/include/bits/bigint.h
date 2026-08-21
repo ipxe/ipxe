@@ -46,7 +46,8 @@ bigint_add_raw ( const unsigned long *addend0, unsigned long *value0,
 		    "=&r" ( index_carry ),
 		    "+S" ( *value )
 		  : "S" ( *addend ),
-		    "2" ( size ) );
+		    "2" ( size )
+		  : "cc" );
 
 	return index_carry;
 }
@@ -86,7 +87,8 @@ bigint_subtract_raw ( const unsigned long *subtrahend0, unsigned long *value0,
 		    "=&r" ( index_borrow ),
 		    "+S" ( *value )
 		  : "S" ( *subtrahend ),
-		    "2" ( size ) );
+		    "2" ( size )
+		  : "cc" );
 
 	return ( -index_borrow );
 }
@@ -122,7 +124,8 @@ bigint_shl_raw ( unsigned long *value0, unsigned int size ) {
 		    "+S" ( *value )
 		  : "0" ( 0UL ),
 		    "2" ( size ),
-		    "3" ( 0U ) );
+		    "3" ( 0U )
+		  : "cc" );
 
 	return carry;
 }
@@ -155,7 +158,8 @@ bigint_shr_raw ( unsigned long *value0, unsigned int size ) {
 		    "=&r" ( carry ),
 		    "+S" ( *value )
 		  : "0" ( sizeof ( *value ) ),
-		    "2" ( 0 ) );
+		    "2" ( 0 )
+		  : "cc" );
 
 	return ( carry & 1 );
 }
@@ -183,7 +187,8 @@ bigint_grow_raw ( const unsigned long *source0, unsigned int source_size,
 		  "mvcle %0, %1, 0\n\t"
 		  "jo 1b\n\t"
 		  : "+r" ( dpair ), "+r" ( spair ), "=m" ( *dest )
-		  : "m" ( *source ) );
+		  : "m" ( *source )
+		  : "cc" );
 }
 
 /**
@@ -209,7 +214,8 @@ bigint_shrink_raw ( const unsigned long *source0, unsigned int source_size,
 		  "mvcle %0, %1, 0\n\t"
 		  "jo 1b\n\t"
 		  : "+r" ( dpair ), "+r" ( spair ), "=m" ( *dest )
-		  : "m" ( *source ) );
+		  : "m" ( *source )
+		  : "cc" );
 }
 
 /**
@@ -242,7 +248,8 @@ bigint_multiply_one ( const unsigned long multiplicand,
 		    "+T" ( *result ),
 		    "+r" ( *carry )
 		  : "r" ( multiplicand ),
-		    "r" ( multiplier ) );
+		    "r" ( multiplier )
+		  : "cc" );
 }
 
 #endif /* _BITS_BIGINT_H */

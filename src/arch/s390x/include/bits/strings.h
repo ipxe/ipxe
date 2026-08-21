@@ -22,7 +22,7 @@ static inline __attribute__ (( always_inline )) int __ffsll ( long long value ){
 	value &= -value;
 
 	/* Count number of leading zeros before LSB */
-	__asm__ ( "flogr %0, %1" : "=r" ( pair ) : "r" ( value ) );
+	__asm__ ( "flogr %0, %1" : "=r" ( pair ) : "r" ( value ) : "cc" );
 
 	return ( 64 - pair.even );
 }
@@ -48,7 +48,7 @@ static inline __attribute__ (( always_inline )) int __flsll ( long long value ){
 	struct s390x_scalar_pair pair;
 
 	/* Count leading zeros */
-	__asm__ ( "flogr %0, %1" : "=r" ( pair ) : "r" ( value ) );
+	__asm__ ( "flogr %0, %1" : "=r" ( pair ) : "r" ( value ) : "cc" );
 	return ( 64 - pair.even );
 }
 

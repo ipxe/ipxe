@@ -34,21 +34,24 @@ memset ( void *dest, int character, size_t len ) {
 		/* Constant small length, zeroing: use XOR-in-place */
 		__asm__ ( "xc %O0(%1, %R0), %0"
 			  : "=Q" ( *dmem )
-			  : "i" ( len ) );
+			  : "i" ( len )
+			  : "cc" );
 	} else if ( __builtin_constant_p ( character ) ) {
 		/* Constant fill character: use "mvcle" with an immediate */
 		__asm__ ( "\n1:\n\t"
 			  "mvcle %0, %2, %3\n\t"
 			  "jo 1b\n\t"
 			  : "+r" ( dpair ), "=m" ( *dmem )
-			  : "r" ( spair ), "i" ( character ) );
+			  : "r" ( spair ), "i" ( character )
+			  : "cc" );
 	} else {
 		/* Variable fill character: use "mvcle" with a register */
 		__asm__ ( "\n1:\n\t"
 			  "mvcle %0, %2, 0(%3)\n\t"
 			  "jo 1b\n\t"
 			  : "+r" ( dpair ), "=m" ( *dmem )
-			  : "r" ( spair ), "a" ( character ) );
+			  : "r" ( spair ), "a" ( character )
+			  : "cc" );
 	}
 
 	return dest;
@@ -82,7 +85,8 @@ memcpy ( void *dest, const void *src, size_t len ) {
 			  "mvcle %0, %1, 0\n\t"
 			  "jo 1b\n\t"
 			  : "+r" ( dpair ), "+r" ( spair ), "=m" ( *dmem )
-			  : "m" ( *smem ) );
+			  : "m" ( *smem )
+			  : "cc" );
 	}
 
 	return dest;

@@ -33,7 +33,8 @@ tcpip_continue_chksum ( uint16_t partial, const void *data, size_t len ) {
 		  "alcr %0, %N1\n\t"
 		  : "=&r" ( cksum ),
 		    "+r" ( pair )
-		  : "0" ( ~partial ) );
+		  : "0" ( ~partial )
+		  : "cc" );
 
 	return ~cksum;
 }

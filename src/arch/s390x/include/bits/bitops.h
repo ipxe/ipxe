@@ -29,7 +29,8 @@ test_and_set_bit ( unsigned int bit, volatile void *bits ) {
 
 	__asm__ __volatile__ ( "lao %0, %2, %1"
 			       : "=r" ( old ), "+S" ( *word )
-			       : "r" ( mask ) );
+			       : "r" ( mask )
+			       : "cc" );
 
 	return ( !! ( old & mask ) );
 }
@@ -51,7 +52,8 @@ test_and_clear_bit ( unsigned int bit, volatile void *bits ) {
 
 	__asm__ __volatile__ ( "lan %0, %2, %1"
 			       : "=r" ( old ), "+S" ( *word )
-			       : "r" ( ~mask ) );
+			       : "r" ( ~mask )
+			       : "cc" );
 
 	return ( !! ( old & mask ) );
 }
