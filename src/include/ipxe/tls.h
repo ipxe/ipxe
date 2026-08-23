@@ -48,6 +48,9 @@ struct tls_header {
 /** TLS version 1.2 */
 #define TLS_VERSION_TLS_1_2 0x0303
 
+/** TLS version 1.3 */
+#define TLS_VERSION_TLS_1_3 0x0304
+
 /** Change cipher content type */
 #define TLS_TYPE_CHANGE_CIPHER 20
 
@@ -192,27 +195,36 @@ enum tls_tx_pending {
 	TLS_TX_FINISHED = 0x0020,
 };
 
+/** TLS key exchange parameters */
+struct tls_key_exchange_parameters {
+	/** Length of parameters (excluding trailing signature) */
+	size_t len;
+	/** Partner key */
+	const void *partner;
+	/** Length of partner key */
+	size_t partner_len;
+};
+
 /** A TLS key exchange algorithm */
 struct tls_key_exchange_algorithm {
 	/** Algorithm name */
 	const char *name;
+	/** Fixed key exchange algorithm (if set) */
+	struct exchange_algorithm *exchange;
 	/**
-	 * Receive new Server Key Exchange record using ECDHE key exchange
+	 * Parse key exchange parameters from Server Key Exchange record
 	 *
 	 * @v tls		TLS connection
 	 * @v data		Server Key Exchange handshake record
 	 * @v len		Length of Server Key Exchange handshake record
+	 * @v params		Key exchange parameters to fill in
 	 * @ret rc		Return status code
 	 */
-	int ( * server ) ( struct tls_connection *tls, const void *data,
-			   size_t len );
-	/**
-	 * Transmit Client Key Exchange record
-	 *
-	 * @v tls		TLS connection
-	 * @ret rc		Return status code
-	 */
-	int ( * client ) ( struct tls_connection *tls );
+	int ( * parse ) ( struct tls_connection *tls,
+			  const void *data, size_t len,
+			  struct tls_key_exchange_parameters *params );
+	/** Length of length field in Client Key Exchange record */
+	uint8_t len_len;
 };
 
 /** A TLS cipher suite */
@@ -376,8 +388,6 @@ struct tls_key_schedule {
 	 * derivation.
 	 */
 	struct digest_algorithm *digest;
-	/** Key exchange algorithm */
-	struct exchange_algorithm *exchange;
 	/** Schedule holds secret key material
 	 *
 	 * This flag is set when shared secret key material is
@@ -548,6 +558,8 @@ struct tls_connection {
 
 	/** Protocol version */
 	uint16_t version;
+	/** Key exchange algorithm */
+	struct exchange_algorithm *exchange;
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
 	/** Extended master secret flag */

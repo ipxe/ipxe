@@ -796,135 +796,14 @@ static void tls_set_kdf_master ( struct tls_connection *tls,
 }
 
 /**
- * Share ephemeral public key
- *
- * @v tls		TLS connection
- * @v public		Public key to fill in
- * @ret rc		Return status code
- */
-static int tls_share_ephemeral ( struct tls_connection *tls, void *public ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct exchange_algorithm *exchange = key->exchange;
-	size_t privsize = exchange->privsize;
-	struct {
-		uint8_t private[privsize];
-	} tmp;
-	int rc;
-
-	/* (Re)generate ephemeral private key */
-	tls_ephemeral_label ( tls, exchange->name, tmp.private, privsize );
-
-	/* Derive public key */
-	if ( ( rc = exchange_share ( exchange, tmp.private, public ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not share ephemeral key: %s\n",
-		       tls, strerror ( rc ) );
-		goto err_share;
-	}
-
- err_share:
-	memset ( &tmp, 0, sizeof ( tmp ) );
-	return rc;
-}
-
-/**
- * Agree ephemeral shared secret (i.e. pre-master secret)
- *
- * @v tls		TLS connection
- * @v partner		Partner public key
- * @v partner_len	Length of partner public key
- * @v strip		Strip/pad leading zeros
- * @ret rc		Return status code
- */
-static int tls_agree_ephemeral ( struct tls_connection *tls,
-				 const void *partner, size_t partner_len,
-				 int strip ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct exchange_algorithm *exchange = key->exchange;
-	size_t privsize = exchange->privsize;
-	size_t pubsize = exchange->pubsize;
-	size_t sharedsize = exchange->sharedsize;
-	struct {
-		uint8_t private[privsize];
-		uint8_t partner[pubsize];
-		uint8_t shared[sharedsize];
-	} *tmp;
-	size_t pad_len;
-	size_t shared_len;
-	uint8_t *shared;
-	int rc;
-
-	/* Allocate working space */
-	tmp = zalloc ( sizeof ( *tmp ) );
-	if ( ! tmp ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-
-	/* (Re)generate ephemeral private key */
-	tls_ephemeral_label ( tls, exchange->name, tmp->private, privsize );
-
-	/* Zero-pad partner key if needed */
-	if ( partner_len > pubsize ) {
-		DBGC ( tls, "TLS %p partner key too long:\n", tls );
-		DBGC_HDA ( tls, 0, partner, partner_len );
-		rc = -EINVAL_KEY_EXCHANGE;
-		goto err_partner_len;
-	}
-	pad_len = ( pubsize - partner_len );
-	if ( pad_len && ( ! strip ) ) {
-		DBGC ( tls, "TLS %p partner key too short:\n", tls );
-		DBGC_HDA ( tls, 0, partner, partner_len );
-		rc = -EINVAL_KEY_EXCHANGE;
-		goto err_partner_len;
-	}
-	memcpy ( ( tmp->partner + pad_len ), partner, partner_len );
-
-	/* Agree shared secret */
-	if ( ( rc = exchange_agree ( exchange, tmp->private, tmp->partner,
-				     tmp->shared ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not agree shared key: %s\n",
-		       tls, strerror ( rc ) );
-		goto err_agree;
-	}
-
-	/* Strip leading zeros if needed */
-	shared = tmp->shared;
-	shared_len = sharedsize;
-	while ( strip && shared_len && ( ! *shared ) ) {
-		shared++;
-		shared_len--;
-	}
-
-	/* Set key derivation function secret to the shared secret */
-	DBGC ( tls, "TLS %p pre-master secret:\n", tls );
-	DBGC_HDA ( tls, 0, shared, shared_len );
-	tls_set_kdf_master ( tls, shared, shared_len );
-
-	/* Key derivation function secret has been overwritten with a
-	 * value that was not derived from its previous value, and so
-	 * is no longer bound to the server's identity.
-	 */
-	tls_clear_binding ( tls );
-
-	/* Key schedule now contains shared secret key material */
-	key->keyed = 1;
-
- err_agree:
- err_partner_len:
-	memset ( tmp, 0, sizeof ( *tmp ) );
-	zfree ( tmp );
- err_alloc:
-	return rc;
-}
-
-/**
  * Generate master secret
  *
  * @v tls		TLS connection
+ * @ret rc		Return status code
  *
  * The client and server random values must already be known.
  */
-static void tls_generate_master_secret ( struct tls_connection *tls ) {
+static int tls_generate_master_secret ( struct tls_connection *tls ) {
 	struct tls_key_schedule *key = &tls->key;
 	struct digest_algorithm *digest = key->digest;
 	uint8_t digest_out[ digest->digestsize ];
@@ -966,6 +845,8 @@ static void tls_generate_master_secret ( struct tls_connection *tls ) {
 
 	/* Set key derivation function secret to the master secret */
 	tls_set_kdf_master ( tls, master_secret, sizeof ( master_secret ) );
+
+	return 0;
 }
 
 /**
@@ -1291,6 +1172,9 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		return -ENOTSUP_CIPHER;
 	}
 
+	/* Set (or clear) key exchange algorithm */
+	tls->exchange = suite->exchange->exchange;
+
 	/* Set key schedule digest algorithm */
 	digest = ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ?
 		   suite->handshake : &md5_sha1_algorithm );
@@ -1389,7 +1273,7 @@ tls_find_signature_hash ( unsigned int code ) {
 
 /******************************************************************************
  *
- * Ephemeral key exchange
+ * Named key exchange groups
  *
  ******************************************************************************
  */
@@ -1439,235 +1323,25 @@ tls_find_param_group ( const void *dh_p, size_t dh_p_len, const void *dh_g,
 	return NULL;
 }
 
-/**
- * Verify Diffie-Hellman parameter signature
- *
- * @v tls		TLS connection
- * @v data		Server Key Exchange handshake record
- * @v len		Length of Server Key Exchange handshake record
- * @v param_len		Length of Diffie-Hellman parameters
- * @ret rc		Return status code
- */
-static int tls_verify_dh_params ( struct tls_connection *tls, const void *data,
-				  size_t len, size_t param_len ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
-	struct tls_signature_hash_algorithm *sig_hash;
-	struct x509_certificate *cert;
-	struct pubkey_algorithm *pubkey;
-	struct digest_algorithm *digest;
-	int use_sig_hash = tls_version ( tls, TLS_VERSION_TLS_1_2 );
-	const struct {
-		uint16_t sig_hash[use_sig_hash];
-		uint16_t signature_len;
-		uint8_t signature[0];
-	} __attribute__ (( packed )) *sig;
-	struct asn1_cursor signature;
-	size_t remaining;
-	int rc;
-
-	/* Identify server certificate */
-	cert = x509_first ( tls->server.chain );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p has no server certificate\n", tls );
-		return -ENOENT_CERT;
-	}
-
-	/* Signature follows parameters */
-	assert ( param_len <= len );
-	sig = ( data + param_len );
-	remaining = ( len - param_len );
-
-	/* Parse signature from ServerKeyExchange */
-	if ( ( sizeof ( *sig ) > remaining ) ||
-	     ( ntohs ( sig->signature_len ) > ( remaining -
-						sizeof ( *sig ) ) ) ) {
-		DBGC ( tls, "TLS %p received underlength ServerKeyExchange\n",
-		       tls );
-		DBGC_HDA ( tls, 0, data, len );
-		return -EINVAL_KEY_EXCHANGE;
-	}
-	signature.data = sig->signature;
-	signature.len = ntohs ( sig->signature_len );
-
-	/* Identify signature and hash algorithm */
-	if ( use_sig_hash ) {
-		sig_hash = tls_find_signature_hash ( sig->sig_hash[0] );
-		if ( ! sig_hash ) {
-			DBGC ( tls, "TLS %p unsupported signature hash "
-			       "%#04x\n", tls, sig->sig_hash[0] );
-			return -ENOTSUP_SIG_HASH;
-		}
-		pubkey = sig_hash->pubkey;
-		digest = sig_hash->digest;
-		DBGC ( tls, "TLS %p using signature hash %s-%s\n",
-		       tls, pubkey->name, digest->name );
-		if ( sig_hash->algorithm !=
-		     cert->subject.public_key.algorithm ) {
-			DBGC ( tls, "TLS %p cannot use %s public key\n", tls,
-			       cert->subject.public_key.algorithm->name );
-			return -EPERM_KEY_EXCHANGE;
-		}
-	} else {
-		pubkey = cipherspec->suite->pubkey;
-		digest = &md5_sha1_algorithm;
-	}
-
-	/* Verify signature */
-	{
-		uint8_t ctx[digest->ctxsize];
-		uint8_t hash[digest->digestsize];
-
-		/* Calculate digest */
-		digest_init ( digest, ctx );
-		digest_update ( digest, ctx, &tls->client.random,
-				sizeof ( tls->client.random ) );
-		digest_update ( digest, ctx, tls->server.random,
-				sizeof ( tls->server.random ) );
-		digest_update ( digest, ctx, data, param_len );
-		digest_final ( digest, ctx, hash );
-
-		/* Verify signature */
-		if ( ( rc = pubkey_verify ( pubkey,
-					    &cert->subject.public_key.raw,
-					    digest, hash,
-					    &signature ) ) != 0 ) {
-			DBGC ( tls, "TLS %p ServerKeyExchange failed "
-			       "verification\n", tls );
-			DBGC_HDA ( tls, 0, data, len );
-			return -EPERM_KEY_EXCHANGE;
-		}
-	}
-
-	/* The verified signature indicates the server's intention to
-	 * delegate authority to the shared secret key material.  The
-	 * shared secret is therefore bound to the server's identity.
-	 */
-	tls_set_binding ( tls, cert );
-
-	return 0;
-}
-
-/**
- * Receive new Server Key Exchange record using public key transport
- *
- * @v tls		TLS connection
- * @v data		Server Key Exchange handshake record
- * @v len		Length of Server Key Exchange handshake record
- * @ret rc		Return status code
- */
-static int tls_new_server_key_exchange_pubkey ( struct tls_connection *tls,
-						const void *data, size_t len ){
-
-	/* Should never be received */
-	DBGC ( tls, "TLS %p received unexpected ServerKeyExchange:\n", tls );
-	DBGC_HDA ( tls, 0, data, len );
-	return -EPROTO;
-}
-
-/**
- * Transmit Client Key Exchange record using public key exchange
- *
- * @v tls		TLS connection
- * @ret rc		Return status code
- */
-static int tls_send_client_key_exchange_pubkey ( struct tls_connection *tls ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
-	struct tls_key_schedule *key = &tls->key;
-	struct pubkey_algorithm *pubkey = cipherspec->suite->pubkey;
-	struct x509_certificate *cert;
-	struct asn1_cursor cursor;
-	struct asn1_builder builder = { NULL, 0 };
-	int rc;
-
-	/* Select classic key transport algorithm */
-	tls->key.exchange = &tls_classic_pre_master_algorithm;
-	assert ( is_key_transport ( tls->key.exchange ) );
-
-	/* Generate pre-master secret */
-	if ( ( rc = tls_agree_ephemeral ( tls, NULL, 0, 0 ) ) != 0 )
-		goto err_agree;
-
-	/* Pre-master secret will be the current KDF secret */
-	cursor.data = key->kdf;
-	cursor.len = tls->key.exchange->sharedsize;
-	assert ( cursor.len <= key->kdfsize );
-
-	/* Identify server certificate */
-	cert = x509_first ( tls->server.chain );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p has no server certificate\n", tls );
-		rc = -ENOENT_CERT;
-		goto err_cert;
-	}
-
-	/* Encrypt pre-master secret using server's public key */
-	if ( ( rc = pubkey_encrypt ( pubkey, &cert->subject.public_key.raw,
-				     &cursor, &builder ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not encrypt pre-master secret: %s\n",
-		       tls, strerror ( rc ) );
-		goto err_encrypt;
-	}
-
-	/* Construct Client Key Exchange record */
-	{
-		struct {
-			uint32_t type_length;
-			uint16_t encrypted_pre_master_secret_len;
-		} __attribute__ (( packed )) header;
-
-		header.type_length =
-			( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-			  htonl ( builder.len + sizeof ( header ) -
-				  sizeof ( header.type_length ) ) );
-		header.encrypted_pre_master_secret_len = htons ( builder.len );
-
-		if ( ( rc = asn1_prepend_raw ( &builder, &header,
-					       sizeof ( header ) ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not construct Client Key "
-			       "Exchange: %s\n", tls, strerror ( rc ) );
-			goto err_prepend;
-		}
-	}
-
-	/* Transmit Client Key Exchange record */
-	if ( ( rc = tls_send_handshake ( tls, builder.data,
-					 builder.len ) ) != 0 ) {
-		goto err_send;
-	}
-
-	/* Shared secret has now been incorporated into the handshake
-	 * digest.  It can be decrypted only with access to the
-	 * certificate's private key, and has thereby been bound to
-	 * the server's identity.
-	 */
-	tls_set_binding ( tls, cert );
-
- err_send:
- err_prepend:
- err_encrypt:
-	zfree ( builder.data );
- err_cert:
- err_agree:
-	return rc;
-}
-
 /** Public key exchange algorithm */
 struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 	.name = "pubkey",
-	.server = tls_new_server_key_exchange_pubkey,
-	.client = tls_send_client_key_exchange_pubkey,
+	.exchange = &tls_classic_pre_master_algorithm,
+	.len_len = sizeof ( uint16_t ),
 };
 
 /**
- * Receive new Server Key Exchange record using DHE key exchange
+ * Parse key exchange parameters from DHE Server Key Exchange record
  *
  * @v tls		TLS connection
  * @v data		Server Key Exchange handshake record
  * @v len		Length of Server Key Exchange handshake record
+ * @v params		Key exchange parameters to fill in
  * @ret rc		Return status code
  */
-static int tls_new_server_key_exchange_dhe ( struct tls_connection *tls,
-					     const void *data, size_t len ) {
+static int tls_parse_dhe ( struct tls_connection *tls,
+			   const void *data, size_t len,
+			   struct tls_key_exchange_parameters *params ) {
 	struct tls_named_group *group;
 	const struct {
 		uint16_t len;
@@ -1679,9 +1353,7 @@ static int tls_new_server_key_exchange_dhe ( struct tls_connection *tls,
 	const void *param;
 	size_t remaining;
 	size_t frag_len;
-	size_t param_len;
 	unsigned int i;
-	int rc;
 
 	/* Parse ServerKeyExchange */
 	param = data;
@@ -1700,9 +1372,9 @@ static int tls_new_server_key_exchange_dhe ( struct tls_connection *tls,
 		param += frag_len;
 		remaining -= frag_len;
 	}
-	param_len = ( len - remaining );
+	params->len = ( len - remaining );
 
-	/* Identify named group */
+	/* Identify named group and partner key */
 	dh_p = dh_val[0];
 	dh_g = dh_val[1];
 	dh_ys = dh_val[2];
@@ -1714,86 +1386,32 @@ static int tls_new_server_key_exchange_dhe ( struct tls_connection *tls,
 		DBGC_HDA ( tls, 0, data, len );
 		return -ENOTSUP_GROUP;
 	}
-	tls->key.exchange = group->exchange;
-	DBGC ( tls, "TLS %p using named group %s\n",
-	       tls, tls->key.exchange->name );
-
-	/* Generate pre-master secret */
-	if ( ( rc = tls_agree_ephemeral ( tls, dh_ys->data,
-					  ntohs ( dh_ys->len ), 1 ) ) != 0 ) {
-		return rc;
-	}
-
-	/* Verify parameter signature */
-	if ( ( rc = tls_verify_dh_params ( tls, data, len, param_len ) ) != 0 )
-		return rc;
+	tls->exchange = group->exchange;
+	params->partner = dh_ys->data;
+	params->partner_len = ntohs ( dh_ys->len );
 
 	return 0;
-}
-
-/**
- * Transmit Client Key Exchange record using DHE key exchange
- *
- * @v tls		TLS connection
- * @ret rc		Return status code
- */
-static int tls_send_client_key_exchange_dhe ( struct tls_connection *tls ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct exchange_algorithm *exchange = key->exchange;
-	size_t pubsize = exchange->pubsize;
-	struct {
-		uint32_t type_length;
-		uint16_t dh_xs_len;
-		uint8_t dh_xs[pubsize];
-	} __attribute__ (( packed )) *key_xchg;
-	int rc;
-
-	/* Allocate space */
-	key_xchg = malloc ( sizeof ( *key_xchg ) );
-	if ( ! key_xchg ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-
-	/* Generate Client Key Exchange record */
-	key_xchg->type_length =
-		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-		  htonl ( sizeof ( *key_xchg ) -
-			  sizeof ( key_xchg->type_length ) ) );
-	key_xchg->dh_xs_len = htons ( sizeof ( key_xchg->dh_xs ) );
-	if ( ( rc = tls_share_ephemeral ( tls, key_xchg->dh_xs ) ) != 0 )
-		goto err_share;
-
-	/* Transmit Client Key Exchange record */
-	if ( ( rc = tls_send_handshake ( tls, key_xchg,
-					 sizeof ( *key_xchg ) ) ) !=0 ) {
-		goto err_send_handshake;
-	}
-
- err_send_handshake:
- err_share:
-	zfree ( key_xchg );
- err_alloc:
-	return rc;
 }
 
 /** Ephemeral Diffie-Hellman key exchange algorithm */
 struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 	.name = "dhe",
-	.server = tls_new_server_key_exchange_dhe,
-	.client = tls_send_client_key_exchange_dhe,
+	.parse = tls_parse_dhe,
+	.len_len = sizeof ( uint16_t ),
 };
 
 /**
- * Receive new Server Key Exchange record using ECDHE key exchange
+ * Parse key exchange parameters from ECDHE Server Key Exchange record
  *
  * @v tls		TLS connection
  * @v data		Server Key Exchange handshake record
  * @v len		Length of Server Key Exchange handshake record
+ * @v params		Key exchange parameters to fill in
  * @ret rc		Return status code
  */
-static int tls_new_server_key_exchange_ecdhe ( struct tls_connection *tls,
-					       const void *data, size_t len ) {
+static int tls_parse_ecdhe ( struct tls_connection *tls,
+			     const void *data, size_t len,
+			     struct tls_key_exchange_parameters *params ) {
 	struct tls_named_group *group;
 	const struct {
 		uint8_t curve_type;
@@ -1801,8 +1419,6 @@ static int tls_new_server_key_exchange_ecdhe ( struct tls_connection *tls,
 		uint8_t public_len;
 		uint8_t public[0];
 	} __attribute__ (( packed )) *ecdh = data;
-	size_t param_len;
-	int rc;
 
 	/* Parse ServerKeyExchange record */
 	if ( ( sizeof ( *ecdh ) > len ) ||
@@ -1812,9 +1428,9 @@ static int tls_new_server_key_exchange_ecdhe ( struct tls_connection *tls,
 		DBGC_HDA ( tls, 0, data, len );
 		return -EINVAL_KEY_EXCHANGE;
 	}
-	param_len = ( sizeof ( *ecdh ) + ecdh->public_len );
+	params->len = ( sizeof ( *ecdh ) + ecdh->public_len );
 
-	/* Identify named group */
+	/* Identify named group and partner key */
 	if ( ecdh->curve_type != TLS_NAMED_CURVE_TYPE ) {
 		DBGC ( tls, "TLS %p unsupported curve type %d\n",
 		       tls, ecdh->curve_type );
@@ -1828,54 +1444,9 @@ static int tls_new_server_key_exchange_ecdhe ( struct tls_connection *tls,
 		DBGC_HDA ( tls, 0, data, len );
 		return -ENOTSUP_GROUP;
 	}
-	tls->key.exchange = group->exchange;
-	DBGC ( tls, "TLS %p using named group %s\n",
-	       tls, tls->key.exchange->name );
-
-	/* Generate pre-master secret */
-	if ( ( rc = tls_agree_ephemeral ( tls, ecdh->public,
-					  ecdh->public_len, 0 ) ) != 0 ) {
-		return rc;
-	}
-
-	/* Verify parameter signature */
-	if ( ( rc = tls_verify_dh_params ( tls, data, len, param_len ) ) != 0 )
-		return rc;
-
-	return 0;
-}
-
-/**
- * Transmit Client Key Exchange record using ECDHE key exchange
- *
- * @v tls		TLS connection
- * @ret rc		Return status code
- */
-static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
-	struct tls_key_schedule *key = &tls->key;
-	struct exchange_algorithm *exchange = key->exchange;
-	size_t pubsize = exchange->pubsize;
-	struct {
-		uint32_t type_length;
-		uint8_t public_len;
-		uint8_t public[pubsize];
-	} __attribute__ (( packed )) key_xchg;
-	int rc;
-
-	/* Generate Client Key Exchange record */
-	key_xchg.type_length =
-		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
-		  htonl ( sizeof ( key_xchg ) -
-			  sizeof ( key_xchg.type_length ) ) );
-	key_xchg.public_len = sizeof ( key_xchg.public );
-	if ( ( rc = tls_share_ephemeral ( tls, key_xchg.public ) ) != 0 )
-		return rc;
-
-	/* Transmit Client Key Exchange record */
-	if ( ( rc = tls_send_handshake ( tls, &key_xchg,
-					 sizeof ( key_xchg ) ) ) !=0 ) {
-		return rc;
-	}
+	tls->exchange = group->exchange;
+	params->partner = ecdh->public;
+	params->partner_len = ecdh->public_len;
 
 	return 0;
 }
@@ -1883,9 +1454,305 @@ static int tls_send_client_key_exchange_ecdhe ( struct tls_connection *tls ) {
 /** Ephemeral Elliptic Curve Diffie-Hellman key exchange algorithm */
 struct tls_key_exchange_algorithm tls_ecdhe_exchange_algorithm = {
 	.name = "ecdhe",
-	.server = tls_new_server_key_exchange_ecdhe,
-	.client = tls_send_client_key_exchange_ecdhe,
+	.parse = tls_parse_ecdhe,
+	.len_len = sizeof ( uint8_t ),
 };
+
+/**
+ * Check if key exchange keys have a variable size
+ *
+ * @v tls		TLS connection
+ * @v exchange		Key exchange algorithm
+ * @ret is_variable	Key exchange keys have a variable size
+ *
+ * TLS versions 1.2 and earlier treat FFDHE public and shared keys as
+ * unsigned big-endian integers using a minimal byte representation.
+ * For all other purposes, key exchange keys have a fixed size
+ * determined by the key exchange algorithm.
+ */
+static int tls_keysize_is_variable ( struct tls_connection *tls,
+				     struct exchange_algorithm *exchange ) {
+
+	/* TLS versions 1.3 and later always have fixed-size keys */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) )
+		return 0;
+
+	/* TLS versions 1.2 and earlier have variable-sized FFDHE keys */
+	return is_ffdhe ( exchange );
+}
+
+/******************************************************************************
+ *
+ * Key agreement
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Share public key
+ *
+ * @v tls		TLS connection
+ * @v public		Public key to fill in
+ * @v len		Length of public key
+ * @ret rc		Return status code
+ */
+static int tls_key_share ( struct tls_connection *tls, void *public,
+			   size_t len ) {
+	struct exchange_algorithm *exchange = tls->exchange;
+	size_t privsize = exchange->privsize;
+	size_t pubsize = exchange->pubsize;
+	struct {
+		uint8_t private[privsize];
+	} tmp;
+	int rc;
+
+	/* Check key length */
+	if ( pubsize != len ) {
+		DBGC ( tls, "TLS %p wrong public %s key size (%zd bytes)\n",
+		       tls, exchange->name, len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_len;
+	}
+
+	/* (Re)generate ephemeral private key */
+	tls_ephemeral_label ( tls, exchange->name, tmp.private, privsize );
+
+	/* Derive public key */
+	if ( ( rc = exchange_share ( exchange, tmp.private, public ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not share public %s key: %s\n",
+		       tls, exchange->name, strerror ( rc ) );
+		goto err_share;
+	}
+
+ err_share:
+	memset ( &tmp, 0, sizeof ( tmp ) );
+ err_len:
+	return rc;
+}
+
+/**
+ * Agree shared secret
+ *
+ * @v tls		TLS connection
+ * @v partner		Partner public key
+ * @v len		Length of partner public key
+ * @ret rc		Return status code
+ */
+static int tls_key_agree ( struct tls_connection *tls, const void *partner,
+			   size_t len ) {
+	struct tls_key_schedule *key = &tls->key;
+	struct exchange_algorithm *exchange = tls->exchange;
+	size_t privsize = exchange->privsize;
+	size_t pubsize = exchange->pubsize;
+	size_t sharedsize = exchange->sharedsize;
+	struct {
+		uint8_t private[privsize];
+		uint8_t partner[pubsize];
+		uint8_t shared[sharedsize];
+	} *tmp;
+	size_t pad_len;
+	size_t shared_len;
+	uint8_t *shared;
+	int strip;
+	int rc;
+
+	/* Allocate working space */
+	tmp = zalloc ( sizeof ( *tmp ) );
+	if ( ! tmp ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Validate partner key */
+	if ( len > pubsize ) {
+		DBGC ( tls, "TLS %p overlength partner %s key:\n",
+		       tls, exchange->name );
+		DBGC_HDA ( tls, 0, partner, len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_len;
+	}
+
+	/* (Re)generate ephemeral private key */
+	tls_ephemeral_label ( tls, exchange->name, tmp->private, privsize );
+
+	/* TLSv1.2 and earlier may require zero-padding for FFDHE keys */
+	strip = tls_keysize_is_variable ( tls, exchange );
+	pad_len = ( pubsize - len );
+	if ( pad_len && ( ! strip ) ) {
+		DBGC ( tls, "TLS %p underlength partner %s key:\n",
+		       tls, exchange->name );
+		DBGC_HDA ( tls, 0, partner, len );
+		rc = -EINVAL_KEY_EXCHANGE;
+		goto err_pad;
+	}
+	memcpy ( ( tmp->partner + pad_len ), partner, len );
+
+	/* Agree shared secret */
+	if ( ( rc = exchange_agree ( exchange, tmp->private, tmp->partner,
+				     tmp->shared ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not agree shared key: %s\n",
+		       tls, strerror ( rc ) );
+		goto err_agree;
+	}
+
+	/* Strip leading zeros if needed */
+	shared = tmp->shared;
+	shared_len = sharedsize;
+	while ( strip && shared_len && ( ! *shared ) ) {
+		shared++;
+		shared_len--;
+	}
+
+	/* Set key derivation function secret to the shared secret */
+	DBGC ( tls, "TLS %p pre-master secret:\n", tls );
+	DBGC_HDA ( tls, 0, shared, shared_len );
+	tls_set_kdf_master ( tls, shared, shared_len );
+
+	/* Key derivation function secret has been overwritten with a
+	 * value that was not derived from its previous value, and so
+	 * is no longer bound to the server's identity.
+	 */
+	tls_clear_binding ( tls );
+
+	/* Key schedule now contains shared secret key material */
+	key->keyed = 1;
+
+ err_agree:
+ err_pad:
+ err_len:
+	zfree ( tmp );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Encrypt (and implicitly bind) shared secret
+ *
+ * @v tls		TLS connection
+ * @v builder		ASN.1 builder
+ * @ret rc		Return status code
+ */
+static int tls_key_encrypt ( struct tls_connection *tls,
+			     struct asn1_builder *builder ) {
+	struct tls_key_schedule *key = &tls->key;
+	struct exchange_algorithm *exchange = tls->exchange;
+	size_t privsize = exchange->privsize;
+	size_t sharedsize = exchange->sharedsize;
+	struct x509_certificate *cert;
+	struct pubkey_algorithm *pubkey;
+	struct asn1_cursor plaintext;
+	struct {
+		uint8_t private[privsize];
+		uint8_t shared[sharedsize];
+	} *tmp;
+	int rc;
+
+	/* Allocate working space */
+	tmp = zalloc ( sizeof ( *tmp ) );
+	if ( ! tmp ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Identify server certificate */
+	cert = x509_first ( tls->server.chain );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p has no server certificate\n", tls );
+		rc = -ENOENT_CERT;
+		goto err_cert;
+	}
+	pubkey = cert->subject.public_key.algorithm->pubkey;
+
+	/* (Re)generate ephemeral private key */
+	tls_ephemeral_label ( tls, exchange->name, tmp->private, privsize );
+
+	/* Sanity check */
+	if ( ! is_key_transport ( exchange ) ) {
+		DBGC ( tls, "TLS %p cannot transport %s\n",
+		       tls, exchange->name );
+		rc = -ENOTTY;
+		goto err_transport;
+	}
+
+	/* Agree shared secret */
+	if ( ( rc = exchange_agree ( exchange, tmp->private, NULL,
+				     tmp->shared ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not agree shared key: %s\n",
+		       tls, strerror ( rc ) );
+		goto err_agree;
+	}
+
+	/* Set key derivation function secret to the shared secret */
+	DBGC ( tls, "TLS %p pre-master secret:\n", tls );
+	DBGC_HDA ( tls, 0, tmp->shared, sharedsize );
+	tls_set_kdf_master ( tls, tmp->shared, sharedsize );
+
+	/* Key derivation function secret has been overwritten with a
+	 * value that was not derived from its previous value, and so
+	 * is no longer bound to the server's identity.
+	 */
+	tls_clear_binding ( tls );
+
+	/* Key schedule now contains shared secret key material */
+	key->keyed = 1;
+
+	/* Encrypt shared secret */
+	plaintext.data = tmp->shared;
+	plaintext.len = sharedsize;
+	if ( ( rc = pubkey_encrypt ( pubkey, &cert->subject.public_key.raw,
+				     &plaintext, builder ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not encrypt %s key: %s\n",
+		       tls, exchange->name, strerror ( rc ) );
+		goto err_encrypt;
+	}
+
+	/* Bind to the identity that can decrypt the shared secret */
+	tls_set_binding ( tls, cert );
+
+ err_encrypt:
+ err_agree:
+ err_transport:
+ err_cert:
+	zfree ( tmp );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Build shareable key
+ *
+ * @v tls		TLS connection
+ * @v builder		ASN.1 builder
+ * @ret rc		Return status code
+ */
+static int tls_key_build ( struct tls_connection *tls,
+			   struct asn1_builder *builder ) {
+	struct exchange_algorithm *exchange = tls->exchange;
+	size_t pubsize = exchange->pubsize;
+	int rc;
+
+	/* Share or encrypt as applicable */
+	if ( pubsize ) {
+
+		/* Allocate space for public key */
+		if ( ( rc = asn1_grow ( builder, pubsize ) ) != 0 )
+			return rc;
+
+		/* Share public key */
+		if ( ( rc = tls_key_share ( tls, builder->data,
+					    pubsize ) ) != 0 ) {
+			return rc;
+		}
+
+	} else {
+
+		/* Encrypt (and implicitly bind) shared secret */
+		if ( ( rc = tls_key_encrypt ( tls, builder ) ) != 0 )
+			return rc;
+	}
+
+	return 0;
+}
 
 /******************************************************************************
  *
@@ -2214,26 +2081,64 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct {
+		uint32_t type_length;
+		uint8_t key_len[suite->exchange->len_len];
+		uint8_t key[0];
+	} __attribute__ (( packed )) key_xchg;
+	struct asn1_builder builder = { NULL, 0 };
+	size_t len;
+	int i;
 	int rc;
 
-	/* Transmit Client Key Exchange record via key exchange algorithm */
-	if ( ( rc = suite->exchange->client ( tls ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not exchange keys: %s\n",
-		       tls, strerror ( rc ) );
-		return rc;
+	/* Build shareable key */
+	if ( ( rc = tls_key_build ( tls, &builder ) ) != 0 )
+		goto err_build;
+	len = builder.len;
+
+	/* Construct record header */
+	key_xchg.type_length =
+		( cpu_to_le32 ( TLS_CLIENT_KEY_EXCHANGE ) |
+		  htonl ( len + sizeof ( key_xchg ) -
+			  sizeof ( key_xchg.type_length ) ) );
+	for ( i = ( sizeof ( key_xchg.key_len ) - 1 ) ; i >= 0 ; i-- ) {
+		key_xchg.key_len[i] = ( len & 0xff );
+		len >>= 8;
+	}
+	assert ( len == 0 );
+
+	/* Prepend record header (as raw data in ASN.1 builder) */
+	if ( ( rc = asn1_prepend_raw ( &builder, &key_xchg,
+				       sizeof ( key_xchg ) ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not construct Client Key "
+		       "Exchange: %s\n", tls, strerror ( rc ) );
+		goto err_prepend;
+	}
+
+	/* Transmit Client Key Exchange record */
+	if ( ( rc = tls_send_handshake ( tls, builder.data,
+					 builder.len ) ) != 0 ) {
+		goto err_send;
 	}
 
 	/* Generate master secret */
-	tls_generate_master_secret ( tls );
+	if ( ( rc = tls_generate_master_secret ( tls ) ) != 0 )
+		goto err_master;
 
 	/* Generate keys from master secret */
 	if ( ( rc = tls_generate_keys ( tls ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not generate keys: %s\n",
 		       tls, strerror ( rc ) );
-		return rc;
+		goto err_keys;
 	}
 
-	return 0;
+ err_keys:
+ err_master:
+ err_send:
+ err_prepend:
+ err_build:
+	free ( builder.data );
+	return rc;
 }
 
 /**
@@ -2926,11 +2831,118 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 					 const void *data, size_t len ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct tls_key_exchange_parameters params;
+	struct tls_signature_hash_algorithm *sig_hash;
+	struct x509_certificate *cert;
+	struct pubkey_algorithm *pubkey;
+	struct digest_algorithm *digest;
+	int use_sig_hash = tls_version ( tls, TLS_VERSION_TLS_1_2 );
+	const struct {
+		uint16_t sig_hash[use_sig_hash];
+		uint16_t signature_len;
+		uint8_t signature[0];
+	} __attribute__ (( packed )) *sig;
+	struct asn1_cursor signature;
+	size_t remaining;
 	int rc;
 
-	/* Parse via key exchange algorithm */
-	if ( ( rc = suite->exchange->server ( tls, data, len ) ) != 0 )
+	/* Identify server certificate */
+	cert = x509_first ( tls->server.chain );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p has no server certificate\n", tls );
+		return -ENOENT_CERT;
+	}
+
+	/* Parse parameters */
+	if ( ! suite->exchange->parse ) {
+		DBGC ( tls, "TLS %p received unexpected ServerKeyExchange:\n",
+		       tls );
+		DBGC_HDA ( tls, 0, data, len );
+		return -EPROTO;
+	}
+	if ( ( rc = suite->exchange->parse ( tls, data, len, &params ) ) != 0)
 		return rc;
+	assert ( tls->exchange != NULL );
+	DBGC ( tls, "TLS %p using named group %s\n",
+	       tls, tls->exchange->name );
+
+	/* Signature follows parameters */
+	assert ( params.len <= len );
+	sig = ( data + params.len );
+	remaining = ( len - params.len );
+
+	/* Parse signature from ServerKeyExchange */
+	if ( ( sizeof ( *sig ) > remaining ) ||
+	     ( ntohs ( sig->signature_len ) > ( remaining -
+						sizeof ( *sig ) ) ) ) {
+		DBGC ( tls, "TLS %p received underlength ServerKeyExchange\n",
+		       tls );
+		DBGC_HDA ( tls, 0, data, len );
+		return -EINVAL_KEY_EXCHANGE;
+	}
+	signature.data = sig->signature;
+	signature.len = ntohs ( sig->signature_len );
+
+	/* Identify signature and hash algorithm */
+	if ( use_sig_hash ) {
+		sig_hash = tls_find_signature_hash ( sig->sig_hash[0] );
+		if ( ! sig_hash ) {
+			DBGC ( tls, "TLS %p unsupported signature hash "
+			       "%#04x\n", tls, sig->sig_hash[0] );
+			return -ENOTSUP_SIG_HASH;
+		}
+		pubkey = sig_hash->pubkey;
+		digest = sig_hash->digest;
+		DBGC ( tls, "TLS %p using signature hash %s-%s\n",
+		       tls, pubkey->name, digest->name );
+		if ( sig_hash->algorithm !=
+		     cert->subject.public_key.algorithm ) {
+			DBGC ( tls, "TLS %p cannot use %s public key\n", tls,
+			       cert->subject.public_key.algorithm->name );
+			return -EPERM_KEY_EXCHANGE;
+		}
+	} else {
+		pubkey = cipherspec->suite->pubkey;
+		digest = &md5_sha1_algorithm;
+	}
+
+	/* Generate pre-master secret */
+	if ( ( rc = tls_key_agree ( tls, params.partner,
+				    params.partner_len ) ) != 0 ) {
+		return rc;
+	}
+
+	/* Verify signature */
+	{
+		uint8_t ctx[digest->ctxsize];
+		uint8_t hash[digest->digestsize];
+
+		/* Calculate digest */
+		digest_init ( digest, ctx );
+		digest_update ( digest, ctx, &tls->client.random,
+				sizeof ( tls->client.random ) );
+		digest_update ( digest, ctx, tls->server.random,
+				sizeof ( tls->server.random ) );
+		digest_update ( digest, ctx, data, params.len );
+		digest_final ( digest, ctx, hash );
+
+		/* Verify signature */
+		if ( ( rc = pubkey_verify ( pubkey,
+					    &cert->subject.public_key.raw,
+					    digest, hash,
+					    &signature ) ) != 0 ) {
+			DBGC ( tls, "TLS %p ServerKeyExchange failed "
+			       "verification\n", tls );
+			DBGC_HDA ( tls, 0, data, len );
+			return -EPERM_KEY_EXCHANGE;
+		}
+	}
+
+	/* The verified signature indicates the server's intention to
+	 * delegate authority to the shared secret key material.  The
+	 * shared secret is therefore bound to the server's identity.
+	 */
+	tls_set_binding ( tls, cert );
 
 	return 0;
 }
