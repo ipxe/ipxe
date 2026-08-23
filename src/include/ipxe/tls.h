@@ -378,17 +378,9 @@ struct tls_session {
 /** HKDF algorithm for ephemeral secrets */
 #define tls_ephemeral_algorithm sha256_algorithm
 
-/** TLS key schedule */
-struct tls_key_schedule {
-	/** Digest algorithm
-	 *
-	 * This is the digest algorithm specified by the cipher suite.
-	 * It is used to construct the handshake running transcript
-	 * digest value, and as the HMAC digest algorithm for key
-	 * derivation.
-	 */
-	struct digest_algorithm *digest;
-	/** Schedule holds secret key material
+/** TLS secure channel */
+struct tls_secure_channel {
+	/** Key schedule holds secret key material
 	 *
 	 * This flag is set when shared secret key material is
 	 * introduced into the schedule (e.g. when the TLS pre-master
@@ -401,7 +393,7 @@ struct tls_key_schedule {
 	 * reset.
 	 */
 	int keyed;
-	/** Server identity to which the schedule has been bound (if any)
+	/** Server identity to which the key schedule has been bound (if any)
 	 *
 	 * This reference to the server certificate is set when the
 	 * shared secret key material has been bound to the identity
@@ -463,6 +455,20 @@ struct tls_key_schedule {
 	 * current value.
 	 */
 	struct x509_certificate *bound;
+	/** Ephemeral master secret */
+	uint8_t ephemeral[SHA256_DIGEST_SIZE];
+};
+
+/** TLS key schedule */
+struct tls_key_schedule {
+	/** Digest algorithm
+	 *
+	 * This is the digest algorithm specified by the cipher suite.
+	 * It is used to construct the handshake running transcript
+	 * digest value, and as the HMAC digest algorithm for key
+	 * derivation.
+	 */
+	struct digest_algorithm *digest;
 	/** Dynamically-allocated storage */
 	void *dynamic;
 	/** Handshake running transcript digest context */
@@ -471,8 +477,6 @@ struct tls_key_schedule {
 	void *kdf;
 	/** Length of key derivation function secret */
 	size_t kdfsize;
-	/** Ephemeral master secret */
-	uint8_t ephemeral[SHA256_DIGEST_SIZE];
 };
 
 /** TLS transmit state */
@@ -567,6 +571,8 @@ struct tls_connection {
 	/** Verification data */
 	struct tls_verify_data verify;
 
+	/** Secure channel */
+	struct tls_secure_channel channel;
 	/** Key schedule */
 	struct tls_key_schedule key;
 	/** Transmit state */
