@@ -269,14 +269,15 @@ aes_round ( const struct aes_table *table, size_t stride,
  * @v in		AES input state
  * @v out		AES output state
  * @v key		Round keys
- * @v rounds		Number of rounds (must be odd)
+ * @v rounds		Number of intermediate rounds (must be odd)
+ * @ret key		Final round key
  *
  * This function is deliberately marked as non-inlinable to ensure
  * maximal availability of registers for GCC's register allocator,
  * which has a tendency to otherwise spill performance-critical
  * registers to the stack.
  */
-static __attribute__ (( noinline )) void
+static __attribute__ (( noinline )) const union aes_matrix *
 aes_encrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
 		     const union aes_matrix *key, unsigned int rounds ) {
 	union aes_matrix *tmp;
@@ -293,6 +294,8 @@ aes_encrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
 		out = tmp;
 
 	} while ( --rounds );
+
+	return key;
 }
 
 /**
@@ -301,7 +304,8 @@ aes_encrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
  * @v in		AES input state
  * @v out		AES output state
  * @v key		Round keys
- * @v rounds		Number of rounds (must be odd)
+ * @v rounds		Number of intermediate rounds (must be odd)
+ * @ret key		Final round key
  *
  * As with aes_encrypt_rounds(), this function is deliberately marked
  * as non-inlinable.
@@ -317,7 +321,7 @@ aes_encrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
  * being spilled to the stack.  We therefore use two separate but very
  * similar binary functions based on the same C source.
  */
-static __attribute__ (( noinline )) void
+static __attribute__ (( noinline )) const union aes_matrix *
 aes_decrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
 		     const union aes_matrix *key, unsigned int rounds ) {
 	union aes_matrix *tmp;
@@ -334,6 +338,8 @@ aes_decrypt_rounds ( union aes_matrix *in, union aes_matrix *out,
 		out = tmp;
 
 	} while ( --rounds );
+
+	return key;
 }
 
 /**
@@ -389,6 +395,24 @@ static void aes_final ( const struct aes_table *table, size_t stride,
 }
 
 /**
+ * Calculate number of intermediate rounds
+ *
+ * @v aes		AES context
+ * @ret rounds		Number of intermediate rounds (must be odd)
+ */
+static unsigned int aes_rounds ( const struct aes_context *aes ) {
+	unsigned int rounds;
+
+	/* Ensure that the number of intermediate rounds is a safe
+	 * value even on a completely uninitialized context.
+	 */
+	rounds = ( ( aes->rounds & 6 ) + 7 );
+	assert ( rounds <= ( AES_MAX_ROUNDS - 2 ) );
+	assert ( rounds & 1 );
+	return rounds;
+}
+
+/**
  * Encrypt data
  *
  * @v cipher		Cipher algorithm
@@ -399,11 +423,11 @@ static void aes_final ( const struct aes_table *table, size_t stride,
  */
 static void aes_encrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
 			  const void *src, void *dst, size_t len ) {
-	struct aes_context *aes = ctx;
+	const struct aes_context *aes = ctx;
+	const union aes_matrix *key = aes->encrypt.key;
 	union aes_matrix buffer[2];
 	union aes_matrix *in = &buffer[0];
 	union aes_matrix *out = &buffer[1];
-	unsigned int rounds = aes->rounds;
 
 	/* Sanity check */
 	assert ( len == sizeof ( *in ) );
@@ -412,18 +436,17 @@ static void aes_encrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
 	memcpy ( in, src, sizeof ( *in ) );
 
 	/* Perform initial round (AddRoundKey) */
-	aes_addroundkey ( in, &aes->encrypt.key[0] );
+	aes_addroundkey ( in, key++ );
 
 	/* Perform intermediate rounds (ShiftRows, SubBytes,
 	 * MixColumns, AddRoundKey).
 	 */
-	aes_encrypt_rounds ( in, out, &aes->encrypt.key[1], ( rounds - 2 ) );
+	key = aes_encrypt_rounds ( in, out, key, aes_rounds ( aes ) );
 	in = out;
 
 	/* Perform final round (ShiftRows, SubBytes, AddRoundKey) */
 	out = dst;
-	aes_final ( &aes_mixcolumns, AES_STRIDE_SHIFTROWS, in, out,
-		    &aes->encrypt.key[ rounds - 1 ] );
+	aes_final ( &aes_mixcolumns, AES_STRIDE_SHIFTROWS, in, out, key );
 }
 
 /**
@@ -437,11 +460,11 @@ static void aes_encrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
  */
 static void aes_decrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
 			  const void *src, void *dst, size_t len ) {
-	struct aes_context *aes = ctx;
+	const struct aes_context *aes = ctx;
+	const union aes_matrix *key = aes->decrypt.key;
 	union aes_matrix buffer[2];
 	union aes_matrix *in = &buffer[0];
 	union aes_matrix *out = &buffer[1];
-	unsigned int rounds = aes->rounds;
 
 	/* Sanity check */
 	assert ( len == sizeof ( *in ) );
@@ -450,18 +473,17 @@ static void aes_decrypt ( struct cipher_algorithm *cipher __unused, void *ctx,
 	memcpy ( in, src, sizeof ( *in ) );
 
 	/* Perform initial round (AddRoundKey) */
-	aes_addroundkey ( in, &aes->decrypt.key[0] );
+	aes_addroundkey ( in, key++ );
 
 	/* Perform intermediate rounds (InvShiftRows, InvSubBytes,
 	 * InvMixColumns, AddRoundKey).
 	 */
-	aes_decrypt_rounds ( in, out, &aes->decrypt.key[1], ( rounds - 2 ) );
+	key = aes_decrypt_rounds ( in, out, key, aes_rounds ( aes ) );
 	in = out;
 
 	/* Perform final round (InvShiftRows, InvSubBytes, AddRoundKey) */
 	out = dst;
-	aes_final ( &aes_invmixcolumns, AES_STRIDE_INVSHIFTROWS, in, out,
-		    &aes->decrypt.key[ rounds - 1 ] );
+	aes_final ( &aes_invmixcolumns, AES_STRIDE_INVSHIFTROWS, in, out, key );
 }
 
 /**
