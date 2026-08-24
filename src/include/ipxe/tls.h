@@ -15,14 +15,13 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/interface.h>
 #include <ipxe/process.h>
 #include <ipxe/crypto.h>
-#include <ipxe/md5.h>
-#include <ipxe/sha1.h>
-#include <ipxe/sha256.h>
 #include <ipxe/x509.h>
 #include <ipxe/privkey.h>
 #include <ipxe/pending.h>
 #include <ipxe/iobuf.h>
 #include <ipxe/tables.h>
+#include <ipxe/channel.h>
+#include <ipxe/tlskey.h>
 
 struct tls_connection;
 
@@ -295,8 +294,8 @@ struct tls_cipherspec {
 	struct tls_cipher_suite *suite;
 	/** Dynamically-allocated storage */
 	void *dynamic;
-	/** Bulk encryption cipher context */
-	void *cipher_ctx;
+	/** Cipher key */
+	void *cipher_key;
 	/** MAC secret */
 	void *mac_secret;
 	/** Fixed initialisation vector */
@@ -305,6 +304,8 @@ struct tls_cipherspec {
 
 /** A TLS cipher specification pair */
 struct tls_cipherspec_pair {
+	/** Writer endpoint */
+	const struct tls_endpoint *writer;
 	/** Current cipher specification */
 	struct tls_cipherspec active;
 	/** Next cipher specification */
@@ -336,12 +337,6 @@ struct tls_signature_hash_algorithm {
 #define __tls_sig_hash_algorithm					\
 	__table_entry ( TLS_SIG_HASH_ALGORITHMS, 01 )
 
-/** TLS client random data */
-struct tls_client_random {
-	/** Random data */
-	uint8_t random[32];
-} __attribute__ (( packed ));
-
 /** A TLS session ID */
 struct tls_session_id {
 	/** ID */
@@ -372,125 +367,17 @@ struct tls_session {
 	/** Private key */
 	struct private_key *key;
 
-	/** Server certificate */
-	struct x509_certificate *cert;
+	/** Bound peer identity */
+	struct secure_preshared_identity psid;
+	/** Pre-shared key */
+	struct tls_preshared_key psk;
 	/** Session ID */
 	struct tls_session_id id;
 	/** Session ticket */
 	struct tls_session_ticket ticket;
-	/** Resumption master secret */
-	uint8_t resumption_master_secret[48];
-	/** Length of resumption master secret */
-	size_t resumption_master_secret_len;
-	/** Extended master secret flag */
-	int extended_master_secret;
 
 	/** List of connections */
 	struct list_head conn;
-};
-
-/** HKDF algorithm for ephemeral secrets */
-#define tls_ephemeral_algorithm sha256_algorithm
-
-/** TLS secure channel */
-struct tls_secure_channel {
-	/** Key schedule holds secret key material
-	 *
-	 * This flag is set when shared secret key material is
-	 * introduced into the schedule (e.g. when the TLS pre-master
-	 * secret is calculated, or when a session is resumed).
-	 *
-	 * If this flag has not been set, then the key schedule
-	 * contains only public information.
-	 *
-	 * This flag must be cleared whenever the key schedule is
-	 * reset.
-	 */
-	int keyed;
-	/** Server identity to which the key schedule has been bound (if any)
-	 *
-	 * This reference to the server certificate is set when the
-	 * shared secret key material has been bound to the identity
-	 * represented by the server's certificate.  It represents the
-	 * successful delegation of authority from the server's
-	 * long-term authentication key to the per-connection shared
-	 * secret key material for the purpose of authenticating the
-	 * connection via a successfully verified server Finished
-	 * message.
-	 *
-	 * Note that this reference may be set before the server
-	 * certificate has been validated.  The validation of the
-	 * server certificate's chain is independent from the binding
-	 * of the key schedule to the server certificate.
-	 *
-	 * The binding may take place in several different ways,
-	 * depending on the protocol version and options:
-	 *
-	 *   - For classic RSA key transport, the binding occurs when
-	 *     the encrypted ClientKeyExchange message is sent and
-	 *     incorporated into the handshake digest.  A subsequent
-	 *     successfully verified server Finished message
-	 *     simultaneously proves knowledge of the certificate's
-	 *     private key and agreement on the shared secret key
-	 *     material.
-	 *
-	 *   - For ephemeral key exchange via ServerKeyExchange, the
-	 *     binding occurs when the signature over the DH
-	 *     parameters within ServerKeyExchange is verified against
-	 *     the certificate's public key.  That signature
-	 *     represents the server's intention to delegate authority
-	 *     to any shared secret constructed from the signed DH
-	 *     parameters.
-	 *
-	 *   - For ephemeral key exchange via ClientHello/ServerHello,
-	 *     the binding occurs when the signature over the
-	 *     handshake digest within the server CertificateVerify is
-	 *     verified against the certificate's public key.  The
-	 *     handshake digest incorporates the ephemeral key
-	 *     exchange and so the signature represents the server's
-	 *     intention to delegate authority to any shared secret
-	 *     constructed from the indirectly signed DH parameters.
-	 *
-	 *   - For session resumption, the binding occurs when the key
-	 *     schedule is resumed from the session secret.  The
-	 *     server's choice to accept the resumption represents its
-	 *     intention to delegate authority to the shared secret
-	 *     derived from the session secret.
-	 *
-	 * This reference may not be set unless the "keyed" flag has
-	 * already been set, and must be cleared whenever the "keyed"
-	 * flag is cleared.
-	 *
-	 * This reference must be cleared whenever the server identity
-	 * represented by the current certificate changes (e.g. when a
-	 * new certificate chain is provided), or whenever the key
-	 * derivation function master secret is overwritten with a
-	 * value that is not cryptographically derived from its
-	 * current value.
-	 */
-	struct x509_certificate *bound;
-	/** Ephemeral master secret */
-	uint8_t ephemeral[SHA256_DIGEST_SIZE];
-};
-
-/** TLS key schedule */
-struct tls_key_schedule {
-	/** Digest algorithm
-	 *
-	 * This is the digest algorithm specified by the cipher suite.
-	 * It is used to construct the handshake running transcript
-	 * digest value, and as the HMAC digest algorithm for key
-	 * derivation.
-	 */
-	struct digest_algorithm *digest;
-	/** Dynamically-allocated storage */
-	void *dynamic;
-	/** Handshake running transcript digest context */
-	void *handshake;
-	/** Key derivation function secret */
-	void *kdf;
-	/** Length of key derivation function secret */
-	size_t kdfsize;
 };
 
 /** TLS transmit state */
@@ -525,8 +412,6 @@ struct tls_rx {
 
 /** TLS client state */
 struct tls_client {
-	/** Random bytes */
-	struct tls_client_random random;
 	/** Private key (if used) */
 	struct private_key *key;
 	/** Certificate chain (if used) */
@@ -537,8 +422,6 @@ struct tls_client {
 
 /** TLS server state */
 struct tls_server {
-	/** Random bytes */
-	uint8_t random[32];
 	/** Root of trust */
 	struct x509_root *root;
 	/** Certificate chain */
@@ -582,7 +465,7 @@ struct tls_connection {
 	struct tls_verify_data verify;
 
 	/** Secure channel */
-	struct tls_secure_channel channel;
+	struct secure_channel channel;
 	/** Key schedule */
 	struct tls_key_schedule key;
 	/** Transmit state */
