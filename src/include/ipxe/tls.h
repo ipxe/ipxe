@@ -199,6 +199,8 @@ enum tls_tx_pending {
 struct tls_key_exchange_parameters {
 	/** Length of parameters (excluding trailing signature) */
 	size_t len;
+	/** Key exchange algorithm */
+	struct exchange_algorithm *exchange;
 	/** Partner key */
 	const void *partner;
 	/** Length of partner key */
