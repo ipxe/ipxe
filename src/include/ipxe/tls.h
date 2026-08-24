@@ -342,6 +342,22 @@ struct tls_client_random {
 	uint8_t random[32];
 } __attribute__ (( packed ));
 
+/** A TLS session ID */
+struct tls_session_id {
+	/** ID */
+	uint8_t data[32];
+	/** Length of ID */
+	uint8_t len;
+};
+
+/** A TLS session ticket */
+struct tls_session_ticket {
+	/** Ticket data */
+	void *data;
+	/** Length of ticket data */
+	size_t len;
+};
+
 /** A TLS session */
 struct tls_session {
 	/** Reference counter */
@@ -359,13 +375,9 @@ struct tls_session {
 	/** Server certificate */
 	struct x509_certificate *cert;
 	/** Session ID */
-	uint8_t id[32];
-	/** Length of session ID */
-	size_t id_len;
+	struct tls_session_id id;
 	/** Session ticket */
-	void *ticket;
-	/** Length of session ticket */
-	size_t ticket_len;
+	struct tls_session_ticket ticket;
 	/** Resumption master secret */
 	uint8_t resumption_master_secret[48];
 	/** Length of resumption master secret */
@@ -548,14 +560,10 @@ struct tls_connection {
 	struct tls_session *session;
 	/** List of connections within the same session */
 	struct list_head list;
-	/** Session ID */
-	uint8_t session_id[32];
-	/** Length of session ID */
-	size_t session_id_len;
-	/** New session ticket */
-	void *new_session_ticket;
-	/** Length of new session ticket */
-	size_t new_session_ticket_len;
+	/** New session ID (if any) */
+	struct tls_session_id new_id;
+	/** New session ticket (if any) */
+	struct tls_session_ticket new_ticket;
 
 	/** Plaintext stream */
 	struct interface plainstream;

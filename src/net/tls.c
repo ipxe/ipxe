@@ -319,7 +319,7 @@ static void free_tls_session ( struct refcnt *refcnt ) {
 	x509_root_put ( session->root );
 	privkey_put ( session->key );
 	x509_put ( session->cert );
-	zfree ( session->ticket );
+	zfree ( session->ticket.data );
 
 	/* Free session */
 	zfree ( session );
@@ -338,7 +338,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	struct io_buffer *tmp;
 
 	/* Free dynamically-allocated resources */
-	zfree ( tls->new_session_ticket );
+	zfree ( tls->new_ticket.data );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.active );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
@@ -939,8 +939,9 @@ static int tls_generate_keys ( struct tls_connection *tls ) {
  * Generate resumption master secret
  *
  * @v tls		TLS connection
+ * @ret rc		Return status code
  */
-static void tls_generate_resumption_master ( struct tls_connection *tls ) {
+static int tls_generate_resumption_master ( struct tls_connection *tls ) {
 	struct tls_session *session = tls->session;
 	struct tls_secure_channel *channel = &tls->channel;
 	struct tls_key_schedule *key = &tls->key;
@@ -994,17 +995,31 @@ static void tls_generate_resumption_master ( struct tls_connection *tls ) {
 		memcpy ( secret->sha1, hkeys->sha1, sizeof ( secret->sha1 ) );
 		session->resumption_master_secret_len = sizeof ( *secret );
 	}
+
+	/* Record master secret generation method */
+	session->extended_master_secret = tls->extended_master_secret;
+
+	return 0;
 }
 
 /**
  * Resume from resumption master secret
  *
  * @v tls		TLS connection
+ * @ret rc		Return status code
  */
-static void tls_resume_secret ( struct tls_connection *tls ) {
+static int tls_resume_secret ( struct tls_connection *tls ) {
 	struct tls_session *session = tls->session;
 	struct tls_secure_channel *channel = &tls->channel;
 	size_t len = session->resumption_master_secret_len;
+
+	/* Ensure master secret generation method matches */
+	if ( tls->extended_master_secret !=
+	     tls->session->extended_master_secret ) {
+		DBGC ( tls, "TLS %p mismatched extended master secret "
+		       "extension\n", tls );
+		return -EPERM_EMS;
+	}
 
 	/* For TLSv1.2 and earlier, the resumption master secret is
 	 * just the original master secret value.
@@ -1012,8 +1027,7 @@ static void tls_resume_secret ( struct tls_connection *tls ) {
 	tls_set_kdf_master ( tls, session->resumption_master_secret, len );
 
 	/* If the resumption master secret was non-empty, then the key
-	 * schedule now contains a shared secret that is already bound
-	 * to the server's identity.
+	 * schedule now contains a shared secret.
 	 *
 	 * If the resumption master secret was empty (which should not
 	 * be possible if this function is called), then the key
@@ -1021,7 +1035,8 @@ static void tls_resume_secret ( struct tls_connection *tls ) {
 	 */
 	assert ( len );
 	channel->keyed = len;
-	tls_set_binding ( tls, session->cert );
+
+	return 0;
 }
 
 /******************************************************************************
@@ -1766,6 +1781,149 @@ static int tls_key_build ( struct tls_connection *tls,
 
 /******************************************************************************
  *
+ * Session management
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Find or create session for TLS connection
+ *
+ * @v tls		TLS connection
+ * @v name		Server name
+ * @ret rc		Return status code
+ */
+static int tls_session ( struct tls_connection *tls, const char *name ) {
+	struct tls_session *session;
+	char *name_copy;
+	int rc;
+
+	/* Find existing matching session, if any */
+	list_for_each_entry ( session, &tls_sessions, list ) {
+		if ( ( strcmp ( name, session->name ) == 0 ) &&
+		     ( tls->server.root == session->root ) &&
+		     ( tls->client.key == session->key ) ) {
+			ref_get ( &session->refcnt );
+			tls->session = session;
+			DBGC ( tls, "TLS %p joining session %s\n", tls, name );
+			return 0;
+		}
+	}
+
+	/* Create new session */
+	session = zalloc ( sizeof ( *session ) + strlen ( name )
+			   + 1 /* NUL */ );
+	if ( ! session ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	ref_init ( &session->refcnt, free_tls_session );
+	name_copy = ( ( ( void * ) session ) + sizeof ( *session ) );
+	strcpy ( name_copy, name );
+	session->name = name_copy;
+	session->root = x509_root_get ( tls->server.root );
+	session->key = privkey_get ( tls->client.key );
+	INIT_LIST_HEAD ( &session->conn );
+	list_add ( &session->list, &tls_sessions );
+
+	/* Generate random initial session ID */
+	tls_ephemeral_label ( tls, "tls session id", session->id.data,
+			      sizeof ( session->id.data ) );
+	session->id.len = sizeof ( session->id.data );
+
+	/* Poison resumption master secret */
+	tls_ephemeral_label ( tls, "res poison",
+			      session->resumption_master_secret,
+			      sizeof ( session->resumption_master_secret ) );
+
+	/* Record session */
+	tls->session = session;
+
+	DBGC ( tls, "TLS %p created session %s\n", tls, name );
+	return 0;
+
+	ref_put ( &session->refcnt );
+ err_alloc:
+	return rc;
+}
+
+/**
+ * Save session for future resumption
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_save ( struct tls_connection *tls ) {
+	struct tls_session *session = tls->session;
+	struct tls_secure_channel *channel = &tls->channel;
+	int rc;
+
+	/* Sanity check */
+	if ( ! x509_is_valid ( channel->bound, tls->server.root ) ) {
+		DBGC ( tls, "TLS %p cannot save unvalidated certificate\n",
+		       tls );
+		return -EPROTO;
+	}
+
+	/* Save master secret */
+	if ( ( rc = tls_generate_resumption_master ( tls ) ) != 0 )
+		return rc;
+
+	/* Save peer identity */
+	x509_put ( session->cert );
+	session->cert = x509_get ( channel->bound );
+
+	/* Record new session ID, if provided */
+	if ( tls->new_id.len ) {
+		memcpy ( &session->id, &tls->new_id, sizeof ( session->id ) );
+		DBGC ( tls, "TLS %p saved session ID:\n", tls );
+		DBGC_HDA ( tls, 0, session->id.data, session->id.len );
+	}
+
+	/* Record (and consume) new session ticket, if provided */
+	if ( tls->new_ticket.len ) {
+		zfree ( session->ticket.data );
+		session->ticket.data = tls->new_ticket.data;
+		session->ticket.len = tls->new_ticket.len;
+		tls->new_ticket.data = NULL;
+		tls->new_ticket.len = 0;
+	}
+
+	return 0;
+}
+
+/**
+ * Resume session
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_resume ( struct tls_connection *tls ) {
+	struct tls_session *session = tls->session;
+	int rc;
+
+	DBGC ( tls, "TLS %p resuming session ID:\n", tls );
+	DBGC_HDA ( tls, 0, session->id.data, session->id.len );
+
+	/* Resume master secret */
+	if ( ( rc = tls_resume_secret ( tls ) ) != 0 )
+		return rc;
+
+	/* If the resumption master secret was non-empty, then the key
+	 * schedule now contains a shared secret that is already bound
+	 * to the server's identity.
+	 */
+	tls_set_binding ( tls, session->cert );
+
+	/* Generate keys */
+	if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/******************************************************************************
+ *
  * Record handling
  *
  ******************************************************************************
@@ -1883,7 +2041,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 		uint16_t type;
 		uint16_t len;
 		struct {
-			uint8_t data[session->ticket_len];
+			uint8_t data[session->ticket.len];
 		} __attribute__ (( packed )) data;
 	} __attribute__ (( packed )) *session_ticket_ext;
 	struct {
@@ -1913,7 +2071,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 		uint16_t version;
 		uint8_t random[32];
 		uint8_t session_id_len;
-		uint8_t session_id[tls->session_id_len];
+		uint8_t session_id[session->id.len];
 		uint16_t cipher_suite_len;
 		uint16_t cipher_suites[TLS_NUM_CIPHER_SUITES];
 		uint8_t compression_methods_len;
@@ -1933,8 +2091,8 @@ static int tls_client_hello ( struct tls_connection *tls,
 				      sizeof ( hello.type_length ) ) );
 	hello.version = htons ( TLS_VERSION_MAX );
 	memcpy ( &hello.random, &tls->client.random, sizeof ( hello.random ) );
-	hello.session_id_len = tls->session_id_len;
-	memcpy ( hello.session_id, tls->session_id,
+	hello.session_id_len = session->id.len;
+	memcpy ( hello.session_id, session->id.data,
 		 sizeof ( hello.session_id ) );
 	hello.cipher_suite_len = htons ( sizeof ( hello.cipher_suites ) );
 	i = 0 ; for_each_table_entry ( suite, TLS_CIPHER_SUITES )
@@ -1987,7 +2145,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	session_ticket_ext->type = htons ( TLS_SESSION_TICKET );
 	session_ticket_ext->len
 		= htons ( sizeof ( session_ticket_ext->data ) );
-	memcpy ( session_ticket_ext->data.data, session->ticket,
+	memcpy ( session_ticket_ext->data.data, session->ticket.data,
 		 sizeof ( session_ticket_ext->data.data ) );
 
 	/* Construct extended master secret extension */
@@ -2453,6 +2611,7 @@ static int tls_new_hello_request ( struct tls_connection *tls,
  */
 static int tls_new_server_hello ( struct tls_connection *tls,
 				  const void *data, size_t len ) {
+	struct tls_session *session = tls->session;
 	const struct {
 		uint16_t version;
 		uint8_t random[32];
@@ -2586,37 +2745,23 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 
 	/* Check session ID */
 	if ( hello_a->session_id_len &&
-	     ( hello_a->session_id_len == tls->session_id_len ) &&
-	     ( memcmp ( session_id, tls->session_id,
-			tls->session_id_len ) == 0 ) ) {
+	     ( hello_a->session_id_len == session->id.len ) &&
+	     ( memcmp ( session_id, session->id.data,
+			session->id.len ) == 0 ) ) {
 
-		/* Session ID match: reuse master secret */
-		DBGC ( tls, "TLS %p resuming session ID:\n", tls );
-		DBGC_HDA ( tls, 0, tls->session_id, tls->session_id_len );
-		tls_resume_secret ( tls );
-		if ( ( rc = tls_generate_keys ( tls ) ) != 0 )
+		/* Session ID match: resume session */
+		if ( ( rc = tls_resume ( tls ) ) != 0 )
 			return rc;
 
-		/* Ensure master secret generation method matches */
-		if ( tls->extended_master_secret !=
-		     tls->session->extended_master_secret ) {
-			DBGC ( tls, "TLS %p mismatched extended master secret "
-			       "extension\n", tls );
-			return -EPERM_EMS;
-		}
+	} else if ( hello_a->session_id_len &&
+		    ( hello_a->session_id_len <=
+		      sizeof ( tls->new_id.data ) ) ) {
 
-	} else {
-
-		/* Record new session ID, if present */
-		if ( hello_a->session_id_len &&
-		     ( hello_a->session_id_len <= sizeof ( tls->session_id ))){
-			tls->session_id_len = hello_a->session_id_len;
-			memcpy ( tls->session_id, session_id,
-				 tls->session_id_len );
-			DBGC ( tls, "TLS %p new session ID:\n", tls );
-			DBGC_HDA ( tls, 0, tls->session_id,
-				   tls->session_id_len );
-		}
+		/* Record new session ID */
+		tls->new_id.len = hello_a->session_id_len;
+		memcpy ( tls->new_id.data, session_id, tls->new_id.len );
+		DBGC ( tls, "TLS %p new session ID:\n", tls );
+		DBGC_HDA ( tls, 0, tls->new_id.data, tls->new_id.len );
 	}
 
 	/* Handle secure renegotiation */
@@ -2679,20 +2824,19 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
 	}
 
 	/* Free any unapplied new session ticket */
-	zfree ( tls->new_session_ticket );
-	tls->new_session_ticket = NULL;
-	tls->new_session_ticket_len = 0;
+	zfree ( tls->new_ticket.data );
+	tls->new_ticket.data = NULL;
+	tls->new_ticket.len = 0;
 
 	/* Record ticket */
-	tls->new_session_ticket = malloc ( ticket_len );
-	if ( ! tls->new_session_ticket )
+	tls->new_ticket.data = malloc ( ticket_len );
+	if ( ! tls->new_ticket.data )
 		return -ENOMEM;
-	memcpy ( tls->new_session_ticket, new_session_ticket->ticket,
+	memcpy ( tls->new_ticket.data, new_session_ticket->ticket,
 		 ticket_len );
-	tls->new_session_ticket_len = ticket_len;
+	tls->new_ticket.len = ticket_len;
 	DBGC ( tls, "TLS %p new session ticket:\n", tls );
-	DBGC_HDA ( tls, 0, tls->new_session_ticket,
-		   tls->new_session_ticket_len );
+	DBGC_HDA ( tls, 0, tls->new_ticket.data, tls->new_ticket.len );
 
 	return 0;
 }
@@ -3117,26 +3261,9 @@ static int tls_new_finished ( struct tls_connection *tls,
 		tls_tx_resume ( tls );
 	}
 
-	/* Record session ID, ticket, and master secret, if applicable */
-	if ( x509_is_valid ( channel->bound, tls->server.root ) &&
-	     ( tls->session_id_len || tls->new_session_ticket_len ) ) {
-		tls_generate_resumption_master ( tls );
-		session->extended_master_secret = tls->extended_master_secret;
-		x509_put ( session->cert );
-		session->cert = x509_get ( channel->bound );
-		if ( tls->session_id_len ) {
-			session->id_len = tls->session_id_len;
-			memcpy ( session->id, tls->session_id,
-				 sizeof ( session->id ) );
-		}
-		if ( tls->new_session_ticket_len ) {
-			zfree ( session->ticket );
-			session->ticket = tls->new_session_ticket;
-			session->ticket_len = tls->new_session_ticket_len;
-			tls->new_session_ticket = NULL;
-			tls->new_session_ticket_len = 0;
-		}
-	}
+	/* Save session for future resumption, if applicable */
+	if ( tls->new_id.len || tls->new_ticket.len )
+		tls_save ( tls );
 
 	/* Move to end of session's connection list and allow other
 	 * connections to start making progress.
@@ -4251,20 +4378,6 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 			if ( is_pending ( &conn->server.negotiation ) )
 				return;
 		}
-		/* Record or generate session ID and associated master secret */
-		if ( session->id_len ) {
-			/* Attempt to resume an existing session */
-			memcpy ( tls->session_id, session->id,
-				 sizeof ( tls->session_id ) );
-			tls->session_id_len = session->id_len;
-		} else {
-			/* No existing session: use a random session ID */
-			assert ( sizeof ( tls->session_id ) ==
-				 sizeof ( tls->client.random ) );
-			memcpy ( tls->session_id, &tls->client.random,
-				 sizeof ( tls->session_id ) );
-			tls->session_id_len = sizeof ( tls->session_id );
-		}
 		/* Send Client Hello */
 		if ( ( rc = tls_send_client_hello ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Client Hello: %s\n",
@@ -4342,69 +4455,6 @@ static struct process_descriptor tls_process_desc =
 
 /******************************************************************************
  *
- * Session management
- *
- ******************************************************************************
- */
-
-/**
- * Find or create session for TLS connection
- *
- * @v tls		TLS connection
- * @v name		Server name
- * @ret rc		Return status code
- */
-static int tls_session ( struct tls_connection *tls, const char *name ) {
-	struct tls_session *session;
-	char *name_copy;
-	int rc;
-
-	/* Find existing matching session, if any */
-	list_for_each_entry ( session, &tls_sessions, list ) {
-		if ( ( strcmp ( name, session->name ) == 0 ) &&
-		     ( tls->server.root == session->root ) &&
-		     ( tls->client.key == session->key ) ) {
-			ref_get ( &session->refcnt );
-			tls->session = session;
-			DBGC ( tls, "TLS %p joining session %s\n", tls, name );
-			return 0;
-		}
-	}
-
-	/* Create new session */
-	session = zalloc ( sizeof ( *session ) + strlen ( name )
-			   + 1 /* NUL */ );
-	if ( ! session ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	ref_init ( &session->refcnt, free_tls_session );
-	name_copy = ( ( ( void * ) session ) + sizeof ( *session ) );
-	strcpy ( name_copy, name );
-	session->name = name_copy;
-	session->root = x509_root_get ( tls->server.root );
-	session->key = privkey_get ( tls->client.key );
-	INIT_LIST_HEAD ( &session->conn );
-	list_add ( &session->list, &tls_sessions );
-
-	/* Poison resumption master secret */
-	tls_ephemeral_label ( tls, "res poison",
-			      session->resumption_master_secret,
-			      sizeof ( session->resumption_master_secret ) );
-
-	/* Record session */
-	tls->session = session;
-
-	DBGC ( tls, "TLS %p created session %s\n", tls, name );
-	return 0;
-
-	ref_put ( &session->refcnt );
- err_alloc:
-	return rc;
-}
-
-/******************************************************************************
- *
  * Instantiator
  *
  ******************************************************************************
@@ -4449,8 +4499,12 @@ int add_tls ( struct interface *xfer, const char *name,
 	iob_populate ( &tls->rx.iobuf, &tls->rx.header, 0,
 		       sizeof ( tls->rx.header ) );
 	INIT_LIST_HEAD ( &tls->rx.data );
+
+	/* Initialise ephemeral master secret */
 	if ( ( rc = tls_generate_ephemeral_master ( tls ) ) != 0 )
 		goto err_ephemeral;
+
+	/* Find or create session */
 	if ( ( rc = tls_session ( tls, name ) ) != 0 )
 		goto err_session;
 	list_add_tail ( &tls->list, &tls->session->conn );
