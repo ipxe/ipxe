@@ -3632,7 +3632,7 @@ static int tls_newdata_process_header ( struct tls_connection *tls ) {
 
 	/* Allocate data buffers now that we know the length */
 	assert ( list_empty ( &tls->rx.data ) );
-	while ( remaining ) {
+	do {
 
 		/* Calculate fragment length.  Ensure that no block is
 		 * smaller than TLS_RX_MIN_BUFSIZE (by increasing the
@@ -3673,7 +3673,9 @@ static int tls_newdata_process_header ( struct tls_connection *tls ) {
 
 		/* Add I/O buffer to list */
 		list_add_tail ( &iobuf->list, &tls->rx.data );
-	}
+
+	} while ( remaining );
+	assert ( ! list_empty ( &tls->rx.data ) );
 
 	/* Move to data state */
 	tls->rx.state = TLS_RX_DATA;
