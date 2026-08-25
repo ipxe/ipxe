@@ -3169,7 +3169,8 @@ static void tls_hmac_list ( struct tls_cipherspec *cipherspec,
 static size_t tls_iob_reserved ( struct tls_connection *tls, size_t len ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
 	struct tls_cipher_suite *suite = cipherspec->suite;
-	struct cipher_algorithm *cipher = suite->cipher;
+	struct secure_pipe *pipe = &tls->channel.tx;
+	struct cipher_algorithm *cipher = pipe->cipher;
 	struct tls_header *tlshdr;
 	unsigned int count;
 	size_t each;
@@ -3224,9 +3225,9 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 			     struct io_buffer *iobuf ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
 	struct tls_cipher_suite *suite = cipherspec->suite;
-	struct cipher_algorithm *cipher = suite->cipher;
 	struct digest_algorithm *digest = suite->digest;
 	struct secure_pipe *pipe = &tls->channel.tx;
+	struct cipher_algorithm *cipher = pipe->cipher;
 	struct {
 		uint8_t fixed[suite->fixed_iv_len];
 		uint8_t rec[suite->record_iv_len];
@@ -3244,7 +3245,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 	int rc;
 
 	/* Sanity check */
-	assert ( pipe->cipher == cipher );
+	assert ( cipher == suite->cipher );
 
 	/* Record plaintext pointer and length */
 	plaintext = iobuf->data;
@@ -3438,9 +3439,9 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 				struct list_head *rx_data ) {
 	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec.active;
 	struct tls_cipher_suite *suite = cipherspec->suite;
-	struct cipher_algorithm *cipher = suite->cipher;
 	struct digest_algorithm *digest = suite->digest;
 	struct secure_pipe *pipe = &tls->channel.rx;
+	struct cipher_algorithm *cipher = pipe->cipher;
 	size_t len = ntohs ( tlshdr->length );
 	struct {
 		uint8_t fixed[suite->fixed_iv_len];
@@ -3459,7 +3460,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	int rc;
 
 	/* Sanity check */
-	assert ( pipe->cipher == cipher );
+	assert ( cipher == suite->cipher );
 
 	/* Locate first and last data buffers */
 	assert ( ! list_empty ( rx_data ) );
@@ -3675,7 +3676,8 @@ static struct interface_descriptor tls_plainstream_desc =
  */
 static int tls_newdata_process_header ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec.active;
-	struct cipher_algorithm *cipher = cipherspec->suite->cipher;
+	struct secure_pipe *pipe = &tls->channel.rx;
+	struct cipher_algorithm *cipher = pipe->cipher;
 	size_t iv_len = cipherspec->suite->record_iv_len;
 	size_t data_len = ntohs ( tls->rx.header.length );
 	size_t remaining = data_len;
