@@ -413,15 +413,15 @@ struct tls_rx {
 	struct io_buffer iobuf;
 	/** List of received data buffers */
 	struct list_head data;
-	/** Received handshake fragment */
+	/** Received handshake fragment (if any) */
 	struct io_buffer *handshake;
 };
 
 /** TLS client state */
 struct tls_client {
-	/** Private key (if used) */
+	/** Private key */
 	struct private_key *key;
-	/** Certificate chain (if used) */
+	/** Certificate chain (if any) */
 	struct x509_chain *chain;
 	/** Security negotiation pending operation */
 	struct pending_operation negotiation;
@@ -431,7 +431,7 @@ struct tls_client {
 struct tls_server {
 	/** Root of trust */
 	struct x509_root *root;
-	/** Certificate chain */
+	/** Certificate chain (if any) */
 	struct x509_chain *chain;
 	/** Certificate validator */
 	struct interface validator;

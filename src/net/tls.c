@@ -2892,6 +2892,27 @@ static int tls_new_finished ( struct tls_connection *tls,
  * @v tls		TLS connection
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
+ *
+ * Following the general robustness principle, we accept handshake
+ * records in any order of arrival and rely on the secure channel
+ * abstraction to determine whether or not the resulting sequence of
+ * operations is sufficient to establish the channel.
+ *
+ * Most non-standard handshake record sequences would not manage to
+ * successfully establish the channel.  For example: a premature
+ * Finished that attempts to skip the ServerKeyExchange would fail
+ * because the channel will reject an attempt to confirm an unbound
+ * peer identity.
+ *
+ * It would be possible for an inventive server to construct
+ * non-standard sequences of handshake records that do successfully
+ * establish the secure channel.  For example: a server could choose
+ * to send a second ServerKeyExchange record with a second valid
+ * signature (over the updated transcript digest that includes the
+ * first ServerKeyExchange).  This would be non-standard and rather
+ * pointless, but would be accepted for the purpose of establishing
+ * the secure channel since it does in fact provide the required
+ * security properties.
  */
 static int tls_new_handshake ( struct tls_connection *tls,
 			       struct io_buffer *iobuf ) {
