@@ -210,7 +210,7 @@ struct tls_key_exchange_parameters {
 struct tls_key_exchange_algorithm {
 	/** Algorithm name */
 	const char *name;
-	/** Fixed key exchange algorithm (if set) */
+	/** Default key exchange algorithm */
 	struct exchange_algorithm *exchange;
 	/**
 	 * Parse key exchange parameters from Server Key Exchange record

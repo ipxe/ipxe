@@ -917,6 +917,7 @@ static int tls_parse_dhe ( struct tls_connection *tls,
 /** Ephemeral Diffie-Hellman key exchange algorithm */
 struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 	.name = "dhe",
+	.exchange = &exchange_null,
 	.parse = tls_parse_dhe,
 	.len_len = sizeof ( uint16_t ),
 };
@@ -975,6 +976,7 @@ static int tls_parse_ecdhe ( struct tls_connection *tls,
 /** Ephemeral Elliptic Curve Diffie-Hellman key exchange algorithm */
 struct tls_key_exchange_algorithm tls_ecdhe_exchange_algorithm = {
 	.name = "ecdhe",
+	.exchange = &exchange_null,
 	.parse = tls_parse_ecdhe,
 	.len_len = sizeof ( uint8_t ),
 };
@@ -4058,6 +4060,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->client.key = privkey_get ( key ? key : &private_key );
 	tls->server.root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_MAX;
+	tls->exchange = &exchange_null;
 	channel_init ( &tls->channel, &tls_channel_ops );
 	tls_clear_digest ( tls );
 	tls->tx.cipherspec.writer = &tls_client;
