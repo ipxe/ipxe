@@ -511,6 +511,7 @@ struct tls_cipher_suite tls_cipher_suite_null = {
 	.pubkey = &pubkey_null,
 	.cipher = &cipher_null,
 	.digest = &digest_null,
+	.handshake = &digest_null,
 };
 
 /** Number of supported cipher suites */
