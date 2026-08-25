@@ -640,7 +640,15 @@ static int tls_select_cipher ( struct tls_connection *tls,
 	/* Identify cipher suite */
 	suite = tls_find_cipher_suite ( cipher_suite );
 	if ( ! suite ) {
-		DBGC ( tls, "TLS %p does not support cipher %04x\n",
+		DBGC ( tls, "TLS %p does not support cipher suite %#04x\n",
+		       tls, ntohs ( cipher_suite ) );
+		return -ENOTSUP_CIPHER;
+	}
+
+	/* Sanity checks */
+	if ( ! ( suite->exchange && suite->pubkey && suite->cipher &&
+		 suite->digest && suite->handshake ) ) {
+		DBGC ( tls, "TLS %p cannot use broken cipher suite %#04x\n",
 		       tls, ntohs ( cipher_suite ) );
 		return -ENOTSUP_CIPHER;
 	}

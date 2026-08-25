@@ -228,7 +228,14 @@ struct tls_key_exchange_algorithm {
 	uint8_t len_len;
 };
 
-/** A TLS cipher suite */
+/**
+ * A TLS cipher suite
+ *
+ * All algorithm fields must be defined.  If the cipher suite does not
+ * use the algorithm in question, then the null version of that
+ * algorithm must be used (e.g. @c &digest_null for AEAD ciphers that
+ * have no MAC digest algorithm).
+ */
 struct tls_cipher_suite {
 	/** Key exchange algorithm */
 	struct tls_key_exchange_algorithm *exchange;
