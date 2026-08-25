@@ -844,10 +844,36 @@ tls_find_param_group ( const void *dh_p, size_t dh_p_len, const void *dh_g,
 	return NULL;
 }
 
+/**
+ * Parse key exchange parameters from unexpected Server Key Exchange record
+ *
+ * @v data		Server Key Exchange handshake record
+ * @v len		Length of Server Key Exchange handshake record
+ * @v params		Key exchange parameters to fill in
+ * @ret rc		Return status code
+ */
+static int
+tls_parse_null ( struct tls_connection *tls, const void *data, size_t len,
+		 struct tls_key_exchange_parameters *params __unused ) {
+
+	DBGC ( tls, "TLS %p received unexpected ServerKeyExchange:\n", tls );
+	DBGC_HDA ( tls, 0, data, len );
+	return -EINVAL_KEY_EXCHANGE;
+}
+
+/** Null key exchange algorithm */
+struct tls_key_exchange_algorithm tls_null_exchange_algorithm = {
+	.name = "null",
+	.exchange = &exchange_null,
+	.parse = tls_parse_null,
+	.len_len = 0,
+};
+
 /** Public key exchange algorithm */
 struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 	.name = "pubkey",
 	.exchange = &tls_classic_pre_master_algorithm,
+	.parse = tls_parse_null,
 	.len_len = sizeof ( uint16_t ),
 };
 
@@ -2612,12 +2638,6 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 	}
 
 	/* Parse parameters */
-	if ( ! suite->exchange->parse ) {
-		DBGC ( tls, "TLS %p received unexpected ServerKeyExchange:\n",
-		       tls );
-		DBGC_HDA ( tls, 0, data, len );
-		return -EINVAL_KEY_EXCHANGE;
-	}
 	if ( ( rc = suite->exchange->parse ( tls, data, len, &params ) ) != 0)
 		return rc;
 	DBGC ( tls, "TLS %p using named group %s-%s\n",

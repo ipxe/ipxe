@@ -519,6 +519,7 @@ struct tls_connection {
 
 extern struct exchange_algorithm tls_classic_pre_master_algorithm;
 
+extern struct tls_key_exchange_algorithm tls_null_exchange_algorithm;
 extern struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm;
 extern struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm;
 extern struct tls_key_exchange_algorithm tls_ecdhe_exchange_algorithm;
