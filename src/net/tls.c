@@ -29,6 +29,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <byteswap.h>
@@ -518,6 +519,41 @@ struct tls_cipher_suite tls_cipher_suite_null = {
 #define TLS_NUM_CIPHER_SUITES table_num_entries ( TLS_CIPHER_SUITES )
 
 /**
+ * Get cipher suite name (for debugging)
+ *
+ * @v suite		Cipher suite
+ * @ret name		Cipher suite name
+ */
+static const char * tls_cipher_name ( struct tls_cipher_suite *suite ) {
+	struct tls_key_exchange_algorithm *exchange = suite->exchange;
+	struct pubkey_algorithm *pubkey = suite->pubkey;
+	struct cipher_algorithm *cipher = suite->cipher;
+	struct digest_algorithm *digest = suite->digest;
+	struct digest_algorithm *handshake = suite->handshake;
+	const char *exchange_name;
+	const char *pubkey_name;
+	const char *digest_name;
+	static char buf[64];
+
+	/* Strip uninteresting name components */
+	exchange_name = ( ( exchange == &tls_pubkey_exchange_algorithm ) ?
+			  NULL : exchange->name );
+	pubkey_name = ( ( pubkey == &pubkey_null ) ? NULL : pubkey->name );
+	digest_name = ( ( digest == &digest_null ) ?
+			handshake->name : digest->name );
+
+	/* Construct name */
+	snprintf ( buf, sizeof ( buf ), "%s%s%s%s%s-%d-%s",
+		   ( exchange_name ? exchange_name : "" ),
+		   ( exchange_name ? "-" : "" ),
+		   ( pubkey_name ? pubkey_name : "" ),
+		   ( pubkey_name ? "-" : "" ),
+		   cipher->name, ( suite->key_len * 8 ), digest_name );
+
+	return buf;
+}
+
+/**
  * Identify cipher suite
  *
  * @v cipher_suite	Cipher suite specification
@@ -625,11 +661,8 @@ static int tls_select_cipher ( struct tls_connection *tls,
 	if ( ( rc = tls_set_cipher ( tls, &tls->rx.cipherspec.pending,
 				     suite ) ) != 0 )
 		return rc;
-
-	DBGC ( tls, "TLS %p selected cipher suite %s-%s-%s-%d-%s\n",
-	       tls, suite->exchange->name, suite->pubkey->name,
-	       suite->cipher->name, ( suite->key_len * 8 ),
-	       suite->digest->name );
+	DBGC ( tls, "TLS %p selected cipher suite %s\n",
+	       tls, tls_cipher_name ( suite ) );
 
 	return 0;
 }
@@ -692,10 +725,8 @@ static int tls_change_cipher ( struct tls_connection *tls,
 	/* Swap in new cipher suite */
 	tls_clear_cipher ( tls, active );
 	memswap ( active, pending, sizeof ( *active ) );
-	DBGC ( tls, "TLS %p activated %s cipher %s-%s-%s-%d-%s\n",
-	       tls, tls_pipe_name ( tls, pipe ), suite->exchange->name,
-	       suite->pubkey->name, suite->cipher->name,
-	       ( suite->key_len * 8 ), suite->digest->name );
+	DBGC ( tls, "TLS %p activated %s cipher %s\n",
+	       tls, tls_pipe_name ( tls, pipe ), tls_cipher_name ( suite ) );
 
 	return 0;
 }
