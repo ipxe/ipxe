@@ -41,6 +41,6 @@ tls_ecdhe_rsa_with_aes_256_gcm_sha384 __tls_cipher_suite ( 02 ) = {
 	.exchange = &tls_ecdhe_exchange_algorithm,
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_gcm_algorithm,
-	.digest = &sha384_algorithm,
+	.digest = &digest_null,
 	.handshake = &sha384_algorithm,
 };

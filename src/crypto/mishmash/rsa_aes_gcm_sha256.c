@@ -41,6 +41,6 @@ tls_rsa_with_aes_128_gcm_sha256 __tls_cipher_suite ( 21 ) = {
 	.exchange = &tls_pubkey_exchange_algorithm,
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_gcm_algorithm,
-	.digest = &sha256_algorithm,
+	.digest = &digest_null,
 	.handshake = &sha256_algorithm,
 };
