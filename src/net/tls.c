@@ -113,7 +113,7 @@ FILE_SECBOOT ( PERMITTED );
 #define ENOENT_CERT __einfo_error ( EINFO_ENOENT_CERT )
 #define EINFO_ENOENT_CERT						\
 	__einfo_uniqify ( EINFO_ENOENT, 0x01,				\
-			  "Missing server certificate" )
+			  "Missing certificate" )
 #define ENOENT_KEY_EXCHANGE __einfo_error ( EINFO_ENOENT_KEY_EXCHANGE )
 #define EINFO_ENOENT_KEY_EXCHANGE					\
 	__einfo_uniqify ( EINFO_ENOENT, 0x02,				\
@@ -1841,6 +1841,12 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	struct io_buffer *iobuf;
 	size_t len;
 
+	/* Sanity check */
+	if ( ! tls->client.chain ) {
+		DBGC ( tls, "TLS %p has no client certificate chain\n", tls );
+		return -ENOENT_CERT;
+	}
+
 	/* Calculate length of client certificates */
 	len = 0;
 	list_for_each_entry ( link, &tls->client.chain->links, list ) {
@@ -1959,14 +1965,28 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  */
 static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	struct digest_algorithm *digest = tls->key.digest;
-	struct x509_certificate *cert = x509_first ( tls->client.chain );
-	struct pubkey_algorithm *pubkey = cert->signature_algorithm->pubkey;
 	struct asn1_cursor *key = privkey_cursor ( tls->client.key );
 	struct tls_signature_hash_algorithm *sig_hash = NULL;
 	struct asn1_builder builder = { NULL, 0 };
+	struct x509_certificate *cert;
+	struct pubkey_algorithm *pubkey;
 	size_t digestsize = digest->digestsize;
 	uint8_t tbshash[digestsize];
 	int rc;
+
+	/* Sanity checks */
+	if ( ! tls->client.chain ) {
+		DBGC ( tls, "TLS %p has no client certificate chain\n", tls );
+		rc = -ENOENT_CERT;
+		goto err_chain;
+	}
+	cert = x509_first ( tls->client.chain );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p has no client certificate\n", tls );
+		rc = -ENOENT_CERT;
+		goto err_cert;
+	}
+	pubkey = cert->signature_algorithm->pubkey;
 
 	/* TLSv1.2 and later use explicit algorithm identifiers */
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
@@ -2035,6 +2055,8 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
  err_pubkey_sign:
  err_tbshash:
  err_sig_hash:
+ err_cert:
+ err_chain:
 	zfree ( builder.data );
 	return rc;
 }
