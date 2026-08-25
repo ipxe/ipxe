@@ -1149,6 +1149,10 @@ static int tls_key_encrypt ( struct tls_connection *tls,
 	int rc;
 
 	/* Identify server certificate */
+	if ( ! tls->server.chain ) {
+		DBGC ( tls, "TLS %p has no server certificate chain\n", tls );
+		return -ENOENT_CERT;
+	}
 	cert = x509_first ( tls->server.chain );
 	if ( ! cert ) {
 		DBGC ( tls, "TLS %p has no server certificate\n", tls );
@@ -2653,6 +2657,10 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 	int rc;
 
 	/* Identify server certificate */
+	if ( ! tls->server.chain ) {
+		DBGC ( tls, "TLS %p has no server certificate chain\n", tls );
+		return -ENOENT_CERT;
+	}
 	cert = x509_first ( tls->server.chain );
 	if ( ! cert ) {
 		DBGC ( tls, "TLS %p has no server certificate\n", tls );
