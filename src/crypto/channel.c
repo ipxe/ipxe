@@ -1070,7 +1070,7 @@ static void channel_dead_crypt ( struct cipher_algorithm *cipher __unused,
  * cipher-related failure, to guard against code paths that may fail
  * to check for cipher errors.
  */
-static struct cipher_algorithm channel_dead_cipher = {
+struct cipher_algorithm channel_dead_cipher = {
 	.name = "dead",
 	.ctxsize = 0,
 	.blocksize = 1,
@@ -1197,29 +1197,6 @@ int channel_set_cipher ( struct secure_channel *channel,
  */
 
 /**
- * Reset secure channel
- *
- * @v channel		Secure channel
- */
-static void channel_reset ( struct secure_channel *channel ) {
-
-	/* Reset ciphers to plaintext */
-	channel_clear_cipher ( &channel->tx );
-	channel_clear_cipher ( &channel->rx );
-	channel->tx.cipher = &cipher_null;
-	channel->rx.cipher = &cipher_null;
-	assert ( channel->tx.ctx == NULL );
-	assert ( channel->rx.ctx == NULL );
-
-	/* Clear security properties */
-	channel_unkey ( channel );
-	assert ( channel->props.keyed == 0 );
-	assert ( channel->props.bound == NULL );
-	assert ( channel->props.confirmed == NULL );
-	assert ( channel->props.established == NULL );
-}
-
-/**
  * Open secure channel
  *
  * @v channel		Secure channel
@@ -1234,15 +1211,33 @@ int channel_open ( struct secure_channel *channel ) {
 	assert ( channel->op->reset != NULL );
 	assert ( channel->op->apply != NULL );
 	assert ( channel->op->verify != NULL );
+
+	/* Clear security properties (which should already be clear) */
+	assert ( channel->props.keyed == 0 );
+	assert ( channel->props.bound == NULL );
+	assert ( channel->props.confirmed == NULL );
+	assert ( channel->props.established == NULL );
+	channel_unkey ( channel );
+	assert ( channel->props.keyed == 0 );
+	assert ( channel->props.bound == NULL );
+	assert ( channel->props.confirmed == NULL );
+	assert ( channel->props.established == NULL );
+
+	/* Reset ciphers (which should already have no contexts) */
 	assert ( channel->tx.ctx == NULL );
 	assert ( channel->rx.ctx == NULL );
-
-	/* Reset ciphers and security properties */
-	channel_reset ( channel );
+	channel_clear_cipher ( &channel->tx );
+	channel_clear_cipher ( &channel->rx );
+	assert ( channel->tx.ctx == NULL );
+	assert ( channel->rx.ctx == NULL );
 
 	/* Initialise ephemeral master secret */
 	if ( ( rc = channel_ephemeral_init ( channel ) ) != 0 )
 		return rc;
+
+	/* Enable initial plaintext ciphers */
+	channel->tx.cipher = &cipher_null;
+	channel->rx.cipher = &cipher_null;
 
 	DBGC ( channel, "CHANNEL %p opened\n", channel );
 	return 0;
@@ -1275,6 +1270,10 @@ void channel_reopen ( struct secure_channel *channel ) {
 
 	/* Clear security properties */
 	channel_unkey ( channel );
+	assert ( channel->props.keyed == 0 );
+	assert ( channel->props.bound == NULL );
+	assert ( channel->props.confirmed == NULL );
+	assert ( channel->props.established == NULL );
 
 	/* Replace ephemeral master secret
 	 *
@@ -1301,8 +1300,18 @@ void channel_reopen ( struct secure_channel *channel ) {
  */
 void channel_close ( struct secure_channel *channel ) {
 
-	/* Reset channel */
-	channel_reset ( channel );
+	/* Clear security properties */
+	channel_unkey ( channel );
+	assert ( channel->props.keyed == 0 );
+	assert ( channel->props.bound == NULL );
+	assert ( channel->props.confirmed == NULL );
+	assert ( channel->props.established == NULL );
+
+	/* Reset ciphers */
+	channel_clear_cipher ( &channel->tx );
+	channel_clear_cipher ( &channel->rx );
+	assert ( channel->tx.ctx == NULL );
+	assert ( channel->rx.ctx == NULL );
 
 	/* Replace ephemeral master secret
 	 *

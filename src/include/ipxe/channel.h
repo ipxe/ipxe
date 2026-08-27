@@ -245,6 +245,8 @@ struct secure_channel_operations {
 			   const void *auth, size_t len );
 };
 
+extern struct cipher_algorithm channel_dead_cipher;
+
 /**
  * Initialise secure channel
  *
@@ -255,6 +257,8 @@ static inline void channel_init ( struct secure_channel *channel,
 				  struct secure_channel_operations *op ) {
 
 	channel->op = op;
+	channel->tx.cipher = &channel_dead_cipher;
+	channel->rx.cipher = &channel_dead_cipher;
 }
 
 /**
