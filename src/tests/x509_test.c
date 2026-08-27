@@ -1354,6 +1354,14 @@ static void x509_test_exec ( void ) {
 	x509_validate_chain_fail_ok ( &useless_chain, test_ca_expired,
 				      &empty_store, &test_root );
 
+	/* Check link finding */
+	link = x509_link ( server_chain.chain, server_crt.cert );
+	ok ( link->cert == server_crt.cert );
+	link = x509_link ( server_chain.chain, intermediate_crt.cert );
+	ok ( link->cert == intermediate_crt.cert );
+	link = x509_link ( server_chain.chain, ecserver_crt.cert );
+	ok ( link == NULL );
+
 	/* Check chain truncation */
 	link = list_last_entry ( &server_chain.chain->links,
 				 struct x509_link, list );

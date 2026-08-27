@@ -1696,6 +1696,26 @@ int x509_append_raw ( struct x509_chain *chain, const void *data,
 }
 
 /**
+ * Find link containing X.509 certificate
+ *
+ * @v chain		X.509 certificate chain
+ * @v cert		X.509 certificate
+ * @ret link		Link containing certificate, or NULL if not found
+ */
+struct x509_link * x509_link ( struct x509_chain *chain,
+			       struct x509_certificate *cert ) {
+	struct x509_link *link;
+
+	/* Find link in chain */
+	list_for_each_entry ( link, &chain->links, list ) {
+		if ( link->cert == cert )
+			return link;
+	}
+
+	return NULL;
+}
+
+/**
  * Truncate X.509 certificate chain
  *
  * @v chain		X.509 certificate chain

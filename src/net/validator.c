@@ -57,8 +57,15 @@ struct validator;
 struct validator_action {
 	/** Name */
 	const char *name;
-	/** Action to take upon completed transfer */
-	void ( * done ) ( struct validator *validator, int rc );
+	/**
+	 * Action to take upon completed transfer
+	 *
+	 * @v validator		Certificate validator
+	 * @v cert		Certificate upon which action was taken
+	 * @v rc		Reason for completion
+	 */
+	void ( * done ) ( struct validator *validator,
+			  struct x509_certificate *cert, int rc );
 };
 
 /** A certificate validator */
@@ -118,15 +125,8 @@ struct validator {
 
 	/** Current action */
 	const struct validator_action *action;
-	/** Current certificate (for progress reporting)
-	 *
-	 * This will always be present within the certificate chain
-	 * and so this pointer does not hold a reference to the
-	 * certificate.
-	 */
+	/** Current certificate */
 	struct x509_certificate *cert;
-	/** Current link within certificate chain */
-	struct x509_link *link;
 };
 
 /**
@@ -158,6 +158,7 @@ static void validator_free ( struct refcnt *refcnt ) {
 	x509_chain_put ( validator->chain );
 	ocsp_put ( validator->ocsp );
 	xferbuf_free ( &validator->buffer );
+	x509_put ( validator->cert );
 	free ( validator );
 }
 
@@ -195,6 +196,7 @@ static int validator_progress ( struct validator *validator,
 
 	/* Report current action, if applicable */
 	if ( validator->action ) {
+		assert ( validator->cert != NULL );
 		snprintf ( progress->message, sizeof ( progress->message ),
 			   "%s %s", validator->action->name,
 			   x509_name ( validator->cert ) );
@@ -234,13 +236,15 @@ static const char crosscert_default[] = CROSSCERT;
  * Append cross-signing certificates to certificate chain
  *
  * @v validator		Certificate validator
+ * @v cert		Cross-signed certificate
  * @v rc		Completion status code
  * @ret rc		Return status code
  */
-static void validator_append ( struct validator *validator, int rc ) {
+static void validator_append ( struct validator *validator,
+			       struct x509_certificate *cert, int rc ) {
 	struct asn1_cursor cursor;
 	struct x509_chain *certs;
-	struct x509_certificate *cert;
+	struct x509_certificate *last;
 	struct x509_link *link;
 	struct x509_link *prev;
 
@@ -249,7 +253,7 @@ static void validator_append ( struct validator *validator, int rc ) {
 		DBGC ( validator, "VALIDATOR %p \"%s\" could not download ",
 		       validator, validator_name ( validator ) );
 		DBGC ( validator, "\"%s\" cross-signature: %s\n",
-		       x509_name ( validator->cert ), strerror ( rc ) );
+		       x509_name ( cert ), strerror ( rc ) );
 		/* If the overall validation is going to fail, then we
 		 * will end up attempting multiple downloads for
 		 * non-existent cross-signed certificates as we work
@@ -262,8 +266,7 @@ static void validator_append ( struct validator *validator, int rc ) {
 	}
 	DBGC ( validator, "VALIDATOR %p \"%s\" downloaded ",
 	       validator, validator_name ( validator ) );
-	DBGC ( validator, "\"%s\" cross-signature\n",
-	       x509_name ( validator->cert ) );
+	DBGC ( validator, "\"%s\" cross-signature\n", x509_name ( cert ) );
 
 	/* Allocate certificate list */
 	certs = x509_alloc_chain();
@@ -296,17 +299,26 @@ static void validator_append ( struct validator *validator, int rc ) {
 			DBGC_HDA ( validator, 0, cursor.data, cursor.len );
 			goto err_append_raw;
 		}
-		cert = x509_last ( certs );
+		last = x509_last ( certs );
 		DBGC ( validator, "VALIDATOR %p \"%s\" found certificate ",
 		       validator, validator_name ( validator ) );
-		DBGC ( validator, "%s\n", x509_name ( cert ) );
+		DBGC ( validator, "%s\n", x509_name ( last ) );
 
 		/* Move to next certificate */
 		asn1_skip_any ( &cursor );
 	}
 
+	/* Locate cross-signed certificate within chain */
+	link = x509_link ( validator->chain, cert );
+	if ( ! link ) {
+		DBGC ( validator, "VALIDATOR %p \"%s\" lost \"%s\"\n",
+		       validator, validator_name ( validator ),
+		       x509_name ( cert ) );
+		rc = -ENOENT;
+		goto err_link;
+	}
+
 	/* Truncate existing certificate chain at current link */
-	link = validator->link;
 	assert ( link->flags & X509_LINK_FL_CROSSED );
 	x509_truncate ( validator->chain, link );
 
@@ -335,6 +347,7 @@ static void validator_append ( struct validator *validator, int rc ) {
 	rc = 0;
 
  err_auto_append:
+ err_link:
  err_append_raw:
  err_certificateset:
 	x509_chain_put ( certs );
@@ -402,8 +415,7 @@ static int validator_start_download ( struct validator *validator,
 
 	/* Set completion handler */
 	validator->action = &validator_crosscert;
-	validator->cert = cert;
-	validator->link = link;
+	validator->cert = x509_get ( cert );
 
 	/* Open URI */
 	if ( ( rc = xfer_open_uri_string ( &validator->xfer,
@@ -423,6 +435,9 @@ static int validator_start_download ( struct validator *validator,
 
 	intf_restart ( &validator->xfer, rc );
  err_open_uri_string:
+	x509_put ( validator->cert );
+	validator->cert = NULL;
+	validator->action = NULL;
 	free ( uri_string );
  err_alloc_uri_string:
  err_check_uri_string:
@@ -441,9 +456,12 @@ static int validator_start_download ( struct validator *validator,
  * Validate OCSP response
  *
  * @v validator		Certificate validator
+ * @v cert		Checked certificate
  * @v rc		Completion status code
  */
-static void validator_ocsp_validate ( struct validator *validator, int rc ) {
+static void validator_ocsp_validate ( struct validator *validator,
+				      struct x509_certificate *cert,
+				      int rc ) {
 	const void *data = validator->buffer.data;
 	size_t len = validator->buffer.len;
 	time_t now;
@@ -476,7 +494,7 @@ static void validator_ocsp_validate ( struct validator *validator, int rc ) {
 	/* Success */
 	DBGC ( validator, "VALIDATOR %p \"%s\" checked ",
 	       validator, validator_name ( validator ) );
-	DBGC ( validator, "\"%s\" via OCSP\n", x509_name ( validator->cert ) );
+	DBGC ( validator, "\"%s\" via OCSP\n", x509_name ( cert ) );
 
  err_validate:
  err_response:
@@ -517,7 +535,7 @@ static int validator_start_ocsp ( struct validator *validator,
 
 	/* Set completion handler */
 	validator->action = &validator_ocsp;
-	validator->cert = cert;
+	validator->cert = x509_get ( cert );
 
 	/* Open URI */
 	uri_string = validator->ocsp->uri_string;
@@ -537,6 +555,9 @@ static int validator_start_ocsp ( struct validator *validator,
 
 	intf_restart ( &validator->xfer, rc );
  err_open:
+	x509_put ( validator->cert );
+	validator->cert = NULL;
+	validator->action = NULL;
 	ocsp_put ( validator->ocsp );
 	validator->ocsp = NULL;
  err_check:
@@ -557,15 +578,29 @@ static int validator_start_ocsp ( struct validator *validator,
  * @v rc		Reason for close
  */
 static void validator_xfer_close ( struct validator *validator, int rc ) {
+	const struct validator_action *action;
+	struct x509_certificate *cert;
 
 	/* Close data transfer interface */
 	intf_restart ( &validator->xfer, rc );
 	DBGC2 ( validator, "VALIDATOR %p \"%s\" transfer complete\n",
 		validator, validator_name ( validator ) );
 
+	/* Clear current action */
+	action = validator->action;
+	validator->action = NULL;
+	assert ( action != NULL );
+
+	/* Take temporary ownership of the current certificate */
+	cert = validator->cert;
+	validator->cert = NULL;
+	assert ( cert != NULL );
+
 	/* Process completed download */
-	assert ( validator->action != NULL );
-	validator->action->done ( validator, rc );
+	action->done ( validator, cert, rc );
+
+	/* Drop temporary reference to certificate */
+	x509_put ( cert );
 
 	/* Free downloaded data */
 	xferbuf_free ( &validator->buffer );

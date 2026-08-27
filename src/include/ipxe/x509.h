@@ -435,6 +435,8 @@ extern int x509_append ( struct x509_chain *chain,
 			 struct x509_certificate *cert );
 extern int x509_append_raw ( struct x509_chain *chain, const void *data,
 			     size_t len );
+extern struct x509_link * x509_link ( struct x509_chain *chain,
+				      struct x509_certificate *cert );
 extern void x509_truncate ( struct x509_chain *chain, struct x509_link *link );
 extern struct x509_certificate * x509_find ( struct x509_chain *store,
 					     const struct asn1_cursor *raw );
