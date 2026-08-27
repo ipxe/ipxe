@@ -2825,11 +2825,16 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
 	} __attribute__ (( packed )) *hello_done = data;
 	int rc;
 
-	/* Sanity check */
+	/* Sanity checks */
 	if ( sizeof ( *hello_done ) != len ) {
 		DBGC ( tls, "TLS %p received overlength Server Hello Done\n",
 		       tls );
 		DBGC_HD ( tls, data, len );
+		return -EINVAL_HELLO_DONE;
+	}
+	if ( is_pending ( &tls->server.validation ) ) {
+		DBGC ( tls, "TLS %p received duplicate Server Hello Done\n",
+		       tls );
 		return -EINVAL_HELLO_DONE;
 	}
 
