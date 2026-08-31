@@ -83,7 +83,7 @@ class HexBytes(bytes):
     def __str__(self):
         return base64.b16encode(self).decode().lower()
 
-    def source(self, prefix, size, width=80):
+    def source(self, prefix, size=0, width=80):
         """Generate source code fragment"""
         pre = prefix.expandtabs() + " ( "
         mid = " " * len(pre)
@@ -97,7 +97,7 @@ class HexBytes(bytes):
                 for batch in itertools.batched(value, count)
             ) +
             post
-        ).replace("\t".expandtabs(), "\t")
+        ).replace("\t".expandtabs(), "\t").replace(" (  )", "()")
         return code
 
 class TestResult(Enum):
@@ -499,6 +499,133 @@ class X25519TestFile(ExchangeTestFile):
 
 ##############################################################################
 #
+# HMAC tests
+#
+
+class HmacTestFlag(Enum):
+    """An HMAC test flag"""
+    MODIFIED_TAG = "ModifiedTag"
+    PSEUDORANDOM = "Pseudorandom"
+    TRUNCATED_HMAC = "TruncatedHmac"
+
+@attrclass
+class HmacTestCase(TestCase):
+    """An HMAC test case"""
+    flags = set_field(HmacTestFlag)
+    key = scalar_field(HexBytes, metadata={"stable": True})
+    msg = scalar_field(HexBytes, metadata={"stable": True})
+    tag = scalar_field(HexBytes)
+
+    @key.validator
+    def validate_key(self, attr, value):
+        """Validate key size"""
+        self.validate_fixed(attr, value, (self.test_group.keySize // 8))
+
+    @tag.validator
+    def validate_tag(self, attr, value):
+        """Validate tag size"""
+        self.validate_fixed(attr, value, (self.test_group.tagSize // 8))
+
+    @property
+    def skip(self):
+        """Reason for skipping test (if any)"""
+        if HmacTestFlag.MODIFIED_TAG in self.flags:
+            # Our HMAC abstraction covers only generating the digest,
+            # not comparing the output to check for a match
+            return "modified tag"
+        if self.failure:
+            # The test suite includes other failures such as using the
+            # wrong algorithm, which is not a meaningful test
+            return self.comment
+
+    def definition(self):
+        """Generate source code for test definition"""
+        code = super().definition()
+        if not self.skip:
+            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            code += (
+                "HMAC_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+                self.key.source("\tKEY") + ",\n" +
+                self.msg.source("\tDATA") + ",\n" +
+                self.tag.source("\tEXPECTED") + " );\n"
+            )
+        return code
+
+    def invocation(self):
+        """Generate source code for test invocation"""
+        code = super().invocation()
+        code += "\thmac_ok ( &%s );\n" % self.test_name
+        return code
+
+@attrclass
+class HmacTestGroup(TestGroup):
+    """An HMAC test group"""
+    keySize = scalar_field(int)
+    tagSize = scalar_field(int)
+    tests = list_field(HmacTestCase)
+
+@attrclass
+class HmacTestFile(TestFile):
+    """An HMAC test file"""
+    SCHEMA: ClassVar = "mac_test_schema_v1.json"
+    testGroups = list_field(HmacTestGroup)
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "hmac_%s" % self.ALGORITHM
+
+@attrclass
+class HmacSha1TestFile(HmacTestFile):
+    """An HMAC-SHA1 test file"""
+    ALGORITHM: ClassVar = "sha1"
+    LABEL: ClassVar = "HMAC-SHA1"
+    SRCFILE: ClassVar = "hmac_sha1_test.json"
+
+@attrclass
+class HmacSha224TestFile(HmacTestFile):
+    """An HMAC-SHA224 test file"""
+    ALGORITHM: ClassVar = "sha224"
+    LABEL: ClassVar = "HMAC-SHA224"
+    SRCFILE: ClassVar = "hmac_sha224_test.json"
+
+@attrclass
+class HmacSha256TestFile(HmacTestFile):
+    """An HMAC-SHA256 test file"""
+    ALGORITHM: ClassVar = "sha256"
+    LABEL: ClassVar = "HMAC-SHA256"
+    SRCFILE: ClassVar = "hmac_sha256_test.json"
+
+@attrclass
+class HmacSha384TestFile(HmacTestFile):
+    """An HMAC-SHA384 test file"""
+    ALGORITHM: ClassVar = "sha384"
+    LABEL: ClassVar = "HMAC-SHA384"
+    SRCFILE: ClassVar = "hmac_sha384_test.json"
+
+@attrclass
+class HmacSha512TestFile(HmacTestFile):
+    """An HMAC-SHA512 test file"""
+    ALGORITHM: ClassVar = "sha512"
+    LABEL: ClassVar = "HMAC-SHA512"
+    SRCFILE: ClassVar = "hmac_sha512_test.json"
+
+@attrclass
+class HmacSha512224TestFile(HmacTestFile):
+    """An HMAC-SHA512/224 test file"""
+    ALGORITHM: ClassVar = "sha512_224"
+    LABEL: ClassVar = "HMAC-SHA512/224"
+    SRCFILE: ClassVar = "hmac_sha512_224_test.json"
+
+@attrclass
+class HmacSha512256TestFile(HmacTestFile):
+    """An HMAC-SHA512/256 test file"""
+    ALGORITHM: ClassVar = "sha512_256"
+    LABEL: ClassVar = "HMAC-SHA512/256"
+    SRCFILE: ClassVar = "hmac_sha512_256_test.json"
+
+##############################################################################
+#
 # Main program
 #
 
@@ -524,6 +651,13 @@ def main():
 
     # Read JSON inputs
     classes = (
+        HmacSha1TestFile,
+        HmacSha224TestFile,
+        HmacSha256TestFile,
+        HmacSha384TestFile,
+        HmacSha512TestFile,
+        HmacSha512224TestFile,
+        HmacSha512256TestFile,
         P256ExchangeTestFile,
         P384ExchangeTestFile,
         X25519TestFile,

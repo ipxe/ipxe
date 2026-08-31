@@ -38,57 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/sha1.h>
 #include <ipxe/sha256.h>
 #include <ipxe/test.h>
-
-/** Define inline key data */
-#define KEY(...) { __VA_ARGS__ }
-
-/** Define inline data */
-#define DATA(...) { __VA_ARGS__ }
-
-/** Define inline expected HMAC */
-#define EXPECTED(...) { __VA_ARGS__ }
-
-/** An HMAC test */
-struct hmac_test {
-	/** Digest algorithm */
-	struct digest_algorithm *digest;
-	/** Key */
-	const void *key;
-	/** Length of key */
-	size_t key_len;
-	/** Data */
-	const void *data;
-	/** Length of data */
-	size_t data_len;
-	/** Expected HMAC */
-	const void *expected;
-	/** Length of expected HMAC */
-	size_t expected_len;
-};
-
-/**
- * Define an HMAC test
- *
- * @v name		Test name
- * @v DIGEST		Digest algorithm
- * @v KEY		Key
- * @v DATA		Data
- * @v EXPECTED		Expected HMAC
- * @ret test		HMAC test
- */
-#define HMAC_TEST( name, DIGEST, KEY, DATA, EXPECTED )			\
-	static const uint8_t name ## _key[] = KEY;			\
-	static const uint8_t name ## _data[] = DATA;			\
-	static const uint8_t name ## _expected[] = EXPECTED;		\
-	static struct hmac_test name = {				\
-		.digest = DIGEST,					\
-		.key = name ## _key,					\
-		.key_len = sizeof ( name ## _key ),			\
-		.data = name ## _data,					\
-		.data_len = sizeof ( name ## _data ),			\
-		.expected = name ## _expected,				\
-		.expected_len = sizeof ( name ## _expected ),		\
-	}
+#include "hmac_test.h"
 
 /**
  * Report an HMAC test result
@@ -97,8 +47,8 @@ struct hmac_test {
  * @v file		Test code file
  * @v line		Test code line
  */
-static void hmac_okx ( struct hmac_test *test, const char *file,
-		       unsigned int line ) {
+void hmac_okx ( struct hmac_test *test, const char *file,
+		unsigned int line ) {
 	struct digest_algorithm *digest = test->digest;
 	uint8_t ctx[ hmac_ctxsize ( digest ) ];
 	uint8_t key[ hmac_keysize ( digest ) ];
@@ -136,7 +86,6 @@ static void hmac_okx ( struct hmac_test *test, const char *file,
 	okx ( memcmp ( hmac, test->expected, test->expected_len ) == 0,
 	      file, line );
 }
-#define hmac_ok( test ) hmac_okx ( test, __FILE__, __LINE__ )
 
 /* Empty key and data */
 HMAC_TEST ( hmac_empty, &sha256_algorithm, KEY(), DATA(),
