@@ -17,8 +17,13 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/sha512.h>
 #include <ipxe/x25519.h>
 #include "exchange_test.h"
+#include "hkdf_test.h"
 #include "hmac_test.h"
 
+extern void wycheproof_hkdf_sha1_exec ( void );
+extern void wycheproof_hkdf_sha256_exec ( void );
+extern void wycheproof_hkdf_sha384_exec ( void );
+extern void wycheproof_hkdf_sha512_exec ( void );
 extern void wycheproof_hmac_sha1_exec ( void );
 extern void wycheproof_hmac_sha224_exec ( void );
 extern void wycheproof_hmac_sha256_exec ( void );

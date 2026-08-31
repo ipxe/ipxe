@@ -626,6 +626,111 @@ class HmacSha512256TestFile(HmacTestFile):
 
 ##############################################################################
 #
+# HKDF tests
+#
+
+class HkdfTestFlag(Enum):
+    """An HKDF test flag"""
+    EMPTY_SALT = "EmptySalt"
+    MAXIMAL_OUTPUT_SIZE = "MaximalOutputSize"
+    NORMAL = "Normal"
+    OUTPUT_COLLISION = "OutputCollision"
+    SIZE_TOO_LARGE = "SizeTooLarge"
+
+@attrclass
+class HkdfTestCase(TestCase):
+    """An HKDF test case"""
+    flags = set_field(HkdfTestFlag)
+    ikm = scalar_field(HexBytes, metadata={"stable": True})
+    salt = scalar_field(HexBytes, metadata={"stable": True})
+    info = scalar_field(HexBytes, metadata={"stable": True})
+    size = scalar_field(int, metadata={"stable": True})
+    okm = scalar_field(HexBytes)
+
+    @ikm.validator
+    def validate_ikm(self, attr, value):
+        """Validate key size"""
+        self.validate_fixed(attr, value, (self.test_group.keySize // 8))
+
+    @property
+    def skip(self):
+        """Reason for skipping test (if any)"""
+        if HkdfTestFlag.SIZE_TOO_LARGE in self.flags:
+            # Our HKDF abstraction does not perform runtime checks for
+            # the output key material size
+            return "size too large"
+
+    def definition(self):
+        """Generate source code for test definition"""
+        code = super().definition()
+        if not self.skip:
+            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            salted = (len(self.salt) > 0)
+            code += (
+                "HKDF_TEST ( %s, %s, %d,\n" % (
+                    self.test_name, algorithm, salted
+                ) +
+                self.ikm.source("\tIKM") + ",\n" +
+                self.salt.source("\tSALT") + ",\n" +
+                self.info.source("\tINFO") + ",\n" +
+                "\tPRK_UNSPECIFIED,\n" +
+                self.okm.source("\tOKM") + " );\n"
+            )
+        return code
+
+    def invocation(self):
+        """Generate source code for test invocation"""
+        code = super().invocation()
+        code += "\thkdf_ok ( &%s );\n" % self.test_name
+        return code
+
+@attrclass
+class HkdfTestGroup(TestGroup):
+    """An HKDF test group"""
+    keySize = scalar_field(int)
+    tests = list_field(HkdfTestCase)
+
+@attrclass
+class HkdfTestFile(TestFile):
+    """An HKDF test file"""
+    SCHEMA: ClassVar = "hkdf_test_schema_v1.json"
+    testGroups = list_field(HkdfTestGroup)
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "hkdf_%s" % self.ALGORITHM
+
+@attrclass
+class HkdfSha1TestFile(HkdfTestFile):
+    """An HKDF-SHA1 test file"""
+    ALGORITHM: ClassVar = "sha1"
+    LABEL: ClassVar = "HKDF-SHA1"
+    SRCFILE: ClassVar = "hkdf_sha1_test.json"
+
+@attrclass
+class HkdfSha256TestFile(HkdfTestFile):
+    """An HKDF-SHA256 test file"""
+    ALGORITHM: ClassVar = "sha256"
+    LABEL: ClassVar = "HKDF-SHA256"
+    SRCFILE: ClassVar = "hkdf_sha256_test.json"
+
+@attrclass
+class HkdfSha384TestFile(HkdfTestFile):
+    """An HKDF-SHA384 test file"""
+    ALGORITHM: ClassVar = "sha384"
+    LABEL: ClassVar = "HKDF-SHA384"
+    SRCFILE: ClassVar = "hkdf_sha384_test.json"
+
+@attrclass
+class HkdfSha512TestFile(HkdfTestFile):
+    """An HKDF-SHA512 test file"""
+    ALGORITHM: ClassVar = "sha512"
+    LABEL: ClassVar = "HKDF-SHA512"
+    SRCFILE: ClassVar = "hkdf_sha512_test.json"
+
+##############################################################################
+#
 # Main program
 #
 
@@ -651,6 +756,10 @@ def main():
 
     # Read JSON inputs
     classes = (
+        HkdfSha1TestFile,
+        HkdfSha256TestFile,
+        HkdfSha384TestFile,
+        HkdfSha512TestFile,
         HmacSha1TestFile,
         HmacSha224TestFile,
         HmacSha256TestFile,
