@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import textwrap
 from typing import ClassVar
+import weakref
 
 import attrs
 
@@ -19,38 +20,51 @@ import attrs
 
 attrclass = attrs.define(frozen=True, kw_only=True)
 
-def scalar_field(cls, **kwargs):
-    """Define an auto-converting field holding a single scalar value"""
-    if attrs.has(cls):
-        converter = lambda x: cls(**x)
+def auto_converter(typ):
+    """Define an automatic converter"""
+    if attrs.has(typ):
+        has_parent = ("_parent" in attrs.fields_dict(typ))
+        def converter(value, self):
+            if has_parent:
+                value["_parent"] = self
+            return typ(**value)
     else:
-        converter = cls
+        def converter(value, self):
+            return typ(value)
+    return converter
+
+def scalar_field(typ, **kwargs):
+    """Define an auto-converting field holding a single scalar value"""
+    converter = attrs.Converter(auto_converter(typ), takes_self=True)
     if "default" in kwargs:
         converter = attrs.converters.optional(converter)
     return attrs.field(converter=converter, **kwargs)
 
-def list_field(cls, **kwargs):
+def list_field(typ, **kwargs):
     """Define an auto-converting field holding an ordered list of values"""
-    if attrs.has(cls):
-        converter = lambda l: [cls(**x) for x in l]
-    else:
-        converter = lambda l: [cls(x) for x in l]
+    subconverter = auto_converter(typ)
+    converter = attrs.Converter(
+        lambda l, self: [subconverter(x, self) for x in l],
+        takes_self=True,
+    )
     return attrs.field(converter=converter, **kwargs)
 
-def set_field(cls, **kwargs):
+def set_field(typ, **kwargs):
     """Define an auto-converting field holding an unordered set of values"""
-    if attrs.has(cls):
-        converter = lambda l: {cls(**x) for x in l}
-    else:
-        converter = lambda l: {cls(x) for x in l}
+    subconverter = auto_converter(typ)
+    converter = attrs.Converter(
+        lambda l, self: {subconverter(x, self) for x in l},
+        takes_self=True,
+    )
     return attrs.field(converter=converter, **kwargs)
 
-def map_field(cls, **kwargs):
+def map_field(typ, **kwargs):
     """Define an auto-converting field holding a map of values"""
-    if attrs.has(cls):
-        converter = lambda d: {k: cls(**v) for k, v in d.items()}
-    else:
-        converter = lambda d: {k: cls(v) for k, v in d.items()}
+    subconverter = auto_converter(typ)
+    converter = attrs.Converter(
+        lambda d, self: {k: subconverter(v, self) for k, v in d.items()},
+        takes_self=True,
+    )
     return attrs.field(converter=converter, **kwargs)
 
 ##############################################################################
@@ -131,11 +145,21 @@ class TestSource:
 @attrclass
 class TestCase:
     """A test case"""
-    ALGORITHM: ClassVar = None
+    _parent = scalar_field(weakref.proxy, alias="_parent")
     comment = scalar_field(str)
     flags = set_field(str)
     result = scalar_field(TestResult)
     tcId = scalar_field(int)
+
+    @property
+    def test_group(self):
+        """Containing test group"""
+        return self._parent
+
+    @property
+    def test_file(self):
+        """Containing test file"""
+        return self.test_group.test_file
 
     def validate_fixed(self, attr, value, size):
         """Validate a fixed-size attribute"""
@@ -165,7 +189,7 @@ class TestCase:
     @property
     def failure(self):
         """Check if test case is expected to fail"""
-        return 0
+        return self.result is TestResult.INVALID
 
     @property
     def stable_id(self):
@@ -182,7 +206,7 @@ class TestCase:
             if field.metadata.get("stable")
         }
         digest = hashlib.sha256()
-        digest.update(b"algorithm:%s" % self.ALGORITHM.encode())
+        digest.update(b"algorithm:%s" % self.test_file.ALGORITHM.encode())
         for name, value in sorted(props.items()):
             digest.update(b":%s:%d:%s" % (name, len(value), value))
         return digest.hexdigest()[:8]
@@ -190,7 +214,12 @@ class TestCase:
     @property
     def test_name(self):
         """Test case name"""
-        return "wycheproof_%s_%s" % (self.ALGORITHM, self.stable_id)
+        return "wycheproof_%s_%s" % (self.test_file.basename, self.stable_id)
+
+    @property
+    def test_label(self):
+        """Test case label"""
+        return self.test_file.LABEL
 
     def definition(self):
         """Generate source code for test definition
@@ -201,7 +230,7 @@ class TestCase:
         """
         skip = self.skip
         code = (
-            "/* %s test case %d" % (self.ALGORITHM.upper(), self.tcId) +
+            "/* %s test case %d" % (self.test_label, self.tcId) +
             (" (skipped: %s)" % skip if skip else "") +
             " */\n"
         )
@@ -214,22 +243,34 @@ class TestCase:
 @attrclass
 class TestGroup:
     """A test group"""
+    _parent = scalar_field(weakref.proxy, alias="_parent")
     source = scalar_field(TestSource)
     tests = list_field(TestCase)
     type = scalar_field(str)
 
+    @property
+    def test_file(self):
+        """Containing test file"""
+        return self._parent
+
 @attrclass
 class TestFile:
     """A test file"""
+    ALGORITHM: ClassVar = None
+    LABEL: ClassVar = None
     SCHEMA: ClassVar = None
     SRCFILE: ClassVar = None
-    DSTFILE: ClassVar = None
     algorithm = scalar_field(str, default=None)
     header = list_field(str, factory=list)
     notes = map_field(TestNote, factory=dict)
     numberOfTests = scalar_field(int)
     schema = scalar_field(str)
     testGroups = list_field(TestGroup)
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return self.ALGORITHM
 
     @property
     def tests(self):
@@ -244,13 +285,14 @@ class TestFile:
                 (self.SRCFILE, self.schema, self.SCHEMA)
             )
         generator = Path(__file__).name
+        execname = "wycheproof_%s_exec" % self.basename
         tests = self.tests
+        label = tests[0].test_label
         if len(tests) != self.numberOfTests:
             raise ValueError(
                 "%s: found %d tests (expected %d)" %
                 (self.SRCFILE, len(tests), self.numberOfTests)
             )
-        algorithm = tests[0].ALGORITHM
         definitions = "\n".join(x.definition() for x in tests)
         invocations = "".join(x.invocation() for x in tests if not x.skip)
         code = (
@@ -266,8 +308,8 @@ class TestFile:
             """).lstrip() +
             definitions +
             textwrap.dedent(f"""
-            /** Perform Wycheproof {algorithm} self-tests */
-            void wycheproof_{algorithm}_exec ( void ) {{
+            /** Perform Wycheproof {label} self-tests */
+            void {execname} ( void ) {{
 
             \t/* Perform tests in tcId order */
             """) +
@@ -301,9 +343,6 @@ class TestFile:
 @attrclass
 class ExchangeTestCase(TestCase):
     """A key exchange test case"""
-    PRIVSIZE: ClassVar = None
-    PUBSIZE: ClassVar = None
-    SHAREDSIZE: ClassVar = None
     private = scalar_field(HexBytes, metadata={"stable": True})
     public = scalar_field(HexBytes, metadata={"stable": True})
     shared = scalar_field(HexBytes)
@@ -311,35 +350,34 @@ class ExchangeTestCase(TestCase):
     @private.validator
     def validate_private(self, attr, value):
         """Validate private key size"""
-        self.validate_padded(attr, value, self.PRIVSIZE)
+        self.validate_padded(attr, value, self.test_file.PRIVSIZE)
 
     @public.validator
     def validate_public(self, attr, value):
         """Validate public key size"""
-        self.validate_fixed(attr, value, self.PUBSIZE)
+        self.validate_fixed(attr, value, self.test_file.PUBSIZE)
 
     @shared.validator
     def validate_shared(self, attr, value):
         """Validate shared key size"""
         if not self.failure:
-            self.validate_fixed(attr, value, self.SHAREDSIZE)
-
-    @property
-    def failure(self):
-        return self.result is TestResult.INVALID
+            self.validate_fixed(attr, value, self.test_file.SHAREDSIZE)
 
     def definition(self):
         """Generate source code for test definition"""
         code = super().definition()
         if not self.skip:
-            algorithm = "&%s_algorithm" % self.ALGORITHM
+            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            privsize = self.test_file.PRIVSIZE
+            pubsize = self.test_file.PUBSIZE
+            sharedsize = self.test_file.SHAREDSIZE
             code += (
                 "EXCHANGE_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
-                self.private.source("\tPRIVATE", self.PRIVSIZE) + ",\n" +
-                self.public.source("\tPARTNER", self.PUBSIZE) + ",\n" +
+                self.private.source("\tPRIVATE", privsize) + ",\n" +
+                self.public.source("\tPARTNER", pubsize) + ",\n" +
                 "\tPUBLIC_UNSPECIFIED,\n" +
                 ("\tSHARED_FAIL" if self.failure else
-                 self.shared.source("\tSHARED", self.SHAREDSIZE)) + " );\n"
+                 self.shared.source("\tSHARED", sharedsize)) + " );\n"
             )
         return code
 
@@ -348,6 +386,19 @@ class ExchangeTestCase(TestCase):
         code = super().invocation()
         code += "\texchange_ok ( &%s );\n" % self.test_name
         return code
+
+@attrclass
+class ExchangeTestGroup(TestGroup):
+    """A key exchange test group"""
+    tests = list_field(ExchangeTestCase)
+
+@attrclass
+class ExchangeTestFile(TestFile):
+    """A key exchange test file"""
+    PRIVSIZE: ClassVar = None
+    PUBSIZE: ClassVar = None
+    SHAREDSIZE: ClassVar = None
+    testGroups = list_field(ExchangeTestGroup)
 
 ##############################################################################
 #
@@ -360,66 +411,44 @@ class NistExchangeTestCase(ExchangeTestCase):
 
     @property
     def skip(self):
+        """Reason for skipping test (if any)"""
         if not self.public:
             return "no public key"
         if self.public[0] in (0x02, 0x03):
             return "compressed"
 
-##############################################################################
-#
-# P-256 key exchange tests
-#
+@attrclass
+class NistExchangeTestGroup(ExchangeTestGroup):
+    """A NIST elliptic curve key exchange test group"""
+    curve = scalar_field(str)
+    encoding = scalar_field(str)
+    tests = list_field(NistExchangeTestCase)
 
 @attrclass
-class P256ExchangeTestCase(NistExchangeTestCase):
-    """A P-256 key exchange test case"""
+class NistExchangeTestFile(ExchangeTestFile):
+    """A NIST elliptic curve key exchange test file"""
+    SCHEMA: ClassVar = "ecdh_ecpoint_test_schema_v1.json"
+    testGroups = list_field(NistExchangeTestGroup)
+
+@attrclass
+class P256ExchangeTestFile(NistExchangeTestFile):
+    """A P-256 key exchange test file"""
     ALGORITHM: ClassVar = "p256"
+    LABEL: ClassVar = "P256"
+    SRCFILE: ClassVar = "ecdh_secp256r1_ecpoint_test.json"
     PRIVSIZE: ClassVar = 32
     PUBSIZE: ClassVar = 65
     SHAREDSIZE: ClassVar = 32
 
 @attrclass
-class P256ExchangeTestGroup(TestGroup):
-    """A P-256 key exchange test group"""
-    curve = scalar_field(str)
-    encoding = scalar_field(str)
-    tests = list_field(P256ExchangeTestCase)
-
-@attrclass
-class P256ExchangeTestFile(TestFile):
-    """A P-256 key exchange test file"""
-    SCHEMA: ClassVar = "ecdh_ecpoint_test_schema_v1.json"
-    SRCFILE: ClassVar = "ecdh_secp256r1_ecpoint_test.json"
-    DSTFILE: ClassVar = "wycheproof_p256.c"
-    testGroups = list_field(P256ExchangeTestGroup)
-
-##############################################################################
-#
-# P-384 key exchange tests
-#
-
-@attrclass
-class P384ExchangeTestCase(NistExchangeTestCase):
-    """A P-384 key exchange test case"""
+class P384ExchangeTestFile(NistExchangeTestFile):
+    """A P-384 key exchange test file"""
     ALGORITHM: ClassVar = "p384"
+    LABEL: ClassVar = "P384"
+    SRCFILE: ClassVar = "ecdh_secp384r1_ecpoint_test.json"
     PRIVSIZE: ClassVar = 48
     PUBSIZE: ClassVar = 97
     SHAREDSIZE: ClassVar = 48
-
-@attrclass
-class P384ExchangeTestGroup(TestGroup):
-    """A P-384 key exchange test group"""
-    curve = scalar_field(str)
-    encoding = scalar_field(str)
-    tests = list_field(P384ExchangeTestCase)
-
-@attrclass
-class P384ExchangeTestFile(TestFile):
-    """A P-384 key exchange test file"""
-    SCHEMA: ClassVar = "ecdh_ecpoint_test_schema_v1.json"
-    SRCFILE: ClassVar = "ecdh_secp384r1_ecpoint_test.json"
-    DSTFILE: ClassVar = "wycheproof_p384.c"
-    testGroups = list_field(P384ExchangeTestGroup)
 
 ##############################################################################
 #
@@ -443,28 +472,29 @@ class X25519TestFlag(Enum):
 @attrclass
 class X25519TestCase(ExchangeTestCase):
     """An X25519 key exchange test case"""
-    ALGORITHM: ClassVar = "x25519"
-    PRIVSIZE: ClassVar = 32
-    PUBSIZE: ClassVar = 32
-    SHAREDSIZE: ClassVar = 32
     flags = set_field(X25519TestFlag)
 
     @property
     def failure(self):
+        """Check if test case is expected to fail"""
         return X25519TestFlag.ZERO_SHARED_SECRET in self.flags
 
 @attrclass
-class X25519TestGroup(TestGroup):
+class X25519TestGroup(ExchangeTestGroup):
     """An X25519 key exchange test group"""
     curve = scalar_field(str)
     tests = list_field(X25519TestCase)
 
 @attrclass
-class X25519TestFile(TestFile):
+class X25519TestFile(ExchangeTestFile):
     """An X25519 key exchange test file"""
+    ALGORITHM: ClassVar = "x25519"
+    LABEL: ClassVar = "X25519"
     SCHEMA: ClassVar = "xdh_comp_schema_v1.json"
     SRCFILE: ClassVar = "x25519_test.json"
-    DSTFILE: ClassVar = "wycheproof_x25519.c"
+    PRIVSIZE: ClassVar = 32
+    PUBSIZE: ClassVar = 32
+    SHAREDSIZE: ClassVar = 32
     testGroups = list_field(X25519TestGroup)
 
 ##############################################################################
@@ -502,7 +532,7 @@ def main():
 
     # Write source code outputs
     for test in tests:
-        test.write(dstdir / test.DSTFILE)
+        test.write(dstdir / ("wycheproof_%s.c" % test.basename))
 
 if __name__ == "__main__":
     main()

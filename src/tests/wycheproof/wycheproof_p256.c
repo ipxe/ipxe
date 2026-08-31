@@ -6550,7 +6550,7 @@ EXCHANGE_TEST ( wycheproof_p256_3551fa82, &p256_algorithm,
 
 /* P256 test case 355 (skipped: compressed) */
 
-/** Perform Wycheproof p256 self-tests */
+/** Perform Wycheproof P256 self-tests */
 void wycheproof_p256_exec ( void ) {
 
 	/* Perform tests in tcId order */

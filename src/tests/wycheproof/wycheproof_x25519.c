@@ -8201,7 +8201,7 @@ EXCHANGE_TEST ( wycheproof_x25519_fad4ba69, &x25519_algorithm,
 		 0x59, 0x0d, 0xbe, 0x14, 0xdb, 0x02, 0x74, 0xcc, 0x86, 0x11,
 		 0xf9, 0x14 ) );
 
-/** Perform Wycheproof x25519 self-tests */
+/** Perform Wycheproof X25519 self-tests */
 void wycheproof_x25519_exec ( void ) {
 
 	/* Perform tests in tcId order */

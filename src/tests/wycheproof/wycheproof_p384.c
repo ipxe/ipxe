@@ -18836,7 +18836,7 @@ EXCHANGE_TEST ( wycheproof_p384_4b73134e, &p384_algorithm,
 
 /* P384 test case 790 (skipped: compressed) */
 
-/** Perform Wycheproof p384 self-tests */
+/** Perform Wycheproof P384 self-tests */
 void wycheproof_p384_exec ( void ) {
 
 	/* Perform tests in tcId order */
