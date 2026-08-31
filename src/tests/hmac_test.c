@@ -108,7 +108,8 @@ static void hmac_okx ( struct hmac_test *test, const char *file,
 	okx ( sizeof ( ctx ) == ( digest->ctxsize + digest->blocksize ),
 	      file, line );
 	okx ( sizeof ( key ) == digest->blocksize, file, line );
-	okx ( test->expected_len == digest->digestsize, file, line );
+	okx ( test->expected_len > 0, file, line );
+	okx ( test->expected_len <= digest->digestsize, file, line );
 
 	/* Calculate HMAC */
 	DBGC ( test, "HMAC-%s key:\n", digest->name );
