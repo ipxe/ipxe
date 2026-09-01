@@ -53,6 +53,10 @@ FILE_LICENCE ( BSD2 );
 /** Self-tests */
 struct self_test wycheproof_test[] __self_test = {
 	{
+		.name = "wycheproof:aes-gcm",
+		.exec = wycheproof_aes_gcm_exec,
+	},
+	{
 		.name = "wycheproof:hkdf-sha1",
 		.exec = wycheproof_hkdf_sha1_exec,
 	},

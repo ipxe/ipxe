@@ -731,6 +731,139 @@ class HkdfSha512TestFile(HkdfTestFile):
 
 ##############################################################################
 #
+# AEAD cipher tests
+#
+
+class AeadCipherTestFlag(Enum):
+    COUNTER_WRAP = "CounterWrap"
+    KTV = "Ktv"
+    LONG_IV = "LongIv"
+    MODIFIED_TAG = "ModifiedTag"
+    PSEUDORANDOM = "Pseudorandom"
+    SMALL_IV = "SmallIv"
+    SPECIAL_CASE = "SpecialCase"
+    ZERO_LENGTH_IV = "ZeroLengthIv"
+
+@attrclass
+class AeadCipherTestCase(TestCase):
+    """An AEAD cipher test case"""
+    flags = set_field(AeadCipherTestFlag)
+    key = scalar_field(HexBytes, metadata={"stable": True})
+    iv = scalar_field(HexBytes, metadata={"stable": True})
+    aad = scalar_field(HexBytes, metadata={"stable": True})
+    msg = scalar_field(HexBytes, metadata={"stable": True})
+    ct = scalar_field(HexBytes)
+    tag = scalar_field(HexBytes)
+
+    @key.validator
+    def validate_key(self, attr, value):
+        """Validate key size"""
+        self.validate_fixed(attr, value, (self.test_group.keySize // 8))
+
+    @iv.validator
+    def validate_iv(self, attr, value):
+        """Validate IV size"""
+        self.validate_fixed(attr, value, (self.test_group.ivSize // 8))
+
+    @tag.validator
+    def validate_tag(self, attr, value):
+        """Validate tag size"""
+        self.validate_fixed(attr, value, (self.test_group.tagSize // 8))
+
+    @property
+    def skip(self):
+        """Reason for skipping test (if any)"""
+        if AeadCipherTestFlag.MODIFIED_TAG in self.flags:
+            # Our cipher abstraction covers only generating the tag,
+            # not comparing the tag to check for a match
+            return "modified tag"
+
+    @property
+    def key_failure(self):
+        """Check if test case is expected to fail due to invalid key"""
+        return False
+
+    @property
+    def iv_failure(self):
+        """Check if test case is expected to fail due to invalid IV"""
+        return False
+
+    def definition(self):
+        """Generate source code for test definition"""
+        code = super().definition()
+        if not self.skip:
+            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            code += (
+                "CIPHER_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+                self.key.source("\tKEY") + ",\n" +
+                self.iv.source("\tIV") + ",\n" +
+                self.aad.source("\tADDITIONAL") + ",\n" +
+                self.msg.source("\tPLAINTEXT") + ",\n" +
+                self.ct.source("\tCIPHERTEXT") + ",\n" +
+                self.tag.source("\tAUTH") + " );\n"
+            )
+        return code
+
+    def invocation(self):
+        """Generate source code for test invocation"""
+        code = super().invocation()
+        if self.key_failure:
+            code += "\tcipher_key_fail_ok ( &%s );\n" % self.test_name
+        elif self.iv_failure:
+            code += "\tcipher_iv_fail_ok ( &%s );\n" % self.test_name
+        elif self.failure:
+            raise ValueError("%d: unknown cipher failure reason" % self.tcId)
+        else:
+            code += "\tcipher_ok ( &%s );\n" % self.test_name
+        return code
+
+@attrclass
+class AeadCipherTestGroup(TestGroup):
+    """An AEAD cipher test group"""
+    ivSize = scalar_field(int)
+    keySize = scalar_field(int)
+    tagSize = scalar_field(int)
+    tests = list_field(AeadCipherTestCase)
+
+@attrclass
+class AeadCipherTestFile(TestFile):
+    """An AEAD cipher test file"""
+    SCHEMA: ClassVar = "aead_test_schema_v1.json"
+    testGroups = list_field(AeadCipherTestGroup)
+
+##############################################################################
+#
+# GCM cipher tests
+#
+
+@attrclass
+class GcmCipherTestCase(AeadCipherTestCase):
+    """A GCM cipher test case"""
+
+    @property
+    def iv_failure(self):
+        """Check if test case is expected to fail due to invalid IV"""
+        return AeadCipherTestFlag.ZERO_LENGTH_IV in self.flags
+
+@attrclass
+class GcmCipherTestGroup(AeadCipherTestGroup):
+    """A GCM cipher test group"""
+    tests = list_field(GcmCipherTestCase)
+
+@attrclass
+class GcmCipherTestFile(AeadCipherTestFile):
+    """A GCM cipher test file"""
+    testGroups = list_field(GcmCipherTestGroup)
+
+@attrclass
+class AesGcmCipherTestFile(GcmCipherTestFile):
+    """An AES-GCM cipher test file"""
+    ALGORITHM: ClassVar = "aes_gcm"
+    LABEL: ClassVar = "AES-GCM"
+    SRCFILE: ClassVar = "aes_gcm_test.json"
+
+##############################################################################
+#
 # Main program
 #
 
@@ -756,6 +889,7 @@ def main():
 
     # Read JSON inputs
     classes = (
+        AesGcmCipherTestFile,
         HkdfSha1TestFile,
         HkdfSha256TestFile,
         HkdfSha384TestFile,

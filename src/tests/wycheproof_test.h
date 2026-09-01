@@ -10,16 +10,19 @@
 FILE_LICENCE ( BSD2 );
 
 #include <ipxe/crypto.h>
+#include <ipxe/aes.h>
 #include <ipxe/p256.h>
 #include <ipxe/p384.h>
 #include <ipxe/sha1.h>
 #include <ipxe/sha256.h>
 #include <ipxe/sha512.h>
 #include <ipxe/x25519.h>
+#include "cipher_test.h"
 #include "exchange_test.h"
 #include "hkdf_test.h"
 #include "hmac_test.h"
 
+extern void wycheproof_aes_gcm_exec ( void );
 extern void wycheproof_hkdf_sha1_exec ( void );
 extern void wycheproof_hkdf_sha256_exec ( void );
 extern void wycheproof_hkdf_sha384_exec ( void );
