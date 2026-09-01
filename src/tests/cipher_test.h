@@ -102,6 +102,10 @@ extern void cipher_decrypt_okx ( struct cipher_test *test, const char *file,
 				 unsigned int line );
 extern void cipher_okx ( struct cipher_test *test, const char *file,
 			 unsigned int line );
+extern void cipher_key_fail_okx ( struct cipher_test *test, const char *file,
+				  unsigned int line );
+extern void cipher_iv_fail_okx ( struct cipher_test *test, const char *file,
+				 unsigned int line );
 extern unsigned long cipher_cost_encrypt ( struct cipher_algorithm *cipher,
 					   size_t key_len );
 extern unsigned long cipher_cost_decrypt ( struct cipher_algorithm *cipher,
@@ -130,5 +134,21 @@ extern unsigned long cipher_cost_decrypt ( struct cipher_algorithm *cipher,
  */
 #define cipher_ok( test ) \
 	cipher_okx ( test, __FILE__, __LINE__ )
+
+/**
+ * Report a cipher key failure test result
+ *
+ * @v test		Cipher test
+ */
+#define cipher_key_fail_ok( test ) \
+	cipher_key_fail_okx ( test, __FILE__, __LINE__ )
+
+/**
+ * Report a cipher IV failure test result
+ *
+ * @v test		Cipher test
+ */
+#define cipher_iv_fail_ok( test ) \
+	cipher_iv_fail_okx ( test, __FILE__, __LINE__ )
 
 #endif /* _CIPHER_TEST_H */

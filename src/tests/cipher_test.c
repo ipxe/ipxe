@@ -192,6 +192,42 @@ void cipher_okx ( struct cipher_test *test, const char *file,
 }
 
 /**
+ * Report a cipher key failure test result
+ *
+ * @v test		Cipher test
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+void cipher_key_fail_okx ( struct cipher_test *test, const char *file,
+			   unsigned int line ) {
+	struct cipher_algorithm *cipher = test->cipher;
+	uint8_t ctx[cipher->ctxsize];
+
+	/* Initialise cipher */
+	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) != 0,
+	      file, line );
+}
+
+/**
+ * Report a cipher IV failure test result
+ *
+ * @v test		Cipher test
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+void cipher_iv_fail_okx ( struct cipher_test *test, const char *file,
+			  unsigned int line ) {
+	struct cipher_algorithm *cipher = test->cipher;
+	uint8_t ctx[cipher->ctxsize];
+
+	/* Initialise cipher */
+	okx ( cipher_setkey ( cipher, ctx, test->key, test->key_len ) == 0,
+	      file, line );
+	okx ( cipher_setiv ( cipher, ctx, test->iv, test->iv_len ) != 0,
+	      file, line );
+}
+
+/**
  * Calculate cipher encryption or decryption cost
  *
  * @v cipher			Cipher algorithm
