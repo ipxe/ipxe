@@ -37,6 +37,7 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
 #include <byteswap.h>
 #include <ipxe/crypto.h>
 #include <ipxe/gcm.h>
@@ -473,7 +474,7 @@ int gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
 		/* Initialisation vector is exactly 96 bits, use it as-is */
 		memcpy ( context->gcm.ctr.ctr.iv, iv, ivlen );
 
-	} else {
+	} else if ( ivlen ) {
 
 		/* Calculate hash over initialisation vector */
 		context->gcm.flags = GCM_FL_IV;
@@ -486,6 +487,11 @@ int gcm_setiv ( struct cipher_algorithm *cipher, void *ctx,
 		build_assert ( gcm_offset ( ctr ) > gcm_offset ( hash ) );
 		build_assert ( gcm_offset ( ctr ) > gcm_offset ( len ) );
 		build_assert ( gcm_offset ( ctr ) < gcm_offset ( key ) );
+
+	} else {
+
+		/* Zero-length IVs are not permitted */
+		return -ENOTSUP;
 	}
 
 	DBGC2 ( context, "GCM %p Y[0]:\n", context );

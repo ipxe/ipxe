@@ -357,6 +357,10 @@ CIPHER_TEST ( gcm_test_18, &aes_gcm_algorithm, GCM_KEY_256,
 	      AUTH ( 0xa4, 0x4a, 0x82, 0x66, 0xee, 0x1c, 0x8e, 0xb0, 0xc8,
 		     0xb5, 0xd4, 0xcf, 0x5a, 0xe9, 0xf1, 0x9a ) );
 
+/** Zero-length IV */
+CIPHER_TEST ( gcm_empty_iv, &aes_gcm_algorithm, GCM_KEY_256, IV(),
+	      ADDITIONAL(), PLAINTEXT(), CIPHERTEXT(), AUTH() );
+
 /**
  * Perform Galois/Counter Mode self-test
  *
@@ -384,6 +388,7 @@ static void gcm_test_exec ( void ) {
 	cipher_ok ( &gcm_test_16 );
 	cipher_ok ( &gcm_test_17 );
 	cipher_ok ( &gcm_test_18 );
+	cipher_iv_fail_ok ( &gcm_empty_iv );
 
 	/* Speed tests */
 	for ( keylen = 128 ; keylen <= 256 ; keylen += 64 ) {
