@@ -1005,6 +1005,136 @@ class Rsa4096Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
 
 ##############################################################################
 #
+# RSA PKCS#1 signing tests
+#
+
+class RsaPkcs1SignShaAlgorithm(Enum):
+    """An RSA PKCS#1 signing digest algorithm"""
+    SHA1_ALGORITHM = "SHA-1"
+    SHA224_ALGORITHM = "SHA-224"
+    SHA256_ALGORITHM = "SHA-256"
+    SHA384_ALGORITHM = "SHA-384"
+    SHA512_ALGORITHM = "SHA-512"
+
+class RsaPkcs1SignTestFlag(Enum):
+    """An RSA PKCS#1 signing test flag"""
+    SMALL_MODULUS = "SmallModulus"
+    SMALL_PUBLIC_KEY = "SmallPublicKey"
+    WEAK_HASH = "WeakHash"
+
+@attrclass
+class RsaPkcs1SignTestCase(TestCase):
+    """An RSA PKCS#1 signing test case"""
+    flags = set_field(RsaPkcs1SignTestFlag)
+    msg = scalar_field(HexBytes, metadata={"stable": True})
+    sig = scalar_field(HexBytes, metadata={"stable": True})
+
+    def definition(self):
+        """Generate source code for test definition"""
+        code = super().definition()
+        digest = self.test_group.sha.name.lower()
+        code += (
+            "PUBKEY_SIGNATURE_TEST ( %s,\n" % self.test_name +
+            "\t&%s, RANDOM(),\n" % self.test_group.test_name +
+            self.msg.source("\tPLAINTEXT") + ",\n" +
+            "\t&%s,\n" % digest +
+            self.sig.source("\tSIGNATURE") + " );\n"
+        )
+        return code
+
+    def invocation(self):
+        """Generate source code for test invocation"""
+        code = super().invocation()
+        code += "\tpubkey_sign_verify_ok ( &%s );\n" % self.test_name
+        return code
+
+@attrclass
+class RsaPkcs1SignTestGroup(TestGroup):
+    """An RSA PKCS#1 signing test group"""
+    privateKey = map_field(str) # ignored
+    keyAsn = scalar_field(str) # ignored
+    keyDer = scalar_field(HexBytes, metadata={"stable": True})
+    keyJwk = map_field(str, factory=dict) # ignored
+    keyPem = scalar_field(str) # ignored
+    keySize = scalar_field(int)
+    privateKeyJwk = map_field(str, factory=dict) # ignored
+    privateKeyPem = scalar_field(str) # ignored
+    privateKeyPkcs8 = scalar_field(HexBytes, metadata={"stable": True})
+    sha = scalar_field(RsaPkcs1SignShaAlgorithm)
+    tests = list_field(RsaPkcs1SignTestCase)
+
+    @keySize.validator
+    def validate_key_size(self, attr, value):
+        """Validate key size"""
+        if value != self.test_file.KEYSIZE:
+            raise ValueError(
+                "%s: incorrect key size %d (expected %d)" %
+                (attr.name, value, self.test_file.KEYSIZE)
+            )
+
+    def definition(self):
+        """Generate source code for test group definition"""
+        algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+        code = (
+            "/* Key pair for following tests */\n" +
+            "PUBKEY_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+            self.privateKeyPkcs8.source("\tPRIVATE") + ",\n" +
+            self.keyDer.source("\tPUBLIC") + " );\n" +
+            "\n" +
+            super().definition()
+        )
+        return code
+
+@attrclass
+class RsaPkcs1SignTestFile(TestFile):
+    """An RSA PKCS#1 signing test file"""
+    ALGORITHM: ClassVar = "rsa"
+    SCHEMA: ClassVar = "rsassa_pkcs1_generate_schema_v1.json"
+    KEYSIZE: ClassVar = None
+    testGroups = list_field(RsaPkcs1SignTestGroup)
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "rsa_pkcs1_%d_sign" % self.KEYSIZE
+
+@attrclass
+class Rsa1024Pkcs1SignTestFile(RsaPkcs1SignTestFile):
+    """A 1024-bit RSA PKCS#1 signing test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 signing (1024-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_1024_sig_gen_test.json"
+    KEYSIZE: ClassVar = 1024
+
+@attrclass
+class Rsa1536Pkcs1SignTestFile(RsaPkcs1SignTestFile):
+    """A 1536-bit RSA PKCS#1 signing test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 signing (1536-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_1536_sig_gen_test.json"
+    KEYSIZE: ClassVar = 1536
+
+@attrclass
+class Rsa2048Pkcs1SignTestFile(RsaPkcs1SignTestFile):
+    """A 2048-bit RSA PKCS#1 signing test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 signing (2048-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_2048_sig_gen_test.json"
+    KEYSIZE: ClassVar = 2048
+
+@attrclass
+class Rsa3072Pkcs1SignTestFile(RsaPkcs1SignTestFile):
+    """A 3072-bit RSA PKCS#1 signing test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 signing (3072-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_3072_sig_gen_test.json"
+    KEYSIZE: ClassVar = 3072
+
+@attrclass
+class Rsa4096Pkcs1SignTestFile(RsaPkcs1SignTestFile):
+    """A 4096-bit RSA PKCS#1 signing test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 signing (4096-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_4096_sig_gen_test.json"
+    KEYSIZE: ClassVar = 4096
+
+##############################################################################
+#
 # Main program
 #
 
@@ -1044,9 +1174,14 @@ def main():
         HmacSha512256TestFile,
         P256ExchangeTestFile,
         P384ExchangeTestFile,
+        Rsa1024Pkcs1SignTestFile,
+        Rsa1536Pkcs1SignTestFile,
         Rsa2048Pkcs1DecryptTestFile,
+        Rsa2048Pkcs1SignTestFile,
         Rsa3072Pkcs1DecryptTestFile,
+        Rsa3072Pkcs1SignTestFile,
         Rsa4096Pkcs1DecryptTestFile,
+        Rsa4096Pkcs1SignTestFile,
         X25519TestFile,
     )
     tests = [x.read(srcdir / x.SRCFILE) for x in classes]
