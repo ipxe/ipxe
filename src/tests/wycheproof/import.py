@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from abc import abstractmethod
 import argparse
 import base64
 from enum import Enum
@@ -143,7 +144,46 @@ class TestSource:
     version = scalar_field(str)
 
 @attrclass
-class TestCase:
+class TestNamedObject:
+    """A test named object"""
+
+    @property
+    @abstractmethod
+    def test_file(self):
+        """Containing test file"""
+
+    @property
+    def stable_id(self):
+        """Calculate a stable test ID
+
+        The tcId provides a stable ordering but not a stable
+        numbering.  To avoid unnecessary churn when tests are
+        renumbered upstream, we construct a stable identifier built
+        from the relevant parameters of the test itself.
+        """
+        props = {
+            field.name.encode(): str(getattr(self, field.name)).encode()
+            for field in attrs.fields(type(self))
+            if field.metadata.get("stable")
+        }
+        digest = hashlib.sha256()
+        digest.update(b"algorithm:%s" % self.test_file.ALGORITHM.encode())
+        for name, value in sorted(props.items()):
+            digest.update(b":%s:%d:%s" % (name, len(value), value))
+        return digest.hexdigest()[:8]
+
+    @property
+    def test_name(self):
+        """Test case name"""
+        return "wycheproof_%s_%s" % (self.test_file.basename, self.stable_id)
+
+    @property
+    def test_label(self):
+        """Test case label"""
+        return self.test_file.LABEL
+
+@attrclass
+class TestCase(TestNamedObject):
     """A test case"""
     _parent = scalar_field(weakref.proxy, alias="_parent")
     comment = scalar_field(str)
@@ -191,36 +231,6 @@ class TestCase:
         """Check if test case is expected to fail"""
         return self.result is TestResult.INVALID
 
-    @property
-    def stable_id(self):
-        """Calculate a stable test ID
-
-        The tcId provides a stable ordering but not a stable
-        numbering.  To avoid unnecessary churn when tests are
-        renumbered upstream, we construct a stable identifier built
-        from the relevant parameters of the test itself.
-        """
-        props = {
-            field.name.encode(): str(getattr(self, field.name)).encode()
-            for field in attrs.fields(type(self))
-            if field.metadata.get("stable")
-        }
-        digest = hashlib.sha256()
-        digest.update(b"algorithm:%s" % self.test_file.ALGORITHM.encode())
-        for name, value in sorted(props.items()):
-            digest.update(b":%s:%d:%s" % (name, len(value), value))
-        return digest.hexdigest()[:8]
-
-    @property
-    def test_name(self):
-        """Test case name"""
-        return "wycheproof_%s_%s" % (self.test_file.basename, self.stable_id)
-
-    @property
-    def test_label(self):
-        """Test case label"""
-        return self.test_file.LABEL
-
     def definition(self):
         """Generate source code for test definition
 
@@ -241,7 +251,7 @@ class TestCase:
         return ""
 
 @attrclass
-class TestGroup:
+class TestGroup(TestNamedObject):
     """A test group"""
     _parent = scalar_field(weakref.proxy, alias="_parent")
     source = scalar_field(TestSource)
@@ -252,6 +262,11 @@ class TestGroup:
     def test_file(self):
         """Containing test file"""
         return self._parent
+
+    def definition(self):
+        """Generate source code for test group definition"""
+        code = "\n".join(x.definition() for x in self.tests)
+        return code
 
 @attrclass
 class TestFile:
@@ -301,7 +316,7 @@ class TestFile:
         execname = "wycheproof_%s_exec" % self.basename
         tests = self.tests
         label = tests[0].test_label
-        definitions = "\n".join(x.definition() for x in tests)
+        definitions = "\n".join(x.definition() for x in self.testGroups)
         invocations = "".join(x.invocation() for x in tests if not x.skip)
         code = (
             textwrap.dedent(f"""
