@@ -212,6 +212,18 @@ struct asn1_builder_header {
 	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
 	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 14 )
 
+/** ASN.1 OID for sha512-224WithRSAEncryption (1.2.840.113549.1.1.15) */
+#define ASN1_OID_SHA512_224WITHRSAENCRYPTION			\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 15 )
+
+/** ASN.1 OID for sha512-256WithRSAEncryption (1.2.840.113549.1.1.16) */
+#define ASN1_OID_SHA512_256WITHRSAENCRYPTION			\
+	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
+	ASN1_OID_TRIPLE ( 113549 ), ASN1_OID_SINGLE ( 1 ),	\
+	ASN1_OID_SINGLE ( 1 ), ASN1_OID_SINGLE ( 16 )
+
 /** ASN.1 OID for id-md4 (1.2.840.113549.2.4) */
 #define ASN1_OID_MD4						\
 	ASN1_OID_INITIAL ( 1, 2 ), ASN1_OID_DOUBLE ( 840 ),	\
@@ -448,13 +460,17 @@ extern struct asn1_algorithm md5_with_rsa_encryption_algorithm __asn1_algorithm;
 extern struct asn1_algorithm
 sha1_with_rsa_encryption_algorithm __asn1_algorithm;
 extern struct asn1_algorithm
+sha224_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm
 sha256_with_rsa_encryption_algorithm __asn1_algorithm;
 extern struct asn1_algorithm
 sha384_with_rsa_encryption_algorithm __asn1_algorithm;
 extern struct asn1_algorithm
 sha512_with_rsa_encryption_algorithm __asn1_algorithm;
 extern struct asn1_algorithm
-sha224_with_rsa_encryption_algorithm __asn1_algorithm;
+sha512_224_with_rsa_encryption_algorithm __asn1_algorithm;
+extern struct asn1_algorithm
+sha512_256_with_rsa_encryption_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_md4_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_md5_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha1_algorithm __asn1_algorithm;

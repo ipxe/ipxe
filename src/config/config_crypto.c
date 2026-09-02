@@ -169,6 +169,16 @@ REQUIRE_OBJECT ( rsa_sha384 );
 REQUIRE_OBJECT ( rsa_sha512 );
 #endif
 
+/* RSA and SHA-512/224 */
+#if defined ( CRYPTO_PUBKEY_RSA ) && defined ( CRYPTO_DIGEST_SHA512_224 )
+REQUIRE_OBJECT ( rsa_sha512_224 );
+#endif
+
+/* RSA and SHA-512/256 */
+#if defined ( CRYPTO_PUBKEY_RSA ) && defined ( CRYPTO_DIGEST_SHA512_256 )
+REQUIRE_OBJECT ( rsa_sha512_256 );
+#endif
+
 /* RSA, AES-CBC, and SHA-1 */
 #if defined ( CRYPTO_EXCHANGE_PUBKEY ) && defined ( CRYPTO_PUBKEY_RSA ) && \
     defined ( CRYPTO_CIPHER_AES_CBC ) && defined ( CRYPTO_DIGEST_SHA1 )
