@@ -414,6 +414,7 @@ static int rsa_pkcs1_decrypt ( struct pubkey_algorithm *pubkey __unused,
 	void *temp;
 	uint8_t *encoded;
 	uint8_t *end;
+	uint8_t *pad;
 	uint8_t *zero;
 	uint8_t *start;
 	size_t len;
@@ -450,8 +451,9 @@ static int rsa_pkcs1_decrypt ( struct pubkey_algorithm *pubkey __unused,
 		rc = -EINVAL;
 		goto err_invalid;
 	}
-	zero = memchr ( &encoded[2], 0, ( end - &encoded[2] ) );
-	if ( ! zero ) {
+	pad = &encoded[2];
+	zero = memchr ( pad, 0, ( end - pad ) );
+	if ( ( ! zero ) || ( ( zero - pad ) < 8 /* minimum padding */ ) ) {
 		DBGC ( &context, "RSA %p invalid decrypted message:\n",
 		       &context );
 		DBGC_HDA ( &context, 0, encoded, context.max_len );
