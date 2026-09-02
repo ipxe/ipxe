@@ -5000,7 +5000,7 @@ HKDF_TEST ( wycheproof_hkdf_sha384_9f8922d1, &sha384_algorithm, 1,
 	      0x99, 0x50 ) );
 
 /** Perform Wycheproof HKDF-SHA384 self-tests */
-void wycheproof_hkdf_sha384_exec ( void ) {
+static void wycheproof_hkdf_sha384_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	hkdf_ok ( &wycheproof_hkdf_sha384_95a892ba );
@@ -5084,3 +5084,10 @@ void wycheproof_hkdf_sha384_exec ( void ) {
 	hkdf_ok ( &wycheproof_hkdf_sha384_91245a0e );
 	hkdf_ok ( &wycheproof_hkdf_sha384_9f8922d1 );
 }
+
+/** Wycheproof HKDF-SHA384 self-tests */
+struct self_test wycheproof_hkdf_sha384 __self_test = {
+	.name = "wycheproof_hkdf_sha384",
+	.exec = wycheproof_hkdf_sha384_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_hkdf_sha384 );

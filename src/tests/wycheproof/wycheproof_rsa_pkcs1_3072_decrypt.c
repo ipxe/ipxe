@@ -10166,7 +10166,7 @@ PUBKEY_ENCRYPTION_TEST ( wycheproof_rsa_pkcs1_3072_decrypt_63dfd100,
 		     0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ) );
 
 /** Perform Wycheproof RSA-PKCS#1 (3072-bit) self-tests */
-void wycheproof_rsa_pkcs1_3072_decrypt_exec ( void ) {
+static void wycheproof_rsa_pkcs1_3072_decrypt_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	pubkey_decrypt_ok ( &wycheproof_rsa_pkcs1_3072_decrypt_983cf533 );
@@ -10237,3 +10237,10 @@ void wycheproof_rsa_pkcs1_3072_decrypt_exec ( void ) {
 	pubkey_decrypt_ok ( &wycheproof_rsa_pkcs1_3072_decrypt_2025e7f4 );
 	pubkey_decrypt_ok ( &wycheproof_rsa_pkcs1_3072_decrypt_63dfd100 );
 }
+
+/** Wycheproof RSA-PKCS#1 (3072-bit) self-tests */
+struct self_test wycheproof_rsa_pkcs1_3072_decrypt __self_test = {
+	.name = "wycheproof_rsa_pkcs1_3072_decrypt",
+	.exec = wycheproof_rsa_pkcs1_3072_decrypt_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_rsa_pkcs1_3072_decrypt );

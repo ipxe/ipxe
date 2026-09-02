@@ -1139,7 +1139,7 @@ HMAC_TEST ( wycheproof_hmac_sha256_d67d39a0, &sha256_algorithm,
 		   0xdd, 0xba, 0x68, 0xab, 0x34, 0xf5, 0xf1 ) );
 
 /** Perform Wycheproof HMAC-SHA256 self-tests */
-void wycheproof_hmac_sha256_exec ( void ) {
+static void wycheproof_hmac_sha256_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	hmac_ok ( &wycheproof_hmac_sha256_7c4140b3 );
@@ -1209,3 +1209,10 @@ void wycheproof_hmac_sha256_exec ( void ) {
 	hmac_ok ( &wycheproof_hmac_sha256_08887d89 );
 	hmac_ok ( &wycheproof_hmac_sha256_d67d39a0 );
 }
+
+/** Wycheproof HMAC-SHA256 self-tests */
+struct self_test wycheproof_hmac_sha256 __self_test = {
+	.name = "wycheproof_hmac_sha256",
+	.exec = wycheproof_hmac_sha256_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_hmac_sha256 );

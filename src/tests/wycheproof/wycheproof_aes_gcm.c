@@ -6798,7 +6798,7 @@ CIPHER_TEST ( wycheproof_aes_gcm_5356a2cb, &aes_gcm_algorithm,
 	       0xd2, 0x28, 0x45, 0x43, 0x63, 0xfa ) );
 
 /** Perform Wycheproof AES-GCM self-tests */
-void wycheproof_aes_gcm_exec ( void ) {
+static void wycheproof_aes_gcm_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	cipher_ok ( &wycheproof_aes_gcm_157a9714 );
@@ -7037,3 +7037,10 @@ void wycheproof_aes_gcm_exec ( void ) {
 	cipher_iv_fail_ok ( &wycheproof_aes_gcm_59e33b44 );
 	cipher_iv_fail_ok ( &wycheproof_aes_gcm_5356a2cb );
 }
+
+/** Wycheproof AES-GCM self-tests */
+struct self_test wycheproof_aes_gcm __self_test = {
+	.name = "wycheproof_aes_gcm",
+	.exec = wycheproof_aes_gcm_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_aes_gcm );

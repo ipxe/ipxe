@@ -3809,7 +3809,7 @@ HKDF_TEST ( wycheproof_hkdf_sha256_dab8c22b, &sha256_algorithm, 1,
 	      0x94, 0x9c ) );
 
 /** Perform Wycheproof HKDF-SHA256 self-tests */
-void wycheproof_hkdf_sha256_exec ( void ) {
+static void wycheproof_hkdf_sha256_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	hkdf_ok ( &wycheproof_hkdf_sha256_a0d947f7 );
@@ -3896,3 +3896,10 @@ void wycheproof_hkdf_sha256_exec ( void ) {
 	hkdf_ok ( &wycheproof_hkdf_sha256_44908c9b );
 	hkdf_ok ( &wycheproof_hkdf_sha256_dab8c22b );
 }
+
+/** Wycheproof HKDF-SHA256 self-tests */
+struct self_test wycheproof_hkdf_sha256 __self_test = {
+	.name = "wycheproof_hkdf_sha256",
+	.exec = wycheproof_hkdf_sha256_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_hkdf_sha256 );

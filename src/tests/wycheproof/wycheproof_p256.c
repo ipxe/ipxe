@@ -6551,7 +6551,7 @@ EXCHANGE_TEST ( wycheproof_p256_3551fa82, &p256_algorithm,
 /* P256 test case 355 (skipped: compressed) */
 
 /** Perform Wycheproof P256 self-tests */
-void wycheproof_p256_exec ( void ) {
+static void wycheproof_p256_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	exchange_ok ( &wycheproof_p256_0275e48b );
@@ -6901,3 +6901,10 @@ void wycheproof_p256_exec ( void ) {
 	exchange_ok ( &wycheproof_p256_fb2466c2 );
 	exchange_ok ( &wycheproof_p256_3551fa82 );
 }
+
+/** Wycheproof P256 self-tests */
+struct self_test wycheproof_p256 __self_test = {
+	.name = "wycheproof_p256",
+	.exec = wycheproof_p256_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_p256 );

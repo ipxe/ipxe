@@ -18837,7 +18837,7 @@ EXCHANGE_TEST ( wycheproof_p384_4b73134e, &p384_algorithm,
 /* P384 test case 790 (skipped: compressed) */
 
 /** Perform Wycheproof P384 self-tests */
-void wycheproof_p384_exec ( void ) {
+static void wycheproof_p384_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	exchange_ok ( &wycheproof_p384_20c88bb9 );
@@ -19628,3 +19628,10 @@ void wycheproof_p384_exec ( void ) {
 	exchange_ok ( &wycheproof_p384_5e35963a );
 	exchange_ok ( &wycheproof_p384_4b73134e );
 }
+
+/** Wycheproof P384 self-tests */
+struct self_test wycheproof_p384 __self_test = {
+	.name = "wycheproof_p384",
+	.exec = wycheproof_p384_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_p384 );

@@ -6279,7 +6279,7 @@ HKDF_TEST ( wycheproof_hkdf_sha512_4c1af171, &sha512_algorithm, 1,
 	      0x1f, 0x98 ) );
 
 /** Perform Wycheproof HKDF-SHA512 self-tests */
-void wycheproof_hkdf_sha512_exec ( void ) {
+static void wycheproof_hkdf_sha512_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	hkdf_ok ( &wycheproof_hkdf_sha512_a3697e50 );
@@ -6363,3 +6363,10 @@ void wycheproof_hkdf_sha512_exec ( void ) {
 	hkdf_ok ( &wycheproof_hkdf_sha512_ccb68099 );
 	hkdf_ok ( &wycheproof_hkdf_sha512_4c1af171 );
 }
+
+/** Wycheproof HKDF-SHA512 self-tests */
+struct self_test wycheproof_hkdf_sha512 __self_test = {
+	.name = "wycheproof_hkdf_sha512",
+	.exec = wycheproof_hkdf_sha512_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_hkdf_sha512 );

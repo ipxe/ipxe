@@ -24,23 +24,4 @@ FILE_LICENCE ( BSD2 );
 #include "hmac_test.h"
 #include "pubkey_test.h"
 
-extern void wycheproof_aes_gcm_exec ( void );
-extern void wycheproof_hkdf_sha1_exec ( void );
-extern void wycheproof_hkdf_sha256_exec ( void );
-extern void wycheproof_hkdf_sha384_exec ( void );
-extern void wycheproof_hkdf_sha512_exec ( void );
-extern void wycheproof_hmac_sha1_exec ( void );
-extern void wycheproof_hmac_sha224_exec ( void );
-extern void wycheproof_hmac_sha256_exec ( void );
-extern void wycheproof_hmac_sha384_exec ( void );
-extern void wycheproof_hmac_sha512_exec ( void );
-extern void wycheproof_hmac_sha512_224_exec ( void );
-extern void wycheproof_hmac_sha512_256_exec ( void );
-extern void wycheproof_p256_exec ( void );
-extern void wycheproof_p384_exec ( void );
-extern void wycheproof_rsa_pkcs1_2048_decrypt_exec ( void );
-extern void wycheproof_rsa_pkcs1_3072_decrypt_exec ( void );
-extern void wycheproof_rsa_pkcs1_4096_decrypt_exec ( void );
-extern void wycheproof_x25519_exec ( void );
-
 #endif /* _WYCHEPROOF_TEST_H */

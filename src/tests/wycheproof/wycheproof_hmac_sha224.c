@@ -1081,7 +1081,7 @@ HMAC_TEST ( wycheproof_hmac_sha224_19a04f15, &sha224_algorithm,
 		   0x63, 0xee, 0xa0, 0x0b, 0x86 ) );
 
 /** Perform Wycheproof HMAC-SHA224 self-tests */
-void wycheproof_hmac_sha224_exec ( void ) {
+static void wycheproof_hmac_sha224_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	hmac_ok ( &wycheproof_hmac_sha224_ca23d586 );
@@ -1151,3 +1151,10 @@ void wycheproof_hmac_sha224_exec ( void ) {
 	hmac_ok ( &wycheproof_hmac_sha224_eb99418d );
 	hmac_ok ( &wycheproof_hmac_sha224_19a04f15 );
 }
+
+/** Wycheproof HMAC-SHA224 self-tests */
+struct self_test wycheproof_hmac_sha224 __self_test = {
+	.name = "wycheproof_hmac_sha224",
+	.exec = wycheproof_hmac_sha224_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_hmac_sha224 );

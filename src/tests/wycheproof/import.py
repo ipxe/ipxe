@@ -313,7 +313,8 @@ class TestFile:
     def source(self):
         """Generate source code"""
         generator = Path(__file__).name
-        execname = "wycheproof_%s_exec" % self.basename
+        testname = "wycheproof_%s" % self.basename
+        execname = "%s_exec" % testname
         tests = self.tests
         label = tests[0].test_label
         definitions = "\n".join(x.definition() for x in self.testGroups)
@@ -332,12 +333,20 @@ class TestFile:
             definitions +
             textwrap.dedent(f"""
             /** Perform Wycheproof {label} self-tests */
-            void {execname} ( void ) {{
+            static void {execname} ( void ) {{
 
             \t/* Perform tests in tcId order */
             """) +
             invocations +
-            "}\n"
+            "}\n" +
+            textwrap.dedent(f"""
+            /** Wycheproof {label} self-tests */
+            struct self_test {testname} __self_test = {{
+            \t.name = "{testname}",
+            \t.exec = {execname},
+            }};
+            REQUIRING_SYMBOL ( {testname} );
+            """)
         )
         return code
 

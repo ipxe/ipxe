@@ -50,78 +50,23 @@ FILE_LICENCE ( BSD2 );
 #include <ipxe/test.h>
 #include "wycheproof_test.h"
 
-/** Self-tests */
-struct self_test wycheproof_test[] __self_test = {
-	{
-		.name = "wycheproof:aes-gcm",
-		.exec = wycheproof_aes_gcm_exec,
-	},
-	{
-		.name = "wycheproof:hkdf-sha1",
-		.exec = wycheproof_hkdf_sha1_exec,
-	},
-	{
-		.name = "wycheproof:hkdf-sha256",
-		.exec = wycheproof_hkdf_sha256_exec,
-	},
-	{
-		.name = "wycheproof:hkdf-sha384",
-		.exec = wycheproof_hkdf_sha384_exec,
-	},
-	{
-		.name = "wycheproof:hkdf-sha512",
-		.exec = wycheproof_hkdf_sha512_exec,
-	},
-	{
-		.name = "wycheproof:hmac-sha1",
-		.exec = wycheproof_hmac_sha1_exec,
-	},
-	{
-		.name = "wycheproof:hmac-sha224",
-		.exec = wycheproof_hmac_sha224_exec,
-	},
-	{
-		.name = "wycheproof:hmac-sha256",
-		.exec = wycheproof_hmac_sha256_exec,
-	},
-	{
-		.name = "wycheproof:hmac-sha384",
-		.exec = wycheproof_hmac_sha384_exec,
-	},
-	{
-		.name = "wycheproof:hmac-sha512",
-		.exec = wycheproof_hmac_sha512_exec,
-	},
-	{
-		.name = "wycheproof:hmac-sha512/224",
-		.exec = wycheproof_hmac_sha512_224_exec,
-	},
-	{
-		.name = "wycheproof:hmac-sha512/256",
-		.exec = wycheproof_hmac_sha512_256_exec,
-	},
-	{
-		.name = "wycheproof:p256",
-		.exec = wycheproof_p256_exec,
-	},
-	{
-		.name = "wycheproof:p384",
-		.exec = wycheproof_p384_exec,
-	},
-	{
-		.name = "wycheproof:rsa-pkcs1-2048-decrypt",
-		.exec = wycheproof_rsa_pkcs1_3072_decrypt_exec,
-	},
-	{
-		.name = "wycheproof:rsa-pkcs1-3072-decrypt",
-		.exec = wycheproof_rsa_pkcs1_3072_decrypt_exec,
-	},
-	{
-		.name = "wycheproof:rsa-pkcs1-4096-decrypt",
-		.exec = wycheproof_rsa_pkcs1_3072_decrypt_exec,
-	},
-	{
-		.name = "wycheproof:x25519",
-		.exec = wycheproof_x25519_exec,
-	},
-};
+/* Drag in all Wycheproof self-tests */
+PROVIDE_REQUIRING_SYMBOL();
+REQUIRE_OBJECT ( wycheproof_aes_gcm );
+REQUIRE_OBJECT ( wycheproof_hkdf_sha1 );
+REQUIRE_OBJECT ( wycheproof_hkdf_sha256 );
+REQUIRE_OBJECT ( wycheproof_hkdf_sha384 );
+REQUIRE_OBJECT ( wycheproof_hkdf_sha512 );
+REQUIRE_OBJECT ( wycheproof_hmac_sha1 );
+REQUIRE_OBJECT ( wycheproof_hmac_sha224 );
+REQUIRE_OBJECT ( wycheproof_hmac_sha256 );
+REQUIRE_OBJECT ( wycheproof_hmac_sha384 );
+REQUIRE_OBJECT ( wycheproof_hmac_sha512_224 );
+REQUIRE_OBJECT ( wycheproof_hmac_sha512_256 );
+REQUIRE_OBJECT ( wycheproof_hmac_sha512 );
+REQUIRE_OBJECT ( wycheproof_p256 );
+REQUIRE_OBJECT ( wycheproof_p384 );
+REQUIRE_OBJECT ( wycheproof_rsa_pkcs1_2048_decrypt );
+REQUIRE_OBJECT ( wycheproof_rsa_pkcs1_3072_decrypt );
+REQUIRE_OBJECT ( wycheproof_rsa_pkcs1_4096_decrypt );
+REQUIRE_OBJECT ( wycheproof_x25519 );

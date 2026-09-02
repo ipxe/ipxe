@@ -8202,7 +8202,7 @@ EXCHANGE_TEST ( wycheproof_x25519_fad4ba69, &x25519_algorithm,
 		 0xf9, 0x14 ) );
 
 /** Perform Wycheproof X25519 self-tests */
-void wycheproof_x25519_exec ( void ) {
+static void wycheproof_x25519_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	exchange_ok ( &wycheproof_x25519_08be174f );
@@ -8724,3 +8724,10 @@ void wycheproof_x25519_exec ( void ) {
 	exchange_ok ( &wycheproof_x25519_b00860fc );
 	exchange_ok ( &wycheproof_x25519_fad4ba69 );
 }
+
+/** Wycheproof X25519 self-tests */
+struct self_test wycheproof_x25519 __self_test = {
+	.name = "wycheproof_x25519",
+	.exec = wycheproof_x25519_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_x25519 );

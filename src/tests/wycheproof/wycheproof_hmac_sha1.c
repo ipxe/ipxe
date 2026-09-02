@@ -984,7 +984,7 @@ HMAC_TEST ( wycheproof_hmac_sha1_31fa7435, &sha1_algorithm,
 		   0x6e ) );
 
 /** Perform Wycheproof HMAC-SHA1 self-tests */
-void wycheproof_hmac_sha1_exec ( void ) {
+static void wycheproof_hmac_sha1_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	hmac_ok ( &wycheproof_hmac_sha1_34c35b06 );
@@ -1054,3 +1054,10 @@ void wycheproof_hmac_sha1_exec ( void ) {
 	hmac_ok ( &wycheproof_hmac_sha1_80c177c9 );
 	hmac_ok ( &wycheproof_hmac_sha1_31fa7435 );
 }
+
+/** Wycheproof HMAC-SHA1 self-tests */
+struct self_test wycheproof_hmac_sha1 __self_test = {
+	.name = "wycheproof_hmac_sha1",
+	.exec = wycheproof_hmac_sha1_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_hmac_sha1 );

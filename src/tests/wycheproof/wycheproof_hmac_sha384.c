@@ -1298,7 +1298,7 @@ HMAC_TEST ( wycheproof_hmac_sha384_2cc77d41, &sha384_algorithm,
 		   0x8a, 0x37, 0x70, 0x7a, 0x63, 0x30 ) );
 
 /** Perform Wycheproof HMAC-SHA384 self-tests */
-void wycheproof_hmac_sha384_exec ( void ) {
+static void wycheproof_hmac_sha384_exec ( void ) {
 
 	/* Perform tests in tcId order */
 	hmac_ok ( &wycheproof_hmac_sha384_bd862db0 );
@@ -1368,3 +1368,10 @@ void wycheproof_hmac_sha384_exec ( void ) {
 	hmac_ok ( &wycheproof_hmac_sha384_e022fc1f );
 	hmac_ok ( &wycheproof_hmac_sha384_2cc77d41 );
 }
+
+/** Wycheproof HMAC-SHA384 self-tests */
+struct self_test wycheproof_hmac_sha384 __self_test = {
+	.name = "wycheproof_hmac_sha384",
+	.exec = wycheproof_hmac_sha384_exec,
+};
+REQUIRING_SYMBOL ( wycheproof_hmac_sha384 );
