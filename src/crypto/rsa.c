@@ -301,23 +301,29 @@ static int rsa_init ( struct rsa_context *context,
  * @v context		RSA context
  * @v in		Input buffer
  * @v out		Output buffer
+ * @ret canonical	Input was in canonical form
  */
-static void rsa_cipher ( struct rsa_context *context,
-			 const void *in, void *out ) {
+static int rsa_cipher ( struct rsa_context *context,
+			const void *in, void *out ) {
 	bigint_t ( context->size ) *input = ( ( void * ) context->input0 );
 	bigint_t ( context->size ) *output = ( ( void * ) context->output0 );
 	bigint_t ( context->size ) *modulus = ( ( void * ) context->modulus0 );
 	bigint_t ( context->exponent_size ) *exponent =
 		( ( void * ) context->exponent0 );
+	int canonical;
 
 	/* Initialise big integer */
 	bigint_init ( input, in, context->max_len );
+	canonical = ( ! bigint_is_geq ( input, modulus ) );
 
 	/* Perform modular exponentiation */
 	bigint_mod_exp ( input, modulus, exponent, output, context->tmp );
 
 	/* Copy out result */
 	bigint_done ( output, out, context->max_len );
+
+	/* Check for canonical input */
+	return canonical;
 }
 
 /**
@@ -338,6 +344,7 @@ static int rsa_pkcs1_encrypt ( struct pubkey_algorithm *pubkey __unused,
 	uint8_t *encoded;
 	size_t min_len;
 	size_t pad_len;
+	int canonical;
 	int rc;
 
 	DBGC ( &context, "RSA %p encrypting:\n", &context );
@@ -380,7 +387,8 @@ static int rsa_pkcs1_encrypt ( struct pubkey_algorithm *pubkey __unused,
 		goto err_grow;
 
 	/* Encipher the encoded message */
-	rsa_cipher ( &context, encoded, ciphertext->data );
+	canonical = rsa_cipher ( &context, encoded, ciphertext->data );
+	assert ( canonical );
 	DBGC ( &context, "RSA %p encrypted:\n", &context );
 	DBGC_HDA ( &context, 0, ciphertext->data, context.max_len );
 
@@ -418,6 +426,7 @@ static int rsa_pkcs1_decrypt ( struct pubkey_algorithm *pubkey __unused,
 	uint8_t *zero;
 	uint8_t *start;
 	size_t len;
+	int canonical;
 	int rc;
 
 	DBGC ( &context, "RSA %p decrypting:\n", &context );
@@ -441,9 +450,15 @@ static int rsa_pkcs1_decrypt ( struct pubkey_algorithm *pubkey __unused,
 	 */
 	temp = context.input0;
 	encoded = temp;
-	rsa_cipher ( &context, ciphertext->data, encoded );
+	canonical = rsa_cipher ( &context, ciphertext->data, encoded );
 	DBGC ( &context, "RSA %p encoded:\n", &context );
 	DBGC_HDA ( &context, 0, encoded, context.max_len );
+	if ( ! canonical ) {
+		DBGC ( &context, "RSA %p ciphertext was not canonical\n",
+		       &context );
+		rc = -EINVAL;
+		goto err_canonical;
+	}
 
 	/* Parse the message */
 	end = ( encoded + context.max_len );
@@ -479,6 +494,7 @@ static int rsa_pkcs1_decrypt ( struct pubkey_algorithm *pubkey __unused,
 
  err_grow:
  err_invalid:
+ err_canonical:
  err_sanity:
 	rsa_free ( &context );
  err_init:
@@ -684,6 +700,7 @@ static int rsa_sign ( struct pubkey_algorithm *pubkey,
 		      struct asn1_builder *signature ) {
 	rsa_encode_t *encode = pubkey->priv;
 	struct rsa_context context;
+	int canonical;
 	int rc;
 
 	DBGC ( &context, "RSA %p signing %s digest:\n",
@@ -704,7 +721,8 @@ static int rsa_sign ( struct pubkey_algorithm *pubkey,
 		goto err_encode;
 
 	/* Encipher the encoded digest */
-	rsa_cipher ( &context, signature->data, signature->data );
+	canonical = rsa_cipher ( &context, signature->data, signature->data );
+	assert ( canonical );
 	DBGC ( &context, "RSA %p signed %s digest:\n", &context, digest->name );
 	DBGC_HDA ( &context, 0, signature->data, signature->len );
 
@@ -739,6 +757,7 @@ static int rsa_verify ( struct pubkey_algorithm *pubkey,
 	void *temp;
 	void *expected;
 	void *actual;
+	int canonical;
 	int rc;
 
 	DBGC ( &context, "RSA %p verifying %s digest:\n",
@@ -764,9 +783,15 @@ static int rsa_verify ( struct pubkey_algorithm *pubkey,
 	 */
 	temp = context.input0;
 	expected = temp;
-	rsa_cipher ( &context, signature->data, expected );
+	canonical = rsa_cipher ( &context, signature->data, expected );
 	DBGC ( &context, "RSA %p deciphered signature:\n", &context );
 	DBGC_HDA ( &context, 0, expected, context.max_len );
+	if ( ! canonical ) {
+		DBGC ( &context, "RSA %p signature was not canonical\n",
+		       &context );
+		rc = -ERANGE;
+		goto err_canonical;
+	}
 
 	/* Encode digest (using the big integer output buffer as
 	 * temporary storage)
@@ -793,6 +818,7 @@ static int rsa_verify ( struct pubkey_algorithm *pubkey,
 
  err_verify:
  err_encode:
+ err_canonical:
  err_sanity:
 	rsa_free ( &context );
  err_init:
