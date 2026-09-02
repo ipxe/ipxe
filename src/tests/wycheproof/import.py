@@ -267,6 +267,24 @@ class TestFile:
     schema = scalar_field(str)
     testGroups = list_field(TestGroup)
 
+    @schema.validator
+    def validate_schema(self, attr, value):
+        """Validate schema"""
+        if value != self.SCHEMA:
+            raise ValueError(
+                "%s: found schema %s (expected %s)" %
+                (self.SRCFILE, value, self.SCHEMA)
+            )
+
+    @numberOfTests.validator
+    def validate_number_of_tests(self, attr, value):
+        """Validate number of tests"""
+        if value != len(self.tests):
+            raise ValueError(
+                "%s: found %d tests (expected %d)" %
+                (self.SRCFILE, len(self.tests), value)
+            )
+
     @property
     def basename(self):
         """Base name for test cases"""
@@ -279,20 +297,10 @@ class TestFile:
 
     def source(self):
         """Generate source code"""
-        if self.schema != self.SCHEMA:
-            raise ValueError(
-                "%s: found schema %s (expected %s)" %
-                (self.SRCFILE, self.schema, self.SCHEMA)
-            )
         generator = Path(__file__).name
         execname = "wycheproof_%s_exec" % self.basename
         tests = self.tests
         label = tests[0].test_label
-        if len(tests) != self.numberOfTests:
-            raise ValueError(
-                "%s: found %d tests (expected %d)" %
-                (self.SRCFILE, len(tests), self.numberOfTests)
-            )
         definitions = "\n".join(x.definition() for x in tests)
         invocations = "".join(x.invocation() for x in tests if not x.skip)
         code = (
