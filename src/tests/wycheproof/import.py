@@ -887,6 +887,115 @@ class AesGcmCipherTestFile(GcmCipherTestFile):
 
 ##############################################################################
 #
+# RSA PKCS#1 decryption tests
+#
+
+class RsaPkcs1DecryptTestFlag(Enum):
+    """An RSA PKCS#1 decryption test flag"""
+    INVALID_CIPHERTEXT_FORMAT = "InvalidCiphertextFormat"
+    INVALID_PKCS1_PADDING = "InvalidPkcs1Padding"
+    NORMAL = "Normal"
+    SPECIAL_CASE = "SpecialCase"
+    SPECIAL_CASE_PADDING = "SpecialCasePadding"
+    SSLV23_PADDING = "Sslv23Padding"
+    CVE_2020_14967 = "CVE-2020-14967"
+    CVE_2021_3580 = "CVE-2021-3580"
+
+@attrclass
+class RsaPkcs1DecryptTestCase(TestCase):
+    """An RSA PKCS#1 decryption test case"""
+    flags = set_field(RsaPkcs1DecryptTestFlag)
+    msg = scalar_field(HexBytes, metadata={"stable": True})
+    ct = scalar_field(HexBytes, metadata={"stable": True})
+
+    def definition(self):
+        """Generate source code for test definition"""
+        code = super().definition()
+        code += (
+            "PUBKEY_ENCRYPTION_TEST ( %s,\n" % self.test_name +
+            "\t&%s, RANDOM(),\n" % self.test_group.test_name +
+            self.msg.source("\tPLAINTEXT") + ",\n" +
+            self.ct.source("\tCIPHERTEXT") + " );\n"
+        )
+        return code
+
+    def invocation(self):
+        """Generate source code for test invocation"""
+        code = super().invocation()
+        if self.failure:
+            code += "\tpubkey_decrypt_fail_ok ( &%s );\n" % self.test_name
+        else:
+            code += "\tpubkey_decrypt_ok ( &%s );\n" % self.test_name
+        return code
+
+@attrclass
+class RsaPkcs1DecryptTestGroup(TestGroup):
+    """An RSA PKCS#1 decryption test group"""
+    privateKey = map_field(str) # ignored
+    privateKeyPkcs8 = scalar_field(HexBytes, metadata={"stable": True})
+    privateKeyPem = scalar_field(str) # ignored
+    privateKeyJwk = map_field(str) # ignored
+    keySize = scalar_field(int)
+    tests = list_field(RsaPkcs1DecryptTestCase)
+
+    @keySize.validator
+    def validate_key_size(self, attr, value):
+        """Validate key size"""
+        if value != self.test_file.KEYSIZE:
+            raise ValueError(
+                "%s: incorrect key size %d (expected %d)" %
+                (attr.name, value, self.test_file.KEYSIZE)
+            )
+
+    def definition(self):
+        """Generate source code for test group definition"""
+        algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+        code = (
+            "/* Private key for following tests */\n" +
+            "PUBKEY_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+            self.privateKeyPkcs8.source("\tPRIVATE") + ",\n" +
+            "\tPUBLIC() );\n" +
+            "\n" +
+            super().definition()
+        )
+        return code
+
+@attrclass
+class RsaPkcs1DecryptTestFile(TestFile):
+    """An RSA PKCS#1 decryption test file"""
+    ALGORITHM: ClassVar = "rsa"
+    SCHEMA: ClassVar = "rsaes_pkcs1_decrypt_schema_v1.json"
+    KEYSIZE: ClassVar = None
+    testGroups = list_field(RsaPkcs1DecryptTestGroup)
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "rsa_pkcs1_%d_decrypt" % self.KEYSIZE
+
+@attrclass
+class Rsa2048Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
+    """A 2048-bit RSA PKCS#1 decryption test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 (2048-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_2048_test.json"
+    KEYSIZE: ClassVar = 2048
+
+@attrclass
+class Rsa3072Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
+    """A 3072-bit RSA PKCS#1 decryption test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 (3072-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_3072_test.json"
+    KEYSIZE: ClassVar = 3072
+
+@attrclass
+class Rsa4096Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
+    """A 4096-bit RSA PKCS#1 decryption test file"""
+    LABEL: ClassVar = "RSA-PKCS#1 (4096-bit)"
+    SRCFILE: ClassVar = "rsa_pkcs1_4096_test.json"
+    KEYSIZE: ClassVar = 4096
+
+##############################################################################
+#
 # Main program
 #
 
@@ -926,6 +1035,9 @@ def main():
         HmacSha512256TestFile,
         P256ExchangeTestFile,
         P384ExchangeTestFile,
+        Rsa2048Pkcs1DecryptTestFile,
+        Rsa3072Pkcs1DecryptTestFile,
+        Rsa4096Pkcs1DecryptTestFile,
         X25519TestFile,
     )
     tests = [x.read(srcdir / x.SRCFILE) for x in classes]

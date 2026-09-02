@@ -109,6 +109,18 @@ struct self_test wycheproof_test[] __self_test = {
 		.exec = wycheproof_p384_exec,
 	},
 	{
+		.name = "wycheproof:rsa-pkcs1-2048-decrypt",
+		.exec = wycheproof_rsa_pkcs1_3072_decrypt_exec,
+	},
+	{
+		.name = "wycheproof:rsa-pkcs1-3072-decrypt",
+		.exec = wycheproof_rsa_pkcs1_3072_decrypt_exec,
+	},
+	{
+		.name = "wycheproof:rsa-pkcs1-4096-decrypt",
+		.exec = wycheproof_rsa_pkcs1_3072_decrypt_exec,
+	},
+	{
 		.name = "wycheproof:x25519",
 		.exec = wycheproof_x25519_exec,
 	},
