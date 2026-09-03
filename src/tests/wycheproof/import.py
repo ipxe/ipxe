@@ -59,11 +59,15 @@ def set_field(typ, **kwargs):
     )
     return attrs.field(converter=converter, **kwargs)
 
-def map_field(typ, **kwargs):
+def map_field(typ, key=str, **kwargs):
     """Define an auto-converting field holding a map of values"""
     subconverter = auto_converter(typ)
+    keyconverter = auto_converter(key)
     converter = attrs.Converter(
-        lambda d, self: {k: subconverter(v, self) for k, v in d.items()},
+        lambda d, self: {
+            keyconverter(k, self): subconverter(v, self)
+            for k, v in d.items()
+        },
         takes_self=True,
     )
     return attrs.field(converter=converter, **kwargs)
@@ -128,6 +132,64 @@ class TestBugType(Enum):
     WEAK_PARAMS = "WEAK_PARAMS"
     WRONG_PRIMITIVE = "WRONG_PRIMITIVE"
 
+class TestFlag(Enum):
+    """A test flag"""
+    ADDITION_CHAIN = "AdditionChain"
+    BER_ENCODED_PADDING = "BerEncodedPadding"
+    COMPRESSED_POINT = "CompressedPoint"
+    COMPRESSED_PUBLIC = "CompressedPublic"
+    COUNTER_WRAP = "CounterWrap"
+    CVS_2017_8932 = "CVE-2017-8932"
+    CVE_2020_14967 = "CVE-2020-14967"
+    CVE_2021_3580 = "CVE-2021-3580"
+    EDGE_CASE_DOUBLING = "EdgeCaseDoubling"
+    EDGE_CASE_EPHEMERAL_KEY = "EdgeCaseEphemeralKey"
+    EDGE_CASE_MULTIPLICATION = "EdgeCaseMultiplication"
+    EDGE_CASE_PRIVATE_KEY = "EdgeCasePrivateKey"
+    EDGE_CASE_SHARED = "EdgeCaseShared"
+    EDGE_CASE_SHARED_SECRET = "EdgeCaseSharedSecret"
+    EDGE_CASE_SIGNAGTURE = "EdgeCaseSignature"
+    EMPTY_SALT = "EmptySalt"
+    INVALID_ASN_IN_PADDING = "InvalidAsnInPadding"
+    INVALID_CIPHERTEXT_FORMAT = "InvalidCiphertextFormat"
+    INVALID_COMPRESSED_PUBLIC = "InvalidCompressedPublic"
+    INVALID_CURVE_ATTACK = "InvalidCurveAttack"
+    INVALID_ENCODING = "InvalidEncoding"
+    INVALID_PADDING = "InvalidPadding"
+    INVALID_PKCS1_PADDING = "InvalidPkcs1Padding"
+    INVALID_SIGNATURE = "InvalidSignature"
+    KTV = "Ktv"
+    LONG_IV = "LongIv"
+    LOW_ORDER_PUBLIC = "LowOrderPublic"
+    MAXIMAL_OUTPUT_SIZE = "MaximalOutputSize"
+    MISSING_NULL = "MissingNull"
+    MODIFIED_PADDING = "ModifiedPadding"
+    MODIFIED_TAG = "ModifiedTag"
+    NO_HASH = "NoHash"
+    NON_CANONICAL_PUBLIC = "NonCanonicalPublic"
+    NORMAL = "Normal"
+    OUTPUT_COLLISION = "OutputCollision"
+    PSEUDORANDOM = "Pseudorandom"
+    SHORT_PADDING = "ShortPadding"
+    SIGNATURE_MALLEABILITY = "SignatureMalleability"
+    SIZE_TOO_LARGE = "SizeTooLarge"
+    SMALL_IV = "SmallIv"
+    SMALL_MODULUS = "SmallModulus"
+    SMALL_PUBLIC_KEY = "SmallPublicKey"
+    SMALL_SIGNATURE = "SmallSignature"
+    SPECIAL_CASE_PADDING = "SpecialCasePadding"
+    SPECIAL_CASE = "SpecialCase"
+    SPECIAL_PUBLIC_KEY = "SpecialPublicKey"
+    SSLV23_PADDING = "Sslv23Padding"
+    TRUNCATED_HMAC = "TruncatedHmac"
+    TWIST = "Twist"
+    WEAK_HASH = "WeakHash"
+    WRONG_CURVE = "WrongCurve"
+    WRONG_HASH = "WrongHash"
+    WRONG_PRIMITIVE = "WrongPrimitive"
+    ZERO_LENGTH_IV = "ZeroLengthIv"
+    ZERO_SHARED_SECRET = "ZeroSharedSecret"
+
 @attrclass
 class TestNote:
     """A test note"""
@@ -187,7 +249,7 @@ class TestCase(TestNamedObject):
     """A test case"""
     _parent = scalar_field(weakref.proxy, alias="_parent")
     comment = scalar_field(str)
-    flags = set_field(str)
+    flags = set_field(TestFlag)
     result = scalar_field(TestResult)
     tcId = scalar_field(int)
 
@@ -277,7 +339,7 @@ class TestFile:
     SRCFILE: ClassVar = None
     algorithm = scalar_field(str, default=None)
     header = list_field(str, factory=list)
-    notes = map_field(TestNote, factory=dict)
+    notes = map_field(TestNote, key=TestFlag, factory=dict)
     numberOfTests = scalar_field(int)
     schema = scalar_field(str)
     testGroups = list_field(TestGroup)
@@ -487,29 +549,14 @@ class P384ExchangeTestFile(NistExchangeTestFile):
 # X25519 key exchange tests
 #
 
-class X25519TestFlag(Enum):
-    """An X25519 test flag"""
-    EDGE_CASE_MULTIPLICATION = "EdgeCaseMultiplication"
-    EDGE_CASE_PRIVATE_KEY = "EdgeCasePrivateKey"
-    EDGE_CASE_SHARED = "EdgeCaseShared"
-    KTV = "Ktv"
-    LOW_ORDER_PUBLIC = "LowOrderPublic"
-    NON_CANONICAL_PUBLIC = "NonCanonicalPublic"
-    NORMAL = "Normal"
-    SMALL_PUBLIC_KEY = "SmallPublicKey"
-    SPECIAL_PUBLIC_KEY = "SpecialPublicKey"
-    TWIST = "Twist"
-    ZERO_SHARED_SECRET = "ZeroSharedSecret"
-
 @attrclass
 class X25519TestCase(ExchangeTestCase):
     """An X25519 key exchange test case"""
-    flags = set_field(X25519TestFlag)
 
     @property
     def failure(self):
         """Check if test case is expected to fail"""
-        return X25519TestFlag.ZERO_SHARED_SECRET in self.flags
+        return TestFlag.ZERO_SHARED_SECRET in self.flags
 
 @attrclass
 class X25519TestGroup(ExchangeTestGroup):
@@ -534,16 +581,9 @@ class X25519TestFile(ExchangeTestFile):
 # HMAC tests
 #
 
-class HmacTestFlag(Enum):
-    """An HMAC test flag"""
-    MODIFIED_TAG = "ModifiedTag"
-    PSEUDORANDOM = "Pseudorandom"
-    TRUNCATED_HMAC = "TruncatedHmac"
-
 @attrclass
 class HmacTestCase(TestCase):
     """An HMAC test case"""
-    flags = set_field(HmacTestFlag)
     key = scalar_field(HexBytes, metadata={"stable": True})
     msg = scalar_field(HexBytes, metadata={"stable": True})
     tag = scalar_field(HexBytes)
@@ -561,7 +601,7 @@ class HmacTestCase(TestCase):
     @property
     def skip(self):
         """Reason for skipping test (if any)"""
-        if HmacTestFlag.MODIFIED_TAG in self.flags:
+        if TestFlag.MODIFIED_TAG in self.flags:
             # Our HMAC abstraction covers only generating the digest,
             # not comparing the output to check for a match
             return "modified tag"
@@ -661,18 +701,9 @@ class HmacSha512256TestFile(HmacTestFile):
 # HKDF tests
 #
 
-class HkdfTestFlag(Enum):
-    """An HKDF test flag"""
-    EMPTY_SALT = "EmptySalt"
-    MAXIMAL_OUTPUT_SIZE = "MaximalOutputSize"
-    NORMAL = "Normal"
-    OUTPUT_COLLISION = "OutputCollision"
-    SIZE_TOO_LARGE = "SizeTooLarge"
-
 @attrclass
 class HkdfTestCase(TestCase):
     """An HKDF test case"""
-    flags = set_field(HkdfTestFlag)
     ikm = scalar_field(HexBytes, metadata={"stable": True})
     salt = scalar_field(HexBytes, metadata={"stable": True})
     info = scalar_field(HexBytes, metadata={"stable": True})
@@ -687,7 +718,7 @@ class HkdfTestCase(TestCase):
     @property
     def skip(self):
         """Reason for skipping test (if any)"""
-        if HkdfTestFlag.SIZE_TOO_LARGE in self.flags:
+        if TestFlag.SIZE_TOO_LARGE in self.flags:
             # Our HKDF abstraction does not perform runtime checks for
             # the output key material size
             return "size too large"
@@ -766,20 +797,9 @@ class HkdfSha512TestFile(HkdfTestFile):
 # AEAD cipher tests
 #
 
-class AeadCipherTestFlag(Enum):
-    COUNTER_WRAP = "CounterWrap"
-    KTV = "Ktv"
-    LONG_IV = "LongIv"
-    MODIFIED_TAG = "ModifiedTag"
-    PSEUDORANDOM = "Pseudorandom"
-    SMALL_IV = "SmallIv"
-    SPECIAL_CASE = "SpecialCase"
-    ZERO_LENGTH_IV = "ZeroLengthIv"
-
 @attrclass
 class AeadCipherTestCase(TestCase):
     """An AEAD cipher test case"""
-    flags = set_field(AeadCipherTestFlag)
     key = scalar_field(HexBytes, metadata={"stable": True})
     iv = scalar_field(HexBytes, metadata={"stable": True})
     aad = scalar_field(HexBytes, metadata={"stable": True})
@@ -805,7 +825,7 @@ class AeadCipherTestCase(TestCase):
     @property
     def skip(self):
         """Reason for skipping test (if any)"""
-        if AeadCipherTestFlag.MODIFIED_TAG in self.flags:
+        if TestFlag.MODIFIED_TAG in self.flags:
             # Our cipher abstraction covers only generating the tag,
             # not comparing the tag to check for a match
             return "modified tag"
@@ -875,7 +895,7 @@ class GcmCipherTestCase(AeadCipherTestCase):
     @property
     def iv_failure(self):
         """Check if test case is expected to fail due to invalid IV"""
-        return AeadCipherTestFlag.ZERO_LENGTH_IV in self.flags
+        return TestFlag.ZERO_LENGTH_IV in self.flags
 
 @attrclass
 class GcmCipherTestGroup(AeadCipherTestGroup):
@@ -899,21 +919,9 @@ class AesGcmCipherTestFile(GcmCipherTestFile):
 # RSA PKCS#1 decryption tests
 #
 
-class RsaPkcs1DecryptTestFlag(Enum):
-    """An RSA PKCS#1 decryption test flag"""
-    INVALID_CIPHERTEXT_FORMAT = "InvalidCiphertextFormat"
-    INVALID_PKCS1_PADDING = "InvalidPkcs1Padding"
-    NORMAL = "Normal"
-    SPECIAL_CASE = "SpecialCase"
-    SPECIAL_CASE_PADDING = "SpecialCasePadding"
-    SSLV23_PADDING = "Sslv23Padding"
-    CVE_2020_14967 = "CVE-2020-14967"
-    CVE_2021_3580 = "CVE-2021-3580"
-
 @attrclass
 class RsaPkcs1DecryptTestCase(TestCase):
     """An RSA PKCS#1 decryption test case"""
-    flags = set_field(RsaPkcs1DecryptTestFlag)
     msg = scalar_field(HexBytes, metadata={"stable": True})
     ct = scalar_field(HexBytes, metadata={"stable": True})
 
@@ -1016,16 +1024,9 @@ class RsaPkcs1SignShaAlgorithm(Enum):
     SHA384_ALGORITHM = "SHA-384"
     SHA512_ALGORITHM = "SHA-512"
 
-class RsaPkcs1SignTestFlag(Enum):
-    """An RSA PKCS#1 signing test flag"""
-    SMALL_MODULUS = "SmallModulus"
-    SMALL_PUBLIC_KEY = "SmallPublicKey"
-    WEAK_HASH = "WeakHash"
-
 @attrclass
 class RsaPkcs1SignTestCase(TestCase):
     """An RSA PKCS#1 signing test case"""
-    flags = set_field(RsaPkcs1SignTestFlag)
     msg = scalar_field(HexBytes, metadata={"stable": True})
     sig = scalar_field(HexBytes, metadata={"stable": True})
 
@@ -1148,37 +1149,16 @@ class RsaPkcs1VerifyShaAlgorithm(Enum):
     SHA512_224 = "SHA-512/224"
     SHA512_256 = "SHA-512/256"
 
-class RsaPkcs1VerifyTestFlag(Enum):
-    """An RSA PKCS#1 verification test flag"""
-    BER_ENCODED_PADDING = "BerEncodedPadding"
-    EDGE_CASE_SIGNAGTURE = "EdgeCaseSignature"
-    INVALID_ASN_IN_PADDING = "InvalidAsnInPadding"
-    INVALID_PADDING = "InvalidPadding"
-    INVALID_SIGNATURE = "InvalidSignature"
-    MISSING_NULL = "MissingNull"
-    MODIFIED_PADDING = "ModifiedPadding"
-    NO_HASH = "NoHash"
-    SHORT_PADDING = "ShortPadding"
-    SIGNATURE_MALLEABILITY = "SignatureMalleability"
-    SMALL_PUBLIC_KEY = "SmallPublicKey"
-    SMALL_SIGNATURE = "SmallSignature"
-    WRONG_HASH = "WrongHash"
-    WRONG_PRIMITIVE = "WrongPrimitive"
-
 @attrclass
 class RsaPkcs1VerifyTestCase(TestCase):
     """An RSA PKCS#1 verification test case"""
-    flags = set_field(RsaPkcs1VerifyTestFlag)
     msg = scalar_field(HexBytes, metadata={"stable": True})
     sig = scalar_field(HexBytes, metadata={"stable": True})
 
     @property
     def failure(self):
         """Check if test case is expected to fail"""
-        failure = (
-            super().failure or
-            RsaPkcs1VerifyTestFlag.MISSING_NULL in self.flags
-        )
+        failure = super().failure or TestFlag.MISSING_NULL in self.flags
         return failure
 
     def definition(self):
