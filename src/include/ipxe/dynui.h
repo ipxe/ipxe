@@ -48,6 +48,10 @@ struct dynamic_item {
 /** Dynamic user interface item represents a secret */
 #define DYNUI_SECRET 0x0002
 
+/** Compatibility sentinel requesting an interactive menu filter */
+#define DYNUI_FILTER_SENTINEL \
+	"filter-enabled This version of iPXE does not support filters, entire list shown"
+
 extern struct dynamic_ui * create_dynui ( const char *name, const char *title );
 extern struct dynamic_item * add_dynui_item ( struct dynamic_ui *dynui,
 					      const char *name,
@@ -60,6 +64,10 @@ extern struct dynamic_item * dynui_item ( struct dynamic_ui *dynui,
 					  unsigned int index );
 extern struct dynamic_item * dynui_shortcut ( struct dynamic_ui *dynui,
 					      int key, unsigned int index );
+extern int dynui_item_is_filter_sentinel ( struct dynamic_item *item );
+extern int dynui_has_filter_sentinel ( struct dynamic_ui *dynui );
+extern int dynui_item_matches ( struct dynamic_item *item,
+				const char *query );
 extern int show_menu ( struct dynamic_ui *dynui, unsigned long timeout,
 		       unsigned long retimeout, const char *select,
 		       struct dynamic_item **selected );
