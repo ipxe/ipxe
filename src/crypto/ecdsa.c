@@ -847,14 +847,30 @@ static int ecdsa_verify ( struct pubkey_algorithm *pubkey __unused,
 
 	/* Enter sequence */
 	memcpy ( &cursor, signature, sizeof ( cursor ) );
+	asn1_shrink_any ( &cursor );
+	if ( cursor.len != signature->len ) {
+		DBGC ( &ctx, "ECDSA %p signature has multiple objects:\n",
+		       &ctx );
+		DBGC_HDA ( &ctx, 0, signature->data, signature->len );
+		rc = -EINVAL_SIGNATURE;
+		goto err_parse;
+	}
 	asn1_enter ( &cursor, ASN1_SEQUENCE );
 
 	/* Extract "r" and "s" values */
 	if ( ( rc = ecdsa_parse_signature ( &ctx, ctx.r0, &cursor ) ) != 0 )
-		goto err_r;
+		goto err_parse;
 	asn1_skip_any ( &cursor );
 	if ( ( rc = ecdsa_parse_signature ( &ctx, ctx.s0, &cursor ) ) != 0 )
-		goto err_s;
+		goto err_parse;
+	asn1_skip_any ( &cursor );
+	if ( cursor.len ) {
+		DBGC ( &ctx, "ECDSA %p signature has extra objects:\n",
+		       &ctx );
+		DBGC_HDA ( &ctx, 0, signature->data, signature->len );
+		rc = -EINVAL_SIGNATURE;
+		goto err_parse;
+	}
 
 	/* Verify signature */
 	if ( ( rc = ecdsa_verify_rs ( &ctx ) ) != 0 )
@@ -866,8 +882,7 @@ static int ecdsa_verify ( struct pubkey_algorithm *pubkey __unused,
 	return 0;
 
  err_verify:
- err_s:
- err_r:
+ err_parse:
 	ecdsa_free ( &ctx );
  err_init:
 	return rc;
