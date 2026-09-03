@@ -426,7 +426,7 @@ class TestGroup(TestNamedObject):
 class TestFile:
     """A test file"""
     SCHEMA: ClassVar = None
-    SRCFILE: ClassVar = None
+    filename = scalar_field(str)
     algorithm = scalar_field(Algorithm)
     header = list_field(str, factory=list)
     notes = map_field(TestNote, key=TestFlag, factory=dict)
@@ -440,7 +440,7 @@ class TestFile:
         if value != self.SCHEMA:
             raise ValueError(
                 "%s: found schema %s (expected %s)" %
-                (self.SRCFILE, value, self.SCHEMA)
+                (self.filename, value, self.SCHEMA)
             )
 
     @numberOfTests.validator
@@ -449,7 +449,7 @@ class TestFile:
         if value != len(self.tests):
             raise ValueError(
                 "%s: found %d tests (expected %d)" %
-                (self.SRCFILE, len(self.tests), value)
+                (self.filename, len(self.tests), value)
             )
 
     @property
@@ -512,16 +512,16 @@ class TestFile:
         return code
 
     @classmethod
-    def load(cls, fh):
+    def load(cls, fh, **kwargs):
         """Load from JSON input file handle"""
         data = json.load(fh)
-        return cls(**data)
+        return cls(**data, **kwargs)
 
     @classmethod
-    def read(cls, filename):
+    def read(cls, filename, **kwargs):
         """Read from JSON input file"""
         with open(filename, "rt") as fh:
-            return cls.load(fh)
+            return cls.load(fh, filename=filename, **kwargs)
 
     def write(self, filename):
         """Write source output file"""
@@ -543,27 +543,27 @@ class ExchangeTestCase(TestCase):
     @private.validator
     def validate_private(self, attr, value):
         """Validate private key size"""
-        self.validate_padded(attr, value, self.test_file.PRIVSIZE)
+        self.validate_padded(attr, value, self.test_file.privsize)
 
     @public.validator
     def validate_public(self, attr, value):
         """Validate public key size"""
-        self.validate_fixed(attr, value, self.test_file.PUBSIZE)
+        self.validate_fixed(attr, value, self.test_file.pubsize)
 
     @shared.validator
     def validate_shared(self, attr, value):
         """Validate shared key size"""
         if not self.failure:
-            self.validate_fixed(attr, value, self.test_file.SHAREDSIZE)
+            self.validate_fixed(attr, value, self.test_file.sharedsize)
 
     def definition(self):
         """Generate source code for test definition"""
         code = super().definition()
         if not self.skip:
             algorithm = self.test_group.curve.symbol
-            privsize = self.test_file.PRIVSIZE
-            pubsize = self.test_file.PUBSIZE
-            sharedsize = self.test_file.SHAREDSIZE
+            privsize = self.test_file.privsize
+            pubsize = self.test_file.pubsize
+            sharedsize = self.test_file.sharedsize
             code += (
                 "EXCHANGE_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
                 self.private.source("\tPRIVATE", privsize) + ",\n" +
@@ -589,9 +589,9 @@ class ExchangeTestGroup(TestGroup):
 @attrclass
 class ExchangeTestFile(TestFile):
     """A key exchange test file"""
-    PRIVSIZE: ClassVar = None
-    PUBSIZE: ClassVar = None
-    SHAREDSIZE: ClassVar = None
+    privsize = scalar_field(int)
+    pubsize = scalar_field(int)
+    sharedsize = scalar_field(int)
     algorithm = scalar_field(DiffieHellmanAlgorithm)
     testGroups = list_field(ExchangeTestGroup)
 
@@ -629,30 +629,14 @@ class NistExchangeTestFile(ExchangeTestFile):
     SCHEMA: ClassVar = "ecdh_ecpoint_test_schema_v1.json"
     testGroups = list_field(NistExchangeTestGroup)
 
-@attrclass
-class P256ExchangeTestFile(NistExchangeTestFile):
-    """A P-256 key exchange test file"""
-    SRCFILE: ClassVar = "ecdh_secp256r1_ecpoint_test.json"
-    PRIVSIZE: ClassVar = 32
-    PUBSIZE: ClassVar = 65
-    SHAREDSIZE: ClassVar = 32
-
-@attrclass
-class P384ExchangeTestFile(NistExchangeTestFile):
-    """A P-384 key exchange test file"""
-    SRCFILE: ClassVar = "ecdh_secp384r1_ecpoint_test.json"
-    PRIVSIZE: ClassVar = 48
-    PUBSIZE: ClassVar = 97
-    SHAREDSIZE: ClassVar = 48
-
 ##############################################################################
 #
-# X25519 key exchange tests
+# XDH key exchange tests
 #
 
 @attrclass
-class X25519TestCase(ExchangeTestCase):
-    """An X25519 key exchange test case"""
+class XdhTestCase(ExchangeTestCase):
+    """An XDH key exchange test case"""
 
     @property
     def failure(self):
@@ -660,19 +644,15 @@ class X25519TestCase(ExchangeTestCase):
         return TestFlag.ZERO_SHARED_SECRET in self.flags
 
 @attrclass
-class X25519TestGroup(ExchangeTestGroup):
-    """An X25519 key exchange test group"""
-    tests = list_field(X25519TestCase)
+class XdhTestGroup(ExchangeTestGroup):
+    """An XDH key exchange test group"""
+    tests = list_field(XdhTestCase)
 
 @attrclass
-class X25519TestFile(ExchangeTestFile):
-    """An X25519 key exchange test file"""
+class XdhTestFile(ExchangeTestFile):
+    """An XDH key exchange test file"""
     SCHEMA: ClassVar = "xdh_comp_schema_v1.json"
-    SRCFILE: ClassVar = "x25519_test.json"
-    PRIVSIZE: ClassVar = 32
-    PUBSIZE: ClassVar = 32
-    SHAREDSIZE: ClassVar = 32
-    testGroups = list_field(X25519TestGroup)
+    testGroups = list_field(XdhTestGroup)
 
 ##############################################################################
 #
@@ -746,41 +726,6 @@ class HmacTestFile(TestFile):
         """Base name for test cases"""
         return "hmac_%s" % super().basename
 
-@attrclass
-class HmacSha1TestFile(HmacTestFile):
-    """An HMAC-SHA1 test file"""
-    SRCFILE: ClassVar = "hmac_sha1_test.json"
-
-@attrclass
-class HmacSha224TestFile(HmacTestFile):
-    """An HMAC-SHA224 test file"""
-    SRCFILE: ClassVar = "hmac_sha224_test.json"
-
-@attrclass
-class HmacSha256TestFile(HmacTestFile):
-    """An HMAC-SHA256 test file"""
-    SRCFILE: ClassVar = "hmac_sha256_test.json"
-
-@attrclass
-class HmacSha384TestFile(HmacTestFile):
-    """An HMAC-SHA384 test file"""
-    SRCFILE: ClassVar = "hmac_sha384_test.json"
-
-@attrclass
-class HmacSha512TestFile(HmacTestFile):
-    """An HMAC-SHA512 test file"""
-    SRCFILE: ClassVar = "hmac_sha512_test.json"
-
-@attrclass
-class HmacSha512224TestFile(HmacTestFile):
-    """An HMAC-SHA512/224 test file"""
-    SRCFILE: ClassVar = "hmac_sha512_224_test.json"
-
-@attrclass
-class HmacSha512256TestFile(HmacTestFile):
-    """An HMAC-SHA512/256 test file"""
-    SRCFILE: ClassVar = "hmac_sha512_256_test.json"
-
 ##############################################################################
 #
 # HKDF tests
@@ -849,26 +794,6 @@ class HkdfTestFile(TestFile):
     def basename(self):
         """Base name for test cases"""
         return "hkdf_%s" % super().basename
-
-@attrclass
-class HkdfSha1TestFile(HkdfTestFile):
-    """An HKDF-SHA1 test file"""
-    SRCFILE: ClassVar = "hkdf_sha1_test.json"
-
-@attrclass
-class HkdfSha256TestFile(HkdfTestFile):
-    """An HKDF-SHA256 test file"""
-    SRCFILE: ClassVar = "hkdf_sha256_test.json"
-
-@attrclass
-class HkdfSha384TestFile(HkdfTestFile):
-    """An HKDF-SHA384 test file"""
-    SRCFILE: ClassVar = "hkdf_sha384_test.json"
-
-@attrclass
-class HkdfSha512TestFile(HkdfTestFile):
-    """An HKDF-SHA512 test file"""
-    SRCFILE: ClassVar = "hkdf_sha512_test.json"
 
 ##############################################################################
 #
@@ -986,10 +911,36 @@ class GcmCipherTestFile(AeadCipherTestFile):
     """A GCM cipher test file"""
     testGroups = list_field(GcmCipherTestGroup)
 
+##############################################################################
+#
+# RSA PKCS#1 tests
+#
+
 @attrclass
-class AesGcmCipherTestFile(GcmCipherTestFile):
-    """An AES-GCM cipher test file"""
-    SRCFILE: ClassVar = "aes_gcm_test.json"
+class RsaPkcs1TestGroup(TestGroup):
+    """An RSA PKCS#1 test group"""
+    keySize = scalar_field(int)
+
+@attrclass
+class RsaPkcs1TestFile(TestFile):
+    """An RSA PKCS#1 test file"""
+    algorithm = scalar_field(PubkeyAlgorithm)
+    testGroups = list_field(RsaPkcs1TestGroup)
+
+    @property
+    def keysizes(self):
+        """All key sizes"""
+        return sorted({x.keySize for x in self.testGroups})
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "rsa_pkcs1_%s" % "_".join("%d" % x for x in self.keysizes)
+
+    @property
+    def label(self):
+        """Label for use in comments"""
+        return "%s-bit" % "/".join("%d" % x for x in self.keysizes)
 
 ##############################################################################
 #
@@ -1023,23 +974,13 @@ class RsaPkcs1DecryptTestCase(TestCase):
         return code
 
 @attrclass
-class RsaPkcs1DecryptTestGroup(TestGroup):
+class RsaPkcs1DecryptTestGroup(RsaPkcs1TestGroup):
     """An RSA PKCS#1 decryption test group"""
     privateKey = map_field(str) # ignored
     privateKeyPkcs8 = scalar_field(HexBytes, metadata={"stable": True})
     privateKeyPem = scalar_field(str) # ignored
     privateKeyJwk = map_field(str) # ignored
-    keySize = scalar_field(int)
     tests = list_field(RsaPkcs1DecryptTestCase)
-
-    @keySize.validator
-    def validate_key_size(self, attr, value):
-        """Validate key size"""
-        if value != self.test_file.KEYSIZE:
-            raise ValueError(
-                "%s: incorrect key size %d (expected %d)" %
-                (attr.name, value, self.test_file.KEYSIZE)
-            )
 
     def definition(self):
         """Generate source code for test group definition"""
@@ -1055,40 +996,20 @@ class RsaPkcs1DecryptTestGroup(TestGroup):
         return code
 
 @attrclass
-class RsaPkcs1DecryptTestFile(TestFile):
+class RsaPkcs1DecryptTestFile(RsaPkcs1TestFile):
     """An RSA PKCS#1 decryption test file"""
     SCHEMA: ClassVar = "rsaes_pkcs1_decrypt_schema_v1.json"
-    KEYSIZE: ClassVar = None
-    algorithm = scalar_field(PubkeyAlgorithm)
     testGroups = list_field(RsaPkcs1DecryptTestGroup)
 
     @property
     def basename(self):
         """Base name for test cases"""
-        return "rsa_pkcs1_%d_decrypt" % self.KEYSIZE
+        return "%s_decrypt" % super().basename
 
     @property
     def label(self):
         """Label for use in comments"""
-        return "RSA-PKCS#1 (%d-bit)" % self.KEYSIZE
-
-@attrclass
-class Rsa2048Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
-    """A 2048-bit RSA PKCS#1 decryption test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_2048_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa3072Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
-    """A 3072-bit RSA PKCS#1 decryption test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_3072_test.json"
-    KEYSIZE: ClassVar = 3072
-
-@attrclass
-class Rsa4096Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
-    """A 4096-bit RSA PKCS#1 decryption test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_4096_test.json"
-    KEYSIZE: ClassVar = 4096
+        return "RSA-PKCS#1 (%s)" % super().label
 
 ##############################################################################
 #
@@ -1121,28 +1042,18 @@ class RsaPkcs1SignTestCase(TestCase):
         return code
 
 @attrclass
-class RsaPkcs1SignTestGroup(TestGroup):
+class RsaPkcs1SignTestGroup(RsaPkcs1TestGroup):
     """An RSA PKCS#1 signing test group"""
     privateKey = map_field(str) # ignored
     keyAsn = scalar_field(str) # ignored
     keyDer = scalar_field(HexBytes, metadata={"stable": True})
     keyJwk = map_field(str, factory=dict) # ignored
     keyPem = scalar_field(str) # ignored
-    keySize = scalar_field(int)
     privateKeyJwk = map_field(str, factory=dict) # ignored
     privateKeyPem = scalar_field(str) # ignored
     privateKeyPkcs8 = scalar_field(HexBytes, metadata={"stable": True})
     sha = scalar_field(DigestAlgorithm)
     tests = list_field(RsaPkcs1SignTestCase)
-
-    @keySize.validator
-    def validate_key_size(self, attr, value):
-        """Validate key size"""
-        if value != self.test_file.KEYSIZE:
-            raise ValueError(
-                "%s: incorrect key size %d (expected %d)" %
-                (attr.name, value, self.test_file.KEYSIZE)
-            )
 
     def definition(self):
         """Generate source code for test group definition"""
@@ -1158,52 +1069,20 @@ class RsaPkcs1SignTestGroup(TestGroup):
         return code
 
 @attrclass
-class RsaPkcs1SignTestFile(TestFile):
+class RsaPkcs1SignTestFile(RsaPkcs1TestFile):
     """An RSA PKCS#1 signing test file"""
     SCHEMA: ClassVar = "rsassa_pkcs1_generate_schema_v1.json"
-    KEYSIZE: ClassVar = None
-    algorithm = scalar_field(PubkeyAlgorithm)
     testGroups = list_field(RsaPkcs1SignTestGroup)
 
     @property
     def basename(self):
         """Base name for test cases"""
-        return "rsa_pkcs1_%d_sign" % self.KEYSIZE
+        return "%s_sign" % super().basename
 
     @property
     def label(self):
         """Label for use in comments"""
-        return "RSA-PKCS#1 signing (%d-bit)" % self.KEYSIZE
-
-@attrclass
-class Rsa1024Pkcs1SignTestFile(RsaPkcs1SignTestFile):
-    """A 1024-bit RSA PKCS#1 signing test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_1024_sig_gen_test.json"
-    KEYSIZE: ClassVar = 1024
-
-@attrclass
-class Rsa1536Pkcs1SignTestFile(RsaPkcs1SignTestFile):
-    """A 1536-bit RSA PKCS#1 signing test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_1536_sig_gen_test.json"
-    KEYSIZE: ClassVar = 1536
-
-@attrclass
-class Rsa2048Pkcs1SignTestFile(RsaPkcs1SignTestFile):
-    """A 2048-bit RSA PKCS#1 signing test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_2048_sig_gen_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa3072Pkcs1SignTestFile(RsaPkcs1SignTestFile):
-    """A 3072-bit RSA PKCS#1 signing test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_3072_sig_gen_test.json"
-    KEYSIZE: ClassVar = 3072
-
-@attrclass
-class Rsa4096Pkcs1SignTestFile(RsaPkcs1SignTestFile):
-    """A 4096-bit RSA PKCS#1 signing test file"""
-    SRCFILE: ClassVar = "rsa_pkcs1_4096_sig_gen_test.json"
-    KEYSIZE: ClassVar = 4096
+        return "RSA-PKCS#1 signing (%s)" % super().label
 
 ##############################################################################
 #
@@ -1245,26 +1124,16 @@ class RsaPkcs1VerifyTestCase(TestCase):
         return code
 
 @attrclass
-class RsaPkcs1VerifyTestGroup(TestGroup):
+class RsaPkcs1VerifyTestGroup(RsaPkcs1TestGroup):
     """An RSA PKCS#1 verification test group"""
     publicKey = map_field(str) # ignored
     publicKeyAsn = scalar_field(str) # ignored
     publicKeyDer = scalar_field(HexBytes, metadata={"stable": True})
     publicKeyPem = scalar_field(str) # ignored
-    keySize = scalar_field(int)
     keyDer = scalar_field(HexBytes, default=None)
     keyJwk = map_field(str, factory=dict) # ignored
     sha = scalar_field(DigestAlgorithm)
     tests = list_field(RsaPkcs1VerifyTestCase)
-
-    @keySize.validator
-    def validate_key_size(self, attr, value):
-        """Validate key size"""
-        if value != self.test_file.KEYSIZE:
-            raise ValueError(
-                "%s: incorrect key size %d (expected %d)" %
-                (attr.name, value, self.test_file.KEYSIZE)
-            )
 
     def definition(self):
         """Generate source code for test group definition"""
@@ -1280,11 +1149,9 @@ class RsaPkcs1VerifyTestGroup(TestGroup):
         return code
 
 @attrclass
-class RsaPkcs1VerifyTestFile(TestFile):
+class RsaPkcs1VerifyTestFile(RsaPkcs1TestFile):
     """An RSA PKCS#1 verification test file"""
     SCHEMA: ClassVar = "rsassa_pkcs1_verify_schema_v1.json"
-    KEYSIZE: ClassVar = None
-    algorithm = scalar_field(PubkeyAlgorithm)
     testGroups = list_field(RsaPkcs1VerifyTestGroup)
 
     @property
@@ -1296,13 +1163,13 @@ class RsaPkcs1VerifyTestFile(TestFile):
     def basename(self):
         """Base name for test cases"""
         digests = "_".join(x.basename for x in self.digests)
-        return "rsa_pkcs1_%d_%s_verify" % (self.KEYSIZE, digests)
+        return "%s_%s_verify" % (super().basename, digests)
 
     @property
     def label(self):
         """Label for use in comments"""
         digests = " / ".join(x.label for x in self.digests)
-        return "RSA-PKCS#1 %s verification (%d-bit)" % (digests, self.KEYSIZE)
+        return "RSA-PKCS#1 %s verification (%s)" % (digests, super().label)
 
     def source(self):
         """Generate source code"""
@@ -1313,108 +1180,6 @@ class RsaPkcs1VerifyTestFile(TestFile):
             for digest in digests
         ))
         return code
-
-@attrclass
-class Rsa2048Pkcs1VerifySha224TestFile(RsaPkcs1VerifyTestFile):
-    """A 2048-bit RSA PKCS#1 SHA-224 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_2048_sha224_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa2048Pkcs1VerifySha256TestFile(RsaPkcs1VerifyTestFile):
-    """A 2048-bit RSA PKCS#1 SHA-256 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_2048_sha256_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa2048Pkcs1VerifySha384TestFile(RsaPkcs1VerifyTestFile):
-    """A 2048-bit RSA PKCS#1 SHA-384 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_2048_sha384_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa2048Pkcs1VerifySha512224TestFile(RsaPkcs1VerifyTestFile):
-    """A 2048-bit RSA PKCS#1 SHA-512/224 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_2048_sha512_224_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa2048Pkcs1VerifySha512256TestFile(RsaPkcs1VerifyTestFile):
-    """A 2048-bit RSA PKCS#1 SHA-512/256 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_2048_sha512_256_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa2048Pkcs1VerifySha512TestFile(RsaPkcs1VerifyTestFile):
-    """A 2048-bit RSA PKCS#1 SHA-512 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_2048_sha512_test.json"
-    KEYSIZE: ClassVar = 2048
-
-@attrclass
-class Rsa3072Pkcs1VerifySha256TestFile(RsaPkcs1VerifyTestFile):
-    """A 3072-bit RSA PKCS#1 SHA-256 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_3072_sha256_test.json"
-    KEYSIZE: ClassVar = 3072
-
-@attrclass
-class Rsa3072Pkcs1VerifySha384TestFile(RsaPkcs1VerifyTestFile):
-    """A 3072-bit RSA PKCS#1 SHA-384 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_3072_sha384_test.json"
-    KEYSIZE: ClassVar = 3072
-
-@attrclass
-class Rsa3072Pkcs1VerifySha512256TestFile(RsaPkcs1VerifyTestFile):
-    """A 3072-bit RSA PKCS#1 SHA-512/256 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_3072_sha512_256_test.json"
-    KEYSIZE: ClassVar = 3072
-
-@attrclass
-class Rsa3072Pkcs1VerifySha512TestFile(RsaPkcs1VerifyTestFile):
-    """A 3072-bit RSA PKCS#1 SHA-512 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_3072_sha512_test.json"
-    KEYSIZE: ClassVar = 3072
-
-@attrclass
-class Rsa4096Pkcs1VerifySha256TestFile(RsaPkcs1VerifyTestFile):
-    """A 4096-bit RSA PKCS#1 SHA-256 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_4096_sha256_test.json"
-    KEYSIZE: ClassVar = 4096
-
-@attrclass
-class Rsa4096Pkcs1VerifySha384TestFile(RsaPkcs1VerifyTestFile):
-    """A 4096-bit RSA PKCS#1 SHA-384 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_4096_sha384_test.json"
-    KEYSIZE: ClassVar = 4096
-
-@attrclass
-class Rsa4096Pkcs1VerifySha512256TestFile(RsaPkcs1VerifyTestFile):
-    """A 4096-bit RSA PKCS#1 SHA-512/256 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_4096_sha512_256_test.json"
-    KEYSIZE: ClassVar = 4096
-
-@attrclass
-class Rsa4096Pkcs1VerifySha512TestFile(RsaPkcs1VerifyTestFile):
-    """A 4096-bit RSA PKCS#1 SHA-512 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_4096_sha512_test.json"
-    KEYSIZE: ClassVar = 4096
-
-@attrclass
-class Rsa8192Pkcs1VerifySha256TestFile(RsaPkcs1VerifyTestFile):
-    """A 8192-bit RSA PKCS#1 SHA-256 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_8192_sha256_test.json"
-    KEYSIZE: ClassVar = 8192
-
-@attrclass
-class Rsa8192Pkcs1VerifySha384TestFile(RsaPkcs1VerifyTestFile):
-    """A 8192-bit RSA PKCS#1 SHA-384 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_8192_sha384_test.json"
-    KEYSIZE: ClassVar = 8192
-
-@attrclass
-class Rsa8192Pkcs1VerifySha512TestFile(RsaPkcs1VerifyTestFile):
-    """A 8192-bit RSA PKCS#1 SHA-512 verification test file"""
-    SRCFILE: ClassVar = "rsa_signature_8192_sha512_test.json"
-    KEYSIZE: ClassVar = 8192
 
 ##############################################################################
 #
@@ -1442,49 +1207,91 @@ def main():
         raise FileNotFoundError(dstdir)
 
     # Read JSON inputs
-    classes = (
-        AesGcmCipherTestFile,
-        HkdfSha1TestFile,
-        HkdfSha256TestFile,
-        HkdfSha384TestFile,
-        HkdfSha512TestFile,
-        HmacSha1TestFile,
-        HmacSha224TestFile,
-        HmacSha256TestFile,
-        HmacSha384TestFile,
-        HmacSha512TestFile,
-        HmacSha512224TestFile,
-        HmacSha512256TestFile,
-        P256ExchangeTestFile,
-        P384ExchangeTestFile,
-        Rsa1024Pkcs1SignTestFile,
-        Rsa1536Pkcs1SignTestFile,
-        Rsa2048Pkcs1DecryptTestFile,
-        Rsa2048Pkcs1SignTestFile,
-        Rsa2048Pkcs1VerifySha224TestFile,
-        Rsa2048Pkcs1VerifySha256TestFile,
-        Rsa2048Pkcs1VerifySha384TestFile,
-        Rsa2048Pkcs1VerifySha512224TestFile,
-        Rsa2048Pkcs1VerifySha512256TestFile,
-        Rsa2048Pkcs1VerifySha512TestFile,
-        Rsa3072Pkcs1DecryptTestFile,
-        Rsa3072Pkcs1SignTestFile,
-        Rsa3072Pkcs1VerifySha256TestFile,
-        Rsa3072Pkcs1VerifySha384TestFile,
-        Rsa3072Pkcs1VerifySha512256TestFile,
-        Rsa3072Pkcs1VerifySha512TestFile,
-        Rsa4096Pkcs1DecryptTestFile,
-        Rsa4096Pkcs1SignTestFile,
-        Rsa4096Pkcs1VerifySha256TestFile,
-        Rsa4096Pkcs1VerifySha384TestFile,
-        Rsa4096Pkcs1VerifySha512256TestFile,
-        Rsa4096Pkcs1VerifySha512TestFile,
-        Rsa8192Pkcs1VerifySha256TestFile,
-        Rsa8192Pkcs1VerifySha384TestFile,
-        Rsa8192Pkcs1VerifySha512TestFile,
-        X25519TestFile,
-    )
-    tests = [x.read(srcdir / x.SRCFILE) for x in classes]
+    tests = [
+        GcmCipherTestFile.read(srcdir / "aes_gcm_test.json"),
+        HkdfTestFile.read(srcdir / "hkdf_sha1_test.json"),
+        HkdfTestFile.read(srcdir / "hkdf_sha256_test.json"),
+        HkdfTestFile.read(srcdir / "hkdf_sha384_test.json"),
+        HkdfTestFile.read(srcdir / "hkdf_sha512_test.json"),
+        HmacTestFile.read(srcdir / "hmac_sha1_test.json"),
+        HmacTestFile.read(srcdir / "hmac_sha224_test.json"),
+        HmacTestFile.read(srcdir / "hmac_sha256_test.json"),
+        HmacTestFile.read(srcdir / "hmac_sha384_test.json"),
+        HmacTestFile.read(srcdir / "hmac_sha512_test.json"),
+        HmacTestFile.read(srcdir / "hmac_sha512_224_test.json"),
+        HmacTestFile.read(srcdir / "hmac_sha512_256_test.json"),
+        NistExchangeTestFile.read(
+            srcdir / "ecdh_secp256r1_ecpoint_test.json",
+            privsize=32, pubsize=65, sharedsize=32,
+        ),
+        NistExchangeTestFile.read(
+            srcdir / "ecdh_secp384r1_ecpoint_test.json",
+            privsize=48, pubsize=97, sharedsize=48,
+        ),
+        RsaPkcs1DecryptTestFile.read(srcdir / "rsa_pkcs1_2048_test.json"),
+        RsaPkcs1DecryptTestFile.read(srcdir / "rsa_pkcs1_3072_test.json"),
+        RsaPkcs1DecryptTestFile.read(srcdir / "rsa_pkcs1_4096_test.json"),
+        RsaPkcs1SignTestFile.read(srcdir / "rsa_pkcs1_1024_sig_gen_test.json"),
+        RsaPkcs1SignTestFile.read(srcdir / "rsa_pkcs1_1536_sig_gen_test.json"),
+        RsaPkcs1SignTestFile.read(srcdir / "rsa_pkcs1_2048_sig_gen_test.json"),
+        RsaPkcs1SignTestFile.read(srcdir / "rsa_pkcs1_3072_sig_gen_test.json"),
+        RsaPkcs1SignTestFile.read(srcdir / "rsa_pkcs1_4096_sig_gen_test.json"),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_2048_sha224_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_2048_sha256_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_2048_sha384_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_2048_sha512_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_2048_sha512_224_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_2048_sha512_256_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_3072_sha256_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_3072_sha384_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_3072_sha512_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_3072_sha512_256_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_4096_sha256_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_4096_sha384_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_4096_sha512_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_4096_sha512_256_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_8192_sha256_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_8192_sha384_test.json"
+        ),
+        RsaPkcs1VerifyTestFile.read(
+            srcdir / "rsa_signature_8192_sha512_test.json"
+        ),
+        XdhTestFile.read(
+            srcdir / "x25519_test.json",
+            privsize=32, pubsize=32, sharedsize=32,
+        ),
+    ]
 
     # Write source code outputs
     for test in tests:
