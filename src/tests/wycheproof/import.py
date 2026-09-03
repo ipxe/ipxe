@@ -74,6 +74,76 @@ def map_field(typ, key=str, **kwargs):
 
 ##############################################################################
 #
+# iPXE algorithm mappings
+#
+
+class Algorithm(Enum):
+    """An iPXE algorithm"""
+
+    @property
+    def basename(self):
+        """Base algorithm name"""
+        return self.name.lower()
+
+    @property
+    def symbol(self):
+        """Algorithm symbol"""
+        return "%s_algorithm" % self.basename
+
+class CipherAlgorithm(Algorithm):
+    """An iPXE cipher algorithm"""
+    AES_GCM = "AES-GCM"
+
+class DigestAlgorithm(Algorithm):
+    """An iPXE digest algorithm"""
+    SHA1 = "SHA-1"
+    SHA224 = "SHA-224"
+    SHA256 = "SHA-256"
+    SHA384 = "SHA-384"
+    SHA512 = "SHA-512"
+    SHA512_224 = "SHA-512/224"
+    SHA512_256 = "SHA-512/256"
+
+class HmacDigestAlgorithm(Algorithm):
+    """An iPXE digest algorithm used with HMAC"""
+    SHA1 = "HMACSHA1"
+    SHA224 = "HMACSHA224"
+    SHA256 = "HMACSHA256"
+    SHA384 = "HMACSHA384"
+    SHA512 = "HMACSHA512"
+    SHA512_224 = "HMACSHA512/224"
+    SHA512_256 = "HMACSHA512/256"
+
+class HkdfDigestAlgorithm(Algorithm):
+    """An iPXE digest algorithm used with HKDF"""
+    SHA1 = "HKDF-SHA-1"
+    SHA256 = "HKDF-SHA-256"
+    SHA384 = "HKDF-SHA-384"
+    SHA512 = "HKDF-SHA-512"
+
+class DiffieHellmanAlgorithm(Algorithm):
+    """A Diffie-Hellman key exchange algorithm family"""
+    ECDH = "ECDH"
+    XDH = "XDH"
+
+class ExchangeAlgorithm(Algorithm):
+    """An iPXE key exchange algorithm"""
+    P256 = "secp256r1"
+    P384 = "secp384r1"
+    X25519 = "curve25519"
+
+class PubkeyAlgorithm(Algorithm):
+    """An iPXE public-key algorithm"""
+    RSA_ES_PKCS1 = "RSAES-PKCS1-v1_5"
+    RSA_SSA_PKCS1 = "RSASSA-PKCS1-v1_5"
+
+    @property
+    def basename(self):
+        """Base algorithm name"""
+        return super().basename.split("_")[0]
+
+##############################################################################
+#
 # Common types
 #
 
@@ -229,9 +299,16 @@ class TestNamedObject:
             if field.metadata.get("stable")
         }
         digest = hashlib.sha256()
-        digest.update(b"algorithm:%s" % self.test_file.ALGORITHM.encode())
-        for name, value in sorted(props.items()):
-            digest.update(b":%s:%d:%s" % (name, len(value), value))
+        digest.update(b":".join(itertools.chain(
+            (
+                b"algorithm:%s" % algorithm.basename.encode()
+                for algorithm in self.test_file.algorithms
+            ),
+            (
+                b"%s:%d:%s" % (name, len(value), value)
+                for name, value in sorted(props.items())
+            ),
+        )))
         return digest.hexdigest()[:8]
 
     @property
@@ -333,11 +410,10 @@ class TestGroup(TestNamedObject):
 @attrclass
 class TestFile:
     """A test file"""
-    ALGORITHM: ClassVar = None
     LABEL: ClassVar = None
     SCHEMA: ClassVar = None
     SRCFILE: ClassVar = None
-    algorithm = scalar_field(str, default=None)
+    algorithm = scalar_field(Algorithm)
     header = list_field(str, factory=list)
     notes = map_field(TestNote, key=TestFlag, factory=dict)
     numberOfTests = scalar_field(int)
@@ -363,9 +439,14 @@ class TestFile:
             )
 
     @property
+    def algorithms(self):
+        """All algorithms"""
+        return [self.algorithm]
+
+    @property
     def basename(self):
         """Base name for test cases"""
-        return self.ALGORITHM
+        return "_".join(x.basename for x in self.algorithms)
 
     @property
     def tests(self):
@@ -461,12 +542,12 @@ class ExchangeTestCase(TestCase):
         """Generate source code for test definition"""
         code = super().definition()
         if not self.skip:
-            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            algorithm = self.test_group.curve.symbol
             privsize = self.test_file.PRIVSIZE
             pubsize = self.test_file.PUBSIZE
             sharedsize = self.test_file.SHAREDSIZE
             code += (
-                "EXCHANGE_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+                "EXCHANGE_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
                 self.private.source("\tPRIVATE", privsize) + ",\n" +
                 self.public.source("\tPARTNER", pubsize) + ",\n" +
                 "\tPUBLIC_UNSPECIFIED,\n" +
@@ -484,6 +565,7 @@ class ExchangeTestCase(TestCase):
 @attrclass
 class ExchangeTestGroup(TestGroup):
     """A key exchange test group"""
+    curve = scalar_field(ExchangeAlgorithm)
     tests = list_field(ExchangeTestCase)
 
 @attrclass
@@ -492,7 +574,13 @@ class ExchangeTestFile(TestFile):
     PRIVSIZE: ClassVar = None
     PUBSIZE: ClassVar = None
     SHAREDSIZE: ClassVar = None
+    algorithm = scalar_field(DiffieHellmanAlgorithm)
     testGroups = list_field(ExchangeTestGroup)
+
+    @property
+    def algorithms(self):
+        """All algorithms"""
+        return sorted({x.curve for x in self.testGroups})
 
 ##############################################################################
 #
@@ -514,7 +602,6 @@ class NistExchangeTestCase(ExchangeTestCase):
 @attrclass
 class NistExchangeTestGroup(ExchangeTestGroup):
     """A NIST elliptic curve key exchange test group"""
-    curve = scalar_field(str)
     encoding = scalar_field(str)
     tests = list_field(NistExchangeTestCase)
 
@@ -527,7 +614,6 @@ class NistExchangeTestFile(ExchangeTestFile):
 @attrclass
 class P256ExchangeTestFile(NistExchangeTestFile):
     """A P-256 key exchange test file"""
-    ALGORITHM: ClassVar = "p256"
     LABEL: ClassVar = "P256"
     SRCFILE: ClassVar = "ecdh_secp256r1_ecpoint_test.json"
     PRIVSIZE: ClassVar = 32
@@ -537,7 +623,6 @@ class P256ExchangeTestFile(NistExchangeTestFile):
 @attrclass
 class P384ExchangeTestFile(NistExchangeTestFile):
     """A P-384 key exchange test file"""
-    ALGORITHM: ClassVar = "p384"
     LABEL: ClassVar = "P384"
     SRCFILE: ClassVar = "ecdh_secp384r1_ecpoint_test.json"
     PRIVSIZE: ClassVar = 48
@@ -561,13 +646,11 @@ class X25519TestCase(ExchangeTestCase):
 @attrclass
 class X25519TestGroup(ExchangeTestGroup):
     """An X25519 key exchange test group"""
-    curve = scalar_field(str)
     tests = list_field(X25519TestCase)
 
 @attrclass
 class X25519TestFile(ExchangeTestFile):
     """An X25519 key exchange test file"""
-    ALGORITHM: ClassVar = "x25519"
     LABEL: ClassVar = "X25519"
     SCHEMA: ClassVar = "xdh_comp_schema_v1.json"
     SRCFILE: ClassVar = "x25519_test.json"
@@ -614,9 +697,9 @@ class HmacTestCase(TestCase):
         """Generate source code for test definition"""
         code = super().definition()
         if not self.skip:
-            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            algorithm = self.test_file.algorithm.symbol
             code += (
-                "HMAC_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+                "HMAC_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
                 self.key.source("\tKEY") + ",\n" +
                 self.msg.source("\tDATA") + ",\n" +
                 self.tag.source("\tEXPECTED") + " );\n"
@@ -640,59 +723,53 @@ class HmacTestGroup(TestGroup):
 class HmacTestFile(TestFile):
     """An HMAC test file"""
     SCHEMA: ClassVar = "mac_test_schema_v1.json"
+    algorithm = scalar_field(HmacDigestAlgorithm)
     testGroups = list_field(HmacTestGroup)
 
     @property
     def basename(self):
         """Base name for test cases"""
-        return "hmac_%s" % self.ALGORITHM
+        return "hmac_%s" % super().basename
 
 @attrclass
 class HmacSha1TestFile(HmacTestFile):
     """An HMAC-SHA1 test file"""
-    ALGORITHM: ClassVar = "sha1"
     LABEL: ClassVar = "HMAC-SHA1"
     SRCFILE: ClassVar = "hmac_sha1_test.json"
 
 @attrclass
 class HmacSha224TestFile(HmacTestFile):
     """An HMAC-SHA224 test file"""
-    ALGORITHM: ClassVar = "sha224"
     LABEL: ClassVar = "HMAC-SHA224"
     SRCFILE: ClassVar = "hmac_sha224_test.json"
 
 @attrclass
 class HmacSha256TestFile(HmacTestFile):
     """An HMAC-SHA256 test file"""
-    ALGORITHM: ClassVar = "sha256"
     LABEL: ClassVar = "HMAC-SHA256"
     SRCFILE: ClassVar = "hmac_sha256_test.json"
 
 @attrclass
 class HmacSha384TestFile(HmacTestFile):
     """An HMAC-SHA384 test file"""
-    ALGORITHM: ClassVar = "sha384"
     LABEL: ClassVar = "HMAC-SHA384"
     SRCFILE: ClassVar = "hmac_sha384_test.json"
 
 @attrclass
 class HmacSha512TestFile(HmacTestFile):
     """An HMAC-SHA512 test file"""
-    ALGORITHM: ClassVar = "sha512"
     LABEL: ClassVar = "HMAC-SHA512"
     SRCFILE: ClassVar = "hmac_sha512_test.json"
 
 @attrclass
 class HmacSha512224TestFile(HmacTestFile):
     """An HMAC-SHA512/224 test file"""
-    ALGORITHM: ClassVar = "sha512_224"
     LABEL: ClassVar = "HMAC-SHA512/224"
     SRCFILE: ClassVar = "hmac_sha512_224_test.json"
 
 @attrclass
 class HmacSha512256TestFile(HmacTestFile):
     """An HMAC-SHA512/256 test file"""
-    ALGORITHM: ClassVar = "sha512_256"
     LABEL: ClassVar = "HMAC-SHA512/256"
     SRCFILE: ClassVar = "hmac_sha512_256_test.json"
 
@@ -727,10 +804,10 @@ class HkdfTestCase(TestCase):
         """Generate source code for test definition"""
         code = super().definition()
         if not self.skip:
-            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            algorithm = self.test_file.algorithm.symbol
             salted = (len(self.salt) > 0)
             code += (
-                "HKDF_TEST ( %s, %s, %d,\n" % (
+                "HKDF_TEST ( %s, &%s, %d,\n" % (
                     self.test_name, algorithm, salted
                 ) +
                 self.ikm.source("\tIKM") + ",\n" +
@@ -757,38 +834,35 @@ class HkdfTestGroup(TestGroup):
 class HkdfTestFile(TestFile):
     """An HKDF test file"""
     SCHEMA: ClassVar = "hkdf_test_schema_v1.json"
+    algorithm = scalar_field(HkdfDigestAlgorithm)
     testGroups = list_field(HkdfTestGroup)
 
     @property
     def basename(self):
         """Base name for test cases"""
-        return "hkdf_%s" % self.ALGORITHM
+        return "hkdf_%s" % super().basename
 
 @attrclass
 class HkdfSha1TestFile(HkdfTestFile):
     """An HKDF-SHA1 test file"""
-    ALGORITHM: ClassVar = "sha1"
     LABEL: ClassVar = "HKDF-SHA1"
     SRCFILE: ClassVar = "hkdf_sha1_test.json"
 
 @attrclass
 class HkdfSha256TestFile(HkdfTestFile):
     """An HKDF-SHA256 test file"""
-    ALGORITHM: ClassVar = "sha256"
     LABEL: ClassVar = "HKDF-SHA256"
     SRCFILE: ClassVar = "hkdf_sha256_test.json"
 
 @attrclass
 class HkdfSha384TestFile(HkdfTestFile):
     """An HKDF-SHA384 test file"""
-    ALGORITHM: ClassVar = "sha384"
     LABEL: ClassVar = "HKDF-SHA384"
     SRCFILE: ClassVar = "hkdf_sha384_test.json"
 
 @attrclass
 class HkdfSha512TestFile(HkdfTestFile):
     """An HKDF-SHA512 test file"""
-    ALGORITHM: ClassVar = "sha512"
     LABEL: ClassVar = "HKDF-SHA512"
     SRCFILE: ClassVar = "hkdf_sha512_test.json"
 
@@ -844,9 +918,9 @@ class AeadCipherTestCase(TestCase):
         """Generate source code for test definition"""
         code = super().definition()
         if not self.skip:
-            algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+            algorithm = self.test_file.algorithm.symbol
             code += (
-                "CIPHER_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+                "CIPHER_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
                 self.key.source("\tKEY") + ",\n" +
                 self.iv.source("\tIV") + ",\n" +
                 self.aad.source("\tADDITIONAL") + ",\n" +
@@ -881,6 +955,7 @@ class AeadCipherTestGroup(TestGroup):
 class AeadCipherTestFile(TestFile):
     """An AEAD cipher test file"""
     SCHEMA: ClassVar = "aead_test_schema_v1.json"
+    algorithm = scalar_field(CipherAlgorithm)
     testGroups = list_field(AeadCipherTestGroup)
 
 ##############################################################################
@@ -910,7 +985,6 @@ class GcmCipherTestFile(AeadCipherTestFile):
 @attrclass
 class AesGcmCipherTestFile(GcmCipherTestFile):
     """An AES-GCM cipher test file"""
-    ALGORITHM: ClassVar = "aes_gcm"
     LABEL: ClassVar = "AES-GCM"
     SRCFILE: ClassVar = "aes_gcm_test.json"
 
@@ -966,10 +1040,10 @@ class RsaPkcs1DecryptTestGroup(TestGroup):
 
     def definition(self):
         """Generate source code for test group definition"""
-        algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+        algorithm = self.test_file.algorithm.symbol
         code = (
             "/* Private key for following tests */\n" +
-            "PUBKEY_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+            "PUBKEY_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
             self.privateKeyPkcs8.source("\tPRIVATE") + ",\n" +
             "\tPUBLIC() );\n" +
             "\n" +
@@ -980,9 +1054,9 @@ class RsaPkcs1DecryptTestGroup(TestGroup):
 @attrclass
 class RsaPkcs1DecryptTestFile(TestFile):
     """An RSA PKCS#1 decryption test file"""
-    ALGORITHM: ClassVar = "rsa"
     SCHEMA: ClassVar = "rsaes_pkcs1_decrypt_schema_v1.json"
     KEYSIZE: ClassVar = None
+    algorithm = scalar_field(PubkeyAlgorithm)
     testGroups = list_field(RsaPkcs1DecryptTestGroup)
 
     @property
@@ -1016,14 +1090,6 @@ class Rsa4096Pkcs1DecryptTestFile(RsaPkcs1DecryptTestFile):
 # RSA PKCS#1 signing tests
 #
 
-class RsaPkcs1SignShaAlgorithm(Enum):
-    """An RSA PKCS#1 signing digest algorithm"""
-    SHA1_ALGORITHM = "SHA-1"
-    SHA224_ALGORITHM = "SHA-224"
-    SHA256_ALGORITHM = "SHA-256"
-    SHA384_ALGORITHM = "SHA-384"
-    SHA512_ALGORITHM = "SHA-512"
-
 @attrclass
 class RsaPkcs1SignTestCase(TestCase):
     """An RSA PKCS#1 signing test case"""
@@ -1033,7 +1099,7 @@ class RsaPkcs1SignTestCase(TestCase):
     def definition(self):
         """Generate source code for test definition"""
         code = super().definition()
-        digest = self.test_group.sha.name.lower()
+        digest = self.test_group.sha.symbol
         code += (
             "PUBKEY_SIGNATURE_TEST ( %s,\n" % self.test_name +
             "\t&%s, RANDOM(),\n" % self.test_group.test_name +
@@ -1061,7 +1127,7 @@ class RsaPkcs1SignTestGroup(TestGroup):
     privateKeyJwk = map_field(str, factory=dict) # ignored
     privateKeyPem = scalar_field(str) # ignored
     privateKeyPkcs8 = scalar_field(HexBytes, metadata={"stable": True})
-    sha = scalar_field(RsaPkcs1SignShaAlgorithm)
+    sha = scalar_field(DigestAlgorithm)
     tests = list_field(RsaPkcs1SignTestCase)
 
     @keySize.validator
@@ -1075,10 +1141,10 @@ class RsaPkcs1SignTestGroup(TestGroup):
 
     def definition(self):
         """Generate source code for test group definition"""
-        algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+        algorithm = self.test_file.algorithm.symbol
         code = (
             "/* Key pair for following tests */\n" +
-            "PUBKEY_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+            "PUBKEY_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
             self.privateKeyPkcs8.source("\tPRIVATE") + ",\n" +
             self.keyDer.source("\tPUBLIC") + " );\n" +
             "\n" +
@@ -1089,9 +1155,9 @@ class RsaPkcs1SignTestGroup(TestGroup):
 @attrclass
 class RsaPkcs1SignTestFile(TestFile):
     """An RSA PKCS#1 signing test file"""
-    ALGORITHM: ClassVar = "rsa"
     SCHEMA: ClassVar = "rsassa_pkcs1_generate_schema_v1.json"
     KEYSIZE: ClassVar = None
+    algorithm = scalar_field(PubkeyAlgorithm)
     testGroups = list_field(RsaPkcs1SignTestGroup)
 
     @property
@@ -1139,16 +1205,6 @@ class Rsa4096Pkcs1SignTestFile(RsaPkcs1SignTestFile):
 # RSA PKCS#1 verification tests
 #
 
-class RsaPkcs1VerifyShaAlgorithm(Enum):
-    """An RSA PKCS#1 verification digest algorithm"""
-    SHA1 = "SHA-1"
-    SHA224 = "SHA-224"
-    SHA256 = "SHA-256"
-    SHA384 = "SHA-384"
-    SHA512 = "SHA-512"
-    SHA512_224 = "SHA-512/224"
-    SHA512_256 = "SHA-512/256"
-
 @attrclass
 class RsaPkcs1VerifyTestCase(TestCase):
     """An RSA PKCS#1 verification test case"""
@@ -1164,7 +1220,7 @@ class RsaPkcs1VerifyTestCase(TestCase):
     def definition(self):
         """Generate source code for test definition"""
         code = super().definition()
-        digest = "%s_algorithm" % self.test_group.sha.name.lower()
+        digest = self.test_group.sha.symbol
         code += (
             "PUBKEY_SIGNATURE_TEST ( %s,\n" % self.test_name +
             "\t&%s, RANDOM(),\n" % self.test_group.test_name +
@@ -1193,7 +1249,7 @@ class RsaPkcs1VerifyTestGroup(TestGroup):
     keySize = scalar_field(int)
     keyDer = scalar_field(HexBytes, default=None)
     keyJwk = map_field(str, factory=dict) # ignored
-    sha = scalar_field(RsaPkcs1VerifyShaAlgorithm)
+    sha = scalar_field(DigestAlgorithm)
     tests = list_field(RsaPkcs1VerifyTestCase)
 
     @keySize.validator
@@ -1207,10 +1263,10 @@ class RsaPkcs1VerifyTestGroup(TestGroup):
 
     def definition(self):
         """Generate source code for test group definition"""
-        algorithm = "&%s_algorithm" % self.test_file.ALGORITHM
+        algorithm = self.test_file.algorithm.symbol
         code = (
             "/* Key pair for following tests */\n" +
-            "PUBKEY_TEST ( %s, %s,\n" % (self.test_name, algorithm) +
+            "PUBKEY_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
             "\tPRIVATE(),\n" +
             self.publicKeyDer.source("\tPUBLIC") + " );\n" +
             "\n" +
@@ -1221,21 +1277,21 @@ class RsaPkcs1VerifyTestGroup(TestGroup):
 @attrclass
 class RsaPkcs1VerifyTestFile(TestFile):
     """An RSA PKCS#1 verification test file"""
-    ALGORITHM: ClassVar = "rsa"
     SCHEMA: ClassVar = "rsassa_pkcs1_verify_schema_v1.json"
     KEYSIZE: ClassVar = None
+    algorithm = scalar_field(PubkeyAlgorithm)
     testGroups = list_field(RsaPkcs1VerifyTestGroup)
 
     @property
     def basename(self):
         """Base name for test cases"""
-        digest = self.testGroups[0].sha.name.lower()
-        return "rsa_pkcs1_%d_%s_verify" % (self.KEYSIZE, digest)
+        digests = "_".join(sorted({x.sha.basename for x in self.testGroups}))
+        return "rsa_pkcs1_%d_%s_verify" % (self.KEYSIZE, digests)
 
     def source(self):
         """Generate source code"""
         code = super().source()
-        digests = sorted({x.sha.name.lower() for x in self.testGroups})
+        digests = sorted({x.sha.basename for x in self.testGroups})
         code += "\n".join((
             "REQUIRE_OBJECT ( rsa_%s );\n" % digest
             for digest in digests
