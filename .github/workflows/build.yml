@@ -322,6 +322,7 @@ jobs:
         run: |
           make ${{ env.bindir }}/ipxe.linux \
                ${{ env.bindir }}/tests.linux \
+               ${{ env.bindir }}/slowtests.linux \
                ${{ env.bindir }}/errors
 
       - name: Upload
@@ -332,12 +333,20 @@ jobs:
           path: |
             src/${{ env.bindir }}/ipxe.linux
             src/${{ env.bindir }}/tests.linux
+            src/${{ env.bindir }}/slowtests.linux
             src/${{ env.bindir }}/errors
 
       - name: Test
         working-directory: src
         run: |
           ${{ matrix.exec }} ${{ env.bindir }}/tests.linux
+
+      - name: Slow test
+        working-directory: src
+        if: >-
+          github.ref == 'refs/heads/slowtest'
+        run: |
+          ${{ matrix.exec }} ${{ env.bindir }}/slowtests.linux
 
   shim:
     name: UEFI shim
