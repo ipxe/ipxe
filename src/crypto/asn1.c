@@ -1003,6 +1003,18 @@ static size_t asn1_header ( struct asn1_builder_header *header,
 }
 
 /**
+ * Calculate ASN.1 header length
+ *
+ * @v len		Content length
+ * @ret header_len	Header length
+ */
+size_t asn1_header_len ( size_t len ) {
+	struct asn1_builder_header header;
+
+	return asn1_header ( &header, ASN1_ANY, len );
+}
+
+/**
  * Grow ASN.1 builder
  *
  * @v builder		ASN.1 builder

@@ -565,6 +565,7 @@ extern int asn1_parse_gcm ( struct asn1_algorithm *algorithm,
 			    struct asn1_cursor *params );
 extern int asn1_generalized_time ( const struct asn1_cursor *cursor,
 				   time_t *time );
+extern size_t asn1_header_len ( size_t len );
 extern int asn1_grow ( struct asn1_builder *builder, size_t extra );
 extern int asn1_prepend_raw ( struct asn1_builder *builder, const void *data,
 			      size_t len );
