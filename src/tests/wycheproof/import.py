@@ -154,6 +154,7 @@ class ExchangeAlgorithm(Algorithm):
 
 class PubkeyAlgorithm(Algorithm):
     """An iPXE public-key algorithm"""
+    ECDSA = "ECDSA"
     RSA_ES_PKCS1 = "RSAES-PKCS1-v1_5"
     RSA_SSA_PKCS1 = "RSASSA-PKCS1-v1_5"
 
@@ -225,7 +226,9 @@ class TestBugType(Enum):
 class TestFlag(Enum):
     """A test flag"""
     ADDITION_CHAIN = "AdditionChain"
+    ARITHMETIC_ERROR = "ArithmeticError"
     BER_ENCODED_PADDING = "BerEncodedPadding"
+    BER_ENCODED_SIGNATURE = "BerEncodedSignature"
     COMPRESSED_POINT = "CompressedPoint"
     COMPRESSED_PUBLIC = "CompressedPublic"
     COUNTER_WRAP = "CounterWrap"
@@ -236,10 +239,13 @@ class TestFlag(Enum):
     EDGE_CASE_EPHEMERAL_KEY = "EdgeCaseEphemeralKey"
     EDGE_CASE_MULTIPLICATION = "EdgeCaseMultiplication"
     EDGE_CASE_PRIVATE_KEY = "EdgeCasePrivateKey"
+    EDGE_CASE_PUBLIC_KEY = "EdgeCasePublicKey"
+    EDGE_CASE_SHAMIR_MULTIPLICATION = "EdgeCaseShamirMultiplication"
     EDGE_CASE_SHARED = "EdgeCaseShared"
     EDGE_CASE_SHARED_SECRET = "EdgeCaseSharedSecret"
     EDGE_CASE_SIGNAGTURE = "EdgeCaseSignature"
     EMPTY_SALT = "EmptySalt"
+    INTEGER_OVERFLOW = "IntegerOverflow"
     INVALID_ASN_IN_PADDING = "InvalidAsnInPadding"
     INVALID_CIPHERTEXT_FORMAT = "InvalidCiphertextFormat"
     INVALID_COMPRESSED_PUBLIC = "InvalidCompressedPublic"
@@ -248,31 +254,42 @@ class TestFlag(Enum):
     INVALID_PADDING = "InvalidPadding"
     INVALID_PKCS1_PADDING = "InvalidPkcs1Padding"
     INVALID_SIGNATURE = "InvalidSignature"
+    INVALID_TYPES_IN_SIGNATURE = "InvalidTypesInSignature"
     KTV = "Ktv"
     LONG_IV = "LongIv"
     LOW_ORDER_PUBLIC = "LowOrderPublic"
     MAXIMAL_OUTPUT_SIZE = "MaximalOutputSize"
     MISSING_NULL = "MissingNull"
+    MISSING_ZERO = "MissingZero"
+    MODIFIED_INTEGER = "ModifiedInteger"
     MODIFIED_PADDING = "ModifiedPadding"
     MODIFIED_TAG = "ModifiedTag"
+    MODIFIED_SIGNATURE = "ModifiedSignature"
+    MODULAR_INVERSE = "ModularInverse"
     NO_HASH = "NoHash"
     NON_CANONICAL_PUBLIC = "NonCanonicalPublic"
     NORMAL = "Normal"
     OUTPUT_COLLISION = "OutputCollision"
+    POINT_DUPLICATION = "PointDuplication"
     PSEUDORANDOM = "Pseudorandom"
+    RANGE_CHECK = "RangeCheck"
     SHORT_PADDING = "ShortPadding"
     SIGNATURE_MALLEABILITY = "SignatureMalleability"
     SIZE_TOO_LARGE = "SizeTooLarge"
     SMALL_IV = "SmallIv"
     SMALL_MODULUS = "SmallModulus"
     SMALL_PUBLIC_KEY = "SmallPublicKey"
+    SMALL_RAND_S = "SmallRandS"
     SMALL_SIGNATURE = "SmallSignature"
+    SPECIAL_CASE_HASH = "SpecialCaseHash"
     SPECIAL_CASE_PADDING = "SpecialCasePadding"
     SPECIAL_CASE = "SpecialCase"
     SPECIAL_PUBLIC_KEY = "SpecialPublicKey"
     SSLV23_PADDING = "Sslv23Padding"
     TRUNCATED_HMAC = "TruncatedHmac"
     TWIST = "Twist"
+    UNTRUNCATED_HASH = "Untruncatedhash"
+    VALID_SIGNATURE = "ValidSignature"
     WEAK_HASH = "WeakHash"
     WRONG_CURVE = "WrongCurve"
     WRONG_HASH = "WrongHash"
@@ -305,6 +322,16 @@ class TestNamedObject:
         """Containing test file"""
 
     @property
+    def stable_props(self):
+        """Get properties for constructing a stable ID"""
+        props = {
+            field.name.encode(): str(getattr(self, field.name)).encode()
+            for field in attrs.fields(type(self))
+            if field.metadata.get("stable")
+        }
+        return props
+
+    @property
     def stable_id(self):
         """Calculate a stable test ID
 
@@ -313,11 +340,7 @@ class TestNamedObject:
         renumbered upstream, we construct a stable identifier built
         from the relevant parameters of the test itself.
         """
-        props = {
-            field.name.encode(): str(getattr(self, field.name)).encode()
-            for field in attrs.fields(type(self))
-            if field.metadata.get("stable")
-        }
+        props = self.stable_props
         digest = hashlib.sha256()
         digest.update(b":".join(itertools.chain(
             (
@@ -472,13 +495,18 @@ class TestFile:
         """All test cases"""
         return [test for group in self.testGroups for test in group.tests]
 
+    def definition(self):
+        """Generate source code for test file definition"""
+        code = "\n".join(x.definition() for x in self.testGroups)
+        return code
+
     def source(self):
         """Generate source code"""
         generator = Path(__file__).name
         testname = "wycheproof_%s" % self.basename
         execname = "%s_exec" % testname
         label = self.label
-        definitions = "\n".join(x.definition() for x in self.testGroups)
+        definitions = self.definition()
         invocations = "".join(x.invocation() for x in self.tests if not x.skip)
         code = (
             textwrap.dedent(f"""
@@ -1174,11 +1202,126 @@ class RsaPkcs1VerifyTestFile(RsaPkcs1TestFile):
     def source(self):
         """Generate source code"""
         code = super().source()
-        digests = sorted({x.sha.basename for x in self.testGroups})
-        code += "\n".join((
-            "REQUIRE_OBJECT ( rsa_%s );\n" % digest
-            for digest in digests
-        ))
+        code += "".join(
+            "REQUIRE_OBJECT ( rsa_%s );\n" % x.basename for x in self.digests
+        )
+        return code
+
+##############################################################################
+#
+# ECDSA verification tests
+#
+
+@attrclass
+class EcdsaTestKey:
+    """An ECDSA public key"""
+    type = scalar_field(str)
+    curve = scalar_field(ExchangeAlgorithm)
+    keySize = scalar_field(int)
+    uncompressed = scalar_field(HexBytes)
+    wx = scalar_field(HexBytes)
+    wy = scalar_field(HexBytes)
+
+@attrclass
+class EcdsaTestCase(TestCase):
+    """An ECDSA test case"""
+    msg = scalar_field(HexBytes, metadata={"stable": True})
+    sig = scalar_field(HexBytes, metadata={"stable": True})
+
+    @property
+    def stable_props(self):
+        """Get properties for constructing a stable ID"""
+        props = super().stable_props
+        props.update(self._parent.stable_props)
+        return props
+
+    def definition(self):
+        """Generate source code for test definition"""
+        code = super().definition()
+        digest = self.test_group.sha.symbol
+        code += (
+            "PUBKEY_SIGNATURE_TEST ( %s,\n" % self.test_name +
+            "\t&%s, RANDOM(),\n" % self.test_group.test_name +
+            self.msg.source("\tPLAINTEXT") + ",\n" +
+            "\t&%s,\n" % digest +
+            self.sig.source("\tSIGNATURE") + " );\n"
+        )
+        return code
+
+    def invocation(self):
+        """Generate source code for test invocation"""
+        code = super().invocation()
+        if self.failure:
+            code += "\tpubkey_verify_fail_ok ( &%s );\n" % self.test_name
+        else:
+            code += "\tpubkey_verify_ok ( &%s );\n" % self.test_name
+        return code
+
+@attrclass
+class EcdsaTestGroup(TestGroup):
+    """An ECDSA test group"""
+    publicKey = scalar_field(EcdsaTestKey)
+    publicKeyDer = scalar_field(HexBytes, metadata={"stable": True})
+    publicKeyPem = scalar_field(str) # ignored
+    sha = scalar_field(DigestAlgorithm)
+    tests = list_field(EcdsaTestCase)
+
+@attrclass
+class EcdsaTestFile(TestFile):
+    """An ECDSA test file"""
+    SCHEMA: ClassVar = "ecdsa_verify_schema_v1.json"
+    algorithm = scalar_field(PubkeyAlgorithm)
+    testGroups = list_field(EcdsaTestGroup)
+
+    @property
+    def curves(self):
+        """All curves"""
+        return sorted({x.publicKey.curve for x in self.testGroups})
+
+    @property
+    def digests(self):
+        """All digest algorithms"""
+        return sorted({x.sha for x in self.testGroups})
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        curves = "_".join(x.basename for x in self.curves)
+        digests = "_".join(x.basename for x in self.digests)
+        return "%s_%s_verify" % (curves, digests)
+
+    @property
+    def label(self):
+        """Label for use in comments"""
+        curves = " / ".join(x.label for x in self.curves)
+        digests = " / ".join(x.label for x in self.digests)
+        return "ECDSA %s %s verification" % (curves, digests)
+
+    def definition(self):
+        """Generate source code for test file definition"""
+        algorithm = self.algorithm.symbol
+        keys = sorted({
+            (x.test_name, x.publicKeyDer) for x in self.testGroups
+        })
+        code = (
+            "\n".join(
+                "/* Key pairs used by at least one following test */\n" +
+                "PUBKEY_TEST ( %s, &%s,\n" % (name, algorithm) +
+                "\tPRIVATE(),\n" +
+                key.source("\tPUBLIC") + " );\n"
+                for name, key in keys
+            ) + "\n" +
+            super().definition()
+        )
+        return code
+
+    def source(self):
+        """Generate source code"""
+        code = super().source()
+        code += "".join(
+            "REQUIRE_OBJECT ( %s );\n" % x.basename
+            for x in self.curves
+        )
         return code
 
 ##############################################################################
@@ -1208,6 +1351,11 @@ def main():
 
     # Read JSON inputs
     tests = [
+        EcdsaTestFile.read(srcdir / "ecdsa_secp256r1_sha256_test.json"),
+        EcdsaTestFile.read(srcdir / "ecdsa_secp256r1_sha512_test.json"),
+        EcdsaTestFile.read(srcdir / "ecdsa_secp384r1_sha256_test.json"),
+        EcdsaTestFile.read(srcdir / "ecdsa_secp384r1_sha384_test.json"),
+        EcdsaTestFile.read(srcdir / "ecdsa_secp384r1_sha512_test.json"),
         GcmCipherTestFile.read(srcdir / "aes_gcm_test.json"),
         HkdfTestFile.read(srcdir / "hkdf_sha1_test.json"),
         HkdfTestFile.read(srcdir / "hkdf_sha256_test.json"),

@@ -11,6 +11,7 @@ FILE_LICENCE ( BSD2 );
 
 #include <ipxe/crypto.h>
 #include <ipxe/aes.h>
+#include <ipxe/ecdsa.h>
 #include <ipxe/p256.h>
 #include <ipxe/p384.h>
 #include <ipxe/rsa.h>
