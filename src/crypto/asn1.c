@@ -175,6 +175,7 @@ FILE_SECBOOT ( PERMITTED );
 static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 	unsigned int len_len;
 	unsigned int len;
+	uint8_t high_byte;
 
 	/* Sanity check */
 	if ( cursor->len < 2 /* Tag byte and first length byte */ ) {
@@ -202,22 +203,29 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 	} else {
 		len_len = 1;
 	}
-	if ( cursor->len < len_len ) {
-		DBGC ( cursor, "ASN1 %p bad length field length %d (max "
-		       "%zd)\n", cursor, len_len, cursor->len );
+	if ( ( len_len == 0 ) || ( cursor->len < len_len ) ) {
+		DBGC ( cursor, "ASN1 %p bad length field length %d (min 0, "
+		       "max %zd)\n", cursor, len_len, cursor->len );
 		asn1_invalidate_cursor ( cursor );
 		return -EINVAL_ASN1_LEN_LEN;
 	}
 
 	/* Extract the length and sanity check */
 	for ( len = 0 ; len_len ; len_len-- ) {
+		high_byte = ( len >> ( 8 * ( sizeof ( len ) - 1 ) ) );
+		if ( high_byte ) {
+			DBGC ( cursor, "ASN1 %p unrepresentable length\n",
+			       cursor );
+			asn1_invalidate_cursor ( cursor );
+			return -EINVAL_ASN1_LEN;
+		}
 		len <<= 8;
 		len |= *( ( uint8_t * ) cursor->data );
 		cursor->data++;
 		cursor->len--;
 	}
-	if ( cursor->len < len ) {
-		DBGC ( cursor, "ASN1 %p bad length %d (max %zd)\n",
+	if ( ( cursor->len < len ) || ( ( ( int ) len ) < 0 ) ) {
+		DBGC ( cursor, "ASN1 %p bad length %d (min 0, max %zd)\n",
 		       cursor, len, cursor->len );
 		asn1_invalidate_cursor ( cursor );
 		return -EINVAL_ASN1_LEN;
