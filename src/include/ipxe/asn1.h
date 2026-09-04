@@ -86,6 +86,9 @@ struct asn1_builder_header {
 /** ASN.1 generalized time */
 #define ASN1_GENERALIZED_TIME 0x18
 
+/** ASN.1 high tag number */
+#define ASN1_HIGH 0x1f
+
 /** ASN.1 sequence */
 #define ASN1_SEQUENCE 0x30
 

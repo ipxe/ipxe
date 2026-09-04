@@ -151,6 +151,10 @@ FILE_SECBOOT ( PERMITTED );
 	__einfo_error ( EINFO_ENOTSUP_ALGORITHM )
 #define EINFO_ENOTSUP_ALGORITHM \
 	__einfo_uniqify ( EINFO_ENOTSUP, 0x01, "Unsupported algorithm" )
+#define ENOTSUP_HIGH \
+	__einfo_error ( EINFO_ENOTSUP_HIGH )
+#define EINFO_ENOTSUP_HIGH \
+	__einfo_uniqify ( EINFO_ENOTSUP, 0x02, "Unsupported high tag number" )
 #define ENOTTY_ALGORITHM \
 	__einfo_error ( EINFO_ENOTTY_ALGORITHM )
 #define EINFO_ENOTTY_ALGORITHM \
@@ -183,6 +187,14 @@ static int asn1_start ( struct asn1_cursor *cursor, unsigned int type ) {
 			DBGC ( cursor, "ASN1 %p too short\n", cursor );
 		asn1_invalidate_cursor ( cursor );
 		return -EINVAL_ASN1_EMPTY;
+	}
+
+	/* Refuse to handle multi-byte tags */
+	if ( ( asn1_type ( cursor ) & ASN1_HIGH ) == ASN1_HIGH ) {
+		DBGC ( cursor, "ASN1 %p has unsupported high tag number\n",
+		       cursor );
+		asn1_invalidate_cursor ( cursor );
+		return -ENOTSUP_HIGH;
 	}
 
 	/* Check the tag byte */
