@@ -152,16 +152,15 @@ class ExchangeAlgorithm(Algorithm):
         """Label for use in comments"""
         return self.name
 
-class PubkeyAlgorithm(Algorithm):
-    """An iPXE public-key algorithm"""
-    ECDSA = "ECDSA"
-    RSA_ES_PKCS1 = "RSAES-PKCS1-v1_5"
-    RSA_SSA_PKCS1 = "RSASSA-PKCS1-v1_5"
+class EncryptionAlgorithm(Algorithm):
+    """An iPXE public-key encryption algorithm"""
+    RSA = "RSAES-PKCS1-v1_5"
 
-    @property
-    def basename(self):
-        """Base algorithm name"""
-        return super().basename.split("_")[0]
+class SignatureAlgorithm(Algorithm):
+    """An iPXE public-key signature algorithm"""
+    ECDSA = "ECDSA"
+    RSA = "RSASSA-PKCS1-v1_5"
+    RSA_PSS = "RSASSA-PSS"
 
 ##############################################################################
 #
@@ -171,7 +170,7 @@ class PubkeyAlgorithm(Algorithm):
 class HexBytes(bytes):
     """A hex-encoded byte string"""
 
-    def __new__(cls, value):
+    def __new__(cls, value=b''):
         if isinstance(value, str):
             value = base64.b16decode(value, casefold=True)
         return super().__new__(cls, value)
@@ -941,19 +940,43 @@ class GcmCipherTestFile(AeadCipherTestFile):
 
 ##############################################################################
 #
-# RSA PKCS#1 tests
+# RSA tests
 #
 
 @attrclass
-class RsaPkcs1TestGroup(TestGroup):
-    """An RSA PKCS#1 test group"""
+class RsaTestGroup(TestGroup):
+    """An RSA test group"""
     keySize = scalar_field(int)
 
+    @property
+    def private_key(self):
+        """Private key"""
+        return None
+
+    @property
+    def public_key(self):
+        """Public key"""
+        return None
+
+    def definition(self):
+        """Generate source code for test group definition"""
+        algorithm = self.test_file.algorithm.symbol
+        private_key = self.private_key or HexBytes()
+        public_key = self.public_key or HexBytes()
+        code = (
+            "/* Key pair for following tests */\n" +
+            "PUBKEY_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
+            private_key.source("\tPRIVATE") + ",\n" +
+            public_key.source("\tPUBLIC") + " );\n" +
+            "\n" +
+            super().definition()
+        )
+        return code
+
 @attrclass
-class RsaPkcs1TestFile(TestFile):
-    """An RSA PKCS#1 test file"""
-    algorithm = scalar_field(PubkeyAlgorithm)
-    testGroups = list_field(RsaPkcs1TestGroup)
+class RsaTestFile(TestFile):
+    """An RSA test file"""
+    testGroups = list_field(RsaTestGroup)
 
     @property
     def keysizes(self):
@@ -963,7 +986,7 @@ class RsaPkcs1TestFile(TestFile):
     @property
     def basename(self):
         """Base name for test cases"""
-        return "rsa_pkcs1_%s" % "_".join("%d" % x for x in self.keysizes)
+        return "_".join("%d" % x for x in self.keysizes)
 
     @property
     def label(self):
@@ -972,12 +995,12 @@ class RsaPkcs1TestFile(TestFile):
 
 ##############################################################################
 #
-# RSA PKCS#1 decryption tests
+# RSA decryption tests
 #
 
 @attrclass
-class RsaPkcs1DecryptTestCase(TestCase):
-    """An RSA PKCS#1 decryption test case"""
+class RsaDecryptTestCase(TestCase):
+    """An RSA decryption test case"""
     msg = scalar_field(HexBytes, metadata={"stable": True})
     ct = scalar_field(HexBytes, metadata={"stable": True})
 
@@ -1002,37 +1025,39 @@ class RsaPkcs1DecryptTestCase(TestCase):
         return code
 
 @attrclass
-class RsaPkcs1DecryptTestGroup(RsaPkcs1TestGroup):
-    """An RSA PKCS#1 decryption test group"""
+class RsaDecryptTestGroup(RsaTestGroup):
+    """An RSA decryption test group"""
     privateKey = map_field(str) # ignored
     privateKeyPkcs8 = scalar_field(HexBytes, metadata={"stable": True})
     privateKeyPem = scalar_field(str) # ignored
     privateKeyJwk = map_field(str) # ignored
-    tests = list_field(RsaPkcs1DecryptTestCase)
+    tests = list_field(RsaDecryptTestCase)
 
-    def definition(self):
-        """Generate source code for test group definition"""
-        algorithm = self.test_file.algorithm.symbol
-        code = (
-            "/* Private key for following tests */\n" +
-            "PUBKEY_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
-            self.privateKeyPkcs8.source("\tPRIVATE") + ",\n" +
-            "\tPUBLIC() );\n" +
-            "\n" +
-            super().definition()
-        )
-        return code
+    @property
+    def private_key(self):
+        """Private key"""
+        return self.privateKeyPkcs8
 
 @attrclass
-class RsaPkcs1DecryptTestFile(RsaPkcs1TestFile):
-    """An RSA PKCS#1 decryption test file"""
-    SCHEMA: ClassVar = "rsaes_pkcs1_decrypt_schema_v1.json"
-    testGroups = list_field(RsaPkcs1DecryptTestGroup)
+class RsaDecryptTestFile(RsaTestFile):
+    """An RSA decryption test file"""
+    algorithm = scalar_field(EncryptionAlgorithm)
+    testGroups = list_field(RsaDecryptTestGroup)
 
     @property
     def basename(self):
         """Base name for test cases"""
         return "%s_decrypt" % super().basename
+
+@attrclass
+class RsaPkcs1DecryptTestFile(RsaDecryptTestFile):
+    """An RSA PKCS#1 decryption test file"""
+    SCHEMA: ClassVar = "rsaes_pkcs1_decrypt_schema_v1.json"
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "rsa_pkcs1_%s" % super().basename
 
     @property
     def label(self):
@@ -1041,12 +1066,12 @@ class RsaPkcs1DecryptTestFile(RsaPkcs1TestFile):
 
 ##############################################################################
 #
-# RSA PKCS#1 signing tests
+# RSA signing tests
 #
 
 @attrclass
-class RsaPkcs1SignTestCase(TestCase):
-    """An RSA PKCS#1 signing test case"""
+class RsaSignTestCase(TestCase):
+    """An RSA signing test case"""
     msg = scalar_field(HexBytes, metadata={"stable": True})
     sig = scalar_field(HexBytes, metadata={"stable": True})
 
@@ -1070,8 +1095,8 @@ class RsaPkcs1SignTestCase(TestCase):
         return code
 
 @attrclass
-class RsaPkcs1SignTestGroup(RsaPkcs1TestGroup):
-    """An RSA PKCS#1 signing test group"""
+class RsaSignTestGroup(RsaTestGroup):
+    """An RSA signing test group"""
     privateKey = map_field(str) # ignored
     keyAsn = scalar_field(str) # ignored
     keyDer = scalar_field(HexBytes, metadata={"stable": True})
@@ -1081,31 +1106,38 @@ class RsaPkcs1SignTestGroup(RsaPkcs1TestGroup):
     privateKeyPem = scalar_field(str) # ignored
     privateKeyPkcs8 = scalar_field(HexBytes, metadata={"stable": True})
     sha = scalar_field(DigestAlgorithm)
-    tests = list_field(RsaPkcs1SignTestCase)
+    tests = list_field(RsaSignTestCase)
 
-    def definition(self):
-        """Generate source code for test group definition"""
-        algorithm = self.test_file.algorithm.symbol
-        code = (
-            "/* Key pair for following tests */\n" +
-            "PUBKEY_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
-            self.privateKeyPkcs8.source("\tPRIVATE") + ",\n" +
-            self.keyDer.source("\tPUBLIC") + " );\n" +
-            "\n" +
-            super().definition()
-        )
-        return code
+    @property
+    def private_key(self):
+        """Private key"""
+        return self.privateKeyPkcs8
+
+    @property
+    def public_key(self):
+        """Public key"""
+        return self.keyDer
 
 @attrclass
-class RsaPkcs1SignTestFile(RsaPkcs1TestFile):
-    """An RSA PKCS#1 signing test file"""
-    SCHEMA: ClassVar = "rsassa_pkcs1_generate_schema_v1.json"
-    testGroups = list_field(RsaPkcs1SignTestGroup)
+class RsaSignTestFile(RsaTestFile):
+    """An RSA signing test file"""
+    algorithm = scalar_field(SignatureAlgorithm)
+    testGroups = list_field(RsaSignTestGroup)
 
     @property
     def basename(self):
         """Base name for test cases"""
         return "%s_sign" % super().basename
+
+@attrclass
+class RsaPkcs1SignTestFile(RsaSignTestFile):
+    """An RSA PKCS#1 signing test file"""
+    SCHEMA: ClassVar = "rsassa_pkcs1_generate_schema_v1.json"
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "rsa_pkcs1_%s" % super().basename
 
     @property
     def label(self):
@@ -1114,12 +1146,12 @@ class RsaPkcs1SignTestFile(RsaPkcs1TestFile):
 
 ##############################################################################
 #
-# RSA PKCS#1 verification tests
+# RSA verification tests
 #
 
 @attrclass
-class RsaPkcs1VerifyTestCase(TestCase):
-    """An RSA PKCS#1 verification test case"""
+class RsaVerifyTestCase(TestCase):
+    """An RSA verification test case"""
     msg = scalar_field(HexBytes, metadata={"stable": True})
     sig = scalar_field(HexBytes, metadata={"stable": True})
 
@@ -1152,35 +1184,28 @@ class RsaPkcs1VerifyTestCase(TestCase):
         return code
 
 @attrclass
-class RsaPkcs1VerifyTestGroup(RsaPkcs1TestGroup):
-    """An RSA PKCS#1 verification test group"""
+class RsaVerifyTestGroup(RsaTestGroup):
+    """An RSA verification test group"""
     publicKey = map_field(str) # ignored
     publicKeyAsn = scalar_field(str) # ignored
     publicKeyDer = scalar_field(HexBytes, metadata={"stable": True})
     publicKeyPem = scalar_field(str) # ignored
+    publicKeyJwk = map_field(str, factory=dict) # ignored
     keyDer = scalar_field(HexBytes, default=None)
     keyJwk = map_field(str, factory=dict) # ignored
     sha = scalar_field(DigestAlgorithm)
-    tests = list_field(RsaPkcs1VerifyTestCase)
+    tests = list_field(RsaVerifyTestCase)
 
-    def definition(self):
-        """Generate source code for test group definition"""
-        algorithm = self.test_file.algorithm.symbol
-        code = (
-            "/* Key pair for following tests */\n" +
-            "PUBKEY_TEST ( %s, &%s,\n" % (self.test_name, algorithm) +
-            "\tPRIVATE(),\n" +
-            self.publicKeyDer.source("\tPUBLIC") + " );\n" +
-            "\n" +
-            super().definition()
-        )
-        return code
+    @property
+    def public_key(self):
+        """Public key"""
+        return self.publicKeyDer
 
 @attrclass
-class RsaPkcs1VerifyTestFile(RsaPkcs1TestFile):
-    """An RSA PKCS#1 verification test file"""
-    SCHEMA: ClassVar = "rsassa_pkcs1_verify_schema_v1.json"
-    testGroups = list_field(RsaPkcs1VerifyTestGroup)
+class RsaVerifyTestFile(RsaTestFile):
+    """An RSA verification test file"""
+    algorithm = scalar_field(SignatureAlgorithm)
+    testGroups = list_field(RsaVerifyTestGroup)
 
     @property
     def digests(self):
@@ -1192,6 +1217,16 @@ class RsaPkcs1VerifyTestFile(RsaPkcs1TestFile):
         """Base name for test cases"""
         digests = "_".join(x.basename for x in self.digests)
         return "%s_%s_verify" % (super().basename, digests)
+
+@attrclass
+class RsaPkcs1VerifyTestFile(RsaVerifyTestFile):
+    """An RSA PKCS#1 verification test file"""
+    SCHEMA: ClassVar = "rsassa_pkcs1_verify_schema_v1.json"
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        return "rsa_pkcs1_%s" % super().basename
 
     @property
     def label(self):
@@ -1206,6 +1241,31 @@ class RsaPkcs1VerifyTestFile(RsaPkcs1TestFile):
             "REQUIRE_OBJECT ( rsa_%s );\n" % x.basename for x in self.digests
         )
         return code
+
+@attrclass
+class RsaPssVerifyTestGroup(RsaVerifyTestGroup):
+    """An RSA-PSS verification test group"""
+    mgf = scalar_field(str)
+    mgfSha = scalar_field(DigestAlgorithm)
+    sLen = scalar_field(int)
+
+@attrclass
+class RsaPssVerifyTestFile(RsaVerifyTestFile):
+    """An RSA-PSS verification test file"""
+    SCHEMA: ClassVar = "rsassa_pss_verify_schema_v1.json"
+    testGroups = list_field(RsaPssVerifyTestGroup)
+
+    @property
+    def basename(self):
+        """Base name for test cases"""
+        digests = "_".join(x.basename for x in self.digests)
+        return "rsa_pss_%s" % super().basename
+
+    @property
+    def label(self):
+        """Label for use in comments"""
+        digests = " / ".join(x.label for x in self.digests)
+        return "RSA-PSS %s verification (%s)" % (digests, super().label)
 
 ##############################################################################
 #
@@ -1270,7 +1330,7 @@ class EcdsaTestGroup(TestGroup):
 class EcdsaTestFile(TestFile):
     """An ECDSA test file"""
     SCHEMA: ClassVar = "ecdsa_verify_schema_v1.json"
-    algorithm = scalar_field(PubkeyAlgorithm)
+    algorithm = scalar_field(SignatureAlgorithm)
     testGroups = list_field(EcdsaTestGroup)
 
     @property
@@ -1434,6 +1494,33 @@ def main():
         ),
         RsaPkcs1VerifyTestFile.read(
             srcdir / "rsa_signature_8192_sha512_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_2048_sha1_mgf1_20_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_2048_sha256_mgf1_32_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_2048_sha384_mgf1_48_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_2048_sha512_224_mgf1_28_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_2048_sha512_256_mgf1_32_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_3072_sha256_mgf1_32_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_4096_sha256_mgf1_32_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_4096_sha384_mgf1_48_test.json"
+        ),
+        RsaPssVerifyTestFile.read(
+            srcdir / "rsa_pss_4096_sha512_mgf1_64_test.json"
         ),
         XdhTestFile.read(
             srcdir / "x25519_test.json",
