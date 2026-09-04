@@ -437,17 +437,35 @@ int asn1_enter_bits ( struct asn1_cursor *cursor, unsigned int *unused ) {
  * @ret rc		Return status code
  */
 int asn1_enter_unsigned ( struct asn1_cursor *cursor ) {
+	uint8_t msb;
 	int rc;
 
 	/* Enter integer */
 	if ( ( rc = asn1_enter ( cursor, ASN1_INTEGER ) ) != 0 )
 		return rc;
 
-	/* Skip initial positive sign byte if applicable */
-	if ( ( cursor->len > 1 ) &&
-	     ( *( ( uint8_t * ) cursor->data ) == 0x00 ) ) {
+	/* Reject empty integers */
+	if ( ! cursor->len ) {
+		DBGC ( cursor, "ASN1 %p empty unsigned integer\n", cursor );
+		/* Cursor is already invalid */
+		return -EINVAL;
+	}
+
+	/* Reject negative values */
+	msb = *( ( uint8_t * ) cursor->data );
+	if ( msb & 0x80 ) {
+		DBGC ( cursor, "ASN1 %p negative unsigned integer:\n",
+		       cursor );
+		DBGC_HDA ( cursor, 0, cursor->data, cursor->len );
+		asn1_invalidate_cursor ( cursor );
+		return -EINVAL;
+	}
+
+	/* Skip any initial positive sign byte(s) */
+	while ( ( cursor->len > 1 ) && ( msb == 0x00 ) ) {
 		cursor->data++;
 		cursor->len--;
+		msb = *( ( uint8_t * ) cursor->data );
 	}
 
 	return 0;
