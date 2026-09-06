@@ -43,6 +43,9 @@ struct x86_features {
 /** Get standard features */
 #define CPUID_FEATURES 0x00000001UL
 
+/** AES-NI instructions are supported */
+#define CPUID_FEATURES_INTEL_ECX_AESNI 0x02000000UL
+
 /** RDRAND instruction is supported */
 #define CPUID_FEATURES_INTEL_ECX_RDRAND 0x40000000UL
 
