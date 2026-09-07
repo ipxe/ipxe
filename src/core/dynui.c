@@ -32,12 +32,116 @@ FILE_SECBOOT ( PERMITTED );
 
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <assert.h>
 #include <ipxe/list.h>
 #include <ipxe/dynui.h>
 
 /** List of all dynamic user interfaces */
 static LIST_HEAD ( dynamic_uis );
+
+/**
+ * Find a bounded case-insensitive substring
+ *
+ * @v haystack		Text to search
+ * @v needle		Text for which to search
+ * @v len		Length of search text
+ * @ret found		Substring was found
+ */
+static int dynui_contains ( const char *haystack, const char *needle,
+			    size_t len ) {
+	const char *candidate;
+	const char *a;
+	const char *b;
+	const char *end = ( needle + len );
+
+	if ( ! len )
+		return 1;
+
+	for ( candidate = haystack ; candidate[0] ; candidate++ ) {
+		for ( a = candidate, b = needle ;
+		      ( b < end ) && a[0] &&
+		      ( tolower ( ( unsigned char ) a[0] ) ==
+			tolower ( ( unsigned char ) b[0] ) ) ; a++, b++ ) {}
+		if ( b == end )
+			return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * Check whether an item is the menu filter compatibility sentinel
+ *
+ * @v item		Dynamic user interface item
+ * @ret is_sentinel	Item is the filter sentinel
+ */
+int dynui_item_is_filter_sentinel ( struct dynamic_item *item ) {
+
+	return ( ( ! item->name ) &&
+		 ( strcmp ( item->text, DYNUI_FILTER_SENTINEL ) == 0 ) );
+}
+
+/**
+ * Check whether a dynamic user interface requests a menu filter
+ *
+ * @v dynui		Dynamic user interface
+ * @ret has_sentinel	User interface contains the filter sentinel
+ */
+int dynui_has_filter_sentinel ( struct dynamic_ui *dynui ) {
+	struct dynamic_item *item;
+
+	list_for_each_entry ( item, &dynui->items, list ) {
+		if ( dynui_item_is_filter_sentinel ( item ) )
+			return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * Check whether a dynamic user interface item matches a query
+ *
+ * @v item		Dynamic user interface item
+ * @v query		Search text
+ * @ret matches		Item matches
+ */
+int dynui_item_matches ( struct dynamic_item *item, const char *query ) {
+	const char *term;
+	size_t len;
+
+	/* Hide the compatibility sentinel on filter-capable clients */
+	if ( dynui_item_is_filter_sentinel ( item ) )
+		return 0;
+
+	/* Ignore leading whitespace */
+	while ( isspace ( ( unsigned char ) query[0] ) )
+		query++;
+
+	/* Preserve the unfiltered menu exactly, including separators */
+	if ( ! query[0] )
+		return 1;
+
+	/* Separators are not searchable values */
+	if ( ! item->name )
+		return 0;
+
+	/* Require every whitespace-separated term to match either field */
+	while ( query[0] ) {
+		term = query;
+		while ( query[0] &&
+			! isspace ( ( unsigned char ) query[0] ) )
+			query++;
+		len = ( query - term );
+		if ( ! ( dynui_contains ( item->name, term, len ) ||
+			 dynui_contains ( item->text, term, len ) ) )
+			return 0;
+		while ( isspace ( ( unsigned char ) query[0] ) )
+			query++;
+	}
+
+	return 1;
+}
 
 /**
  * Create dynamic user interface
