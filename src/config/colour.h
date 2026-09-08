@@ -31,6 +31,9 @@ FILE_SECBOOT ( PERMITTED );
 #define COLOR_PXE_FG		COLOR_BLACK
 #define COLOR_PXE_BG		COLOR_WHITE
 
+#define COLOR_TITLE_FG		 COLOR_RED
+#define COLOR_TITLE_BG		 COLOR_BLACK
+
 #include <config/named.h>
 #include NAMED_CONFIG(colour.h)
 #include <config/local/colour.h>
