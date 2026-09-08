@@ -286,16 +286,16 @@ FILE_SECBOOT ( FORBIDDEN );
  */
 #define AR5K_ISR		0x001c			/* Register Address [5210] */
 #define AR5K_PISR		0x0080			/* Register Address [5211+] */
-#define AR5K_ISR_RXOK		0x00000001	/* Frame successfuly recieved */
+#define AR5K_ISR_RXOK		0x00000001	/* Frame successfully received */
 #define AR5K_ISR_RXDESC		0x00000002	/* RX descriptor request */
 #define AR5K_ISR_RXERR		0x00000004	/* Receive error */
 #define AR5K_ISR_RXNOFRM	0x00000008	/* No frame received (receive timeout) */
 #define AR5K_ISR_RXEOL		0x00000010	/* Empty RX descriptor */
 #define AR5K_ISR_RXORN		0x00000020	/* Receive FIFO overrun */
-#define AR5K_ISR_TXOK		0x00000040	/* Frame successfuly transmited */
+#define AR5K_ISR_TXOK		0x00000040	/* Frame successfully transmitted */
 #define AR5K_ISR_TXDESC		0x00000080	/* TX descriptor request */
 #define AR5K_ISR_TXERR		0x00000100	/* Transmit error */
-#define AR5K_ISR_TXNOFRM	0x00000200	/* No frame transmited (transmit timeout) */
+#define AR5K_ISR_TXNOFRM	0x00000200	/* No frame transmitted (transmit timeout) */
 #define AR5K_ISR_TXEOL		0x00000400	/* Empty TX descriptor */
 #define AR5K_ISR_TXURN		0x00000800	/* Transmit FIFO underrun */
 #define AR5K_ISR_MIB		0x00001000	/* Update MIB counters */
@@ -380,16 +380,16 @@ FILE_SECBOOT ( FORBIDDEN );
  */
 #define	AR5K_IMR		0x0020			/* Register Address [5210] */
 #define AR5K_PIMR		0x00a0			/* Register Address [5211+] */
-#define AR5K_IMR_RXOK		0x00000001	/* Frame successfuly recieved*/
+#define AR5K_IMR_RXOK		0x00000001	/* Frame successfully received*/
 #define AR5K_IMR_RXDESC		0x00000002	/* RX descriptor request*/
 #define AR5K_IMR_RXERR		0x00000004	/* Receive error*/
 #define AR5K_IMR_RXNOFRM	0x00000008	/* No frame received (receive timeout)*/
 #define AR5K_IMR_RXEOL		0x00000010	/* Empty RX descriptor*/
 #define AR5K_IMR_RXORN		0x00000020	/* Receive FIFO overrun*/
-#define AR5K_IMR_TXOK		0x00000040	/* Frame successfuly transmited*/
+#define AR5K_IMR_TXOK		0x00000040	/* Frame successfully transmitted*/
 #define AR5K_IMR_TXDESC		0x00000080	/* TX descriptor request*/
 #define AR5K_IMR_TXERR		0x00000100	/* Transmit error*/
-#define AR5K_IMR_TXNOFRM	0x00000200	/* No frame transmited (transmit timeout)*/
+#define AR5K_IMR_TXNOFRM	0x00000200	/* No frame transmitted (transmit timeout)*/
 #define AR5K_IMR_TXEOL		0x00000400	/* Empty TX descriptor*/
 #define AR5K_IMR_TXURN		0x00000800	/* Transmit FIFO underrun*/
 #define AR5K_IMR_MIB		0x00001000	/* Update MIB counters*/
@@ -783,7 +783,7 @@ FILE_SECBOOT ( FORBIDDEN );
  * and it's used for generating pseudo-random
  * number sequences.
  *
- * (If i understand corectly, random numbers are
+ * (If i understand correctly, random numbers are
  * used for idle sensing -multiplied with cwmin/max etc-)
  */
 #define AR5K_DCU_GBL_IFS_MISC			0x10f0			/* Register Address */
@@ -1399,7 +1399,7 @@ FILE_SECBOOT ( FORBIDDEN );
 #define AR5K_DIAG_SW_DIS_ENC		0x00000008	/* Disable encryption */
 #define AR5K_DIAG_SW_DIS_DEC		0x00000010	/* Disable decryption */
 #define AR5K_DIAG_SW_DIS_TX		0x00000020	/* Disable transmit [5210] */
-#define AR5K_DIAG_SW_DIS_RX_5210	0x00000040	/* Disable recieve */
+#define AR5K_DIAG_SW_DIS_RX_5210	0x00000040	/* Disable receive */
 #define AR5K_DIAG_SW_DIS_RX_5211	0x00000020
 #define	AR5K_DIAG_SW_DIS_RX		(ah->ah_version == AR5K_AR5210 ? \
 					AR5K_DIAG_SW_DIS_RX_5210 : AR5K_DIAG_SW_DIS_RX_5211)

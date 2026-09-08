@@ -70,7 +70,7 @@ typedef int pci_power_t;
 #define PORT_FIBRE		0x03
 #define PORT_BNC		0x04
 
-/* Which tranceiver to use. */
+/* Which transceiver to use. */
 #define XCVR_INTERNAL		0x00
 #define XCVR_EXTERNAL		0x01
 #define XCVR_DUMMY1		0x02
@@ -118,7 +118,7 @@ typedef int pci_power_t;
 #define PORT_FIBRE              0x03
 #define PORT_BNC                0x04
 
-/* Which tranceiver to use. */
+/* Which transceiver to use. */
 #define XCVR_INTERNAL           0x00
 #define XCVR_EXTERNAL           0x01
 #define XCVR_DUMMY1             0x02
