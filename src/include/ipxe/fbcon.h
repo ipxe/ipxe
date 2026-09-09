@@ -119,6 +119,8 @@ struct fbcon {
 	struct fbcon_geometry *pixel;
 	/** Character geometry */
 	struct fbcon_geometry character;
+	/** Glyph scale factor (each font pixel drawn as scale x scale) */
+	unsigned int scale;
 	/** Margin */
 	struct fbcon_margin margin;
 	/** Indent to first character (in bytes) */
