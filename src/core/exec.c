@@ -538,6 +538,80 @@ static int iseq_exec ( int argc, char **argv ) {
 /** "iseq" command */
 COMMAND ( iseq, iseq_exec );
 
+/** First value is less than second value */
+#define NUM_LT 0x01
+
+/** Values are equal */
+#define NUM_EQ 0x02
+
+/** First value is greater than second value */
+#define NUM_GT 0x04
+
+/** Numeric comparison options */
+struct num_options {};
+
+/** Numeric comparison option list */
+static struct option_descriptor num_opts[] = {};
+
+/** Numeric comparison command descriptor */
+static struct command_descriptor num_cmd =
+	COMMAND_DESC ( struct num_options, num_opts, 2, 2,
+		       "<value1> <value2>" );
+
+/**
+ * Numeric comparison commands
+ *
+ * @v argc		Argument count
+ * @v argv		Argument list
+ * @v permitted		Permitted comparison outcomes
+ * @ret rc		Return status code
+ */
+static int num_exec ( int argc, char **argv, unsigned int permitted ) {
+	struct num_options opts;
+	unsigned int first;
+	unsigned int second;
+	unsigned int outcome;
+	int rc;
+
+	/* Parse options */
+	if ( ( rc = parse_options ( argc, argv, &num_cmd, &opts ) ) != 0 )
+		return rc;
+
+	/* Parse values */
+	if ( ( rc = parse_integer ( argv[optind], &first ) ) != 0 )
+		return rc;
+	if ( ( rc = parse_integer ( argv[ optind + 1 ], &second ) ) != 0 )
+		return rc;
+
+	/* Compare values */
+	outcome = ( ( first < second ) ? NUM_LT :
+		    ( ( first > second ) ? NUM_GT : NUM_EQ ) );
+
+	/* Return success iff outcome is permitted */
+	return ( ( outcome & permitted ) ? 0 : -ERANGE );
+}
+
+/** "numlt" command */
+static int numlt_exec ( int argc, char **argv ) {
+	return num_exec ( argc, argv, NUM_LT );
+}
+
+COMMAND ( numlt, numlt_exec );
+
+/** "numeq" command */
+static int numeq_exec ( int argc, char **argv ) {
+	return num_exec ( argc, argv, NUM_EQ );
+}
+
+COMMAND ( numeq, numeq_exec );
+
+/** "numgt" command */
+static int numgt_exec ( int argc, char **argv ) {
+	return num_exec ( argc, argv, NUM_GT );
+}
+
+COMMAND ( numgt, numgt_exec );
+
 /** "sleep" options */
 struct sleep_options {};
 
