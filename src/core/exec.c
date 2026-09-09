@@ -530,7 +530,7 @@ static int iseq_exec ( int argc, char **argv ) {
 	if ( ( rc = parse_options ( argc, argv, &iseq_cmd, &opts ) ) != 0 )
 		return rc;
 
-	/* Return success iff arguments are equal */
+	/* Return success iff string values are equal */
 	return ( ( strcmp ( argv[optind], argv[ optind + 1 ] ) == 0 ) ?
 		 0 : -ERANGE );
 }
