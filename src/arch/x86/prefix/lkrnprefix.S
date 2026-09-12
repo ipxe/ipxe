@@ -4,7 +4,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 
 #define BZI_LOAD_HIGH_ADDR 0x100000
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.code16
 	.arch i386
 	.section ".prefix", "ax", @progbits
