@@ -161,6 +161,9 @@ struct tls_header {
 /* TLS session ticket extension */
 #define TLS_SESSION_TICKET 35
 
+/* TLS supported versions extension */
+#define TLS_SUPPORTED_VERSIONS 43
+
 /* TLS renegotiation information extension */
 #define TLS_RENEGOTIATION_INFO 0xff01
 

@@ -218,6 +218,9 @@ static void tls_clear_cipher ( struct tls_connection *tls,
  ******************************************************************************
  */
 
+/** Number of supported TLS versions */
+#define TLS_NUM_VERSIONS ( TLS_VERSION_MAX - TLS_VERSION_MIN + 1 )
+
 /** A TLS 24-bit integer
  *
  * TLS uses 24-bit integers in several places, which are awkward to
@@ -1710,12 +1713,21 @@ static int tls_client_hello ( struct tls_connection *tls,
 		uint16_t len;
 	} __attribute__ (( packed )) *extended_master_secret_ext;
 	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint8_t len;
+			uint16_t versions[TLS_NUM_VERSIONS];
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *supported_versions_ext;
+	struct {
 		typeof ( *server_name_ext ) server_name;
 		typeof ( *max_fragment_length_ext ) max_fragment_length;
 		typeof ( *signature_algorithms_ext ) signature_algorithms;
 		typeof ( *renegotiation_info_ext ) renegotiation_info;
 		typeof ( *session_ticket_ext ) session_ticket;
 		typeof ( *extended_master_secret_ext ) extended_master_secret;
+		typeof ( *supported_versions_ext ) supported_versions;
 		typeof ( *named_group_ext )
 			named_group[TLS_NUM_NAMED_GROUPS ? 1 : 0];
 	} __attribute__ (( packed )) *extensions;
@@ -1806,6 +1818,18 @@ static int tls_client_hello ( struct tls_connection *tls,
 	extended_master_secret_ext->type
 		= htons ( TLS_EXTENDED_MASTER_SECRET );
 	extended_master_secret_ext->len = 0;
+
+	/* Construct supported versions extension */
+	supported_versions_ext = &extensions->supported_versions;
+	supported_versions_ext->type = htons ( TLS_SUPPORTED_VERSIONS );
+	supported_versions_ext->len
+		= htons ( sizeof ( supported_versions_ext->data ) );
+	supported_versions_ext->data.len
+		= sizeof ( supported_versions_ext->data.versions );
+	for ( i = 0 ; i < TLS_NUM_VERSIONS ; i++ ) {
+		supported_versions_ext->data.versions[i]
+			= htons ( TLS_VERSION_MAX - i );
+	}
 
 	/* Construct named groups extension, if applicable */
 	if ( sizeof ( extensions->named_group ) ) {
@@ -2319,6 +2343,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	const struct {
 		uint8_t data[0];
 	} __attribute__ (( packed )) *ems = NULL;
+	const struct {
+		uint16_t version;
+	} __attribute__ (( packed )) *supver = NULL;
 	uint16_t version;
 	size_t exts_len;
 	size_t ext_len;
@@ -2386,12 +2413,22 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 			case htons ( TLS_EXTENDED_MASTER_SECRET ) :
 				ems = ( ( void * ) ext->data );
 				break;
+			case htons ( TLS_SUPPORTED_VERSIONS ):
+				supver = ( ( void * ) ext->data );
+				if ( sizeof ( *supver ) > ext_len ) {
+					DBGC ( tls, "TLS %p received "
+					       "underlength supported "
+					       "version\n", tls );
+					DBGC_HD ( tls, data, len );
+					return -EINVAL_HELLO;
+				}
+				break;
 			}
 		}
 	}
 
 	/* Check and store protocol version */
-	version = ntohs ( hello_a->version );
+	version = ntohs ( supver ? supver->version : hello_a->version );
 	if ( version < TLS_VERSION_MIN ) {
 		DBGC ( tls, "TLS %p does not support protocol version %d.%d\n",
 		       tls, ( version >> 8 ), ( version & 0xff ) );
