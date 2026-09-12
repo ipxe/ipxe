@@ -10,7 +10,7 @@ FILE_LICENCE ( GPL2_OR_LATER )
 #define PIC1_ICR 0x20
 #define PIC2_ICR 0xa0
 	
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.code16
 	.arch i386
 

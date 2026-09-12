@@ -32,7 +32,7 @@
 #include <config/serial.h>
 #include <config/fault.h>
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.text
 
 	/* Link-time base address of _prefix

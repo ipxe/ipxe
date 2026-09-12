@@ -29,7 +29,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.text
 
 /* Selectively assemble code for 32-bit/64-bit builds */

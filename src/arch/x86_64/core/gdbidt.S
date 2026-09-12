@@ -39,7 +39,7 @@ FILE_SECBOOT ( FORBIDDEN );
 #define SIGFPE 8
 #define SIGSTKFLT 16
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.section ".text.gdbmach_interrupt", "ax", @progbits
 	.code64
 

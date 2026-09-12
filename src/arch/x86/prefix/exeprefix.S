@@ -36,7 +36,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define PSP_CMDLINE_LEN 0x80
 #define PSP_CMDLINE_START 0x81
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.code16
 	.arch i386
 	.org 0

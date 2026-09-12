@@ -11,7 +11,7 @@ FILE_SECBOOT ( FORBIDDEN );
  * Interrupt handlers
  ****************************************************************************
  */
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.section ".text", "ax", @progbits
 	.code32
 
