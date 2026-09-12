@@ -1681,6 +1681,11 @@ static int tls_client_hello ( struct tls_connection *tls,
 						 size_t len ) ) {
 	struct tls_session *session = tls->session;
 	size_t name_len = strlen ( session->name );
+	size_t reneg_len = ( tls->secure_renegotiation ?
+			     sizeof ( tls->verify.client ) : 0 );
+	size_t pubsize = tls->group->exchange->pubsize;
+	unsigned int has_key_share_key = ( tls->group->code ? 1 : 0 );
+	unsigned int has_named_group = ( TLS_NUM_NAMED_GROUPS ? 1 : 0 );
 	struct {
 		uint16_t type;
 		uint16_t len;
@@ -1713,8 +1718,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 		uint16_t len;
 		struct {
 			uint8_t len;
-			uint8_t data[ tls->secure_renegotiation ?
-				      sizeof ( tls->verify.client ) :0 ];
+			uint8_t data[reneg_len];
 		} __attribute__ (( packed )) data;
 	} __attribute__ (( packed )) *renegotiation_info_ext;
 	struct {
@@ -1745,6 +1749,18 @@ static int tls_client_hello ( struct tls_connection *tls,
 		} __attribute__ (( packed )) data;
 	} __attribute__ (( packed )) *supported_versions_ext;
 	struct {
+		uint16_t type;
+		uint16_t len;
+		struct {
+			uint16_t len;
+			struct {
+				uint16_t code;
+				uint16_t len;
+				uint8_t share[pubsize];
+			} __attribute__ (( packed )) key[has_key_share_key];
+		} __attribute__ (( packed )) data;
+	} __attribute__ (( packed )) *key_share_ext;
+	struct {
 		typeof ( *server_name_ext ) server_name;
 		typeof ( *max_fragment_length_ext ) max_fragment_length;
 		typeof ( *signature_algorithms_ext ) signature_algorithms;
@@ -1752,8 +1768,8 @@ static int tls_client_hello ( struct tls_connection *tls,
 		typeof ( *session_ticket_ext ) session_ticket;
 		typeof ( *extended_master_secret_ext ) extended_master_secret;
 		typeof ( *supported_versions_ext ) supported_versions;
-		typeof ( *named_group_ext )
-			named_group[TLS_NUM_NAMED_GROUPS ? 1 : 0];
+		typeof ( *key_share_ext ) key_share;
+		typeof ( *named_group_ext ) named_group[has_named_group];
 	} __attribute__ (( packed )) *extensions;
 	struct {
 		uint32_t type_length;
@@ -1767,28 +1783,39 @@ static int tls_client_hello ( struct tls_connection *tls,
 		uint8_t compression_methods[1];
 		uint16_t extensions_len;
 		typeof ( *extensions ) extensions;
-	} __attribute__ (( packed )) hello;
+	} __attribute__ (( packed )) *hello;
 	struct tls_cipher_suite *suite;
 	struct tls_signature_hash_algorithm *sighash;
 	struct tls_named_group *group;
+	unsigned int version;
 	unsigned int i;
+	int rc;
+
+	/* Allocate space for record */
+	hello = zalloc ( sizeof ( *hello ) );
+	if ( ! hello ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
 
 	/* Construct record */
-	memset ( &hello, 0, sizeof ( hello ) );
-	hello.type_length = ( cpu_to_le32 ( TLS_CLIENT_HELLO ) |
-			      htonl ( sizeof ( hello ) -
-				      sizeof ( hello.type_length ) ) );
-	hello.version = htons ( TLS_VERSION_MAX );
-	tls_nonce ( tls, &hello.random );
-	hello.session_id_len = session->id.len;
-	memcpy ( hello.session_id, session->id.data,
-		 sizeof ( hello.session_id ) );
-	hello.cipher_suite_len = htons ( sizeof ( hello.cipher_suites ) );
+	hello->type_length = ( cpu_to_le32 ( TLS_CLIENT_HELLO ) |
+			       htonl ( sizeof ( *hello ) -
+				       sizeof ( hello->type_length ) ) );
+	version = TLS_VERSION_MAX;
+	if ( version > TLS_VERSION_TLS_1_2 )
+		version = TLS_VERSION_TLS_1_2;
+	hello->version = htons ( version );
+	tls_nonce ( tls, &hello->random );
+	hello->session_id_len = session->id.len;
+	memcpy ( hello->session_id, session->id.data,
+		 sizeof ( hello->session_id ) );
+	hello->cipher_suite_len = htons ( sizeof ( hello->cipher_suites ) );
 	i = 0 ; for_each_table_entry ( suite, TLS_CIPHER_SUITES )
-		hello.cipher_suites[i++] = suite->code;
-	hello.compression_methods_len = sizeof ( hello.compression_methods );
-	hello.extensions_len = htons ( sizeof ( hello.extensions ) );
-	extensions = &hello.extensions;
+		hello->cipher_suites[i++] = suite->code;
+	hello->compression_methods_len = sizeof ( hello->compression_methods );
+	hello->extensions_len = htons ( sizeof ( hello->extensions ) );
+	extensions = &hello->extensions;
 
 	/* Construct server name extension */
 	server_name_ext = &extensions->server_name;
@@ -1856,7 +1883,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	}
 
 	/* Construct named groups extension, if applicable */
-	if ( sizeof ( extensions->named_group ) ) {
+	if ( has_named_group ) {
 		named_group_ext = &extensions->named_group[0];
 		named_group_ext->type = htons ( TLS_NAMED_GROUP );
 		named_group_ext->len
@@ -1870,7 +1897,27 @@ static int tls_client_hello ( struct tls_connection *tls,
 		assert ( i == TLS_NUM_NAMED_GROUPS );
 	}
 
-	return action ( tls, &hello, sizeof ( hello ) );
+	/* Construct key share extension */
+	key_share_ext = &extensions->key_share;
+	key_share_ext->type = htons ( TLS_KEY_SHARE );
+	key_share_ext->len = htons ( sizeof ( key_share_ext->data ) );
+	key_share_ext->data.len
+		= htons ( sizeof ( key_share_ext->data.key ) );
+	if ( has_key_share_key ) {
+		key_share_ext->data.key[0].code = tls->group->code;
+		key_share_ext->data.key[0].len = htons ( pubsize );
+		tls_key_share ( tls, tls->group,
+				key_share_ext->data.key[0].share, pubsize );
+	}
+
+	/* Send (or digest) record */
+	if ( ( rc = action ( tls, hello, sizeof ( *hello ) ) ) != 0 )
+		goto err_action;
+
+ err_action:
+	free ( hello );
+ err_alloc:
+	return rc;
 }
 
 /**
@@ -2370,6 +2417,14 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	const struct {
 		uint16_t version;
 	} __attribute__ (( packed )) *supver = NULL;
+	const struct {
+		uint16_t code;
+	} __attribute__ (( packed )) *key = NULL;
+	const struct {
+		uint16_t code;
+		uint16_t len;
+		uint8_t share[0];
+	} __attribute__ (( packed )) *keyval = NULL;
 	const uint8_t *session_id;
 	uint16_t version;
 	size_t session_id_len;
@@ -2447,6 +2502,27 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 					DBGC ( tls, "TLS %p received "
 					       "underlength supported "
 					       "version\n", tls );
+					DBGC_HD ( tls, data, len );
+					return -EINVAL_HELLO;
+				}
+				break;
+			case htons ( TLS_KEY_SHARE ):
+				key = ( ( void * ) ext->data );
+				if ( sizeof ( *key ) > ext_len ) {
+					DBGC ( tls, "TLS %p received "
+					       "underlength key share\n",
+					       tls );
+					DBGC_HD ( tls, data, len );
+					return -EINVAL_HELLO;
+				}
+				if ( sizeof ( *keyval ) > ext_len )
+					break;
+				keyval = ( ( void * ) key );
+				if ( ntohs ( keyval->len ) >
+				     ( ext_len - sizeof ( *keyval ) ) ) {
+					DBGC ( tls, "TLS %p received "
+					       "underlength key share\n",
+					       tls );
 					DBGC_HD ( tls, data, len );
 					return -EINVAL_HELLO;
 				}
@@ -2543,6 +2619,23 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 			return -EPERM_RENEG_VERIFY;
 		}
 		tls->secure_renegotiation = 1;
+	}
+
+	/* Select named group, if applicable */
+	if ( key ) {
+		tls->group = tls_find_named_group ( key->code );
+		if ( ! tls->group ) {
+			DBGC ( tls, "TLS %p unsupported named group %d\n",
+			       tls, ntohs ( key->code ) );
+			return -ENOTSUP_GROUP;
+		}
+	}
+
+	/* Agree shared key, if applicable */
+	if ( keyval &&
+	     ( ( rc = tls_key_agree ( tls, tls->group, keyval->share,
+				      ntohs ( keyval->len ) ) ) != 0 ) ) {
+		return rc;
 	}
 
 	return 0;
@@ -4226,7 +4319,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->client.key = privkey_get ( key ? key : &private_key );
 	tls->server.root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_MAX;
-	tls->group = &tls_null_named_group;
+	tls->group = table_start ( TLS_NAMED_GROUPS );
 	channel_init ( &tls->channel, &tls_channel_ops );
 	tls_clear_digest ( tls );
 	tls->tx.cipherspec.writer = &tls_client;

@@ -182,6 +182,9 @@ union tls_server_random {
 /* TLS supported versions extension */
 #define TLS_SUPPORTED_VERSIONS 43
 
+/* TLS key share extension */
+#define TLS_KEY_SHARE 51
+
 /* TLS renegotiation information extension */
 #define TLS_RENEGOTIATION_INFO 0xff01
 
