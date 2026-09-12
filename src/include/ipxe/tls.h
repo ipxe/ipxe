@@ -198,8 +198,8 @@ enum tls_tx_pending {
 struct tls_key_exchange_parameters {
 	/** Length of parameters (excluding trailing signature) */
 	size_t len;
-	/** Key exchange algorithm */
-	struct exchange_algorithm *exchange;
+	/** Named group */
+	struct tls_named_group *group;
 	/** Partner key */
 	const void *partner;
 	/** Length of partner key */
@@ -210,8 +210,8 @@ struct tls_key_exchange_parameters {
 struct tls_key_exchange_algorithm {
 	/** Algorithm name */
 	const char *name;
-	/** Default key exchange algorithm */
-	struct exchange_algorithm *exchange;
+	/** Default named group */
+	struct tls_named_group *group;
 	/**
 	 * Parse key exchange parameters from Server Key Exchange record
 	 *
@@ -462,8 +462,8 @@ struct tls_connection {
 
 	/** Protocol version */
 	uint16_t version;
-	/** Key exchange algorithm */
-	struct exchange_algorithm *exchange;
+	/** Key exchange named group */
+	struct tls_named_group *group;
 	/** Secure renegotiation flag */
 	int secure_renegotiation;
 	/** Extended master secret flag */

@@ -653,8 +653,8 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		return -ENOTSUP_CIPHER;
 	}
 
-	/* Set (or clear) key exchange algorithm */
-	tls->exchange = suite->exchange->exchange;
+	/* Set default named group */
+	tls->group = suite->exchange->group;
 
 	/* Set key schedule digest algorithm */
 	digest = ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ?
@@ -861,18 +861,28 @@ tls_parse_null ( struct tls_connection *tls, const void *data, size_t len,
 	return -EINVAL_KEY_EXCHANGE;
 }
 
+/** Null named group */
+struct tls_named_group tls_null_named_group __tls_anon_named_group = {
+	.exchange = &exchange_null,
+};
+
 /** Null key exchange algorithm */
 struct tls_key_exchange_algorithm tls_null_exchange_algorithm = {
 	.name = "null",
-	.exchange = &exchange_null,
+	.group = &tls_null_named_group,
 	.parse = tls_parse_null,
 	.len_len = 0,
+};
+
+/** Public key named group */
+struct tls_named_group tls_pubkey_named_group __tls_anon_named_group = {
+	.exchange = &tls_classic_pre_master_algorithm,
 };
 
 /** Public key exchange algorithm */
 struct tls_key_exchange_algorithm tls_pubkey_exchange_algorithm = {
 	.name = "pubkey",
-	.exchange = &tls_classic_pre_master_algorithm,
+	.group = &tls_pubkey_named_group,
 	.parse = tls_parse_null,
 	.len_len = sizeof ( uint16_t ),
 };
@@ -933,7 +943,7 @@ static int tls_parse_dhe ( struct tls_connection *tls,
 		DBGC_HDA ( tls, 0, data, len );
 		return -ENOTSUP_GROUP;
 	}
-	params->exchange = group->exchange;
+	params->group = group;
 	params->partner = dh_ys->data;
 	params->partner_len = ntohs ( dh_ys->len );
 
@@ -943,7 +953,7 @@ static int tls_parse_dhe ( struct tls_connection *tls,
 /** Ephemeral Diffie-Hellman key exchange algorithm */
 struct tls_key_exchange_algorithm tls_dhe_exchange_algorithm = {
 	.name = "dhe",
-	.exchange = &exchange_null,
+	.group = &tls_null_named_group,
 	.parse = tls_parse_dhe,
 	.len_len = sizeof ( uint16_t ),
 };
@@ -992,7 +1002,7 @@ static int tls_parse_ecdhe ( struct tls_connection *tls,
 		DBGC_HDA ( tls, 0, data, len );
 		return -ENOTSUP_GROUP;
 	}
-	params->exchange = group->exchange;
+	params->group = group;
 	params->partner = ecdh->public;
 	params->partner_len = ecdh->public_len;
 
@@ -1002,7 +1012,7 @@ static int tls_parse_ecdhe ( struct tls_connection *tls,
 /** Ephemeral Elliptic Curve Diffie-Hellman key exchange algorithm */
 struct tls_key_exchange_algorithm tls_ecdhe_exchange_algorithm = {
 	.name = "ecdhe",
-	.exchange = &exchange_null,
+	.group = &tls_null_named_group,
 	.parse = tls_parse_ecdhe,
 	.len_len = sizeof ( uint8_t ),
 };
@@ -1041,15 +1051,16 @@ static int tls_keysize_is_variable ( struct tls_connection *tls,
  * Share public key
  *
  * @v tls		TLS connection
- * @v exchange		Key exchange algorithm
+ * @v group		Named group
  * @v public		Public key to fill in
  * @v len		Length of public key
  * @ret rc		Return status code
  */
 static int tls_key_share ( struct tls_connection *tls,
-			   struct exchange_algorithm *exchange,
+			   struct tls_named_group *group,
 			   void *public, size_t len ) {
 	struct secure_channel *channel = &tls->channel;
+	struct exchange_algorithm *exchange = group->exchange;
 	size_t pubsize = exchange->pubsize;
 	int rc;
 
@@ -1074,15 +1085,16 @@ static int tls_key_share ( struct tls_connection *tls,
  * Agree shared secret
  *
  * @v tls		TLS connection
- * @v exchange		Key exchange algorithm
+ * @v group		Named group
  * @v partner		Partner public key
  * @v len		Length of partner public key
  * @ret rc		Return status code
  */
 static int tls_key_agree ( struct tls_connection *tls,
-			   struct exchange_algorithm *exchange,
+			   struct tls_named_group *group,
 			   const void *partner, size_t len ) {
 	struct secure_channel *channel = &tls->channel;
+	struct exchange_algorithm *exchange = group->exchange;
 	size_t pubsize = exchange->pubsize;
 	uint8_t *tmp;
 	size_t pad_len;
@@ -1136,16 +1148,17 @@ static int tls_key_agree ( struct tls_connection *tls,
  * Encrypt (and implicitly bind) shared secret
  *
  * @v tls		TLS connection
- * @v exchange		Key exchange algorithm
+ * @v group		Named group
  * @v builder		ASN.1 builder
  * @ret rc		Return status code
  */
 static int tls_key_encrypt ( struct tls_connection *tls,
-			     struct exchange_algorithm *exchange,
+			     struct tls_named_group *group,
 			     struct asn1_builder *builder ) {
 	struct secure_channel *channel = &tls->channel;
-	struct x509_certificate *cert;
+	struct exchange_algorithm *exchange = group->exchange;
 	struct pubkey_algorithm *pubkey;
+	struct x509_certificate *cert;
 	int rc;
 
 	/* Identify server certificate */
@@ -1175,13 +1188,14 @@ static int tls_key_encrypt ( struct tls_connection *tls,
  * Build shareable key
  *
  * @v tls		TLS connection
- * @v exchange		Key exchange algorithm
+ * @v group		Named group
  * @v builder		ASN.1 builder
  * @ret rc		Return status code
  */
 static int tls_key_build ( struct tls_connection *tls,
-			   struct exchange_algorithm *exchange,
+			   struct tls_named_group *group,
 			   struct asn1_builder *builder ) {
+	struct exchange_algorithm *exchange = group->exchange;
 	size_t pubsize = exchange->pubsize;
 	int rc;
 
@@ -1193,7 +1207,7 @@ static int tls_key_build ( struct tls_connection *tls,
 			return rc;
 
 		/* Share public key */
-		if ( ( rc = tls_key_share ( tls, exchange, builder->data,
+		if ( ( rc = tls_key_share ( tls, group, builder->data,
 					    pubsize ) ) != 0 ) {
 			return rc;
 		}
@@ -1201,10 +1215,8 @@ static int tls_key_build ( struct tls_connection *tls,
 	} else {
 
 		/* Encrypt (and implicitly bind) shared secret */
-		if ( ( rc = tls_key_encrypt ( tls, exchange,
-					      builder ) ) != 0 ) {
+		if ( ( rc = tls_key_encrypt ( tls, group, builder ) ) != 0 )
 			return rc;
-		}
 	}
 
 	return 0;
@@ -1896,7 +1908,7 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
 	struct tls_cipher_suite *suite = cipherspec->suite;
-	struct exchange_algorithm *exchange = tls->exchange;
+	struct tls_named_group *group = tls->group;
 	struct {
 		uint32_t type_length;
 		uint8_t key_len[suite->exchange->len_len];
@@ -1907,15 +1919,15 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	int i;
 	int rc;
 
-	/* Fail if we have not selected a key exchange algorithm */
-	if ( ! exchange ) {
-		DBGC ( tls, "TLS %p has no key exchange algorithm\n", tls );
+	/* Fail if we have not selected a named group */
+	if ( ! group ) {
+		DBGC ( tls, "TLS %p has no key exchange group\n", tls );
 		rc = -ENOENT_KEY_EXCHANGE;
-		goto err_exchange;
+		goto err_group;
 	}
 
 	/* Build shareable key */
-	if ( ( rc = tls_key_build ( tls, exchange, &builder ) ) != 0 )
+	if ( ( rc = tls_key_build ( tls, group, &builder ) ) != 0 )
 		goto err_build;
 	len = builder.len;
 
@@ -1956,7 +1968,7 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  err_send:
  err_prepend:
  err_build:
- err_exchange:
+ err_group:
 	free ( builder.data );
 	return rc;
 }
@@ -2671,7 +2683,7 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 	if ( ( rc = suite->exchange->parse ( tls, data, len, &params ) ) != 0)
 		return rc;
 	DBGC ( tls, "TLS %p using named group %s-%s\n",
-	       tls, suite->exchange->name, params.exchange->name );
+	       tls, suite->exchange->name, params.group->exchange->name );
 
 	/* Signature follows parameters */
 	assert ( params.len <= len );
@@ -2714,7 +2726,7 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 	}
 
 	/* Generate pre-master secret */
-	if ( ( rc = tls_key_agree ( tls, params.exchange, params.partner,
+	if ( ( rc = tls_key_agree ( tls, params.group, params.partner,
 				    params.partner_len ) ) != 0 ) {
 		return rc;
 	}
@@ -2744,8 +2756,8 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 		}
 	}
 
-	/* Record key exchange algorithm for sending ClientKeyExchange */
-	tls->exchange = params.exchange;
+	/* Record named group */
+	tls->group = params.group;
 
 	return 0;
 }
@@ -4138,7 +4150,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->client.key = privkey_get ( key ? key : &private_key );
 	tls->server.root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_MAX;
-	tls->exchange = &exchange_null;
+	tls->group = &tls_null_named_group;
 	channel_init ( &tls->channel, &tls_channel_ops );
 	tls_clear_digest ( tls );
 	tls->tx.cipherspec.writer = &tls_client;
