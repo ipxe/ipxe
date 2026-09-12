@@ -306,3 +306,13 @@ REQUIRE_OBJECT ( ecdhe_ecdsa_aes_gcm_sha256 );
     defined ( CRYPTO_CIPHER_AES_GCM ) && defined ( CRYPTO_DIGEST_SHA384 )
 REQUIRE_OBJECT ( ecdhe_ecdsa_aes_gcm_sha384 );
 #endif
+
+/* AES-GCM and SHA-256 */
+#if defined ( CRYPTO_CIPHER_AES_GCM ) && defined ( CRYPTO_DIGEST_SHA256 )
+REQUIRE_OBJECT ( aes_gcm_sha256 );
+#endif
+
+/* AES-GCM and SHA-384 */
+#if defined ( CRYPTO_CIPHER_AES_GCM ) && defined ( CRYPTO_DIGEST_SHA384 )
+REQUIRE_OBJECT ( aes_gcm_sha384 );
+#endif
