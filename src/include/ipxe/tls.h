@@ -41,6 +41,24 @@ struct tls_header {
 	uint16_t length;
 } __attribute__ (( packed ));
 
+/** TLS server random data */
+union tls_server_random {
+	/** Random nonce (as used by the key schedule) */
+	struct tls_random random;
+	/** Version downgrade detection */
+	struct {
+		/** Unused */
+		uint8_t unused[24];
+		/** Magic signature */
+		uint8_t magic[7];
+		/** Negotiated version (as a delta from TLSv1.1) */
+		uint8_t version;
+	} __attribute__ (( packed )) downgrade;
+};
+
+/** TLS server downgrade detection magic signature */
+#define TLS_SERVER_DOWNGRADE_MAGIC "DOWNGRD"
+
 /** TLS version 1.1 */
 #define TLS_VERSION_TLS_1_1 0x0302
 

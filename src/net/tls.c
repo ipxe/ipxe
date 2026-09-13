@@ -190,6 +190,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EPERM_SAVE						\
 	__einfo_uniqify ( EINFO_EPERM, 0x07,				\
 			  "Pre-shared key was not established" )
+#define EPERM_DOWNGRADE __einfo_error ( EINFO_EPERM_DOWNGRADE )
+#define EINFO_EPERM_DOWNGRADE						\
+	__einfo_uniqify ( EINFO_EPERM, 0x08,				\
+			  "Downgrade attack detected" )
 #define EPROTO_VERSION __einfo_error ( EINFO_EPROTO_VERSION )
 #define EINFO_EPROTO_VERSION						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x01,				\
@@ -2314,10 +2318,11 @@ static int tls_new_hello_request ( struct tls_connection *tls,
  */
 static int tls_new_server_hello ( struct tls_connection *tls,
 				  const void *data, size_t len ) {
+	static const uint8_t downgrade_magic[7] = TLS_SERVER_DOWNGRADE_MAGIC;
 	struct tls_session *session = tls->session;
 	const struct {
 		uint16_t version;
-		struct tls_random random;
+		union tls_server_random random;
 		uint8_t session_id_len;
 		uint8_t session_id[0];
 	} __attribute__ (( packed )) *hello_a = data;
@@ -2443,6 +2448,18 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	tls->version = version;
 	DBGC ( tls, "TLS %p using protocol version %d.%d\n",
 	       tls, ( version >> 8 ), ( version & 0xff ) );
+
+	/* Check for downgrade attacks */
+	if ( ( version < TLS_VERSION_MAX ) &&
+	     ( memcmp ( hello_a->random.downgrade.magic, downgrade_magic,
+			sizeof ( hello_a->random.downgrade.magic ) ) == 0 ) &&
+	     ( hello_a->random.downgrade.version <
+	       ( TLS_VERSION_MAX - TLS_VERSION_TLS_1_1 ) ) ) {
+		DBGC ( tls, "TLS %p detected downgrade attack:\n", tls );
+		DBGC_HDA ( tls, 0, &hello_a->random.downgrade,
+			   sizeof ( hello_a->random.downgrade ) );
+		return -EPERM_DOWNGRADE;
+	}
 
 	/* Select cipher suite */
 	if ( ( rc = tls_select_cipher ( tls, hello_b->cipher_suite ) ) != 0 )
