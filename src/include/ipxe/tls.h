@@ -325,6 +325,13 @@ struct tls_named_group {
 struct tls_cipherspec {
 	/** Cipher suite */
 	struct tls_cipher_suite *suite;
+	/** Writer endpoint */
+	const struct tls_endpoint *writer;
+	/** Secure pipe */
+	struct secure_pipe *pipe;
+	/** Sequence number */
+	uint64_t seq;
+
 	/** Dynamically-allocated storage */
 	void *dynamic;
 	/** Cipher key */
@@ -333,16 +340,6 @@ struct tls_cipherspec {
 	void *mac_secret;
 	/** Fixed initialisation vector */
 	void *fixed_iv;
-};
-
-/** A TLS cipher specification pair */
-struct tls_cipherspec_pair {
-	/** Writer endpoint */
-	const struct tls_endpoint *writer;
-	/** Current cipher specification */
-	struct tls_cipherspec active;
-	/** Next cipher specification */
-	struct tls_cipherspec pending;
 };
 
 /** A TLS signature algorithm */
@@ -415,10 +412,8 @@ struct tls_session {
 
 /** TLS transmit state */
 struct tls_tx {
-	/** Cipher specifications */
-	struct tls_cipherspec_pair cipherspec;
-	/** Sequence number */
-	uint64_t seq;
+	/** Cipher specification */
+	struct tls_cipherspec cipherspec;
 	/** Pending transmissions */
 	unsigned int pending;
 	/** Transmit process */
@@ -427,10 +422,8 @@ struct tls_tx {
 
 /** TLS receive state */
 struct tls_rx {
-	/** Cipher specifications */
-	struct tls_cipherspec_pair cipherspec;
-	/** Sequence number */
-	uint64_t seq;
+	/** Cipher specification */
+	struct tls_cipherspec cipherspec;
 	/** State machine current state */
 	enum tls_rx_state state;
 	/** Current received record header */
@@ -488,6 +481,8 @@ struct tls_connection {
 
 	/** Protocol version */
 	uint16_t version;
+	/** Cipher suite */
+	struct tls_cipher_suite *suite;
 	/** Key exchange named group */
 	struct tls_named_group *group;
 	/** Secure renegotiation flag */

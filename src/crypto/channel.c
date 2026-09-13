@@ -1103,7 +1103,7 @@ static inline const char * channel_pipe_name ( struct secure_channel *channel,
  *
  * @v pipe		Secure channel pipe
  */
-static void channel_clear_cipher ( struct secure_pipe *pipe ) {
+void channel_clear_cipher ( struct secure_pipe *pipe ) {
 
 	/* Zero and free any existing cipher context */
 	zfree ( pipe->ctx );

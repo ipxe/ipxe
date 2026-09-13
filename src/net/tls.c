@@ -366,10 +366,8 @@ static void free_tls ( struct refcnt *refcnt ) {
 	/* Free dynamically-allocated resources */
 	zfree ( tls->new_ticket.data );
 	tls_clear_digest ( tls );
-	tls_clear_cipher ( tls, &tls->tx.cipherspec.active );
-	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
-	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
-	tls_clear_cipher ( tls, &tls->rx.cipherspec.pending );
+	tls_clear_cipher ( tls, &tls->tx.cipherspec );
+	tls_clear_cipher ( tls, &tls->rx.cipherspec );
 	list_for_each_entry_safe ( iobuf, tmp, &tls->rx.data, list ) {
 		list_del ( &iobuf->list );
 		free_iob ( iobuf );
@@ -607,58 +605,6 @@ tls_find_cipher_suite ( unsigned int cipher_suite ) {
 }
 
 /**
- * Clear cipher specification
- *
- * @v cipherspec	TLS cipher specification
- */
-static void tls_clear_cipher ( struct tls_connection *tls __unused,
-			       struct tls_cipherspec *cipherspec ) {
-
-	zfree ( cipherspec->dynamic );
-	memset ( cipherspec, 0, sizeof ( *cipherspec ) );
-	cipherspec->suite = &tls_cipher_suite_null;
-}
-
-/**
- * Set cipher specification
- *
- * @v tls		TLS connection
- * @v cipherspec	TLS cipher specification
- * @v suite		Cipher suite
- * @ret rc		Return status code
- */
-static int tls_set_cipher ( struct tls_connection *tls,
-			    struct tls_cipherspec *cipherspec,
-			    struct tls_cipher_suite *suite ) {
-	size_t total;
-	void *dynamic;
-
-	/* Clear out old cipher contents, if any */
-	tls_clear_cipher ( tls, cipherspec );
-
-	/* Allocate dynamic storage */
-	total = ( suite->key_len + suite->mac_len + suite->fixed_iv_len );
-	dynamic = zalloc ( total );
-	if ( ! dynamic ) {
-		DBGC ( tls, "TLS %p could not allocate %zd bytes for crypto "
-		       "context\n", tls, total );
-		return -ENOMEM_CONTEXT;
-	}
-
-	/* Assign storage */
-	cipherspec->dynamic = dynamic;
-	cipherspec->cipher_key = dynamic;	dynamic += suite->key_len;
-	cipherspec->mac_secret = dynamic;	dynamic += suite->mac_len;
-	cipherspec->fixed_iv = dynamic;		dynamic += suite->fixed_iv_len;
-	assert ( ( cipherspec->dynamic + total ) == dynamic );
-
-	/* Store parameters */
-	cipherspec->suite = suite;
-
-	return 0;
-}
-
-/**
  * Select cipher suite
  *
  * @v tls		TLS connection
@@ -706,13 +652,8 @@ static int tls_select_cipher ( struct tls_connection *tls,
 	/* Set default named group */
 	tls->group = suite->exchange->group;
 
-	/* Set ciphers */
-	if ( ( rc = tls_set_cipher ( tls, &tls->tx.cipherspec.pending,
-				     suite ) ) != 0 )
-		return rc;
-	if ( ( rc = tls_set_cipher ( tls, &tls->rx.cipherspec.pending,
-				     suite ) ) != 0 )
-		return rc;
+	/* Set cipher suite */
+	tls->suite = suite;
 	DBGC ( tls, "TLS %p selected cipher suite %s\n",
 	       tls, tls_cipher_name ( suite ) );
 
@@ -720,67 +661,121 @@ static int tls_select_cipher ( struct tls_connection *tls,
 }
 
 /**
- * Activate next cipher suite
+ * Clear cipher specification
  *
  * @v tls		TLS connection
- * @v pair		Cipher specification pair
- * @v pipe		Secure pipe
+ * @v cipherspec	TLS cipher specification
+ */
+static void tls_clear_cipher ( struct tls_connection *tls __unused,
+			       struct tls_cipherspec *cipherspec ) {
+
+	/* Clear cipher */
+	channel_clear_cipher ( cipherspec->pipe );
+
+	/* Reset to the null cipher suite (with no dynamic storage) */
+	cipherspec->suite = &tls_cipher_suite_null;
+
+	/* Clear and free any dynamically-allocated storage */
+	zfree ( cipherspec->dynamic );
+	cipherspec->dynamic = NULL;
+	cipherspec->cipher_key = NULL;
+	cipherspec->mac_secret = NULL;
+	cipherspec->fixed_iv = NULL;
+
+	/* Reset sequence number */
+	cipherspec->seq = 0;
+}
+
+/**
+ * Change cipher specification
+ *
+ * @v tls		TLS connection
+ * @v cipherspec	TLS cipher specification
+ * @v phase		New traffic phase (or NULL to retain existing phase)
  * @ret rc		Return status code
  */
 static int tls_change_cipher ( struct tls_connection *tls,
-			       struct tls_cipherspec_pair *pair,
-			       struct secure_pipe *pipe ) {
-	struct tls_cipherspec *pending = &pair->pending;
-	struct tls_cipherspec *active = &pair->active;
-	struct tls_cipher_suite *suite = pending->suite;
-	size_t mac_len = suite->mac_len;
-	size_t key_len = suite->key_len;
-	size_t iv_len = suite->fixed_iv_len;
+			       struct tls_cipherspec *cipherspec,
+			       const struct tls_phase *phase ) {
+	struct tls_cipher_suite *suite = tls->suite;
+	const struct tls_endpoint *writer = cipherspec->writer;
+	struct secure_pipe *pipe = cipherspec->pipe;
+	size_t total;
+	void *dynamic;
 	int rc;
+
+	/* Clear any existing cipher specification */
+	tls_clear_cipher ( tls, cipherspec );
 
 	/* Sanity check */
 	if ( suite == &tls_cipher_suite_null ) {
 		DBGC ( tls, "TLS %p refusing to use null %s cipher\n",
 		       tls, tls_pipe_name ( tls, pipe ) );
-		return -ENOTSUP_NULL;
+		rc = -ENOTSUP_NULL;
+		goto err_null;
 	}
 
-	/* Generate traffic secret */
-	if ( ( rc = tlskey_traffic ( &tls->key, pair->writer,
-				     &tls_application ) ) != 0 ) {
+	/* Allocate dynamic storage */
+	total = ( suite->key_len + suite->mac_len + suite->fixed_iv_len );
+	dynamic = zalloc ( total );
+	if ( ! dynamic ) {
+		DBGC ( tls, "TLS %p could not allocate %zd bytes for crypto "
+		       "context\n", tls, total );
+		rc = -ENOMEM_CONTEXT;
+		goto err_alloc;
+	}
+
+	/* Assign storage */
+	cipherspec->dynamic = dynamic;
+	cipherspec->cipher_key = dynamic;	dynamic += suite->key_len;
+	cipherspec->mac_secret = dynamic;	dynamic += suite->mac_len;
+	cipherspec->fixed_iv = dynamic;		dynamic += suite->fixed_iv_len;
+	assert ( ( cipherspec->dynamic + total ) == dynamic );
+
+	/* Record cipher suite */
+	cipherspec->suite = suite;
+
+	/* Generate traffic secret, if applicable */
+	if ( phase &&
+	     ( ( rc = tlskey_traffic ( &tls->key, writer, phase ) ) != 0 ) ) {
 		DBGC ( tls, "TLS %p could not generate %s %s traffic secret: "
 		       "%s\n", tls, tls_pipe_name ( tls, pipe ),
-		       pair->writer->name, strerror ( rc ) );
-		return rc;
+		       writer->name, strerror ( rc ) );
+		goto err_traffic;
 	}
 
 	/* Generate cipher key material */
-	if ( ( rc = tlskey_cipher ( &tls->key, pair->writer,
-				    pending->cipher_key, key_len,
-				    pending->fixed_iv, iv_len,
-				    pending->mac_secret, mac_len ) ) != 0 ) {
+	if ( ( rc = tlskey_cipher ( &tls->key, writer,
+				    cipherspec->cipher_key, suite->key_len,
+				    cipherspec->fixed_iv, suite->fixed_iv_len,
+				    cipherspec->mac_secret,
+				    suite->mac_len ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not generate %s %s keys: %s\n",
-		       tls, tls_pipe_name ( tls, pipe ), pair->writer->name,
+		       tls, tls_pipe_name ( tls, pipe ), writer->name,
 		       strerror ( rc ) );
-		return rc;
+		goto err_cipher;
 	}
 
 	/* Set cipher algorithm and key */
 	if ( ( rc = channel_set_cipher ( &tls->channel, pipe, suite->cipher,
-					 pending->cipher_key,
-					 key_len ) ) != 0 ) {
+					 cipherspec->cipher_key,
+					 suite->key_len ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not set %s cipher: %s\n",
 		       tls, tls_pipe_name ( tls, pipe ), strerror ( rc ) );
-		return rc;
+		goto err_channel;
 	}
 
-	/* Swap in new cipher suite */
-	tls_clear_cipher ( tls, active );
-	memswap ( active, pending, sizeof ( *active ) );
 	DBGC ( tls, "TLS %p activated %s cipher %s\n",
 	       tls, tls_pipe_name ( tls, pipe ), tls_cipher_name ( suite ) );
-
 	return 0;
+
+ err_channel:
+ err_cipher:
+ err_traffic:
+	tls_clear_cipher ( tls, cipherspec );
+ err_alloc:
+ err_null:
+	return rc;
 }
 
 /******************************************************************************
@@ -2001,8 +1996,7 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
-	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct tls_cipher_suite *suite = tls->suite;
 	struct tls_named_group *group = tls->group;
 	struct {
 		uint32_t type_length;
@@ -2184,9 +2178,22 @@ static int tls_send_change_cipher ( struct tls_connection *tls ) {
 	} __attribute__ (( packed )) change_cipher = {
 		.spec = TLS_CHANGE_CIPHER_SPEC,
 	};
+	int rc;
 
-	return tls_send_plaintext ( tls, TLS_TYPE_CHANGE_CIPHER,
-				    &change_cipher, sizeof ( change_cipher ) );
+	/* Transmit record */
+	if ( ( rc = tls_send_plaintext ( tls, TLS_TYPE_CHANGE_CIPHER,
+					 &change_cipher,
+					 sizeof ( change_cipher ) ) ) != 0 ) {
+		return rc;
+	}
+
+	/* Change transmit cipher spec */
+	if ( ( rc = tls_change_cipher ( tls, &tls->tx.cipherspec,
+					&tls_application ) ) != 0 ) {
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
@@ -2285,12 +2292,9 @@ static int tls_new_change_cipher ( struct tls_connection *tls,
 
 	/* Change receive cipher spec */
 	if ( ( rc = tls_change_cipher ( tls, &tls->rx.cipherspec,
-					&tls->channel.rx ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not activate RX cipher: %s\n",
-		       tls, strerror ( rc ) );
+					&tls_application ) ) != 0 ) {
 		return rc;
 	}
-	tls->rx.seq = ~( ( uint64_t ) 0 );
 
 	return 0;
 }
@@ -2820,8 +2824,7 @@ static int tls_new_certificate ( struct tls_connection *tls,
  */
 static int tls_new_server_key_exchange ( struct tls_connection *tls,
 					 const void *data, size_t len ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.pending;
-	struct tls_cipher_suite *suite = cipherspec->suite;
+	struct tls_cipher_suite *suite = tls->suite;
 	struct tls_key_exchange_parameters params;
 	struct tls_signature_hash_algorithm *sig_hash;
 	struct x509_certificate *cert;
@@ -2890,7 +2893,7 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 			return -EPERM_KEY_EXCHANGE;
 		}
 	} else {
-		pubkey = cipherspec->suite->pubkey;
+		pubkey = suite->pubkey;
 		digest = &md5_sha1_algorithm;
 	}
 
@@ -3404,7 +3407,7 @@ static void tls_hmac_list ( struct tls_cipherspec *cipherspec,
  * @ret reserve		Maximum additional length to reserve
  */
 static size_t tls_iob_reserved ( struct tls_connection *tls, size_t len ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec;
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct secure_pipe *pipe = &tls->channel.tx;
 	struct cipher_algorithm *cipher = pipe->cipher;
@@ -3460,7 +3463,7 @@ static struct io_buffer * tls_alloc_iob ( struct tls_connection *tls,
  */
 static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 			     struct io_buffer *iobuf ) {
-	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec.active;
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec;
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct digest_algorithm *digest = suite->digest;
 	struct secure_pipe *pipe = &tls->channel.tx;
@@ -3504,7 +3507,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 			record_len = TLS_TX_BUFSIZE;
 
 		/* Construct authentication header */
-		authhdr.seq = cpu_to_be64 ( tls->tx.seq );
+		authhdr.seq = cpu_to_be64 ( cipherspec->seq++ );
 		authhdr.header.type = type;
 		authhdr.header.version = htons ( tls->version );
 		authhdr.header.length = htons ( record_len );
@@ -3578,7 +3581,6 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 			      iob_put ( iobuf, cipher->authsize ) );
 
 		/* Move to next record */
-		tls->tx.seq += 1;
 		plaintext += record_len;
 		len -= record_len;
 
@@ -3674,7 +3676,7 @@ static int tls_verify_padding ( struct tls_connection *tls,
 static int tls_new_ciphertext ( struct tls_connection *tls,
 				struct tls_header *tlshdr,
 				struct list_head *rx_data ) {
-	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec.active;
+	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec;
 	struct tls_cipher_suite *suite = cipherspec->suite;
 	struct digest_algorithm *digest = suite->digest;
 	struct secure_pipe *pipe = &tls->channel.rx;
@@ -3727,7 +3729,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	auth = last->tail;
 
 	/* Construct authentication data */
-	authhdr.seq = cpu_to_be64 ( tls->rx.seq );
+	authhdr.seq = cpu_to_be64 ( cipherspec->seq++ );
 	authhdr.header.type = tlshdr->type;
 	authhdr.header.version = tlshdr->version;
 	authhdr.header.length = htons ( len );
@@ -3912,7 +3914,7 @@ static struct interface_descriptor tls_plainstream_desc =
  * @ret rc		Returned status code
  */
 static int tls_newdata_process_header ( struct tls_connection *tls ) {
-	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec.active;
+	struct tls_cipherspec *cipherspec = &tls->rx.cipherspec;
 	struct secure_pipe *pipe = &tls->channel.rx;
 	struct cipher_algorithm *cipher = pipe->cipher;
 	size_t iv_len = cipherspec->suite->record_iv_len;
@@ -4015,9 +4017,6 @@ static int tls_newdata_process_data ( struct tls_connection *tls ) {
 	if ( ( rc = tls_new_ciphertext ( tls, &tls->rx.header,
 					 &tls->rx.data ) ) != 0 )
 		return rc;
-
-	/* Increment RX sequence number */
-	tls->rx.seq += 1;
 
 	/* Return to header state */
 	assert ( list_empty ( &tls->rx.data ) );
@@ -4238,19 +4237,12 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 		}
 		tls->tx.pending &= ~TLS_TX_CERTIFICATE_VERIFY;
 	} else if ( tls->tx.pending & TLS_TX_CHANGE_CIPHER ) {
-		/* Send Change Cipher, and then change the cipher in use */
+		/* Send Change Cipher */
 		if ( ( rc = tls_send_change_cipher ( tls ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not send Change Cipher: "
 			       "%s\n", tls, strerror ( rc ) );
 			goto err;
 		}
-		if ( ( rc = tls_change_cipher ( tls, &tls->tx.cipherspec,
-						&tls->channel.tx ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not activate TX cipher: "
-			       "%s\n", tls, strerror ( rc ) );
-			goto err;
-		}
-		tls->tx.seq = 0;
 		tls->tx.pending &= ~TLS_TX_CHANGE_CIPHER;
 	} else if ( tls->tx.pending & TLS_TX_FINISHED ) {
 		/* Send Finished */
@@ -4319,15 +4311,16 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->client.key = privkey_get ( key ? key : &private_key );
 	tls->server.root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_MAX;
+	tls->suite = &tls_cipher_suite_null;
 	tls->group = table_start ( TLS_NAMED_GROUPS );
 	channel_init ( &tls->channel, &tls_channel_ops );
 	tls_clear_digest ( tls );
+	tls->tx.cipherspec.suite = &tls_cipher_suite_null;
 	tls->tx.cipherspec.writer = &tls_client;
-	tls_clear_cipher ( tls, &tls->tx.cipherspec.active );
-	tls_clear_cipher ( tls, &tls->tx.cipherspec.pending );
+	tls->tx.cipherspec.pipe = &tls->channel.tx;
+	tls->rx.cipherspec.suite = &tls_cipher_suite_null;
 	tls->rx.cipherspec.writer = &tls_server;
-	tls_clear_cipher ( tls, &tls->rx.cipherspec.active );
-	tls_clear_cipher ( tls, &tls->rx.cipherspec.pending );
+	tls->rx.cipherspec.pipe = &tls->channel.rx;
 	iob_populate ( &tls->rx.iobuf, &tls->rx.header, 0,
 		       sizeof ( tls->rx.header ) );
 	INIT_LIST_HEAD ( &tls->rx.data );

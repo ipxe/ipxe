@@ -317,6 +317,7 @@ extern int channel_confirm ( struct secure_channel *channel,
 			     const void *auth, size_t len );
 extern int channel_establish ( struct secure_channel *channel,
 			       const char *name, struct x509_root *root );
+extern void channel_clear_cipher ( struct secure_pipe *pipe );
 extern int channel_set_cipher ( struct secure_channel *channel,
 				struct secure_pipe *pipe,
 				struct cipher_algorithm *cipher,
