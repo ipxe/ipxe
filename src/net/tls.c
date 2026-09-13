@@ -194,6 +194,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EPERM_DOWNGRADE						\
 	__einfo_uniqify ( EINFO_EPERM, 0x08,				\
 			  "Downgrade attack detected" )
+#define EPERM_SESSION_ID __einfo_error ( EINFO_EPERM_SESSION_ID )
+#define EINFO_EPERM_SESSION_ID						\
+	__einfo_uniqify ( EINFO_EPERM, 0x09,				\
+			  "Session ID echo mismatch" )
 #define EPROTO_VERSION __einfo_error ( EINFO_EPROTO_VERSION )
 #define EINFO_EPROTO_VERSION						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x01,				\
@@ -2328,7 +2332,6 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		uint8_t session_id_len;
 		uint8_t session_id[0];
 	} __attribute__ (( packed )) *hello_a = data;
-	const uint8_t *session_id;
 	const struct {
 		uint16_t cipher_suite;
 		uint8_t compression_method;
@@ -2353,7 +2356,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	const struct {
 		uint16_t version;
 	} __attribute__ (( packed )) *supver = NULL;
+	const uint8_t *session_id;
 	uint16_t version;
+	size_t session_id_len;
 	size_t exts_len;
 	size_t ext_len;
 	size_t remaining;
@@ -2364,15 +2369,17 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	     ( hello_a->session_id_len > ( len - sizeof ( *hello_a ) ) ) ||
 	     ( sizeof ( *hello_b ) > ( len - sizeof ( *hello_a ) -
 				       hello_a->session_id_len ) ) ) {
-		DBGC ( tls, "TLS %p received underlength Server Hello\n", tls );
+		DBGC ( tls, "TLS %p received underlength Server Hello\n",
+		       tls );
 		DBGC_HD ( tls, data, len );
 		return -EINVAL_HELLO;
 	}
 	session_id = hello_a->session_id;
-	hello_b = ( ( void * ) ( session_id + hello_a->session_id_len ) );
+	session_id_len = hello_a->session_id_len;
+	hello_b = ( ( void * ) ( session_id + session_id_len ) );
 
 	/* Parse extensions, if present */
-	remaining = ( len - sizeof ( *hello_a ) - hello_a->session_id_len -
+	remaining = ( len - sizeof ( *hello_a ) - session_id_len -
 		      sizeof ( *hello_b ) );
 	if ( remaining ) {
 
@@ -2481,24 +2488,33 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	tls->extended_master_secret = ( !! ems );
 
 	/* Check session ID */
-	if ( hello_a->session_id_len &&
-	     ( hello_a->session_id_len == session->id.len ) &&
-	     ( memcmp ( session_id, session->id.data,
-			session->id.len ) == 0 ) ) {
+	if ( session_id_len && ( session_id_len == session->id.len ) &&
+	     ( memcmp ( session_id, session->id.data, session_id_len ) == 0)){
 
-		/* Session ID match: resume session */
-		if ( ( rc = tls_resume ( tls ) ) != 0 )
+		/* Session ID match: resume session for TLSv1.2 or earlier */
+		if ( ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) &&
+		     ( rc = tls_resume ( tls ) ) != 0 ) {
 			return rc;
+		}
 
-	} else if ( hello_a->session_id_len &&
-		    ( hello_a->session_id_len <=
-		      sizeof ( tls->new_id.data ) ) ) {
+	} else {
 
-		/* Record new session ID */
-		tls->new_id.len = hello_a->session_id_len;
-		memcpy ( tls->new_id.data, session_id, tls->new_id.len );
-		DBGC ( tls, "TLS %p new session ID:\n", tls );
-		DBGC_HDA ( tls, 0, tls->new_id.data, tls->new_id.len );
+		/* Session ID echo mismatch: abort for TLSv1.3 or later */
+		if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+			DBGC ( tls, "TLS %p session ID mismatch\n", tls );
+			DBGC_HDA ( tls, 0, session_id, session_id_len );
+			return -EPERM_SESSION_ID;
+		}
+
+		/* Record new session ID, if possible */
+		if ( session_id_len && ( session_id_len <=
+					 sizeof ( tls->new_id.data ) ) ) {
+			tls->new_id.len = session_id_len;
+			memcpy ( tls->new_id.data, session_id,
+				 session_id_len );
+			DBGC ( tls, "TLS %p new session ID:\n", tls );
+			DBGC_HDA ( tls, 0, session_id, session_id_len );
+		}
 	}
 
 	/* Handle secure renegotiation */
