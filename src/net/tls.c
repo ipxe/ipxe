@@ -218,6 +218,10 @@ static int tls_send_plaintext ( struct tls_connection *tls, unsigned int type,
 static void tls_clear_digest ( struct tls_connection *tls );
 static void tls_clear_cipher ( struct tls_connection *tls,
 			       struct tls_cipherspec *cipherspec );
+static int tls_client_hello ( struct tls_connection *tls,
+			      int ( * action ) ( struct tls_connection *tls,
+						 const void *data,
+						 size_t len ) );
 
 /******************************************************************************
  *
@@ -512,6 +516,23 @@ static int tls_set_digest ( struct tls_connection *tls,
 	return 0;
 }
 
+/**
+ * Add handshake record to verification hash
+ *
+ * @v tls		TLS connection
+ * @v data		Handshake record
+ * @v len		Length of handshake record
+ * @ret rc		Return status code
+ */
+static int tls_add_handshake ( struct tls_connection *tls,
+			       const void *data, size_t len ) {
+
+	/* Record in transcript digest */
+	tlskey_digest ( &tls->key, data, len );
+
+	return 0;
+}
+
 /******************************************************************************
  *
  * Cipher suite management
@@ -666,14 +687,24 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		return -ENOTSUP_CIPHER;
 	}
 
-	/* Set default named group */
-	tls->group = suite->exchange->group;
-
 	/* Set key schedule digest algorithm */
 	digest = ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ?
 		   suite->handshake : &md5_sha1_algorithm );
 	if ( ( rc = tls_set_digest ( tls, digest ) ) != 0 )
 		return rc;
+
+	/* Add initial Client Hello to handshake digest
+	 *
+	 * When the Client Hello was originally sent, the digest
+	 * algorithm selected by the server's choice of cipher suite
+	 * was not yet known.  This is the earliest point at which it
+	 * can be incorporated into the handshake transcript digest.
+	 */
+	if ( ( rc = tls_client_hello ( tls, tls_add_handshake ) ) != 0 )
+		return rc;
+
+	/* Set default named group */
+	tls->group = suite->exchange->group;
 
 	/* Set ciphers */
 	if ( ( rc = tls_set_cipher ( tls, &tls->tx.cipherspec.pending,
@@ -1542,23 +1573,6 @@ static int tls_resume ( struct tls_connection *tls ) {
  *
  ******************************************************************************
  */
-
-/**
- * Add handshake record to verification hash
- *
- * @v tls		TLS connection
- * @v data		Handshake record
- * @v len		Length of handshake record
- * @ret rc		Return status code
- */
-static int tls_add_handshake ( struct tls_connection *tls,
-			       const void *data, size_t len ) {
-
-	/* Record in transcript digest */
-	tlskey_digest ( &tls->key, data, len );
-
-	return 0;
-}
 
 /**
  * Resume TX state machine
@@ -2472,16 +2486,6 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 
 	/* Select cipher suite */
 	if ( ( rc = tls_select_cipher ( tls, hello_b->cipher_suite ) ) != 0 )
-		return rc;
-
-	/* Add preceding Client Hello to handshake digest
-	 *
-	 * When the Client Hello was originally sent, the digest
-	 * algorithm selected by the server's choice of cipher suite
-	 * was not yet known.  This is the earliest point at which it
-	 * can be incorporated into the handshake transcript digest.
-	 */
-	if ( ( rc = tls_client_hello ( tls, tls_add_handshake ) ) != 0 )
 		return rc;
 
 	/* Handle extended master secret */
