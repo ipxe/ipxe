@@ -487,7 +487,9 @@ static int tls_set_digest ( struct tls_connection *tls,
 	tls_clear_digest ( tls );
 
 	/* Select key schedule */
-	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+		op = &tlskey_hkdf;
+	} else if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 		op = &tlskey_hash;
 	} else {
 		op = &tlskey_md5_sha1;
