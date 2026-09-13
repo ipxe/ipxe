@@ -1731,6 +1731,17 @@ static int tlskey_hash_tbshash ( struct tls_key_schedule *tlskey,
 
 	} else {
 
+		/* Additional data (i.e. the ServerKeyExchange
+		 * parameters) must be incorporated, since otherwise
+		 * the digest does not cover the parameters used to
+		 * establish the shared secret.
+		 */
+		if ( ! len ) {
+			DBGC ( tlskey, "TLSKEY %p cannot generate digest "
+			       "without additional data\n", tlskey );
+			return -ENOTSUP;
+		}
+
 		/* Generate ServerKeyExchange digest */
 		digest_init ( digest, tmp.ctx );
 		digest_update ( digest, tmp.ctx, &tlskey->random,
