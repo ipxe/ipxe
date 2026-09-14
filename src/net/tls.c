@@ -276,6 +276,21 @@ static void tls_set_uint24 ( tls24_t *field24, unsigned long value ) {
 }
 
 /**
+ * XOR data block
+ *
+ * @v dst		Destination data
+ * @v src		Source data
+ * @v len		Length of data
+ */
+static void tls_xor ( void *dst, const void *src, size_t len ) {
+	const uint8_t *src_bytes = src;
+	uint8_t *dst_bytes = dst;
+
+	while ( len-- )
+		*(dst_bytes++) ^= *(src_bytes++);
+}
+
+/**
  * Determine if TLS connection is ready for application data
  *
  * @v tls		TLS connection
@@ -3476,7 +3491,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 	struct cipher_algorithm *cipher = pipe->cipher;
 	struct {
 		uint8_t fixed[suite->fixed_iv_len];
-		uint8_t rec[suite->record_iv_len];
+		uint8_t record[suite->record_iv_len];
 	} __attribute__ (( packed )) iv;
 	struct tls_auth_header authhdr;
 	struct tls_header *tlshdr;
@@ -3520,9 +3535,17 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 
 		/* Construct and set initialisation vector */
 		memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
-		channel_ephemeral ( &tls->channel, &authhdr,
-				    sizeof ( authhdr ), iv.rec,
-				    sizeof ( iv.rec ) );
+		if ( suite->flags & TLS_CIPHER_FL_SEQUENTIAL_IV ) {
+			memset ( iv.record, 0, sizeof ( iv.record ) );
+			assert ( sizeof ( iv ) >= sizeof ( authhdr.seq ) );
+			tls_xor ( ( ( ( void * ) &iv ) + sizeof ( iv )
+				    - sizeof ( authhdr.seq ) ),
+				  &authhdr.seq, sizeof ( authhdr.seq ) );
+		} else {
+			channel_ephemeral ( &tls->channel, &authhdr,
+					    sizeof ( authhdr ), iv.record,
+					    sizeof ( iv.record ) );
+		}
 		if ( ( rc = cipher_setiv ( cipher, pipe->ctx, &iv,
 					   sizeof ( iv ) ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not set TX IV: %s\n",
@@ -3554,12 +3577,12 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 		tlshdr = iob_put ( iobuf, sizeof ( *tlshdr ) );
 		tlshdr->type = type;
 		tlshdr->version = htons ( tls->legacy_version );
-		tlshdr->length = htons ( sizeof ( iv.rec ) + encrypt_len +
+		tlshdr->length = htons ( sizeof ( iv.record ) + encrypt_len +
 					 cipher->authsize );
 
 		/* Add record initialisation vector, if applicable */
-		memcpy ( iob_put ( iobuf, sizeof ( iv.rec ) ), iv.rec,
-			 sizeof ( iv.rec ) );
+		memcpy ( iob_put ( iobuf, sizeof ( iv.record ) ), iv.record,
+			 sizeof ( iv.record ) );
 
 		/* Copy plaintext data if necessary */
 		ciphertext = iob_put ( iobuf, record_len );
@@ -3712,6 +3735,11 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	first = list_first_entry ( rx_data, struct io_buffer, list );
 	last = list_last_entry ( rx_data, struct io_buffer, list );
 
+	/* Construct authentication data (excluding length) */
+	authhdr.seq = cpu_to_be64 ( cipherspec->seq++ );
+	authhdr.header.type = tlshdr->type;
+	authhdr.header.version = tlshdr->version;
+
 	/* Extract initialisation vector */
 	if ( iob_len ( first ) < sizeof ( iv.record ) ) {
 		DBGC ( tls, "TLS %p received underlength IV\n", tls );
@@ -3719,6 +3747,13 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 		return -EINVAL_IV;
 	}
 	memcpy ( iv.fixed, cipherspec->fixed_iv, sizeof ( iv.fixed ) );
+	if ( suite->flags & TLS_CIPHER_FL_SEQUENTIAL_IV ) {
+		memset ( iv.record, 0, sizeof ( iv.record ) );
+		assert ( sizeof ( iv ) >= sizeof ( authhdr.seq ) );
+		tls_xor ( ( ( ( void * ) &iv ) + sizeof ( iv ) -
+			    sizeof ( authhdr.seq ) ), &authhdr.seq,
+			  sizeof ( authhdr.seq ) );
+	}
 	memcpy ( iv.record, first->data, sizeof ( iv.record ) );
 	iob_pull ( first, sizeof ( iv.record ) );
 	len -= sizeof ( iv.record );
@@ -3734,12 +3769,6 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	len -= cipher->authsize;
 	auth = last->tail;
 
-	/* Construct authentication data */
-	authhdr.seq = cpu_to_be64 ( cipherspec->seq++ );
-	authhdr.header.type = tlshdr->type;
-	authhdr.header.version = tlshdr->version;
-	authhdr.header.length = htons ( len );
-
 	/* Set initialisation vector */
 	if ( ( rc = cipher_setiv ( cipher, pipe->ctx, &iv,
 				   sizeof ( iv ) ) ) != 0 ) {
@@ -3749,6 +3778,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	}
 
 	/* Process authentication data, if applicable */
+	authhdr.header.length = htons ( len );
 	if ( is_auth_cipher ( cipher ) ) {
 		cipher_decrypt ( cipher, pipe->ctx, &authhdr,
 				 NULL, sizeof ( authhdr ) );

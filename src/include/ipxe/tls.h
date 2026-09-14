@@ -283,7 +283,12 @@ struct tls_cipher_suite {
 	uint8_t record_iv_len;
 	/** MAC length */
 	uint8_t mac_len;
+	/** Flags */
+	uint8_t flags;
 };
+
+/** Cipher XORs sequence number into the initialisation vector */
+#define TLS_CIPHER_FL_SEQUENTIAL_IV 0x01
 
 /** TLS cipher suite table */
 #define TLS_CIPHER_SUITES						\

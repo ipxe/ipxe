@@ -38,6 +38,7 @@ tls_dhe_rsa_with_aes_128_gcm_sha256 __tls_cipher_suite ( 11 ) = {
 	.fixed_iv_len = 4,
 	.record_iv_len = 8,
 	.mac_len = 0,
+	.flags = TLS_CIPHER_FL_SEQUENTIAL_IV,
 	.exchange = &tls_dhe_exchange_algorithm,
 	.pubkey = &rsa_algorithm,
 	.cipher = &aes_gcm_algorithm,

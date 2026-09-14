@@ -33,9 +33,10 @@ FILE_SECBOOT ( PERMITTED );
 struct tls_cipher_suite tls_aes_128_gcm_sha256 __tls_cipher_suite ( 31 ) = {
 	.code = htons ( TLS_AES_128_GCM_SHA256 ),
 	.key_len = ( 128 / 8 ),
-	.fixed_iv_len = 4,
-	.record_iv_len = 8,
+	.fixed_iv_len = 12,
+	.record_iv_len = 0,
 	.mac_len = 0,
+	.flags = TLS_CIPHER_FL_SEQUENTIAL_IV,
 	.exchange = &tls_null_exchange_algorithm,
 	.pubkey = &pubkey_null,
 	.cipher = &aes_gcm_algorithm,

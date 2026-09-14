@@ -38,6 +38,7 @@ tls_ecdhe_ecdsa_with_aes_256_cbc_sha384 __tls_cipher_suite ( 04 ) = {
 	.fixed_iv_len = 0,
 	.record_iv_len = AES_BLOCKSIZE,
 	.mac_len = SHA384_DIGEST_SIZE,
+	.flags = 0,
 	.exchange = &tls_ecdhe_exchange_algorithm,
 	.pubkey = &ecdsa_algorithm,
 	.cipher = &aes_cbc_algorithm,
