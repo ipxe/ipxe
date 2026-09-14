@@ -3559,8 +3559,14 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 				   record_len, mac );
 		}
 		if ( is_auth_cipher ( cipher ) ) {
-			cipher_encrypt ( cipher, pipe->ctx, &authhdr, NULL,
-					 sizeof ( authhdr ) );
+			if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+				cipher_encrypt ( cipher, pipe->ctx,
+						 &authhdr.header, NULL,
+						 sizeof ( authhdr.header ) );
+			} else {
+				cipher_encrypt ( cipher, pipe->ctx, &authhdr,
+						 NULL, sizeof ( authhdr ) );
+			}
 		}
 
 		/* Calculate encryption length */
@@ -3780,8 +3786,13 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	/* Process authentication data, if applicable */
 	authhdr.header.length = htons ( len );
 	if ( is_auth_cipher ( cipher ) ) {
-		cipher_decrypt ( cipher, pipe->ctx, &authhdr,
-				 NULL, sizeof ( authhdr ) );
+		if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+			cipher_decrypt ( cipher, pipe->ctx, &authhdr.header,
+					 NULL, sizeof ( authhdr.header ) );
+		} else {
+			cipher_decrypt ( cipher, pipe->ctx, &authhdr,
+					 NULL, sizeof ( authhdr ) );
+		}
 	}
 
 	/* Decrypt the received data */
