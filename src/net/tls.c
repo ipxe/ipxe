@@ -310,12 +310,15 @@ static int tls_ready ( struct tls_connection *tls ) {
  *
  * Check that TLS connection uses at least the specified protocol
  * version.  Optimise down to a compile-time constant true result if
- * this is already guaranteed by the minimum supported version check.
+ * this is already guaranteed by the minimum or maximum supported
+ * version check.
  */
 static inline __attribute__ (( always_inline )) int
 tls_version ( struct tls_connection *tls, unsigned int version ) {
-	return ( ( TLS_VERSION_MIN >= version ) ||
-		 ( tls->version >= version ) );
+
+	return ( ( TLS_VERSION_MAX >= version ) &&
+		 ( ( TLS_VERSION_MIN >= version ) ||
+		   ( tls->version >= version ) ) );
 }
 
 /**
