@@ -2308,9 +2308,10 @@ static int tls_new_change_cipher ( struct tls_connection *tls,
 	}
 	iob_pull ( iobuf, sizeof ( *change_cipher ) );
 
-	/* Change receive cipher spec */
-	if ( ( rc = tls_change_cipher ( tls, &tls->rx.cipherspec,
-					&tls_application ) ) != 0 ) {
+	/* Change receive cipher spec, if applicable */
+	if ( ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) &&
+	     ( ( rc = tls_change_cipher ( tls, &tls->rx.cipherspec,
+					  &tls_application ) ) != 0 ) ) {
 		return rc;
 	}
 
@@ -3716,6 +3717,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	struct digest_algorithm *digest = suite->digest;
 	struct secure_pipe *pipe = &tls->channel.rx;
 	struct cipher_algorithm *cipher = pipe->cipher;
+	unsigned int type = tlshdr->type;
 	size_t len = ntohs ( tlshdr->length );
 	struct {
 		uint8_t fixed[suite->fixed_iv_len];
@@ -3735,6 +3737,23 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 
 	/* Sanity check */
 	assert ( cipher == suite->cipher );
+
+	/* Handle TLS version 1.3 Change Cipher records */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
+	     ( type == TLS_TYPE_CHANGE_CIPHER ) ) {
+		/* TLS version 1.3 allows unencrypted Change Cipher
+		 * records to be sent after switching to use the
+		 * handshake traffic keys.  This is an ugly protocol
+		 * hack to work around badly implemented firewalls of
+		 * the kind beloved by large organisations.
+		 *
+		 * Process these as plaintext records.  Change Cipher
+		 * records are ignored for TLS version 1.3, so this is
+		 * just the most convenient way to discard the
+		 * records.
+		 */
+		return tls_new_record ( tls, type, rx_data );
+	}
 
 	/* Locate first and last data buffers */
 	assert ( ! list_empty ( rx_data ) );
@@ -3856,7 +3875,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	}
 
 	/* Process plaintext record */
-	if ( ( rc = tls_new_record ( tls, tlshdr->type, rx_data ) ) != 0 )
+	if ( ( rc = tls_new_record ( tls, type, rx_data ) ) != 0 )
 		return rc;
 
 	return 0;
