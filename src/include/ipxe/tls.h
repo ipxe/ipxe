@@ -481,6 +481,8 @@ struct tls_connection {
 
 	/** Protocol version */
 	uint16_t version;
+	/** Legacy protocol version */
+	uint16_t legacy_version;
 	/** Cipher suite */
 	struct tls_cipher_suite *suite;
 	/** Key exchange named group */

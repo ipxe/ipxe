@@ -233,6 +233,11 @@ static int tls_client_hello ( struct tls_connection *tls,
 /** Number of supported TLS versions */
 #define TLS_NUM_VERSIONS ( TLS_VERSION_MAX - TLS_VERSION_MIN + 1 )
 
+/** Maximum pre-TLSv1.3 version */
+#define TLS_LEGACY_VERSION_MAX						\
+	( ( TLS_VERSION_MAX <= TLS_VERSION_TLS_1_2 ) ?			\
+	  TLS_VERSION_MAX : TLS_VERSION_TLS_1_2 )
+
 /** A TLS 24-bit integer
  *
  * TLS uses 24-bit integers in several places, which are awkward to
@@ -1797,9 +1802,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	hello->type_length = ( cpu_to_le32 ( TLS_CLIENT_HELLO ) |
 			       htonl ( sizeof ( *hello ) -
 				       sizeof ( hello->type_length ) ) );
-	version = TLS_VERSION_MAX;
-	if ( version > TLS_VERSION_TLS_1_2 )
-		version = TLS_VERSION_TLS_1_2;
+	version = TLS_LEGACY_VERSION_MAX;
 	hello->version = htons ( version );
 	tls_nonce ( tls, &hello->random );
 	hello->session_id_len = session->id.len;
@@ -2549,6 +2552,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		return -EPROTO_VERSION;
 	}
 	tls->version = version;
+	tls->legacy_version = version;
+	if ( tls->legacy_version > TLS_LEGACY_VERSION_MAX )
+		tls->legacy_version = TLS_LEGACY_VERSION_MAX;
 	DBGC ( tls, "TLS %p using protocol version %d.%d\n",
 	       tls, ( version >> 8 ), ( version & 0xff ) );
 
@@ -3509,7 +3515,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 		/* Construct authentication header */
 		authhdr.seq = cpu_to_be64 ( cipherspec->seq++ );
 		authhdr.header.type = type;
-		authhdr.header.version = htons ( tls->version );
+		authhdr.header.version = htons ( tls->legacy_version );
 		authhdr.header.length = htons ( record_len );
 
 		/* Construct and set initialisation vector */
@@ -3547,7 +3553,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 		/* Add record header */
 		tlshdr = iob_put ( iobuf, sizeof ( *tlshdr ) );
 		tlshdr->type = type;
-		tlshdr->version = htons ( tls->version );
+		tlshdr->version = htons ( tls->legacy_version );
 		tlshdr->length = htons ( sizeof ( iv.rec ) + encrypt_len +
 					 cipher->authsize );
 
@@ -4311,6 +4317,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->client.key = privkey_get ( key ? key : &private_key );
 	tls->server.root = x509_root_get ( root ? root : &root_certificates );
 	tls->version = TLS_VERSION_MAX;
+	tls->legacy_version = TLS_LEGACY_VERSION_MAX;
 	tls->suite = &tls_cipher_suite_null;
 	tls->group = table_start ( TLS_NAMED_GROUPS );
 	channel_init ( &tls->channel, &tls_channel_ops );
