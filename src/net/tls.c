@@ -411,6 +411,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	/* Free dynamically-allocated resources */
 	zfree ( tls->new_ticket.data );
 	tls_clear_digest ( tls );
+	free ( tls->verify.dynamic );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec );
 	list_for_each_entry_safe ( iobuf, tmp, &tls->rx.data, list ) {
@@ -650,6 +651,38 @@ tls_find_cipher_suite ( unsigned int cipher_suite ) {
 }
 
 /**
+ * Set verification data length
+ *
+ * @v tls		TLS connection
+ * @v verify_len	Verification data length
+ * @ret rc		Return status code
+ */
+static int tls_set_verify_len ( struct tls_connection *tls,
+				size_t verify_len ) {
+	struct tls_verify_data *verify = &tls->verify;
+	size_t total;
+	void *dynamic;
+
+	/* Free any existing dynamically allocated storage */
+	free ( verify->dynamic );
+	memset ( verify, 0, sizeof ( *verify ) );
+
+	/* Allocate dynamic storage */
+	total = ( verify_len * 2 );
+	dynamic = zalloc ( total );
+	if ( ! dynamic )
+		return -ENOMEM;
+
+	/* Assign storage */
+	verify->dynamic = dynamic;
+	verify->client = dynamic;		dynamic += verify_len;
+	verify->server = dynamic;		dynamic += verify_len;
+	assert ( ( verify->dynamic + total ) == dynamic );
+
+	return 0;
+}
+
+/**
  * Select cipher suite
  *
  * @v tls		TLS connection
@@ -692,6 +725,10 @@ static int tls_select_cipher ( struct tls_connection *tls,
 	 * can be incorporated into the handshake transcript digest.
 	 */
 	if ( ( rc = tls_client_hello ( tls, tls_add_handshake ) ) != 0 )
+		return rc;
+
+	/* Set verification data length */
+	if ( ( rc = tls_set_verify_len ( tls, suite->verify_len ) ) != 0 )
 		return rc;
 
 	/* Set default named group */
@@ -1510,10 +1547,11 @@ static int tls_channel_verify ( struct secure_channel *channel,
 				const void *auth, size_t len ) {
 	struct tls_connection *tls =
 		container_of ( channel, struct tls_connection, channel );
+	struct tls_cipher_suite *suite = tls->suite;
 	int rc;
 
 	/* Sanity checks */
-	if ( len != sizeof ( tls->verify.server ) ) {
+	if ( ( len == 0 ) || ( len != suite->verify_len ) ) {
 		DBGC ( tls, "TLS %p invalid authenticator value:\n", tls );
 		DBGC_HDA ( tls, 0, auth, len );
 		return -EPERM_VERIFY;
@@ -1521,8 +1559,7 @@ static int tls_channel_verify ( struct secure_channel *channel,
 
 	/* Generate verification data */
 	if ( ( rc = tlskey_verify ( &tls->key, &tls_server,
-				    tls->verify.server,
-				    sizeof ( tls->verify.server ) ) ) != 0 ) {
+				    tls->verify.server, len ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not generate server verification: "
 		       "%s\n", tls, strerror ( rc ) );
 		return rc;
@@ -1784,7 +1821,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 	struct tls_session *session = tls->session;
 	size_t name_len = strlen ( session->name );
 	size_t reneg_len = ( tls->secure_renegotiation ?
-			     sizeof ( tls->verify.client ) : 0 );
+			     tls->suite->verify_len : 0 );
 	size_t pubsize = tls->group->exchange->pubsize;
 	unsigned int has_key_share_key = ( tls->group->code ? 1 : 0 );
 	unsigned int has_named_group = ( TLS_NUM_NAMED_GROUPS ? 1 : 0 );
@@ -2308,16 +2345,17 @@ static int tls_send_change_cipher ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_finished ( struct tls_connection *tls ) {
+	struct tls_cipher_suite *suite = tls->suite;
+	size_t verify_len = suite->verify_len;
 	struct {
 		uint32_t type_length;
-		uint8_t verify_data[ sizeof ( tls->verify.client ) ];
+		uint8_t verify_data[verify_len];
 	} __attribute__ (( packed )) finished;
 	int rc;
 
 	/* Construct client verification data */
-	if ( ( rc = tlskey_verify ( &tls->key, &tls_client,
-				    tls->verify.client,
-				    sizeof ( tls->verify.client ) ) ) != 0 ) {
+	if ( ( rc = tlskey_verify ( &tls->key, &tls_client, tls->verify.client,
+				    verify_len ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not generate client verification: "
 		       "%s\n", tls, strerror ( rc ) );
 		return rc;
@@ -2328,8 +2366,7 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 	finished.type_length = ( cpu_to_le32 ( TLS_FINISHED ) |
 				 htonl ( sizeof ( finished ) -
 					 sizeof ( finished.type_length ) ) );
-	memcpy ( finished.verify_data, tls->verify.client,
-		 sizeof ( finished.verify_data ) );
+	memcpy ( finished.verify_data, tls->verify.client, verify_len );
 
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, &finished,
@@ -2540,6 +2577,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	size_t session_id_len;
 	size_t exts_len;
 	size_t ext_len;
+	size_t verify_len;
 	size_t remaining;
 	int rc;
 
@@ -2673,6 +2711,31 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		return -EPERM_DOWNGRADE;
 	}
 
+	/* Handle secure renegotiation */
+	if ( tls->secure_renegotiation ) {
+
+		/* Secure renegotiation is expected; verify data */
+		verify_len = ( 2 * tls->suite->verify_len );
+		if ( ( reneg == NULL ) ||
+		     ( reneg->len != verify_len ) ||
+		     ( memcmp ( reneg->data, tls->verify.dynamic,
+				verify_len ) != 0 ) ) {
+			DBGC ( tls, "TLS %p server failed secure "
+			       "renegotiation\n", tls );
+			return -EPERM_RENEG_VERIFY;
+		}
+
+	} else if ( reneg != NULL ) {
+
+		/* Secure renegotiation is being enabled */
+		if ( reneg->len != 0 ) {
+			DBGC ( tls, "TLS %p server provided non-empty initial "
+			       "renegotiation\n", tls );
+			return -EPERM_RENEG_VERIFY;
+		}
+		tls->secure_renegotiation = 1;
+	}
+
 	/* Select cipher suite */
 	if ( ( rc = tls_select_cipher ( tls, hello_b->cipher_suite ) ) != 0 )
 		return rc;
@@ -2708,30 +2771,6 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 			DBGC ( tls, "TLS %p new session ID:\n", tls );
 			DBGC_HDA ( tls, 0, session_id, session_id_len );
 		}
-	}
-
-	/* Handle secure renegotiation */
-	if ( tls->secure_renegotiation ) {
-
-		/* Secure renegotiation is expected; verify data */
-		if ( ( reneg == NULL ) ||
-		     ( reneg->len != sizeof ( tls->verify ) ) ||
-		     ( memcmp ( reneg->data, &tls->verify,
-				sizeof ( tls->verify ) ) != 0 ) ) {
-			DBGC ( tls, "TLS %p server failed secure "
-			       "renegotiation\n", tls );
-			return -EPERM_RENEG_VERIFY;
-		}
-
-	} else if ( reneg != NULL ) {
-
-		/* Secure renegotiation is being enabled */
-		if ( reneg->len != 0 ) {
-			DBGC ( tls, "TLS %p server provided non-empty initial "
-			       "renegotiation\n", tls );
-			return -EPERM_RENEG_VERIFY;
-		}
-		tls->secure_renegotiation = 1;
 	}
 
 	/* Select named group, if applicable */

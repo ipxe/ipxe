@@ -36,6 +36,7 @@ struct tls_cipher_suite tls_aes_256_gcm_sha384 __tls_cipher_suite ( 32 ) = {
 	.fixed_iv_len = 12,
 	.record_iv_len = 0,
 	.mac_len = 0,
+	.verify_len = SHA384_DIGEST_SIZE,
 	.flags = TLS_CIPHER_FL_SEQUENTIAL_IV,
 	.exchange = &tls_null_exchange_algorithm,
 	.pubkey = &pubkey_null,

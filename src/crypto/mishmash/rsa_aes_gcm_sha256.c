@@ -38,6 +38,7 @@ tls_rsa_with_aes_128_gcm_sha256 __tls_cipher_suite ( 21 ) = {
 	.fixed_iv_len = 4,
 	.record_iv_len = 8,
 	.mac_len = 0,
+	.verify_len = 12,
 	.flags = TLS_CIPHER_FL_SEQUENTIAL_IV,
 	.exchange = &tls_pubkey_exchange_algorithm,
 	.pubkey = &rsa_algorithm,

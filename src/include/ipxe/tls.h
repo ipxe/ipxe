@@ -196,14 +196,6 @@ struct tls_auth_header {
 	struct tls_header header;
 } __attribute__ (( packed ));
 
-/** TLS verification data */
-struct tls_verify_data {
-	/** Client verification data */
-	uint8_t client[12];
-	/** Server verification data */
-	uint8_t server[12];
-} __attribute__ (( packed ));
-
 /** TLS RX state machine state */
 enum tls_rx_state {
 	TLS_RX_HEADER = 0,
@@ -283,6 +275,8 @@ struct tls_cipher_suite {
 	uint8_t record_iv_len;
 	/** MAC length */
 	uint8_t mac_len;
+	/** Verification data length */
+	uint8_t verify_len;
 	/** Flags */
 	uint8_t flags;
 };
@@ -413,6 +407,16 @@ struct tls_session {
 
 	/** List of connections */
 	struct list_head conn;
+};
+
+/** TLS verification data */
+struct tls_verify_data {
+	/** Dynamically allocated storage */
+	void *dynamic;
+	/** Client verification data */
+	void *client;
+	/** Server verification data */
+	void *server;
 };
 
 /** TLS transmit state */
