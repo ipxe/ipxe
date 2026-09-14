@@ -110,6 +110,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EINVAL_INNER						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x10,				\
 			  "Invalid inner plaintext" )
+#define EINVAL_SIGNATURE __einfo_error ( EINFO_EINVAL_SIGNATURE )
+#define EINFO_EINVAL_SIGNATURE						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x11,				\
+			  "Invalid signature" )
 #define EIO_ALERT __einfo_error ( EINFO_EIO_ALERT )
 #define EINFO_EIO_ALERT							\
 	__einfo_uniqify ( EINFO_EIO, 0x01,				\
@@ -1297,6 +1301,68 @@ static int tls_key_build ( struct tls_connection *tls,
 		/* Encrypt (and implicitly bind) shared secret */
 		if ( ( rc = tls_key_encrypt ( tls, group, builder ) ) != 0 )
 			return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Verify signature over parameters used to construct shared secret
+ *
+ * @v tls		TLS connection
+ * @v sig_hash		Signature hash algorithm
+ * @v sig		Signature
+ * @v sig_len		Length of signature
+ * @v params		Additional parameters
+ * @v params_len	Length of additional parameters
+ * @ret rc		Return status code
+ */
+static int tls_key_verify ( struct tls_connection *tls,
+			    struct tls_signature_hash_algorithm *sig_hash,
+			    const void *sig, size_t sig_len,
+			    const void *params, size_t params_len ) {
+	const struct asn1_cursor signature = { sig, sig_len };
+	struct pubkey_algorithm *pubkey = sig_hash->pubkey;
+	struct digest_algorithm *digest = sig_hash->digest;
+	struct x509_certificate *cert;
+	uint8_t tbshash[digest->digestsize];
+	int rc;
+
+	/* Identify server certificate */
+	if ( ! tls->server.chain ) {
+		DBGC ( tls, "TLS %p has no server certificate chain\n", tls );
+		return -ENOENT_CERT;
+	}
+	cert = x509_first ( tls->server.chain );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p has no server certificate\n", tls );
+		return -ENOENT_CERT;
+	}
+
+	/* Identify algorithms */
+	if ( sig_hash->algorithm &&
+	     ( sig_hash->algorithm != cert->subject.public_key.algorithm ) ) {
+		DBGC ( tls, "TLS %p cannot use %s public key\n",
+		       tls, cert->subject.public_key.algorithm->name );
+		return -EPERM_KEY_EXCHANGE;
+	}
+	DBGC ( tls, "TLS %p using signature hash %s-%s\n",
+	       tls, pubkey->name, digest->name );
+
+	/* Calculate digest */
+	if ( ( rc = tlskey_tbshash ( &tls->key, &tls_server, digest, params,
+				     params_len, tbshash ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not generate signable digest: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Verify signature and bind shared secret */
+	if ( ( rc = channel_bind_verify ( &tls->channel, cert, pubkey, digest,
+					  tbshash, &signature ) ) != 0 ) {
+		DBGC ( tls, "TLS %p failed signature verification: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
 	}
 
 	return 0;
@@ -2912,6 +2978,89 @@ static int tls_new_certificate ( struct tls_connection *tls,
 }
 
 /**
+ * Verify a signature record
+ *
+ * @v tls		TLS connection
+ * @v data		Signature record
+ * @v len		Length of signature record
+ * @v params		Additional parameters
+ * @v params_len	Length of additional parameters
+ * @ret rc		Return status code
+ */
+static int tls_verify_signature ( struct tls_connection *tls,
+				  const void *data, size_t len,
+				  const void *params, size_t params_len ) {
+	struct tls_cipher_suite *suite = tls->suite;
+	struct tls_signature_hash_algorithm *sig_hash;
+	struct tls_signature_hash_algorithm tmp;
+	int use_sig_hash = tls_version ( tls, TLS_VERSION_TLS_1_2 );
+	const struct {
+		uint16_t sig_hash[use_sig_hash];
+		uint16_t signature_len;
+		uint8_t signature[0];
+	} __attribute__ (( packed )) *sig;
+	size_t signature_len;
+	int rc;
+
+	/* Parse signature */
+	if ( sizeof ( *sig ) > len ) {
+		DBGC ( tls, "TLS %p received underlength signature\n", tls );
+		DBGC_HDA ( tls, 0, data, len );
+		return -EINVAL_SIGNATURE;
+	}
+	sig = data;
+	signature_len = ntohs ( sig->signature_len );
+	if ( signature_len > ( len - sizeof ( *sig ) ) ) {
+		DBGC ( tls, "TLS %p received overlength signature\n", tls );
+		DBGC_HDA ( tls, 0, data, len );
+		return -EINVAL_SIGNATURE;
+	}
+
+	/* Identify signature and hash algorithm */
+	if ( use_sig_hash ) {
+		sig_hash = tls_find_signature_hash ( sig->sig_hash[0] );
+		if ( ! sig_hash ) {
+			DBGC ( tls, "TLS %p unsupported signature hash "
+			       "%#04x\n", tls, sig->sig_hash[0] );
+			return -ENOTSUP_SIG_HASH;
+		}
+	} else {
+		sig_hash = &tmp;
+		memset ( sig_hash, 0, sizeof ( *sig_hash ) );
+		sig_hash->pubkey = suite->pubkey;
+		sig_hash->digest = &md5_sha1_algorithm;
+	}
+
+	/* Verify signature */
+	if ( ( rc = tls_key_verify ( tls, sig_hash, sig->signature,
+				     signature_len, params,
+				     params_len ) ) != 0 ) {
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
+ * Receive new Certificate Verify handshake record
+ *
+ * @v tls		TLS connection
+ * @v data		Plaintext handshake record
+ * @v len		Length of plaintext handshake record
+ * @ret rc		Return status code
+ */
+static int tls_new_certificate_verify ( struct tls_connection *tls,
+					const void *data, size_t len ) {
+	int rc;
+
+	/* Verify signature */
+	if ( ( rc = tls_verify_signature ( tls, data, len, NULL, 0 ) ) != 0 )
+		return rc;
+
+	return 0;
+}
+
+/**
  * Receive new Server Key Exchange handshake record
  *
  * @v tls		TLS connection
@@ -2923,76 +3072,14 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 					 const void *data, size_t len ) {
 	struct tls_cipher_suite *suite = tls->suite;
 	struct tls_key_exchange_parameters params;
-	struct tls_signature_hash_algorithm *sig_hash;
-	struct x509_certificate *cert;
-	struct pubkey_algorithm *pubkey;
-	struct digest_algorithm *digest;
-	int use_sig_hash = tls_version ( tls, TLS_VERSION_TLS_1_2 );
-	const struct {
-		uint16_t sig_hash[use_sig_hash];
-		uint16_t signature_len;
-		uint8_t signature[0];
-	} __attribute__ (( packed )) *sig;
-	struct asn1_cursor signature;
-	size_t remaining;
 	int rc;
-
-	/* Identify server certificate */
-	if ( ! tls->server.chain ) {
-		DBGC ( tls, "TLS %p has no server certificate chain\n", tls );
-		return -ENOENT_CERT;
-	}
-	cert = x509_first ( tls->server.chain );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p has no server certificate\n", tls );
-		return -ENOENT_CERT;
-	}
 
 	/* Parse parameters */
 	if ( ( rc = suite->exchange->parse ( tls, data, len, &params ) ) != 0)
 		return rc;
 	DBGC ( tls, "TLS %p using named group %s-%s\n",
 	       tls, suite->exchange->name, params.group->exchange->name );
-
-	/* Signature follows parameters */
 	assert ( params.len <= len );
-	sig = ( data + params.len );
-	remaining = ( len - params.len );
-
-	/* Parse signature from ServerKeyExchange */
-	if ( ( sizeof ( *sig ) > remaining ) ||
-	     ( ntohs ( sig->signature_len ) > ( remaining -
-						sizeof ( *sig ) ) ) ) {
-		DBGC ( tls, "TLS %p received underlength ServerKeyExchange\n",
-		       tls );
-		DBGC_HDA ( tls, 0, data, len );
-		return -EINVAL_KEY_EXCHANGE;
-	}
-	signature.data = sig->signature;
-	signature.len = ntohs ( sig->signature_len );
-
-	/* Identify signature and hash algorithm */
-	if ( use_sig_hash ) {
-		sig_hash = tls_find_signature_hash ( sig->sig_hash[0] );
-		if ( ! sig_hash ) {
-			DBGC ( tls, "TLS %p unsupported signature hash "
-			       "%#04x\n", tls, sig->sig_hash[0] );
-			return -ENOTSUP_SIG_HASH;
-		}
-		pubkey = sig_hash->pubkey;
-		digest = sig_hash->digest;
-		DBGC ( tls, "TLS %p using signature hash %s-%s\n",
-		       tls, pubkey->name, digest->name );
-		if ( sig_hash->algorithm !=
-		     cert->subject.public_key.algorithm ) {
-			DBGC ( tls, "TLS %p cannot use %s public key\n", tls,
-			       cert->subject.public_key.algorithm->name );
-			return -EPERM_KEY_EXCHANGE;
-		}
-	} else {
-		pubkey = suite->pubkey;
-		digest = &md5_sha1_algorithm;
-	}
 
 	/* Generate pre-master secret */
 	if ( ( rc = tls_key_agree ( tls, params.group, params.partner,
@@ -3000,29 +3087,11 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
 		return rc;
 	}
 
-	/* Verify signature */
-	{
-		uint8_t tbshash[digest->digestsize];
-
-		/* Calculate digest */
-		if ( ( rc = tlskey_tbshash ( &tls->key, &tls_server,
-					     digest, data, params.len,
-					     tbshash ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not generate "
-			       "ServerKeyExchange digest: %s\n",
-			       tls, strerror ( rc ) );
-			return rc;
-		}
-
-		/* Verify signature to bind pre-master secret */
-		if ( ( rc = channel_bind_verify ( &tls->channel, cert,
-						  pubkey, digest, tbshash,
-						  &signature ) ) != 0 ) {
-			DBGC ( tls, "TLS %p ServerKeyExchange failed "
-			       "verification: %s\n", tls, strerror ( rc ) );
-			DBGC_HDA ( tls, 0, data, len );
-			return rc;
-		}
+	/* Verify signature (immediately follows parameters) */
+	if ( ( rc = tls_verify_signature ( tls, ( data + params.len ),
+					   ( len - params.len ),
+					   data, params.len ) ) != 0 ) {
+		return rc;
 	}
 
 	/* Record named group */
@@ -3243,6 +3312,10 @@ static int tls_new_handshake ( struct tls_connection *tls,
 			break;
 		case TLS_CERTIFICATE:
 			rc = tls_new_certificate ( tls, payload, payload_len );
+			break;
+		case TLS_CERTIFICATE_VERIFY:
+			rc = tls_new_certificate_verify ( tls, payload,
+							  payload_len );
 			break;
 		case TLS_SERVER_KEY_EXCHANGE:
 			rc = tls_new_server_key_exchange ( tls, payload,
