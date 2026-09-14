@@ -234,6 +234,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 			      int ( * action ) ( struct tls_connection *tls,
 						 const void *data,
 						 size_t len ) );
+static int tls_validator_start ( struct tls_connection *tls );
 
 /******************************************************************************
  *
@@ -3254,21 +3255,10 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
 		DBGC_HD ( tls, data, len );
 		return -EINVAL_HELLO_DONE;
 	}
-	if ( is_pending ( &tls->server.validation ) ) {
-		DBGC ( tls, "TLS %p received duplicate Server Hello Done\n",
-		       tls );
-		return -EINVAL_HELLO_DONE;
-	}
 
-	/* Begin certificate validation */
-	if ( ( rc = create_validator ( &tls->server.validator,
-				       tls->server.chain,
-				       tls->server.root ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not start certificate validation: "
-		       "%s\n", tls, strerror ( rc ) );
+	/* End of certificate-based handshake: start validation */
+	if ( ( rc = tls_validator_start ( tls ) ) != 0 )
 		return rc;
-	}
-	pending_get ( &tls->server.validation );
 
 	return 0;
 }
@@ -3295,19 +3285,38 @@ static int tls_new_finished ( struct tls_connection *tls,
 	/* Mark server as finished */
 	pending_put ( &tls->server.negotiation );
 
-	/* If client has finished, then establish the secure channel */
-	if ( ( ! is_pending ( &tls->client.negotiation ) ) &&
-	     ( ( rc = tls_establish ( tls ) ) != 0 ) ) {
-		return rc;
+	/* Handle key schedule */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+
+		/* Generate master secret */
+		if ( ( rc = tlskey_master ( &tls->key, 1 ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not generate master secret: "
+			       "%s\n", tls, strerror ( rc ) );
+			return rc;
+		}
+
+		/* Schedule change to application traffic keys */
+		tls->rx.cipherspec.pending = &tls_application;
 	}
 
-	/* If we are resuming a session (i.e. if the server Finished
-	 * arrives before the client Finished is sent), then schedule
-	 * transmission of Change Cipher and Finished.
-	 */
-	if ( is_pending ( &tls->client.negotiation ) ) {
+	/* Handle state transitions */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) && tls->server.chain ) {
+
+		/* End of certificate-based handshake: start validation */
+		if ( ( rc = tls_validator_start ( tls ) ) != 0 )
+			return rc;
+
+	} else if ( is_pending ( &tls->client.negotiation ) ) {
+
+		/* Resuming session: trigger sending Finished */
 		tls->tx.pending |= ( TLS_TX_CHANGE_CIPHER | TLS_TX_FINISHED );
 		tls_tx_resume ( tls );
+
+	} else {
+
+		/* Client has already finished: establish session */
+		if ( ( rc = tls_establish ( tls ) ) != 0 )
+			return rc;
 	}
 
 	return 0;
@@ -4491,6 +4500,34 @@ static struct interface_descriptor tls_cipherstream_desc =
  *
  ******************************************************************************
  */
+
+/**
+ * Start certificate validation
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_validator_start ( struct tls_connection *tls ) {
+	int rc;
+
+	/* Sanity check */
+	if ( is_pending ( &tls->server.validation ) ) {
+		DBGC ( tls, "TLS %p refusing to restart validation\n", tls );
+		return -EINVAL_HELLO_DONE;
+	}
+
+	/* Begin certificate validation */
+	if ( ( rc = create_validator ( &tls->server.validator,
+				       tls->server.chain,
+				       tls->server.root ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not start certificate validation: "
+		       "%s\n", tls, strerror ( rc ) );
+		return rc;
+	}
+	pending_get ( &tls->server.validation );
+
+	return 0;
+}
 
 /**
  * Handle certificate validation completion
