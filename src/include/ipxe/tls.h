@@ -328,6 +328,8 @@ struct tls_cipherspec {
 	const struct tls_endpoint *writer;
 	/** Secure pipe */
 	struct secure_pipe *pipe;
+	/** Pending traffic phase change */
+	const struct tls_phase *pending;
 	/** Sequence number */
 	uint64_t seq;
 

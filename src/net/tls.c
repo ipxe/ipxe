@@ -210,6 +210,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EPROTO_VERSION						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x01,				\
 			  "Illegal protocol version upgrade" )
+#define EPROTO_CIPHER_CHANGE __einfo_error ( EINFO_EPROTO_CIPHER_CHANGE )
+#define EINFO_EPROTO_CIPHER_CHANGE					\
+	__einfo_uniqify ( EINFO_EPROTO, 0x02,				\
+			  "Illegal cipher change mid-record" )
 
 /** List of TLS session */
 static LIST_HEAD ( tls_sessions );
@@ -858,6 +862,33 @@ static int tls_change_cipher ( struct tls_connection *tls,
  err_alloc:
  err_null:
 	return rc;
+}
+
+/**
+ * Apply pending traffic phase change (if any)
+ *
+ * @v tls		TLS connection
+ * @v cipherspec	TLS cipher specification
+ * @ret rc		Return status code
+ */
+static int tls_pending_cipher ( struct tls_connection *tls,
+				struct tls_cipherspec *cipherspec ) {
+	const struct tls_phase *pending;
+	int rc;
+
+	/* Do nothing if no change is pending */
+	pending = cipherspec->pending;
+	if ( ! pending )
+		return 0;
+
+	/* Change cipher */
+	if ( ( rc = tls_change_cipher ( tls, cipherspec, pending ) ) != 0 )
+		return rc;
+
+	/* Clear pending change */
+	cipherspec->pending = NULL;
+
+	return 0;
 }
 
 /******************************************************************************
@@ -2421,7 +2452,6 @@ static int tls_new_change_cipher ( struct tls_connection *tls,
 		uint8_t spec;
 	} __attribute__ (( packed )) *change_cipher = iobuf->data;
 	size_t len = iob_len ( iobuf );
-	int rc;
 
 	/* Sanity check */
 	if ( ( sizeof ( *change_cipher ) != len ) ||
@@ -2432,12 +2462,9 @@ static int tls_new_change_cipher ( struct tls_connection *tls,
 	}
 	iob_pull ( iobuf, sizeof ( *change_cipher ) );
 
-	/* Change receive cipher spec, if applicable */
-	if ( ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) &&
-	     ( ( rc = tls_change_cipher ( tls, &tls->rx.cipherspec,
-					  &tls_application ) ) != 0 ) ) {
-		return rc;
-	}
+	/* Schedule change to application traffic keys, if applicable */
+	if ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) )
+		tls->rx.cipherspec.pending = &tls_application;
 
 	return 0;
 }
@@ -3323,6 +3350,12 @@ static int tls_new_handshake ( struct tls_connection *tls,
 		size_t payload_len;
 		size_t record_len;
 
+		/* Fail if receive cipher has changed mid-record */
+		if ( tls->rx.cipherspec.pending ) {
+			DBGC ( tls, "TLS %p cipher change mid-record\n", tls );
+			return -EPROTO_CIPHER_CHANGE;
+		}
+
 		/* Parse header */
 		if ( sizeof ( *handshake ) > remaining ) {
 			/* Leave remaining fragment unconsumed */
@@ -4135,6 +4168,12 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 
 	/* Process plaintext record */
 	if ( ( rc = tls_new_record ( tls, type, rx_data ) ) != 0 )
+		return rc;
+
+	/* Handle any pending traffic phase changes */
+	if ( ( rc = tls_pending_cipher ( tls, &tls->tx.cipherspec ) ) != 0 )
+		return rc;
+	if ( ( rc = tls_pending_cipher ( tls, &tls->rx.cipherspec ) ) != 0 )
 		return rc;
 
 	return 0;
