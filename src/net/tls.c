@@ -774,6 +774,32 @@ static void tls_clear_cipher ( struct tls_connection *tls __unused,
 }
 
 /**
+ * Prepare cipher specification for a new traffic phase
+ *
+ * @v tls		TLS connection
+ * @v cipherspec	TLS cipher specification
+ * @v phase		Traffic phase
+ * @ret rc		Return status code
+ */
+static int tls_prep_cipher ( struct tls_connection *tls,
+			     struct tls_cipherspec *cipherspec,
+			     const struct tls_phase *phase ) {
+	const struct tls_endpoint *writer = cipherspec->writer;
+	struct secure_pipe *pipe = cipherspec->pipe;
+	int rc;
+
+	/* Generate traffic secret */
+	if ( ( rc = tlskey_traffic ( &tls->key, writer, phase ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not generate %s %s traffic secret: "
+		       "%s\n", tls, tls_pipe_name ( tls, pipe ),
+		       writer->name, strerror ( rc ) );
+		return rc;
+	}
+
+	return 0;
+}
+
+/**
  * Change cipher specification
  *
  * @v tls		TLS connection
@@ -822,13 +848,10 @@ static int tls_change_cipher ( struct tls_connection *tls,
 	/* Record cipher suite */
 	cipherspec->suite = suite;
 
-	/* Generate traffic secret, if applicable */
+	/* Prepare for new traffic phase, if applicable */
 	if ( phase &&
-	     ( ( rc = tlskey_traffic ( &tls->key, writer, phase ) ) != 0 ) ) {
-		DBGC ( tls, "TLS %p could not generate %s %s traffic secret: "
-		       "%s\n", tls, tls_pipe_name ( tls, pipe ),
-		       writer->name, strerror ( rc ) );
-		goto err_traffic;
+	     ( ( rc = tls_prep_cipher ( tls, cipherspec, phase ) ) != 0 ) ) {
+		goto err_prep;
 	}
 
 	/* Generate cipher key material */
@@ -858,7 +881,7 @@ static int tls_change_cipher ( struct tls_connection *tls,
 
  err_channel:
  err_cipher:
- err_traffic:
+ err_prep:
 	tls_clear_cipher ( tls, cipherspec );
  err_alloc:
  err_null:
@@ -2377,6 +2400,7 @@ static int tls_send_change_cipher ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_finished ( struct tls_connection *tls ) {
+	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec;
 	struct tls_cipher_suite *suite = tls->suite;
 	size_t verify_len = suite->verify_len;
 	struct {
@@ -2400,10 +2424,29 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 					 sizeof ( finished.type_length ) ) );
 	memcpy ( finished.verify_data, tls->verify.client, verify_len );
 
+	/* TLS version 1.3 has an awkward design quirk in which the
+	 * application traffic secret must be generated using the
+	 * digest state prior to sending the client Finished, but the
+	 * corresponding application traffic keys must not be
+	 * activated until after sending the record.
+	 */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
+	     ( ( rc = tls_prep_cipher ( tls, cipherspec,
+					&tls_application ) ) != 0 ) ) {
+		return rc;
+	}
+
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, &finished,
-					 sizeof ( finished ) ) ) != 0 )
+					 sizeof ( finished ) ) ) != 0 ) {
 		return rc;
+	}
+
+	/* Change the (already prepared) cipher specification */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
+	     ( ( rc = tls_change_cipher ( tls, cipherspec, NULL ) ) != 0 ) ) {
+		return rc;
+	}
 
 	/* Mark client as finished */
 	pending_put ( &tls->client.negotiation );
