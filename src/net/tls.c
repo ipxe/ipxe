@@ -2817,6 +2817,12 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		return rc;
 	}
 
+	/* Schedule change to handshake traffic keys, if applicable */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+		tls->tx.cipherspec.pending = &tls_handshake;
+		tls->rx.cipherspec.pending = &tls_handshake;
+	}
+
 	return 0;
 }
 
