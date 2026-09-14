@@ -106,6 +106,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EINVAL_KEY_EXCHANGE					\
 	__einfo_uniqify ( EINFO_EINVAL, 0x0f,				\
 			  "Invalid Server Key Exchange record" )
+#define EINVAL_INNER __einfo_error ( EINFO_EINVAL_INNER )
+#define EINFO_EINVAL_INNER						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x10,				\
+			  "Invalid inner plaintext" )
 #define EIO_ALERT __einfo_error ( EINFO_EIO_ALERT )
 #define EINFO_EIO_ALERT							\
 	__einfo_uniqify ( EINFO_EIO, 0x01,				\
@@ -319,6 +323,20 @@ tls_version ( struct tls_connection *tls, unsigned int version ) {
 	return ( ( TLS_VERSION_MAX >= version ) &&
 		 ( ( TLS_VERSION_MIN >= version ) ||
 		   ( tls->version >= version ) ) );
+}
+
+/**
+ * Check if TLS inner plaintext is in use
+ *
+ * @v tls		TLS connection
+ * @v cipher		Active cipher algorithm
+ * @ret has_inner	Inner plaintext is in use
+ */
+static inline __attribute__ (( always_inline )) int
+tls_has_inner ( struct tls_connection *tls, struct cipher_algorithm *cipher ) {
+
+	return ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
+		 ( cipher != &cipher_null ) );
 }
 
 /**
@@ -3437,14 +3455,17 @@ static size_t tls_iob_reserved ( struct tls_connection *tls, size_t len ) {
 	struct secure_pipe *pipe = &tls->channel.tx;
 	struct cipher_algorithm *cipher = pipe->cipher;
 	struct tls_header *tlshdr;
+	uint8_t *inner_type;
 	unsigned int count;
 	size_t each;
 
 	/* Calculate number of records (allowing for zero-length records) */
-	count = ( len ? ( ( len + TLS_TX_BUFSIZE - 1 ) / TLS_TX_BUFSIZE ) : 1 );
+	count = ( len ?
+		  ( ( len + TLS_TX_BUFSIZE - 1 ) / TLS_TX_BUFSIZE ) : 1 );
 
 	/* Calculate maximum additional length per record */
-	each = ( sizeof ( *tlshdr ) + suite->record_iv_len + suite->mac_len +
+	each = ( sizeof ( *tlshdr ) + suite->record_iv_len +
+		 sizeof ( *inner_type ) + suite->mac_len +
 		 ( is_block_cipher ( cipher ) ? cipher->blocksize : 0 ) +
 		 cipher->authsize );
 
@@ -3503,6 +3524,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 	const void *plaintext;
 	const void *encrypt;
 	void *ciphertext;
+	uint8_t inner_type;
 	size_t record_len;
 	size_t encrypt_len;
 	size_t pad_len;
@@ -3523,6 +3545,14 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 	/* Start constructing ciphertext at start of reserved space */
 	iob_push ( iobuf, tls_iob_reserved ( tls, len ) );
 	iob_unput ( iobuf, iob_len ( iobuf ) );
+
+	/* Determine inner type, if any */
+	if ( tls_has_inner ( tls, cipher ) ) {
+		inner_type = type;
+		type = TLS_TYPE_DATA;
+	} else {
+		inner_type = 0;
+	}
 
 	/* Construct records */
 	do {
@@ -3557,24 +3587,11 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 			goto err_setiv;
 		}
 
-		/* Process authentication data */
-		if ( suite->mac_len ) {
-			tls_hmac ( cipherspec, &authhdr, plaintext,
-				   record_len, mac );
-		}
-		if ( is_auth_cipher ( cipher ) ) {
-			if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
-				cipher_encrypt ( cipher, pipe->ctx,
-						 &authhdr.header, NULL,
-						 sizeof ( authhdr.header ) );
-			} else {
-				cipher_encrypt ( cipher, pipe->ctx, &authhdr,
-						 NULL, sizeof ( authhdr ) );
-			}
-		}
-
 		/* Calculate encryption length */
-		encrypt_len = ( record_len + suite->mac_len );
+		encrypt_len = record_len;
+		if ( inner_type )
+			encrypt_len += sizeof ( inner_type );
+		encrypt_len += suite->mac_len;
 		if ( is_block_cipher ( cipher ) ) {
 			pad_len = ( ( ( cipher->blocksize - 1 ) &
 				      -( encrypt_len + 1 ) ) + 1 );
@@ -3590,6 +3607,23 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 		tlshdr->length = htons ( sizeof ( iv.record ) + encrypt_len +
 					 cipher->authsize );
 
+		/* Process authentication data */
+		if ( suite->mac_len ) {
+			tls_hmac ( cipherspec, &authhdr, plaintext,
+				   record_len, mac );
+		}
+		if ( is_auth_cipher ( cipher ) ) {
+			if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+				authhdr.header.length = tlshdr->length;
+				cipher_encrypt ( cipher, pipe->ctx,
+						 &authhdr.header, NULL,
+						 sizeof ( authhdr.header ) );
+			} else {
+				cipher_encrypt ( cipher, pipe->ctx, &authhdr,
+						 NULL, sizeof ( authhdr ) );
+			}
+		}
+
 		/* Add record initialisation vector, if applicable */
 		memcpy ( iob_put ( iobuf, sizeof ( iv.record ) ), iv.record,
 			 sizeof ( iv.record ) );
@@ -3604,12 +3638,19 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 			encrypt = plaintext;
 		}
 
+		/* Add inner type, if applicable */
+		if ( inner_type ) {
+			memcpy ( iob_put ( iobuf, sizeof ( inner_type ) ),
+				 &inner_type, sizeof ( inner_type ) );
+		}
+
 		/* Add MAC, if applicable */
 		memcpy ( iob_put ( iobuf, suite->mac_len ), mac,
 			 suite->mac_len );
 
 		/* Add padding, if applicable */
-		memset ( iob_put ( iobuf, pad_len ), ( pad_len - 1 ), pad_len );
+		memset ( iob_put ( iobuf, pad_len ), ( pad_len - 1 ),
+			 pad_len );
 
 		/* Encrypt data and append authentication tag */
 		DBGC2 ( tls, "Sending plaintext data:\n" );
@@ -3705,6 +3746,47 @@ static int tls_verify_padding ( struct tls_connection *tls,
 }
 
 /**
+ * Extract inner plaintext
+ *
+ * @v tls		TLS connection
+ * @v type		Record type
+ * @v rx_data		List of received data buffers
+ * @ret type		Inner plaintext record type, or negative error
+ */
+static int tls_extract_inner ( struct tls_connection *tls, int type,
+			       struct list_head *rx_data ) {
+	struct io_buffer *iobuf;
+	const uint8_t *data;
+	size_t len;
+
+	/* Check outer record type */
+	if ( type != TLS_TYPE_DATA ) {
+		DBGC ( tls, "TLS %p invalid outer type %d\n", tls, type );
+		return -EINVAL_INNER;
+	}
+
+	/* Strip trailing zero padding and obtain inner type */
+	type = 0;
+	list_for_each_entry_reverse ( iobuf, rx_data, list ) {
+		len = iob_len ( iobuf );
+		data = iobuf->data;
+		while ( len && ( ! type ) )
+			type = data[--len];
+		iob_unput ( iobuf, ( iob_len ( iobuf ) - len ) );
+		if ( type )
+			break;
+	}
+
+	/* Fail if no inner type was detected */
+	if ( ! type ) {
+		DBGC ( tls, "TLS %p missing inner type\n", tls );
+		return -EINVAL_INNER;
+	}
+
+	return type;
+}
+
+/**
  * Receive new ciphertext record
  *
  * @v tls		TLS connection
@@ -3720,7 +3802,7 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	struct digest_algorithm *digest = suite->digest;
 	struct secure_pipe *pipe = &tls->channel.rx;
 	struct cipher_algorithm *cipher = pipe->cipher;
-	unsigned int type = tlshdr->type;
+	int type = tlshdr->type;
 	size_t len = ntohs ( tlshdr->length );
 	struct {
 		uint8_t fixed[suite->fixed_iv_len];
@@ -3763,10 +3845,11 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	first = list_first_entry ( rx_data, struct io_buffer, list );
 	last = list_last_entry ( rx_data, struct io_buffer, list );
 
-	/* Construct authentication data (excluding length) */
+	/* Construct authentication data */
 	authhdr.seq = cpu_to_be64 ( cipherspec->seq++ );
 	authhdr.header.type = tlshdr->type;
 	authhdr.header.version = tlshdr->version;
+	authhdr.header.length = htons ( len );
 
 	/* Extract initialisation vector */
 	if ( iob_len ( first ) < sizeof ( iv.record ) ) {
@@ -3806,12 +3889,12 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	}
 
 	/* Process authentication data, if applicable */
-	authhdr.header.length = htons ( len );
 	if ( is_auth_cipher ( cipher ) ) {
 		if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
 			cipher_decrypt ( cipher, pipe->ctx, &authhdr.header,
 					 NULL, sizeof ( authhdr.header ) );
 		} else {
+			authhdr.header.length = htons ( len );
 			cipher_decrypt ( cipher, pipe->ctx, &authhdr,
 					 NULL, sizeof ( authhdr ) );
 		}
@@ -3875,6 +3958,13 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 		DBGC ( tls, "TLS %p failed authentication tag verification\n",
 		       tls );
 		return -EINVAL_MAC;
+	}
+
+	/* Extract inner plaintext, if applicable */
+	if ( ( tls_has_inner ( tls, cipher ) ) &&
+	     ( ( type = tls_extract_inner ( tls, type, rx_data ) ) < 0 ) ) {
+		rc = type;
+		return rc;
 	}
 
 	/* Process plaintext record */
