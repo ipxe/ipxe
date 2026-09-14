@@ -2768,8 +2768,13 @@ static int tls_parse_chain ( struct tls_connection *tls,
 		const struct {
 			tls24_t length;
 			uint8_t data[0];
-		} __attribute__ (( packed )) *certificate = data;
+		} __attribute__ (( packed )) *certificate;
+		const struct {
+			uint16_t length;
+			uint8_t data[0];
+		} __attribute__ (( packed )) *extension;
 		size_t certificate_len;
+		size_t extension_len;
 		size_t record_len;
 
 		/* Parse header */
@@ -2777,14 +2782,16 @@ static int tls_parse_chain ( struct tls_connection *tls,
 			DBGC ( tls, "TLS %p underlength certificate:\n", tls );
 			DBGC_HDA ( tls, 0, data, remaining );
 			rc = -EINVAL_CERTIFICATE;
-			goto err_underlength;
+			goto err_invalid;
 		}
+		certificate = data;
 		certificate_len = tls_uint24 ( &certificate->length );
-		if ( certificate_len > ( remaining - sizeof ( *certificate ) )){
+		if ( certificate_len >
+		     ( remaining - sizeof ( *certificate ) ) ) {
 			DBGC ( tls, "TLS %p overlength certificate:\n", tls );
 			DBGC_HDA ( tls, 0, data, remaining );
 			rc = -EINVAL_CERTIFICATE;
-			goto err_overlength;
+			goto err_invalid;
 		}
 		record_len = ( sizeof ( *certificate ) + certificate_len );
 
@@ -2792,25 +2799,48 @@ static int tls_parse_chain ( struct tls_connection *tls,
 		if ( ( rc = x509_append_raw ( tls->server.chain,
 					      certificate->data,
 					      certificate_len ) ) != 0 ) {
-			DBGC ( tls, "TLS %p could not append certificate: %s\n",
-			       tls, strerror ( rc ) );
+			DBGC ( tls, "TLS %p could not append certificate: "
+			       "%s\n", tls, strerror ( rc ) );
 			DBGC_HDA ( tls, 0, data, remaining );
-			goto err_parse;
+			goto err_invalid;
 		}
 		cert = x509_last ( tls->server.chain );
 		DBGC ( tls, "TLS %p found certificate %s\n",
 		       tls, x509_name ( cert ) );
 
-		/* Move to next certificate in list */
+		/* Move to next entry in list */
+		data += record_len;
+		remaining -= record_len;
+
+		/* Skip extensions, if not applicable */
+		if ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) )
+			continue;
+
+		/* Parse header */
+		if ( sizeof ( *extension ) > remaining ) {
+			DBGC ( tls, "TLS %p underlength extension:\n", tls );
+			DBGC_HDA ( tls, 0, data, remaining );
+			rc = -EINVAL_CERTIFICATE;
+			goto err_invalid;
+		}
+		extension = data;
+		extension_len = ntohs ( extension->length );
+		if ( extension_len > ( remaining - sizeof ( *extension ) ) ) {
+			DBGC ( tls, "TLS %p overlength extension:\n", tls );
+			DBGC_HDA ( tls, 0, data, remaining );
+			rc = -EINVAL_CERTIFICATE;
+			goto err_invalid;
+		}
+		record_len = ( sizeof ( *extension ) + extension_len );
+
+		/* Move to next entry in list */
 		data += record_len;
 		remaining -= record_len;
 	}
 
 	return 0;
 
- err_parse:
- err_overlength:
- err_underlength:
+ err_invalid:
 	x509_chain_put ( tls->server.chain );
 	tls->server.chain = NULL;
  err_alloc_chain:
@@ -2828,24 +2858,48 @@ static int tls_parse_chain ( struct tls_connection *tls,
 static int tls_new_certificate ( struct tls_connection *tls,
 				 const void *data, size_t len ) {
 	const struct {
+		uint8_t length;
+		uint8_t data[0];
+	} __attribute__ (( packed )) *context;
+	const struct {
 		tls24_t length;
 		uint8_t certificates[0];
-	} __attribute__ (( packed )) *certificate = data;
+	} __attribute__ (( packed )) *certificate;
+	size_t context_len;
 	size_t certificates_len;
 	int rc;
 
-	/* Parse header */
+	/* Strip context, if present */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+		if ( sizeof ( *context ) > len ) {
+			DBGC ( tls, "TLS %p received underlength "
+			       "Certificate context\n", tls );
+			DBGC_HDA ( tls, 0, data, len );
+			return -EINVAL_CERTIFICATES;
+		}
+		context = data;
+		context_len = context->length;
+		if ( context_len > ( len - sizeof ( *context ) ) ) {
+			DBGC ( tls, "TLS %p received overlength "
+			       "Certificate context\n", tls );
+			DBGC_HDA ( tls, 0, data, len );
+			return -EINVAL_CERTIFICATES;
+		}
+		data += ( sizeof ( *context ) + context_len );
+		len -= ( sizeof ( *context ) + context_len );
+	}
+
+	/* Parse certificates */
 	if ( sizeof ( *certificate ) > len ) {
-		DBGC ( tls, "TLS %p received underlength Server Certificate\n",
-		       tls );
-		DBGC_HD ( tls, data, len );
+		DBGC ( tls, "TLS %p received underlength Certificate\n", tls );
+		DBGC_HDA ( tls, 0, data, len );
 		return -EINVAL_CERTIFICATES;
 	}
+	certificate = data;
 	certificates_len = tls_uint24 ( &certificate->length );
 	if ( certificates_len > ( len - sizeof ( *certificate ) ) ) {
-		DBGC ( tls, "TLS %p received overlength Server Certificate\n",
-		       tls );
-		DBGC_HD ( tls, data, len );
+		DBGC ( tls, "TLS %p received overlength Certificate\n", tls );
+		DBGC_HDA ( tls, 0, data, len );
 		return -EINVAL_CERTIFICATES;
 	}
 
