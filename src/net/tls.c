@@ -2844,6 +2844,13 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
 	} __attribute__ (( packed )) *new_session_ticket = data;
 	size_t ticket_len;
 
+	/* Ignore as-yet unsupported session tickets */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+		DBGC ( tls, "TLS %p ignoring unsupported New Session Ticket\n",
+		       tls );
+		return 0;
+	}
+
 	/* Parse header */
 	if ( sizeof ( *new_session_ticket ) > len ) {
 		DBGC ( tls, "TLS %p received underlength New Session Ticket\n",
