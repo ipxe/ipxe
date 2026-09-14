@@ -3316,7 +3316,9 @@ static int tls_new_finished ( struct tls_connection *tls,
 	} else if ( is_pending ( &tls->client.negotiation ) ) {
 
 		/* Resuming session: trigger sending Finished */
-		tls->tx.pending |= ( TLS_TX_CHANGE_CIPHER | TLS_TX_FINISHED );
+		if ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) )
+			tls->tx.pending |= TLS_TX_CHANGE_CIPHER;
+		tls->tx.pending |= TLS_TX_FINISHED;
 		tls_tx_resume ( tls );
 
 	} else {
@@ -4559,14 +4561,16 @@ static void tls_validator_done ( struct tls_connection *tls, int rc ) {
 	DBGC ( tls, "TLS %p certificate validation succeeded\n", tls );
 
 	/* Schedule transmission of applicable handshake messages */
-	tls->tx.pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
-			     TLS_TX_CHANGE_CIPHER |
-			     TLS_TX_FINISHED );
 	if ( tls->client.chain ) {
 		tls->tx.pending |= TLS_TX_CERTIFICATE;
 		if ( ! list_empty ( &tls->client.chain->links ) )
 			tls->tx.pending |= TLS_TX_CERTIFICATE_VERIFY;
 	}
+	if ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+		tls->tx.pending |= ( TLS_TX_CLIENT_KEY_EXCHANGE |
+				     TLS_TX_CHANGE_CIPHER );
+	}
+	tls->tx.pending |= TLS_TX_FINISHED;
 	tls_tx_resume ( tls );
 
 	return;
