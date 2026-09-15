@@ -30,7 +30,7 @@
  *
  */
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.text
 
 /**

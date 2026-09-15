@@ -29,7 +29,7 @@
  *
  */
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.text
 
 /* Selectively assemble code for 32-bit/64-bit builds */
