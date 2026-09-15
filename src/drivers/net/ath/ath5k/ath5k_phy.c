@@ -151,7 +151,7 @@ static unsigned int ath5k_hw_rfb_op(struct ath5k_hw *ah,
  * http://madwifi-project.org/ticket/1659
  * with various measurements and diagrams
  *
- * TODO: Deal with power drops due to probes by setting an apropriate
+ * TODO: Deal with power drops due to probes by setting an appropriate
  * tx power on the probe packets ! Make this part of the calibration process.
  */
 
@@ -179,12 +179,12 @@ int ath5k_hw_rfgain_opt_init(struct ath5k_hw *ah)
 	return 0;
 }
 
-/* Schedule a gain probe check on the next transmited packet.
+/* Schedule a gain probe check on the next transmitted packet.
  * That means our next packet is going to be sent with lower
  * tx power and a Peak to Average Power Detector (PAPD) will try
  * to measure the gain.
  *
- * TODO: Use propper tx power setting for the probe packet so
+ * TODO: Use proper tx power setting for the probe packet so
  * that we don't observe a serious power drop on the receiver
  *
  * XXX:  How about forcing a tx packet (bypassing PCU arbitrator etc)
@@ -1574,7 +1574,7 @@ ath5k_create_power_curve(s16 pmin, s16 pmax,
 /*
  * Get the surrounding per-channel power calibration piers
  * for a given frequency so that we can interpolate between
- * them and come up with an apropriate dataset for our current
+ * them and come up with an appropriate dataset for our current
  * channel.
  */
 static void

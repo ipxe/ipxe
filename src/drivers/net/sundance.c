@@ -262,13 +262,13 @@ static struct sundance_private {
 	unsigned int cur_rx;	/* Producer/consumer ring indices */
 	unsigned int mtu;
 
-	/* These values keep track of the tranceiver/media in use */
+	/* These values keep track of the transceiver/media in use */
 	unsigned int flowctrl:1;
 	unsigned int an_enable:1;
 
 	unsigned int speed;
 
-	/* MII tranceiver section */
+	/* MII transceiver section */
 	struct mii_if_info mii_if;
 	int mii_preamble_required;
 	unsigned char phys[MII_CNT];

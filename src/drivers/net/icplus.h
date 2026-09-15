@@ -149,7 +149,7 @@ struct icplus_descriptor {
 /** Sole transmit fragment */
 #define ICP_TX_SOLE_FRAG 0x01
 
-/** Recieve frame overrun error */
+/** Receive frame overrun error */
 #define ICP_RX_ERR_OVERRUN 0x01
 
 /** Receive runt frame error */
@@ -164,7 +164,7 @@ struct icplus_descriptor {
 /** Receive oversized frame error */
 #define ICP_RX_ERR_OVERSIZED 0x10
 
-/** Recieve length error */
+/** Receive length error */
 #define ICP_RX_ERR_LEN 0x20
 
 /** Descriptor ring */
