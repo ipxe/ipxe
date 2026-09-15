@@ -158,7 +158,9 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 	size_t pixel_len;
 	size_t skip_len;
 	unsigned int row;
+	unsigned int sub;
 	unsigned int column;
+	unsigned int rep;
 	uint8_t bitmask;
 	int transparent;
 	const void *src;
@@ -176,36 +178,47 @@ static void fbcon_draw ( struct fbcon *fbcon, struct fbcon_text_cell *cell,
 	/* Check for transparent background colour */
 	transparent = ( cell->background == FBCON_TRANSPARENT );
 
-	/* Draw character rows */
+	/* Draw character rows (each font pixel as scale x scale) */
 	for ( row = 0 ; row < fbcon->font->height ; row++ ) {
+		for ( sub = 0 ; sub < fbcon->scale ; sub++ ) {
 
-		/* Draw background picture, if applicable */
-		if ( transparent ) {
-			if ( fbcon->picture.start ) {
-				memcpy ( ( fbcon->start + offset ),
-					 ( fbcon->picture.start + offset ),
-					 fbcon->character.len );
-			} else {
-				memset ( ( fbcon->start + offset ), 0,
-					 fbcon->character.len );
+			/* Draw background picture, if applicable */
+			if ( transparent ) {
+				if ( fbcon->picture.start ) {
+					memcpy ( ( fbcon->start + offset ),
+						 ( fbcon->picture.start +
+						   offset ),
+						 fbcon->character.len );
+				} else {
+					memset ( ( fbcon->start + offset ), 0,
+						 fbcon->character.len );
+				}
 			}
-		}
 
-		/* Draw character row */
-		for ( column = FBCON_CHAR_WIDTH, bitmask = glyph[row] ;
-		      column ; column--, bitmask <<= 1, offset += pixel_len ) {
-			if ( bitmask & 0x80 ) {
-				src = &cell->foreground;
-			} else if ( ! transparent ) {
-				src = &cell->background;
-			} else {
-				continue;
+			/* Draw character row */
+			for ( column = FBCON_CHAR_WIDTH,
+			      bitmask = glyph[row] ;
+			      column ; column--, bitmask <<= 1 ) {
+				if ( bitmask & 0x80 ) {
+					src = &cell->foreground;
+				} else if ( ! transparent ) {
+					src = &cell->background;
+				} else {
+					src = NULL;
+				}
+				for ( rep = fbcon->scale ; rep ;
+				      rep--, offset += pixel_len ) {
+					if ( src ) {
+						memcpy ( ( fbcon->start +
+							   offset ),
+							 src, pixel_len );
+					}
+				}
 			}
-			memcpy ( ( fbcon->start + offset ), src, pixel_len );
-		}
 
-		/* Move to next row */
-		offset += skip_len;
+			/* Move to next row */
+			offset += skip_len;
+		}
 	}
 }
 
@@ -660,8 +673,20 @@ int fbcon_init ( struct fbcon *fbcon, void *start,
 		rc = -EINVAL;
 		goto err_margin;
 	}
-	xgap = ( width % FBCON_CHAR_WIDTH );
-	ygap = ( height % font->height );
+	/* Select glyph scale factor: the largest that keeps a usable
+	 * text density (at least 100 columns and 25 rows), so that
+	 * text remains readable on high-DPI (e.g. Retina)
+	 * framebuffers that expose only their native mode.
+	 */
+	fbcon->scale = ( width / ( FBCON_CHAR_WIDTH * 100 ) );
+	if ( fbcon->scale < 1 )
+		fbcon->scale = 1;
+	while ( ( fbcon->scale > 1 ) &&
+		( ( height / ( font->height * fbcon->scale ) ) < 25 ) )
+		fbcon->scale--;
+
+	xgap = ( width % ( FBCON_CHAR_WIDTH * fbcon->scale ) );
+	ygap = ( height % ( font->height * fbcon->scale ) );
 	fbcon->margin.left += ( xgap / 2 );
 	fbcon->margin.top += ( ygap / 2 );
 	fbcon->margin.right += ( xgap - ( xgap / 2 ) );
@@ -670,10 +695,14 @@ int fbcon_init ( struct fbcon *fbcon, void *start,
 			  ( fbcon->margin.left * pixel->len ) );
 
 	/* Derive character geometry from pixel geometry */
-	fbcon->character.width = ( width / FBCON_CHAR_WIDTH );
-	fbcon->character.height = ( height / font->height );
-	fbcon->character.len = ( pixel->len * FBCON_CHAR_WIDTH );
-	fbcon->character.stride = ( pixel->stride * font->height );
+	fbcon->character.width = ( width / ( FBCON_CHAR_WIDTH *
+					     fbcon->scale ) );
+	fbcon->character.height = ( height / ( font->height *
+					       fbcon->scale ) );
+	fbcon->character.len = ( pixel->len * FBCON_CHAR_WIDTH *
+				 fbcon->scale );
+	fbcon->character.stride = ( pixel->stride * font->height *
+				    fbcon->scale );
 	DBGC ( fbcon, "FBCON %p is pixel %dx%d, char %dx%d at "
 	       "[%d-%d),[%d-%d)\n", fbcon, fbcon->pixel->width,
 	       fbcon->pixel->height, fbcon->character.width,

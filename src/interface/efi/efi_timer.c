@@ -167,8 +167,15 @@ static void efi_tick_startup ( void ) {
 	int rc;
 
 	/* Create timer tick event */
+	/* Notify at TPL_NOTIFY (not TPL_CALLBACK): iPXE runs at
+	 * TPL_CALLBACK almost all of the time, and on some older
+	 * Apple EFI implementations RestoreTPL(TPL_APPLICATION)
+	 * can hang once startup has completed.  A TPL_NOTIFY tick
+	 * dispatches while running at TPL_CALLBACK, so the clock
+	 * advances without ever dropping below TPL_CALLBACK.
+	 */
 	if ( ( efirc = bs->CreateEvent ( ( EVT_TIMER | EVT_NOTIFY_SIGNAL ),
-					 TPL_CALLBACK, efi_tick, NULL,
+					 TPL_NOTIFY, efi_tick, NULL,
 					 &efi_tick_event ) ) != 0 ) {
 		rc = -EEFI ( efirc );
 		DBGC ( colour, "EFI could not create timer tick: %s\n",
