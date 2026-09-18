@@ -2771,11 +2771,12 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	       tls, ( version >> 8 ), ( version & 0xff ) );
 
 	/* Check for downgrade attacks */
-	if ( ( version < TLS_VERSION_MAX ) &&
+	if ( ( TLS_VERSION_TLS_1_1 < TLS_VERSION_MAX ) &&
+	     ( version < TLS_VERSION_MAX ) &&
 	     ( memcmp ( hello_a->random.downgrade.magic, downgrade_magic,
 			sizeof ( hello_a->random.downgrade.magic ) ) == 0 ) &&
-	     ( hello_a->random.downgrade.version <
-	       ( TLS_VERSION_MAX - TLS_VERSION_TLS_1_1 ) ) ) {
+	     ( ( hello_a->random.downgrade.version + TLS_VERSION_TLS_1_1 ) <
+	       TLS_VERSION_MAX ) ) {
 		DBGC ( tls, "TLS %p detected downgrade attack:\n", tls );
 		DBGC_HDA ( tls, 0, &hello_a->random.downgrade,
 			   sizeof ( hello_a->random.downgrade ) );
