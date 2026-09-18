@@ -96,3 +96,4 @@ REQUIRE_OBJECT ( ffdhe_test );
 REQUIRE_OBJECT ( mime_test );
 REQUIRE_OBJECT ( datauri_test );
 REQUIRE_OBJECT ( tlskey_test );
+REQUIRE_OBJECT ( tlsfmt_test );

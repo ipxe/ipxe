@@ -22,6 +22,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/tables.h>
 #include <ipxe/channel.h>
 #include <ipxe/tlskey.h>
+#include <ipxe/tlsfmt.h>
 
 struct tls_connection;
 
@@ -58,15 +59,6 @@ union tls_server_random {
 
 /** TLS server downgrade detection magic signature */
 #define TLS_SERVER_DOWNGRADE_MAGIC "DOWNGRD"
-
-/** TLS version 1.1 */
-#define TLS_VERSION_TLS_1_1 0x0302
-
-/** TLS version 1.2 */
-#define TLS_VERSION_TLS_1_2 0x0303
-
-/** TLS version 1.3 */
-#define TLS_VERSION_TLS_1_3 0x0304
 
 /** Change cipher content type */
 #define TLS_TYPE_CHANGE_CIPHER 20
