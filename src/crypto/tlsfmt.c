@@ -157,8 +157,8 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 	unsigned int byte;
 	unsigned int minimum;
 	unsigned int len_len;
-	unsigned int extensions;
 	unsigned int len;
+	int extensions;
 	int fixed;
 	int rc;
 
@@ -232,7 +232,8 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 		byte = map[next++];
 		len_len = TLS_MAP_LEN_LEN ( byte );
 		extensions = TLS_MAP_EXTENSIONS ( byte );
-		next += ( extensions * 2 );
+		if ( extensions >= 0 )
+			next += ( extensions * 2 );
 		if ( next > count ) {
 			DBGC ( map, "TLSFMT %s #%d mapping extensions "
 			       "overrun\n", tls_map_name ( map ), index );
@@ -246,7 +247,7 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 		}
 
 		/* Allow for optional extensions fields */
-		if ( extensions && ( ! remaining ) &&
+		if ( ( extensions >= 0 ) && ( ! remaining ) &&
 		     ( version < TLS_VERSION_TLS_1_3 ) ) {
 			DBGC2 ( map, "TLSFMT %s #%d optional in version "
 				"%d.%d\n", tls_map_name ( map ), index,
@@ -285,7 +286,7 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 		DBGC2_HDA ( map, 0, field->data, field->len );
 		data += len;
 		remaining -= len;
-		if ( ! extensions )
+		if ( extensions < 0 )
 			continue;
 
 		/* Handle fields containing extensions */

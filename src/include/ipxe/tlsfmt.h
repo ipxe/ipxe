@@ -65,8 +65,8 @@
  *       (encoded as a delta from the lowest version currently
  *       supported by the codebase).
  *
- *     - `L = llllll` is the length of the corresponding fixed-length
- *       data structure plus one.  An empty fixed-length data
+ *     - `L = llllll` is one plus the length of the corresponding
+ *       fixed-length data structure.  An empty fixed-length data
  *       structure is pointless, and so we choose a zero fixed length
  *       (i.e. `L==1`) to represent a variable-length data structure.
  *       A negative fixed length (i.e. `L==0`) is invalid and is
@@ -88,9 +88,12 @@
  *       invalid, and so we choose `N==0` to represent a field that
  *       covers all remaining data.
  *
- *     - `X = xxxxxx` is the number of TLS extension types that
- *       immediately follow `map[N+1]` and that represent extensions
- *       of interest that may be present within this field.
+ *     - `X = xxxxxx` is one plus the number of TLS extension types
+ *       that immediately follow `map[N+1]` and that represent
+ *       extensions of interest that may be present within this field.
+ *       A negative number of extensions (i.e. `X==0`) is impossible
+ *       and so we choose this to represent a field that is not used
+ *       to contain extensions.
  *
  *     - When parsing: store the pointer to the start of the
  *       variable-length data as `ptrlen[N-1]`, and store the decoded
@@ -102,10 +105,10 @@
  *       (i.e. always build fields that contain extensions as being
  *       empty).
  *
- *   - For each `1<=k<=X` in a data structure that has a non-zero
- *     number of TLS extensions of interest (i.e. with `X>0'),
- *     interpret `T = map[N+2k]:map[N+2k+1]` as the inverse of a TLS
- *     extension type (in network-endian order):
+ *   - For each `1<=k<=(X-1)` in a variable-length data structure that
+ *     is used to contain extensions (i.e. that has `X>0`), interpret
+ *     `T = map[N+2k]:map[N+2k+1]` as the inverse of a TLS extension
+ *     type (in network-endian order):
  *
  *     - If `T==0`, then terminate processing with a fatal error.
  *
@@ -275,7 +278,7 @@ union tls_ptr_len {
  * @v version		Minimum TLS version that includes this field
  * @v field		Field name within descriptor structure
  * @v bits		Number of bits used to encode field length
- * @v extns		Number of extensions of interest within this field
+ * @v extns		Number of extensions of interest plus one (if any)
  */
 #define TLS_VARIABLE( desc, version, field, bits, extns )		\
 	/* Encoded `000001vv` */					\
@@ -334,7 +337,7 @@ union tls_ptr_len {
  */
 #define TLS_EXT16( desc, version, field )				\
 	TLS_VARIABLE ( desc, (version), field.all, 16,			\
-		       TLS_EXTNS ( desc, field ) )
+		       ( TLS_EXTNS ( desc, field ) + 1 ) )
 
 /**
  * Describe a variable-length field containing an extension of interest
@@ -379,7 +382,7 @@ union tls_ptr_len {
  * @v byte		Mapping byte
  * @ret extensions	Number of extensions
  */
-#define TLS_MAP_EXTENSIONS( byte ) ( (byte) >> 2 )
+#define TLS_MAP_EXTENSIONS( byte ) ( ( (byte) >> 2 ) - 1 )
 
 /** Certificate descriptor */
 struct tls_certificate {
