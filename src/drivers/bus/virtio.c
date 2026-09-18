@@ -495,7 +495,7 @@ int virtio_pci_map ( struct virtio_device *virtio, struct pci_device *pci ) {
 	/* Check if MSI-X is enabled */
 	msix = pci_find_capability ( pci, PCI_CAP_ID_MSIX );
 	if ( msix ) {
-		pci_read_config_word ( pci, msix, &ctrl );
+		pci_read_config_word ( pci, ( msix + PCI_MSIX_CTRL ), &ctrl );
 		if ( ! ( ctrl & PCI_MSIX_CTRL_ENABLE ) )
 			msix = 0;
 	}
