@@ -35,6 +35,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/crypto.h>
 #include <ipxe/bigint.h>
 #include <ipxe/random_nz.h>
+#include <ipxe/md5_sha1.h>
 #include <ipxe/rsa.h>
 
 /** @file
@@ -523,14 +524,16 @@ static int rsa_pkcs1_encode ( struct rsa_context *context,
 	size_t min_len;
 	size_t pad_len;
 
-	/* Identify prefix */
+	/* Identify prefix (if any) */
 	prefix = rsa_find_prefix ( digest );
-	if ( ! prefix ) {
+	if ( ( ! prefix ) && ( ! is_md5_sha1 ( digest ) ) ) {
 		DBGC ( context, "RSA %p has no prefix for %s\n",
 		       context, digest->name );
 		return -ENOTSUP;
 	}
-	digestinfo_len = ( prefix->len + digest_len );
+
+	/* Calculate length */
+	digestinfo_len = ( digest_len + ( prefix ? prefix->len : 0 ) );
 
 	/* Sanity check */
 	min_len = ( 1 /* "0x00" */ + 1 /* "0x01" */ + 8 /* minimum padding */
@@ -551,8 +554,10 @@ static int rsa_pkcs1_encode ( struct rsa_context *context,
 	memset ( temp, 0xff, pad_len );
 	temp += pad_len;
 	*(temp++) = 0x00;
-	memcpy ( temp, prefix->data, prefix->len );
-	temp += prefix->len;
+	if ( prefix ) {
+		memcpy ( temp, prefix->data, prefix->len );
+		temp += prefix->len;
+	}
 	memcpy ( temp, value, digest_len );
 	temp += digest_len;
 	assert ( temp == ( encoded + context->max_len ) );

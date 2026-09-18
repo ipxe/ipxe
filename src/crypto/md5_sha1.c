@@ -34,6 +34,9 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/rsa.h>
 #include <ipxe/md5_sha1.h>
 
+/** Sentinel used to avoid explicit symbol references */
+char md5_sha1_sentinel[1];
+
 /**
  * Initialise MD5+SHA1 algorithm
  *
@@ -89,13 +92,7 @@ struct digest_algorithm md5_sha1_algorithm = {
 	.init		= md5_sha1_init,
 	.update		= md5_sha1_update,
 	.final		= md5_sha1_final,
-};
-
-/** RSA digestInfo prefix for MD5+SHA1 algorithm */
-struct rsa_digestinfo_prefix rsa_md5_sha1_prefix __rsa_digestinfo_prefix = {
-	.digest = &md5_sha1_algorithm,
-	.data = NULL, /* MD5+SHA1 signatures have no digestInfo */
-	.len = 0,
+	.priv		= md5_sha1_sentinel,
 };
 
 /* Sanity checks */

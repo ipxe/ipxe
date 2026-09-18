@@ -61,6 +61,29 @@ struct md5_sha1_hmac_keys {
 	uint8_t sha1[SHA1_BLOCK_SIZE];
 };
 
+extern char md5_sha1_sentinel[1];
 extern struct digest_algorithm md5_sha1_algorithm;
+
+/**
+ * Check if a digest algorithm is MD5+SHA1
+ *
+ * @v digest		Digest algorithm
+ * @v is_md5_sha1	Digest algorithm is MD5+SHA1
+ */
+static inline __attribute__ (( always_inline )) int
+is_md5_sha1 ( struct digest_algorithm *digest ) {
+
+	/* The MD5+SHA1 algorithm is hardcoded into various parts of
+	 * the TLS specifications prior to TLSv1.2, which has knock-on
+	 * effects on non-TLS code such as the RSA algorithm (which
+	 * needs to be able to identify the PKCS#1 digestInfo prefix).
+	 *
+	 * Allow a digest algorithm to be tested to see if it is the
+	 * MD5+SHA1 algorithm without creating an explicit symbol
+	 * reference that will drag the algorithm into a build that
+	 * otherwise does not need it.
+	 */
+	return ( digest->priv == md5_sha1_sentinel );
+}
 
 #endif /* _IPXE_MD5_SHA1_H */
