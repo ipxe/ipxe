@@ -2852,14 +2852,21 @@ static int tls_verify_signature ( struct tls_connection *tls,
 	}
 
 	/* Identify signature and hash algorithm */
-	if ( dsig.sig_hash ) {
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
+
+		/* TLSv1.2 and above use explicit algorithm identifiers */
+		assert ( dsig.sig_hash != NULL );
 		sig_hash = tls_find_signature_hash ( *dsig.sig_hash );
 		if ( ! sig_hash ) {
 			DBGC ( tls, "TLS %p unsupported signature hash "
 			       "%#04x\n", tls, ntohs ( *dsig.sig_hash ) );
 			return -ENOTSUP_SIG_HASH;
 		}
+
 	} else {
+
+		/* TLSv1.1 and below use fixed algorithms */
+		assert ( dsig.sig_hash == NULL );
 		sig_hash = &tmp;
 		memset ( sig_hash, 0, sizeof ( *sig_hash ) );
 		sig_hash->pubkey = suite->pubkey;
