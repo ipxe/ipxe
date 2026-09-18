@@ -191,6 +191,9 @@ FILE_SECBOOT ( PERMITTED );
 	__einfo_uniqify ( EINFO_EPROTO, 0x04,				\
 			  "Certificate validation already in progress" )
 
+/* Avoid dragging in RSA support unconditionally */
+struct pubkey_algorithm rsa_algorithm __attribute__ (( weak ));
+
 /** List of TLS session */
 static LIST_HEAD ( tls_sessions );
 
@@ -2197,14 +2200,12 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  * @ret rc		Return status code
  */
 static int tls_send_certificate_verify ( struct tls_connection *tls ) {
-	struct digest_algorithm *digest = tls->key.digest;
 	struct asn1_cursor *key = privkey_cursor ( tls->client.key );
 	struct tls_signature_hash_algorithm *sig_hash = NULL;
 	struct asn1_builder builder = { NULL, 0 };
 	struct x509_certificate *cert;
 	struct pubkey_algorithm *pubkey;
-	size_t digestsize = digest->digestsize;
-	uint8_t tbshash[digestsize];
+	struct digest_algorithm *digest;
 	int rc;
 
 	/* Sanity checks */
@@ -2221,8 +2222,11 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	}
 	pubkey = cert->signature_algorithm->pubkey;
 
-	/* TLSv1.2 and later use explicit algorithm identifiers */
+	/* Identify signature and hash algorithm */
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
+
+		/* TLSv1.2 and above use explicit algorithm identifiers */
+		digest = tls->key.digest;
 		sig_hash = tls_signature_hash_algorithm ( pubkey, digest );
 		if ( ! sig_hash ) {
 			DBGC ( tls, "TLS %p could not identify (%s,%s) "
@@ -2231,27 +2235,18 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 			rc = -ENOTSUP_SIG_HASH;
 			goto err_sig_hash;
 		}
-	}
 
-	/* Generate digest */
-	if ( ( rc = tlskey_tbshash ( &tls->key, &tls_client, digest, NULL, 0,
-				     tbshash ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not generate CertificateVerify "
-		       "digest: %s\n", tls, strerror ( rc ) );
-		goto err_tbshash;
-	}
+	} else {
 
-	/* Sign digest */
-	if ( ( rc = pubkey_sign ( pubkey, key, digest, tbshash,
-				  &builder ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not sign %s digest using %s client "
-		       "private key: %s\n", tls, digest->name, pubkey->name,
-		       strerror ( rc ) );
-		goto err_pubkey_sign;
+		/* TLSv1.1 and below use fixed algorithms */
+		digest = ( ( pubkey == &rsa_algorithm ) ?
+			   &md5_sha1_algorithm : &sha1_algorithm );
 	}
 
 	/* Construct Certificate Verify record */
 	{
+		size_t digestsize = digest->digestsize;
+		uint8_t tbshash[digestsize];
 		int use_sig_hash = ( ( sig_hash == NULL ) ? 0 : 1 );
 		struct {
 			uint32_t type_length;
@@ -2259,6 +2254,25 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 			uint16_t signature_len;
 		} __attribute__ (( packed )) header;
 
+		/* Generate digest */
+		if ( ( rc = tlskey_tbshash ( &tls->key, &tls_client, digest,
+					     NULL, 0, tbshash ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not generate "
+			       "CertificateVerify digest: %s\n",
+			       tls, strerror ( rc ) );
+			goto err_tbshash;
+		}
+
+		/* Sign digest */
+		if ( ( rc = pubkey_sign ( pubkey, key, digest, tbshash,
+					  &builder ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not sign %s digest using "
+			       "%s client private key: %s\n", tls,
+			       digest->name, pubkey->name, strerror ( rc ) );
+			goto err_pubkey_sign;
+		}
+
+		/* Construct header */
 		header.type_length = ( cpu_to_le32 ( TLS_CERTIFICATE_VERIFY ) |
 				       htonl ( builder.len +
 					       sizeof ( header ) -
@@ -2269,6 +2283,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 		}
 		header.signature_len = htons ( builder.len );
 
+		/* Prepend header */
 		if ( ( rc = asn1_prepend_raw ( &builder, &header,
 					       sizeof ( header ) ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not construct Certificate "
@@ -2870,7 +2885,8 @@ static int tls_verify_signature ( struct tls_connection *tls,
 		sig_hash = &tmp;
 		memset ( sig_hash, 0, sizeof ( *sig_hash ) );
 		sig_hash->pubkey = suite->pubkey;
-		sig_hash->digest = &md5_sha1_algorithm;
+		sig_hash->digest = ( ( suite->pubkey == &rsa_algorithm ) ?
+				     &md5_sha1_algorithm : &sha1_algorithm );
 	}
 
 	/* Verify signature */
