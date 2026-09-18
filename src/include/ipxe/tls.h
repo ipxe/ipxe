@@ -42,10 +42,21 @@ struct tls_header {
 	uint16_t length;
 } __attribute__ (( packed ));
 
+/** A TLS handshake header */
+union tls_handshake_header {
+	/** Type */
+	uint8_t type;
+	/** Type and length */
+	uint32_t type_len;
+} __attribute__ (( packed ));
+
+/** Get TLS handshake length */
+#define TLS_HANDSHAKE_LEN( type_len ) ( ntohl (type_len) & 0xffffff )
+
 /** TLS server random data */
 union tls_server_random {
-	/** Random nonce (as used by the key schedule) */
-	struct tls_random random;
+	/** Random bytes */
+	uint8_t random[32];
 	/** Version downgrade detection */
 	struct {
 		/** Unused */
@@ -211,9 +222,7 @@ struct tls_key_exchange_parameters {
 	/** Named group */
 	struct tls_named_group *group;
 	/** Partner key */
-	const void *partner;
-	/** Length of partner key */
-	size_t partner_len;
+	struct tls_cursor partner;
 };
 
 /** A TLS key exchange algorithm */
@@ -226,14 +235,13 @@ struct tls_key_exchange_algorithm {
 	 * Parse key exchange parameters from Server Key Exchange record
 	 *
 	 * @v tls		TLS connection
-	 * @v data		Server Key Exchange handshake record
-	 * @v len		Length of Server Key Exchange handshake record
-	 * @v params		Key exchange parameters to fill in
+	 * @v cursor		Server Key Exchange handshake record
+	 * @v kex		Key exchange parameters to fill in
 	 * @ret rc		Return status code
 	 */
 	int ( * parse ) ( struct tls_connection *tls,
-			  const void *data, size_t len,
-			  struct tls_key_exchange_parameters *params );
+			  const struct tls_cursor *cursor,
+			  struct tls_key_exchange_parameters *kex );
 	/** Length of length field in Client Key Exchange record */
 	uint8_t len_len;
 };
