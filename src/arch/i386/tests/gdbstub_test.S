@@ -1,4 +1,4 @@
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.code32
 	.arch i386
 
