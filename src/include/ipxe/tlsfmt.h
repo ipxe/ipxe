@@ -167,6 +167,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
+#include <stddef.h>
 #include <ipxe/asn1.h>
 
 /** TLS version 1.1 */
@@ -184,7 +185,7 @@ FILE_SECBOOT ( PERMITTED );
 /** A TLS variable-length data cursor */
 struct tls_cursor {
 	/** Data */
-	const void *data;
+	void *data;
 	/** Length of data */
 	size_t len;
 };
@@ -192,7 +193,7 @@ struct tls_cursor {
 /** A pointer/length value */
 union tls_ptr_len {
 	/** Data pointer */
-	const void *data;
+	void *data;
 	/** Length */
 	size_t len;
 };
@@ -376,6 +377,9 @@ union tls_ptr_len {
  */
 #define TLS_MAP_LEN_LEN( byte ) ( (byte) & 0x03 )
 
+/** Maximum number of length bytes */
+#define TLS_MAP_LEN_LEN_MAX 3
+
 /**
  * Interpret number of extensions from an `xxxxxxnn` byte
  *
@@ -408,7 +412,7 @@ struct tls_certificate_entry {
 /** DigitallySigned descriptor */
 struct tls_digitally_signed {
 	/** Signature and hash algorithm */
-	const uint16_t __attribute__ (( aligned ( 1 ) )) *sig_hash;
+	uint16_t __attribute__ (( aligned ( 1 ) )) *sig_hash;
 	/** Signature */
 	struct tls_cursor sig;
 };
@@ -416,7 +420,7 @@ struct tls_digitally_signed {
 /** Extension descriptor */
 struct tls_extension {
 	/** Extension type */
-	const uint16_t __attribute__ (( aligned ( 1 ) )) *type;
+	uint16_t __attribute__ (( aligned ( 1 ) )) *type;
 	/** Extension data */
 	struct tls_cursor data;
 	/** Next extension */
@@ -429,7 +433,7 @@ struct tls_hello_request {};
 /** KeyShareEntry descriptor */
 struct tls_key_share_entry {
 	/** Named group */
-	const uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
 	/** Public key */
 	struct tls_cursor public;
 	/** Next key share */
@@ -439,9 +443,9 @@ struct tls_key_share_entry {
 /** NewSessionTicket descriptor */
 struct tls_new_session_ticket {
 	/** Lifetime hint */
-	const uint32_t __attribute__ (( aligned ( 1 ) )) *lifetime;
+	uint32_t __attribute__ (( aligned ( 1 ) )) *lifetime;
 	/** Age obfuscation */
-	const uint32_t __attribute__ (( aligned ( 1 ) )) *age;
+	uint32_t __attribute__ (( aligned ( 1 ) )) *age;
 	/** Nonce */
 	struct tls_cursor nonce;
 	/** Ticket */
@@ -462,7 +466,7 @@ struct tls_renegotiation_info {
 /** ServerHello descriptor */
 struct tls_server_hello {
 	/** First fixed-length portion */
-	const struct {
+	struct {
 		/** Selected version */
 		uint16_t version;
 		/** Server random bytes */
@@ -471,7 +475,7 @@ struct tls_server_hello {
 	/** Session ID */
 	struct tls_cursor session_id;
 	/** Second fixed-length portion */
-	const struct {
+	struct {
 		/** Selected cipher suite */
 		uint16_t cipher_suite;
 		/** Selected compression method */
@@ -525,7 +529,7 @@ struct tls_server_key_exchange_ecdhe {
 /** SupportedVersions descriptor (in ServerHello) */
 struct tls_supported_version {
 	/** Selected version */
-	const uint16_t __attribute__ (( aligned ( 1 ) )) *selected;
+	uint16_t __attribute__ (( aligned ( 1 ) )) *selected;
 };
 
 /** SupportedVersions descriptor (in ClientHello) */
@@ -548,7 +552,7 @@ tls_asn1 ( const struct tls_cursor *cursor ) {
 	} *u = container_of ( cursor, typeof ( *u ), tls );
 
 	/* Sanity check */
-	build_assert ( &u->tls.data == &u->asn1.data );
+	build_assert ( ( ( const void * ) &u->tls.data ) == &u->asn1.data );
 	build_assert ( &u->tls.len == &u->asn1.len );
 
 	return &u->asn1;
@@ -560,6 +564,26 @@ extern int tls_parse_map ( const uint8_t *map, unsigned int version,
 extern int tls_parse_opt_map ( const uint8_t *map, unsigned int version,
 			       const struct tls_cursor *cursor,
 			       union tls_ptr_len *desc );
+extern int tls_build_map ( const uint8_t *map, unsigned int version,
+			   union tls_ptr_len *desc,
+			   struct tls_cursor *cursor );
+
+/**
+ * Calculate length of TLS data structure
+ *
+ * @v type		Descriptor structure name
+ * @v version		Protocol version
+ * @v desc		Data structure descriptor to fill in
+ * @v cursor		Cursor to contain TLS data structure
+ * @ret rc		Return status code
+ */
+static inline __attribute__ (( always_inline )) int
+tls_size_map ( const uint8_t *map, unsigned int version,
+	       union tls_ptr_len *desc, struct tls_cursor *cursor ) {
+
+	cursor->data = NULL;
+	return tls_build_map ( map, version, desc, cursor );
+}
 
 /**
  * Parse TLS data structure
@@ -590,6 +614,36 @@ extern int tls_parse_opt_map ( const uint8_t *map, unsigned int version,
 			    ( ( union tls_ptr_len * )			\
 			      ( (desc) == ( ( struct type * ) NULL ) ?	\
 				(desc) : (desc) ) ) )
+
+/**
+ * Build TLS data structure
+ *
+ * @v type		Descriptor structure name
+ * @v version		Protocol version
+ * @v desc		Data structure descriptor to fill in
+ * @v cursor		Cursor to contain TLS data structure
+ * @ret rc		Return status code
+ */
+#define tls_build( type, version, desc, cursor )			\
+	tls_build_map ( type ## _map, (version),			\
+			( ( union tls_ptr_len * )			\
+			  ( (desc) == ( ( struct type * ) NULL ) ?	\
+			    (desc) : (desc) ) ), (cursor) )
+
+/**
+ * Calculate length of TLS data structure
+ *
+ * @v type		Descriptor structure name
+ * @v version		Protocol version
+ * @v desc		Data structure descriptor to fill in
+ * @v cursor		Cursor to contain TLS data structure
+ * @ret rc		Return status code
+ */
+#define tls_size( type, version, desc, cursor )				\
+	tls_size_map ( type ## _map, (version),				\
+		       ( ( union tls_ptr_len * )			\
+			 ( (desc) == ( ( struct type * ) NULL ) ?	\
+			   (desc) : (desc) ) ), (cursor) )
 
 extern TLS_DESCR_MAPPING ( tls_certificate );
 extern TLS_DESCR_MAPPING ( tls_certificate_entry );

@@ -126,9 +126,9 @@ static int tls_parse_extensions ( const uint8_t *map, unsigned int index,
 			}
 			fields[i].data = extension.data.data;
 			fields[i].len = extension.data.len;
-			DBGC2 ( map, "TLSFMT %s #%d extension %#04x:%s\n",
-				tls_map_name ( map ), index, ntohs ( type ),
-				( fields[i].len ? "" : " (empty)" ) );
+			DBGC2 ( map, "TLSFMT %s #%d extension %#04x len "
+				"%zd\n", tls_map_name ( map ), index,
+				ntohs ( type ), fields[i].len );
 			DBGC2_HDA ( map, 0, fields[i].data, fields[i].len );
 		}
 	}
@@ -149,7 +149,7 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 		    const struct tls_cursor *cursor,
 		    union tls_ptr_len *desc ) {
 	struct tls_cursor *field;
-	const void *data;
+	void *data;
 	size_t remaining;
 	unsigned int count;
 	unsigned int index;
@@ -158,15 +158,15 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 	unsigned int minimum;
 	unsigned int len_len;
 	unsigned int len;
-	int extensions;
 	int fixed;
+	int exts;
 	int rc;
 
 	/* Read initial cursor (may overlap output data structure) */
 	data = cursor->data;
 	remaining = cursor->len;
-	DBGC2 ( map, "TLSFMT %s parsing:%s\n",
-		tls_map_name ( map ), ( remaining ? "" : " (empty)" ) );
+	DBGC2 ( map, "TLSFMT %s parsing len %zd\n",
+		tls_map_name ( map ), remaining );
 	DBGC2_HDA ( map, 0, data, remaining );
 
 	/* Get mapping length */
@@ -215,8 +215,8 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 				return -EPROTO;
 			}
 			field->data = data;
-			DBGC2 ( map, "TLSFMT %s #%d:\n",
-				tls_map_name ( map ), index );
+			DBGC2 ( map, "TLSFMT %s #%d len %d\n",
+				tls_map_name ( map ), index, fixed );
 			DBGC2_HDA ( map, 0, field->data, fixed );
 			data += fixed;
 			remaining -= fixed;
@@ -231,9 +231,9 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 		}
 		byte = map[next++];
 		len_len = TLS_MAP_LEN_LEN ( byte );
-		extensions = TLS_MAP_EXTENSIONS ( byte );
-		if ( extensions >= 0 )
-			next += ( extensions * 2 );
+		exts = TLS_MAP_EXTENSIONS ( byte );
+		if ( exts >= 0 )
+			next += ( exts * 2 );
 		if ( next > count ) {
 			DBGC ( map, "TLSFMT %s #%d mapping extensions "
 			       "overrun\n", tls_map_name ( map ), index );
@@ -247,7 +247,7 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 		}
 
 		/* Allow for optional extensions fields */
-		if ( ( extensions >= 0 ) && ( ! remaining ) &&
+		if ( ( exts >= 0 ) && ( ! remaining ) &&
 		     ( version < TLS_VERSION_TLS_1_3 ) ) {
 			DBGC2 ( map, "TLSFMT %s #%d optional in version "
 				"%d.%d\n", tls_map_name ( map ), index,
@@ -281,17 +281,17 @@ int tls_parse_map ( const uint8_t *map, unsigned int version,
 		}
 		field->data = data;
 		field->len = len;
-		DBGC2 ( map, "TLSFMT %s #%d:%s\n", tls_map_name ( map ),
-			index, ( field->len ? "" : " (empty)" ) );
+		DBGC2 ( map, "TLSFMT %s #%d len %zd\n",
+			tls_map_name ( map ), index, field->len );
 		DBGC2_HDA ( map, 0, field->data, field->len );
 		data += len;
 		remaining -= len;
-		if ( extensions < 0 )
+		if ( exts < 0 )
 			continue;
 
 		/* Handle fields containing extensions */
 		if ( ( rc = tls_parse_extensions ( map, index, field,
-						   extensions ) ) != 0 ) {
+						   exts ) ) != 0 ) {
 			return rc;
 		}
 	}
@@ -340,6 +340,255 @@ int tls_parse_opt_map ( const uint8_t *map, unsigned int version,
 	/* Parse data structure */
 	if ( ( rc = tls_parse_map ( map, version, cursor, desc ) ) != 0 )
 		return rc;
+
+	return 0;
+}
+
+/**
+ * Build TLS extensions within a data structure
+ *
+ * @v map		Data structure descriptor mapping
+ * @v index		Current index within mapping
+ * @v fields		Extensions data fields
+ * @v count		Number of extensions
+ * @ret rc		Return status code
+ */
+static int tls_build_extensions ( const uint8_t *map, unsigned int index,
+				  struct tls_cursor *fields,
+				  unsigned int count ) {
+	const uint16_t __attribute__ (( aligned ( 1 ) )) *invtypes;
+	struct tls_cursor *cursor = &fields[0];
+	struct tls_cursor *subcursor;
+	struct tls_extension extension;
+	unsigned int i;
+	uint16_t type;
+	int rc;
+
+	/* Prepare per-extension subcursor */
+	subcursor = &extension.next;
+	subcursor->data = cursor->data;
+	cursor->len = 0;
+
+	/* Extension types are encoded as inverted */
+	invtypes = ( ( const void * ) &map[index] );
+	for ( i = 1 ; i <= count ; i++ ) {
+		if ( ! invtypes[i] ) {
+			DBGC ( map, "TLSFMT %s #%d mapping missing extension "
+			       "%d\n", tls_map_name ( map ), index, i );
+			return -EINVAL;
+		}
+	}
+
+	/* Build extensions */
+	for ( i = 1 ; i <= count ; i++ ) {
+
+		/* Skip extensions that will not be included */
+		if ( ! ( fields[i].data || fields[i].len ) )
+			continue;
+
+		/* Build extension */
+		type = ~invtypes[i];
+		extension.type = &type;
+		extension.data = fields[i];
+		extension.next.len = 0;
+		if ( ( rc = tls_build ( tls_extension, TLS_VERSION_BASE,
+					&extension, subcursor ) ) != 0 ) {
+			return rc;
+		}
+		fields[i].len = extension.data.len;
+		DBGC2 ( map, "TLSFMT %s #%d extension %#04x len %zd\n",
+			tls_map_name ( map ), index, ntohs ( type ),
+			fields[i].len );
+		cursor->len += subcursor->len;
+		if ( cursor->data ) {
+			fields[i].data = extension.data.data;
+			DBGC2_HDA ( map, 0, fields[i].data, fields[i].len );
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Build TLS data structure
+ *
+ * @v map		Data structure descriptor mapping
+ * @v version		Protocol version
+ * @v desc		Data structure descriptor
+ * @v cursor		Cursor to contain TLS data structure
+ * @ret rc		Return status code
+ *
+ * Build a TLS data structure at the cursor.  The cursor's original
+ * length will be ignored and will be set to the overall length of the
+ * built data structure.  The caller must ensure that sufficient space
+ * already exists (e.g. by calling tls_size() first to determine the
+ * required length).
+ *
+ * The overall length will be calculated based on the variable lengths
+ * within the descriptor.  The output content will be be copied from
+ * any non-NULL pointers within the descriptor (with any missing
+ * content initialised to zero).
+ *
+ * Pointers within the descriptor will be updated to point to the
+ * appropriate location within the built data structure.
+ *
+ * The caller must therefore fill in any variable lengths within the
+ * descriptor beforehand, but may freely choose to either fill in
+ * pointers within the descriptor beforehand or to write through the
+ * updated pointers afterwards.
+ *
+ * A cursor with a NULL data pointer may be used to calculate the
+ * required length without copying in any data or updating any
+ * pointers within the descriptor.
+ */
+int tls_build_map ( const uint8_t *map, unsigned int version,
+		    union tls_ptr_len *desc, struct tls_cursor *cursor ) {
+	struct tls_cursor *field;
+	void *data;
+	size_t len;
+	size_t max;
+	unsigned int count;
+	unsigned int index;
+	unsigned int next;
+	unsigned int byte;
+	unsigned int minimum;
+	unsigned int len_len;
+	int fixed;
+	int exts;
+	int rc;
+
+	/* Read initial cursor (may overlap output data structure) */
+	data = cursor->data;
+	len = 0;
+
+	/* Get mapping length */
+	count = map[0];
+	if ( ! count ) {
+		DBGC ( map, "TLSFMT %s mapping has no count\n",
+		       tls_map_name ( map ) );
+		return -EINVAL;
+	}
+
+	/* Accumulate total length via mapping */
+	for ( index = 1 ; ( next = index ) < count ; index = next ) {
+
+		/* Prepare to read field description */
+		field = container_of ( &desc[ index - 1 ].data,
+				       struct tls_cursor, data );
+
+		/* Interpret byte as `llllllvv` */
+		byte = map[next++];
+		minimum = TLS_MAP_MIN ( byte );
+		fixed = TLS_MAP_FIXED ( byte );
+		if ( fixed < 0 ) {
+			DBGC ( map, "TLSFMT %s #%d mapping missing\n",
+			       tls_map_name ( map ), index );
+			return -EINVAL;
+		}
+		assert ( next <= count );
+
+		/* Handle fixed-length fields */
+		if ( fixed ) {
+			if ( version < minimum ) {
+				DBGC2 ( map, "TLSFMT %s #%d not in version "
+					"%d.%d\n", tls_map_name ( map ),
+					index, ( version >> 8 ),
+					( version & 0xff ) );
+				continue;
+			}
+			DBGC2 ( map, "TLSFMT %s #%d len %d\n",
+				tls_map_name ( map ), index, fixed );
+			len += fixed;
+			if ( data ) {
+				if ( field->data ) {
+					memcpy ( data, field->data, fixed );
+				} else {
+					memset ( data, 0, fixed );
+				}
+				field->data = data;
+				data += fixed;
+				DBGC2_HDA ( map, 0, field->data, fixed );
+			}
+			continue;
+		}
+
+		/* Interpret next byte as `xxxxxxnn` */
+		if ( next >= count ) {
+			DBGC ( map, "TLSFMT %s #%d mapping overrun\n",
+			       tls_map_name ( map ), index );
+			return -EINVAL;
+		}
+		byte = map[next++];
+		len_len = TLS_MAP_LEN_LEN ( byte );
+		exts = TLS_MAP_EXTENSIONS ( byte );
+		if ( exts >= 0 )
+			next += ( exts * 2 );
+		if ( next > count ) {
+			DBGC ( map, "TLSFMT %s #%d mapping extensions "
+			       "overrun\n", tls_map_name ( map ), index );
+			return -EINVAL;
+		}
+		if ( version < minimum ) {
+			DBGC2 ( map, "TLSFMT %s #%d not in version %d.%d\n",
+				tls_map_name ( map ), index, ( version >> 8 ),
+				( version & 0xff ) );
+			continue;
+		}
+
+		/* Handle variable-length fields */
+		max = ( len_len ? ( ( 1 << ( 8 * len_len ) ) - 1 ) :
+			( ( 1 << ( 8 * TLS_MAP_LEN_LEN_MAX ) ) - 1 ) );
+		if ( exts >= 0 ) {
+			field->data = ( data ? ( data + len_len ) : NULL );
+			if ( ( rc = tls_build_extensions ( map, index, field,
+							   exts ) ) != 0 ) {
+				return rc;
+			}
+		}
+		if ( field->len > max ) {
+			DBGC ( map, "TLSFMT %s #%d len %zd too long\n",
+			       tls_map_name ( map ), index, field->len );
+			return -ERANGE;
+		}
+
+		/* Allow for optional extensions fields */
+		if ( ( exts >= 0 ) && ( ! field->len ) &&
+		     ( version < TLS_VERSION_TLS_1_3 ) ) {
+			DBGC2 ( map, "TLSFMT %s #%d optional in version "
+				"%d.%d\n", tls_map_name ( map ), index,
+				( version >> 8 ), ( version & 0xff ) );
+			continue;
+		}
+
+		/* Build field */
+		DBGC2 ( map, "TLSFMT %s #%d len %zd\n",
+			tls_map_name ( map ), index, field->len );
+		len += ( len_len + field->len );
+		if ( data ) {
+			while ( len_len-- ) {
+				*( ( uint8_t * ) data++ ) =
+					( field->len >> ( 8 * len_len ) );
+			}
+			if ( exts < 0 ) {
+				if ( field->data ) {
+					memcpy ( data, field->data,
+						 field->len );
+				} else {
+					memset ( data, 0, field->len );
+				}
+			}
+			field->data = data;
+			data += field->len;
+			DBGC2_HDA ( map, 0, field->data, field->len );
+		}
+	}
+
+	/* Update cursor (may overlap output data structure) */
+	cursor->len = len;
+	DBGC2 ( map, "TLSFMT %s built len %zd\n",
+		tls_map_name ( map ), cursor->len );
+	if ( data )
+		DBGC2_HDA ( map, 0, cursor->data, cursor->len );
 
 	return 0;
 }
