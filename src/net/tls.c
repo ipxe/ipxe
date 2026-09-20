@@ -585,7 +585,8 @@ static const char * tls_cipher_name ( struct tls_cipher_suite *suite ) {
 	static char buf[64];
 
 	/* Strip uninteresting name components */
-	exchange_name = ( ( exchange == &tls_pubkey_exchange_algorithm ) ?
+	exchange_name = ( ( ( exchange == &tls_null_exchange_algorithm ) ||
+			    ( exchange == &tls_pubkey_exchange_algorithm ) ) ?
 			  NULL : exchange->name );
 	pubkey_name = ( ( pubkey == &pubkey_null ) ? NULL : pubkey->name );
 	digest_name = ( ( digest == &digest_null ) ?
@@ -1338,30 +1339,20 @@ static int tls_key_build ( struct tls_connection *tls,
  *
  * @v tls		TLS connection
  * @v sig_hash		Signature hash algorithm
- * @v sig		Signature
+ * @v cert		Certificate
  * @v params		Additional parameters
+ * @v sig		Signature
  * @ret rc		Return status code
  */
-static int tls_key_verify ( struct tls_connection *tls,
-			    struct tls_signature_hash_algorithm *sig_hash,
-			    const struct tls_cursor *sig,
-			    const struct tls_cursor *params ) {
+static int tls_hash_verify ( struct tls_connection *tls,
+			     struct tls_signature_hash_algorithm *sig_hash,
+			     struct x509_certificate *cert,
+			     const struct tls_cursor *params,
+			     const struct asn1_cursor *sig ) {
 	struct pubkey_algorithm *pubkey = sig_hash->pubkey;
 	struct digest_algorithm *digest = sig_hash->digest;
-	struct x509_certificate *cert;
 	uint8_t tbshash[digest->digestsize];
 	int rc;
-
-	/* Identify server certificate */
-	if ( ! tls->server.chain ) {
-		DBGC ( tls, "TLS %p has no server certificate chain\n", tls );
-		return -ENOENT_CERT;
-	}
-	cert = x509_first ( tls->server.chain );
-	if ( ! cert ) {
-		DBGC ( tls, "TLS %p has no server certificate\n", tls );
-		return -ENOENT_CERT;
-	}
 
 	/* Identify algorithms */
 	if ( sig_hash->algorithm &&
@@ -1370,7 +1361,7 @@ static int tls_key_verify ( struct tls_connection *tls,
 		       tls, cert->subject.public_key.algorithm->name );
 		return -EPERM_KEY_EXCHANGE;
 	}
-	DBGC ( tls, "TLS %p using signature hash %s-%s\n",
+	DBGC ( tls, "TLS %p verifying with %s-%s\n",
 	       tls, pubkey->name, digest->name );
 
 	/* Calculate digest */
@@ -1384,8 +1375,7 @@ static int tls_key_verify ( struct tls_connection *tls,
 
 	/* Verify signature and bind shared secret */
 	if ( ( rc = channel_bind_verify ( &tls->channel, cert, pubkey,
-					  digest, tbshash,
-					  tls_asn1 ( sig ) ) ) != 0 ) {
+					  digest, tbshash, sig ) ) != 0 ) {
 		DBGC ( tls, "TLS %p failed signature verification: %s\n",
 		       tls, strerror ( rc ) );
 		return rc;
@@ -2852,10 +2842,10 @@ static int tls_new_certificate ( struct tls_connection *tls,
 static int tls_verify_signature ( struct tls_connection *tls,
 				  const struct tls_cursor *cursor,
 				  const struct tls_cursor *params ) {
-	struct tls_cipher_suite *suite = tls->suite;
 	struct tls_signature_hash_algorithm *sig_hash;
 	struct tls_signature_hash_algorithm tmp;
 	struct tls_digitally_signed dsig;
+	struct x509_certificate *cert;
 	int rc;
 
 	/* Parse DigitallySigned structure */
@@ -2864,6 +2854,17 @@ static int tls_verify_signature ( struct tls_connection *tls,
 		DBGC ( tls, "TLS %p could not parse DigitallySigned: %s\n",
 		       tls, strerror ( rc ) );
 		return rc;
+	}
+
+	/* Identify server certificate */
+	if ( ! tls->server.chain ) {
+		DBGC ( tls, "TLS %p has no server certificate chain\n", tls );
+		return -ENOENT_CERT;
+	}
+	cert = x509_first ( tls->server.chain );
+	if ( ! cert ) {
+		DBGC ( tls, "TLS %p has no server certificate\n", tls );
+		return -ENOENT_CERT;
 	}
 
 	/* Identify signature and hash algorithm */
@@ -2884,14 +2885,14 @@ static int tls_verify_signature ( struct tls_connection *tls,
 		assert ( dsig.sig_hash == NULL );
 		sig_hash = &tmp;
 		memset ( sig_hash, 0, sizeof ( *sig_hash ) );
-		sig_hash->pubkey = suite->pubkey;
-		sig_hash->digest = ( ( suite->pubkey == &rsa_algorithm ) ?
+		sig_hash->pubkey = cert->subject.public_key.algorithm->pubkey;
+		sig_hash->digest = ( ( sig_hash->pubkey == &rsa_algorithm ) ?
 				     &md5_sha1_algorithm : &sha1_algorithm );
 	}
 
 	/* Verify signature */
-	if ( ( rc = tls_key_verify ( tls, sig_hash, &dsig.sig,
-				     params ) ) != 0 ) {
+	if ( ( rc = tls_hash_verify ( tls, sig_hash, cert, params,
+				      tls_asn1 ( &dsig.sig ) ) ) != 0 ) {
 		return rc;
 	}
 
