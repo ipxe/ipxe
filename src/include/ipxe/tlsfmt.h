@@ -567,23 +567,9 @@ extern int tls_parse_opt_map ( const uint8_t *map, unsigned int version,
 extern int tls_build_map ( const uint8_t *map, unsigned int version,
 			   union tls_ptr_len *desc,
 			   struct tls_cursor *cursor );
-
-/**
- * Calculate length of TLS data structure
- *
- * @v type		Descriptor structure name
- * @v version		Protocol version
- * @v desc		Data structure descriptor to fill in
- * @v cursor		Cursor to contain TLS data structure
- * @ret rc		Return status code
- */
-static inline __attribute__ (( always_inline )) int
-tls_size_map ( const uint8_t *map, unsigned int version,
-	       union tls_ptr_len *desc, struct tls_cursor *cursor ) {
-
-	cursor->data = NULL;
-	return tls_build_map ( map, version, desc, cursor );
-}
+extern int tls_size_map ( const uint8_t *map, unsigned int version,
+			  union tls_ptr_len *desc,
+			  struct tls_cursor *cursor );
 
 /**
  * Parse TLS data structure

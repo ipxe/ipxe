@@ -608,6 +608,25 @@ static void tlsfmt_test_exec ( void ) {
 		      tls11_server_key_exchange_ecdhe,
 		      sizeof ( tls11_server_key_exchange_ecdhe ) ) == 0 );
 
+	/* Propagation of sizing errors */
+	memset ( &digitally_signed, 0, sizeof ( digitally_signed ) );
+	memset ( &server_key_exchange_ecdhe, 0,
+		 sizeof ( server_key_exchange_ecdhe ) );
+	ok ( tls_size ( tls_digitally_signed, TLS_VERSION_TLS_1_2,
+			&digitally_signed,
+			&server_key_exchange_ecdhe.dsig ) == 0 );
+	ok ( tls_size ( tls_server_key_exchange_ecdhe, TLS_VERSION_TLS_1_2,
+			&server_key_exchange_ecdhe, &cursor ) == 0 );
+	memset ( &digitally_signed, 0, sizeof ( digitally_signed ) );
+	memset ( &server_key_exchange_ecdhe, 0,
+		 sizeof ( server_key_exchange_ecdhe ) );
+	digitally_signed.sig.len = 0x10000;
+	ok ( tls_size ( tls_digitally_signed, TLS_VERSION_TLS_1_2,
+			&digitally_signed,
+			&server_key_exchange_ecdhe.dsig ) != 0 );
+	ok ( tls_size ( tls_server_key_exchange_ecdhe, TLS_VERSION_TLS_1_2,
+			&server_key_exchange_ecdhe, &cursor ) != 0 );
+
 	/* Drop certificate references */
 	x509_put ( tls12_cert );
 	x509_put ( tls13_cert );

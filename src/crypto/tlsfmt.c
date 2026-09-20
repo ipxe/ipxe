@@ -588,7 +588,60 @@ int tls_build_map ( const uint8_t *map, unsigned int version,
 	DBGC2 ( map, "TLSFMT %s built len %zd\n",
 		tls_map_name ( map ), cursor->len );
 	if ( data )
-		DBGC2_HDA ( map, 0, cursor->data, cursor->len );
+		DBGC2_HDA ( map, 0, ( data - cursor->len ), cursor->len );
+
+	return 0;
+}
+
+/**
+ * Calculate length of TLS data structure
+ *
+ * @v type		Descriptor structure name
+ * @v version		Protocol version
+ * @v desc		Data structure descriptor to fill in
+ * @v cursor		Cursor to contain TLS data structure
+ * @ret rc		Return status code
+ *
+ * The cursor size will be set to the overall length required to
+ * contain the TLS data structure, and the cursor data pointer will be
+ * set to NULL.
+ *
+ * If this function returns successfully, then a subsequent call to
+ * tls_build() with the exact same inputs is guaranteed to succeed and
+ * need not be checked for an error return status.  The data structure
+ * descriptor must not be modified in any way that would affect its
+ * length before calling tls_build(): the easiest way to ensure this
+ * is to not modify the data structure descriptor at all.
+ *
+ * If this function fails, then the cursor length will be set to a
+ * value that is too large to be represented by a 24-bit length field.
+ * If the cursor itself lies within a containing data structure
+ * descriptor (e.g. if tls_size() is being used to calculate the size
+ * of an extension within a ClientHello descriptor), then this
+ * guarantees that a subsequent call to tls_size() on the containing
+ * descriptor will also fail.  The caller therefore need only check
+ * the return status code from the call to tls_size() for the
+ * outermost descriptor.
+ *
+ * Note that this optimisation applies only when the result cursor
+ * lies within a containing data structure descriptor and so is
+ * guaranteed to be consumed by a subsequent call to calculate the
+ * length of that containing TLS data structure.  If a caller is using
+ * the result from tls_size() in any other way (e.g. to add up the
+ * lengths of a sequence of CertificateEntry structures), then the
+ * caller must check the return status code in the normal way.
+  */
+int tls_size_map ( const uint8_t *map, unsigned int version,
+		   union tls_ptr_len *desc, struct tls_cursor *cursor ) {
+	int rc;
+
+	/* Calculate length */
+	cursor->data = NULL;
+	if ( ( rc = tls_build_map ( map, version, desc, cursor ) ) != 0 ) {
+		/* Set an uncontainable length on error */
+		cursor->len = -1UL;
+		return rc;
+	}
 
 	return 0;
 }
