@@ -2220,7 +2220,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 		rc = -ENOENT_CERT;
 		goto err_cert;
 	}
-	pubkey = cert->signature_algorithm->pubkey;
+	pubkey = cert->subject.public_key.algorithm->pubkey;
 
 	/* Identify signature and hash algorithm */
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
