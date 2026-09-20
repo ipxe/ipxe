@@ -258,6 +258,66 @@ static uint8_t server_key_exchange_sig[] = {
 	0x02, 0x07, 0x2e
 };
 
+/** Reference TLSv1.3 ClientHello (from RFC 8448) */
+static uint8_t tls13_client_hello[] = {
+	0x03, 0x03, 0xcb, 0x34, 0xec, 0xb1, 0xe7, 0x81, 0x63, 0xba, 0x1c,
+	0x38, 0xc6, 0xda, 0xcb, 0x19, 0x6a, 0x6d, 0xff, 0xa2, 0x1a, 0x8d,
+	0x99, 0x12, 0xec, 0x18, 0xa2, 0xef, 0x62, 0x83, 0x02, 0x4d, 0xec,
+	0xe7, 0x00, 0x00, 0x06, 0x13, 0x01, 0x13, 0x03, 0x13, 0x02, 0x01,
+	0x00, 0x00, 0x91, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x09, 0x00, 0x00,
+	0x06, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0xff, 0x01, 0x00, 0x01,
+	0x00, 0x00, 0x0a, 0x00, 0x14, 0x00, 0x12, 0x00, 0x1d, 0x00, 0x17,
+	0x00, 0x18, 0x00, 0x19, 0x01, 0x00, 0x01, 0x01, 0x01, 0x02, 0x01,
+	0x03, 0x01, 0x04, 0x00, 0x23, 0x00, 0x00, 0x00, 0x33, 0x00, 0x26,
+	0x00, 0x24, 0x00, 0x1d, 0x00, 0x20, 0x99, 0x38, 0x1d, 0xe5, 0x60,
+	0xe4, 0xbd, 0x43, 0xd2, 0x3d, 0x8e, 0x43, 0x5a, 0x7d, 0xba, 0xfe,
+	0xb3, 0xc0, 0x6e, 0x51, 0xc1, 0x3c, 0xae, 0x4d, 0x54, 0x13, 0x69,
+	0x1e, 0x52, 0x9a, 0xaf, 0x2c, 0x00, 0x2b, 0x00, 0x03, 0x02, 0x03,
+	0x04, 0x00, 0x0d, 0x00, 0x20, 0x00, 0x1e, 0x04, 0x03, 0x05, 0x03,
+	0x06, 0x03, 0x02, 0x03, 0x08, 0x04, 0x08, 0x05, 0x08, 0x06, 0x04,
+	0x01, 0x05, 0x01, 0x06, 0x01, 0x02, 0x01, 0x04, 0x02, 0x05, 0x02,
+	0x06, 0x02, 0x02, 0x02, 0x00, 0x2d, 0x00, 0x02, 0x01, 0x01, 0x00,
+	0x1c, 0x00, 0x02, 0x40, 0x01
+};
+
+/** TLSv1.3 ClientHello random bytes */
+static uint8_t tls13_client_hello_random[] = {
+	0xcb, 0x34, 0xec, 0xb1, 0xe7, 0x81, 0x63, 0xba, 0x1c, 0x38, 0xc6,
+	0xda, 0xcb, 0x19, 0x6a, 0x6d, 0xff, 0xa2, 0x1a, 0x8d, 0x99, 0x12,
+	0xec, 0x18, 0xa2, 0xef, 0x62, 0x83, 0x02, 0x4d, 0xec, 0xe7
+};
+
+/** TLSv1.3 ClientHello cipher suites */
+static uint8_t tls13_client_hello_suites[] = {
+	0x13, 0x01, 0x13, 0x03, 0x13, 0x02
+};
+
+/** TLSv1.3 ClientHello supported groups */
+static uint8_t tls13_client_hello_groups[] = {
+	0x00, 0x12, 0x00, 0x1d, 0x00, 0x17, 0x00, 0x18, 0x00, 0x19, 0x01,
+	0x00, 0x01, 0x01, 0x01, 0x02, 0x01, 0x03, 0x01, 0x04
+};
+
+/** TLSv1.3 ClientHello public key */
+static uint8_t tls13_client_hello_public[] = {
+	0x99, 0x38, 0x1d, 0xe5, 0x60, 0xe4, 0xbd, 0x43, 0xd2, 0x3d, 0x8e,
+	0x43, 0x5a, 0x7d, 0xba, 0xfe, 0xb3, 0xc0, 0x6e, 0x51, 0xc1, 0x3c,
+	0xae, 0x4d, 0x54, 0x13, 0x69, 0x1e, 0x52, 0x9a, 0xaf, 0x2c
+};
+
+/** TLSv1.3 ClientHello signature algorithms */
+static uint8_t tls13_client_hello_sigs[] = {
+	0x00, 0x1e, 0x04, 0x03, 0x05, 0x03, 0x06, 0x03, 0x02, 0x03, 0x08,
+	0x04, 0x08, 0x05, 0x08, 0x06, 0x04, 0x01, 0x05, 0x01, 0x06, 0x01,
+	0x02, 0x01, 0x04, 0x02, 0x05, 0x02, 0x06, 0x02, 0x02, 0x02
+};
+
+/** TLSv1.3 ClientHello supported version */
+static uint8_t tls13_client_hello_supvers[] = { 0x03, 0x04 };
+
+/** TLSv1.3 ClientHello pre-shared key modes */
+static uint8_t tls13_client_hello_pskmodes[] = { 0x01 };
+
 /** Space for test data */
 union tlsfmt_test_data {
 	uint8_t tls13_server_hello[ sizeof ( tls13_server_hello ) + 1 ];
@@ -268,7 +328,53 @@ union tlsfmt_test_data {
 		[ sizeof ( tls12_server_key_exchange_ecdhe ) ];
 	uint8_t tls11_server_key_exchange_ecdhe
 		[ sizeof ( tls11_server_key_exchange_ecdhe ) ];
+	uint8_t tls13_client_hello[ sizeof ( tls13_client_hello ) ];
 };
+
+/**
+ * Report a cursor comparison test result
+ *
+ * @v cursor		Cursor
+ * @v reference		Reference cursor
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static void cursor_okx ( struct tls_cursor *cursor,
+			 struct tls_cursor *reference,
+			 const char *file, unsigned int line ) {
+
+	/* Compare cursors */
+	okx ( cursor->len == reference->len, file, line );
+	okx ( memcmp ( cursor->data, reference->data, reference->len ) == 0,
+	      file, line );
+}
+#define cursor_ok( cursor, reference )					\
+	cursor_okx ( (cursor), (reference), __FILE__, __LINE__ )
+
+/**
+ * Report a pre-extensions comparison test result
+ *
+ * @v data		Data
+ * @v ext		Extensions
+ * @v reference		Reference data
+ * @v reference_ext	Reference extensions
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static void pre_ext_okx ( const void *data, struct tls_cursor *extensions,
+			  const void *reference,
+			  struct tls_cursor *reference_ext,
+			  const char *file, unsigned int line ) {
+	size_t reference_len = ( reference_ext->data - reference );
+	size_t len = ( extensions->data - data );
+
+	/* Compare cursors */
+	okx ( len == reference_len, file, line );
+	okx ( memcmp ( data, reference, reference_len ) == 0, file, line );
+}
+#define pre_ext_ok( data, ext, reference, reference_ext )		\
+	pre_ext_okx ( (data), (ext), (reference), (reference_ext),	\
+		      __FILE__, __LINE__ )
 
 /**
  * Perform TLS data format self-test
@@ -277,19 +383,28 @@ union tlsfmt_test_data {
 static void tlsfmt_test_exec ( void ) {
 	union tlsfmt_test_data u;
 	struct tls_cursor cursor;
+	struct tls_client_hello client_hello;
+	struct tls_client_hello client_hello_ref;
 	struct tls_server_hello server_hello;
 	struct tls_server_hello server_hello_ref;
 	struct tls_supported_version supported_version;
+	struct tls_supported_versions supported_versions;
 	struct tls_key_share_entry key_share_entry;
+	struct tls_key_share_client_hello key_share_client_hello;
 	struct tls_certificate certificate;
 	struct tls_certificate_entry certificate_entry;
 	struct tls_server_key_exchange_ecdhe server_key_exchange_ecdhe;
 	struct tls_digitally_signed digitally_signed;
+	struct tls_server_name server_name;
+	struct tls_server_name_list server_name_list;
+	struct tls_psk_key_exchange_modes psk_key_exchange_modes;
 	struct x509_certificate *tls13_cert;
 	struct x509_certificate *tls12_cert;
 	unsigned int offset;
 	uint16_t __attribute__ (( aligned ( 1 ) )) *tmp16;
 	uint16_t group;
+	uint16_t record;
+	uint8_t empty[0];
 
 	/* Well-formed TLSv1.3 ServerHello */
 	memset ( u.tls13_server_hello, 0xaa, sizeof ( u.tls13_server_hello ) );
@@ -302,8 +417,7 @@ static void tlsfmt_test_exec ( void ) {
 	ok ( server_hello.a->version == htons ( TLS_VERSION_TLS_1_2 ) );
 	ok ( server_hello.session_id.data != NULL );
 	ok ( server_hello.session_id.len == 0 );
-	ok ( server_hello.b->cipher_suite ==
-	     htons ( TLS_AES_128_GCM_SHA256 ) );
+	ok ( server_hello.b->suite == htons ( TLS_AES_128_GCM_SHA256 ) );
 	ok ( server_hello.ext.reneg.data == NULL );
 	ok ( server_hello.ext.ems.data == NULL );
 	ok ( server_hello.ext.supver.data != NULL );
@@ -512,7 +626,7 @@ static void tlsfmt_test_exec ( void ) {
 	server_hello.a->version = htons ( TLS_VERSION_TLS_1_2 );
 	memcpy ( server_hello.a->random, tls13_server_hello_random,
 		 sizeof ( server_hello.a->random ) );
-	server_hello.b->cipher_suite = htons ( TLS_AES_128_GCM_SHA256 );
+	server_hello.b->suite = htons ( TLS_AES_128_GCM_SHA256 );
 	ok ( tls_build ( tls_key_share_entry, TLS_VERSION_TLS_1_3,
 			 &key_share_entry, &server_hello.ext.key ) == 0 );
 	ok ( tls_build ( tls_supported_version, TLS_VERSION_TLS_1_3,
@@ -527,17 +641,10 @@ static void tlsfmt_test_exec ( void ) {
 	cursor.len = sizeof ( tls13_server_hello );
 	ok ( tls_parse ( tls_server_hello, TLS_VERSION_TLS_1_3,
 			 &cursor, &server_hello_ref ) == 0 );
-	ok ( server_hello.ext.supver.len == server_hello_ref.ext.supver.len );
-	ok ( server_hello.ext.key.len == server_hello_ref.ext.key.len );
-	ok ( memcmp ( u.tls13_server_hello, tls13_server_hello,
-		      ( server_hello.ext.all.data -
-			( ( void * ) u.tls13_server_hello ) ) ) == 0 );
-	ok ( memcmp ( server_hello.ext.supver.data,
-		      server_hello_ref.ext.supver.data,
-		      server_hello_ref.ext.supver.len ) == 0 );
-	ok ( memcmp ( server_hello.ext.key.data,
-		      server_hello_ref.ext.key.data,
-		      server_hello_ref.ext.key.len ) == 0 );
+	pre_ext_ok ( u.tls13_server_hello, &server_hello.ext.all,
+		     tls13_server_hello, &server_hello_ref.ext.all );
+	cursor_ok ( &server_hello.ext.supver, &server_hello_ref.ext.supver );
+	cursor_ok ( &server_hello.ext.key, &server_hello_ref.ext.key );
 
 	/* Build TLSv1.2 ServerKeyExchange */
 	memset ( &digitally_signed, 0, sizeof ( digitally_signed ) );
@@ -607,6 +714,104 @@ static void tlsfmt_test_exec ( void ) {
 	ok ( memcmp ( u.tls11_server_key_exchange_ecdhe,
 		      tls11_server_key_exchange_ecdhe,
 		      sizeof ( tls11_server_key_exchange_ecdhe ) ) == 0 );
+
+	/* Build TLSv1.3 ClientHello */
+	memset ( &server_name, 0, sizeof ( server_name ) );
+	memset ( &server_name_list, 0, sizeof ( server_name_list ) );
+	memset ( &key_share_entry, 0, sizeof ( key_share_entry ) );
+	memset ( &key_share_client_hello, 0,
+		 sizeof ( key_share_client_hello ) );
+	memset ( &supported_versions, 0, sizeof ( supported_versions ) );
+	memset ( &psk_key_exchange_modes, 0,
+		 sizeof ( psk_key_exchange_modes ) );
+	memset ( &client_hello, 0, sizeof ( client_hello ) );
+	server_name.name.data = "server";
+	server_name.name.len = strlen ( server_name.name.data );
+	ok ( tls_size ( tls_server_name, TLS_VERSION_TLS_1_3,
+			&server_name, &server_name_list.list ) == 0 );
+	ok ( tls_size ( tls_server_name_list, TLS_VERSION_TLS_1_3,
+			&server_name_list, &client_hello.ext.names ) == 0 );
+	group = htons ( TLS_NAMED_GROUP_X25519 );
+	key_share_entry.group = &group;
+	key_share_entry.public.data = tls13_client_hello_public;
+	key_share_entry.public.len = sizeof ( tls13_client_hello_public );
+	ok ( tls_size ( tls_key_share_entry, TLS_VERSION_TLS_1_3,
+			&key_share_entry,
+			&key_share_client_hello.list ) == 0 );
+	ok ( tls_size ( tls_key_share_client_hello, TLS_VERSION_TLS_1_3,
+			&key_share_client_hello,
+			&client_hello.ext.keys ) == 0 );
+	supported_versions.list.data = tls13_client_hello_supvers;
+	supported_versions.list.len = sizeof ( tls13_client_hello_supvers );
+	ok ( tls_size ( tls_supported_versions, TLS_VERSION_TLS_1_3,
+			&supported_versions,
+			&client_hello.ext.supvers ) == 0 );
+	psk_key_exchange_modes.list.data = tls13_client_hello_pskmodes;
+	psk_key_exchange_modes.list.len =
+		sizeof ( tls13_client_hello_pskmodes );
+	ok ( tls_size ( tls_psk_key_exchange_modes, TLS_VERSION_TLS_1_3,
+			&psk_key_exchange_modes,
+			&client_hello.ext.pskmodes ) == 0 );
+	client_hello.suites.data = tls13_client_hello_suites;
+	client_hello.suites.len = sizeof ( tls13_client_hello_suites );
+	client_hello.compression.len = 1;
+	client_hello.ext.reneg.len = 1;
+	client_hello.ext.groups.data = tls13_client_hello_groups;
+	client_hello.ext.groups.len = sizeof ( tls13_client_hello_groups );
+	client_hello.ext.ticket.data = empty;
+	client_hello.ext.sigs.data = tls13_client_hello_sigs;
+	client_hello.ext.sigs.len = sizeof ( tls13_client_hello_sigs );
+	record = htons ( 0x4001 );
+	client_hello.ext.record.data = &record;
+	client_hello.ext.record.len = sizeof ( record );
+	ok ( tls_size ( tls_client_hello, TLS_VERSION_TLS_1_3,
+			&client_hello, &cursor ) == 0 );
+	ok ( cursor.len == sizeof ( tls13_client_hello ) );
+	cursor.data = u.tls13_client_hello;
+	ok ( tls_build ( tls_client_hello, TLS_VERSION_TLS_1_3,
+			 &client_hello, &cursor ) == 0 );
+	client_hello.a->version = htons ( TLS_VERSION_TLS_1_2 );
+	ok ( tls_build ( tls_server_name_list, TLS_VERSION_TLS_1_3,
+			&server_name_list, &client_hello.ext.names ) == 0 );
+	ok ( tls_build ( tls_server_name, TLS_VERSION_TLS_1_3,
+			 &server_name, &server_name_list.list ) == 0 );
+	ok ( tls_build ( tls_key_share_client_hello, TLS_VERSION_TLS_1_3,
+			 &key_share_client_hello,
+			 &client_hello.ext.keys ) == 0 );
+	ok ( tls_build ( tls_key_share_entry, TLS_VERSION_TLS_1_3,
+			 &key_share_entry,
+			 &key_share_client_hello.list ) == 0 );
+	ok ( tls_build ( tls_supported_versions, TLS_VERSION_TLS_1_3,
+			 &supported_versions,
+			 &client_hello.ext.supvers ) == 0 );
+	ok ( tls_build ( tls_psk_key_exchange_modes, TLS_VERSION_TLS_1_3,
+			 &psk_key_exchange_modes,
+			 &client_hello.ext.pskmodes ) == 0 );
+	memcpy ( client_hello.a->random, tls13_client_hello_random,
+		 sizeof ( client_hello.a->random ) );
+	DBGC ( &cursor, "TLSFMT built TLSv1.3 ClientHello:\n" );
+	DBGC_HDA ( &cursor, 0, cursor.data, cursor.len );
+	DBGC ( &cursor, "TLSFMT reference TLSv1.3 ClientHello:\n" );
+	DBGC_HDA ( &cursor, 0, tls13_client_hello,
+		   sizeof ( tls13_client_hello ) );
+	cursor.data = tls13_client_hello;
+	cursor.len = sizeof ( tls13_client_hello );
+	ok ( tls_parse ( tls_client_hello, TLS_VERSION_TLS_1_3,
+			 &cursor, &client_hello_ref ) == 0 );
+	pre_ext_ok ( u.tls13_client_hello, &client_hello.ext.all,
+		     tls13_client_hello, &client_hello_ref.ext.all );
+	cursor_ok ( &client_hello.ext.ems, &client_hello_ref.ext.ems );
+	cursor_ok ( &client_hello.ext.frag, &client_hello_ref.ext.frag );
+	cursor_ok ( &client_hello.ext.groups, &client_hello_ref.ext.groups );
+	cursor_ok ( &client_hello.ext.keys, &client_hello_ref.ext.keys );
+	cursor_ok ( &client_hello.ext.names, &client_hello_ref.ext.names );
+	cursor_ok ( &client_hello.ext.pskmodes,
+		    &client_hello_ref.ext.pskmodes );
+	cursor_ok ( &client_hello.ext.record, &client_hello_ref.ext.record );
+	cursor_ok ( &client_hello.ext.reneg, &client_hello_ref.ext.reneg );
+	cursor_ok ( &client_hello.ext.sigs, &client_hello_ref.ext.sigs );
+	cursor_ok ( &client_hello.ext.supvers, &client_hello_ref.ext.supvers );
+	cursor_ok ( &client_hello.ext.ticket, &client_hello_ref.ext.ticket );
 
 	/* Propagation of sizing errors */
 	memset ( &digitally_signed, 0, sizeof ( digitally_signed ) );

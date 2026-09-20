@@ -179,11 +179,17 @@ union tls_server_random {
 /* TLS extended master secret extension */
 #define TLS_EXTENDED_MASTER_SECRET 23
 
+/* TLS record size limit extension */
+#define TLS_RECORD_SIZE_LIMIT 28
+
 /* TLS session ticket extension */
 #define TLS_SESSION_TICKET 35
 
 /* TLS supported versions extension */
 #define TLS_SUPPORTED_VERSIONS 43
+
+/* TLS pre-shared key modes extension */
+#define TLS_PSK_MODES 45
 
 /* TLS key share extension */
 #define TLS_KEY_SHARE 51
@@ -242,8 +248,8 @@ struct tls_key_exchange_algorithm {
 	int ( * parse ) ( struct tls_connection *tls,
 			  const struct tls_cursor *cursor,
 			  struct tls_key_exchange_parameters *kex );
-	/** Length of length field in Client Key Exchange record */
-	uint8_t len_len;
+	/** ClientKeyExchange descriptor mapping */
+	const uint8_t *map;
 };
 
 /**

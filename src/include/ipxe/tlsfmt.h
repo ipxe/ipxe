@@ -409,6 +409,82 @@ struct tls_certificate_entry {
 	struct tls_cursor next;
 };
 
+/** ClientHello descriptor */
+struct tls_client_hello {
+	/** Fixed portion */
+	struct {
+		/** Offered version */
+		uint16_t version;
+		/** Client random bytes */
+		uint8_t random[32];
+	} __attribute__ (( packed )) *a;
+	/** Session ID */
+	struct tls_cursor session_id;
+	/** Cipher suites */
+	struct tls_cursor suites;
+	/** Compression methods */
+	struct tls_cursor compression;
+	/** Extensions of interest */
+	struct {
+		/** All extensions */
+		struct tls_cursor all;
+		/** Extended master secret extension */
+		struct tls_cursor ems;
+		/** Maximum fragment length extension */
+		struct tls_cursor frag;
+		/** Supported groups extension */
+		struct tls_cursor groups;
+		/** Key share extension */
+		struct tls_cursor keys;
+		/** Server name indication extension */
+		struct tls_cursor names;
+		/** Preshared key modes extension */
+		struct tls_cursor pskmodes;
+		/** Record size limit extension */
+		struct tls_cursor record;
+		/** Renegotiation information extension */
+		struct tls_cursor reneg;
+		/** Signature algorithms extension */
+		struct tls_cursor sigs;
+		/** Supported versions extension */
+		struct tls_cursor supvers;
+		/** Session ticket extension */
+		struct tls_cursor ticket;
+	} ext;
+};
+
+/** ClientKeyExchange descriptor (for DHE) */
+struct tls_client_key_exchange_dhe {
+	/** Public key */
+	struct tls_cursor dh_yc;
+};
+
+/** ClientKeyExchange descriptor (for ECDHE) */
+struct tls_client_key_exchange_ecdhe {
+	/** Curve point */
+	struct tls_cursor point;
+};
+
+/** ClientKeyExchange descriptor (for key transport) */
+struct tls_client_key_exchange_pubkey {
+	/** Encrypted pre-master secret */
+	struct tls_cursor enc;
+};
+
+/** ClientKeyExchange descriptor (unified) */
+union tls_client_key_exchange {
+	/** ClientKeyExchange descriptor (common format) */
+	struct tls_cursor cursor;
+	/** ClientKeyExchange descriptor (for key transport) */
+	struct tls_client_key_exchange_pubkey pubkey;
+	/** ClientKeyExchange descriptor (for DHE) */
+	struct tls_client_key_exchange_dhe dhe;
+	/** ClientKeyExchange descriptor (for ECDHE) */
+	struct tls_client_key_exchange_ecdhe ecdhe;
+	/** Raw pointer/length array */
+	union tls_ptr_len desc[0];
+};
+
 /** DigitallySigned descriptor */
 struct tls_digitally_signed {
 	/** Signature and hash algorithm */
@@ -430,6 +506,12 @@ struct tls_extension {
 /** HelloRequest descriptor */
 struct tls_hello_request {};
 
+/** KeyShareClientHello descriptor */
+struct tls_key_share_client_hello {
+	/** Key share list */
+	struct tls_cursor list;
+};
+
 /** KeyShareEntry descriptor */
 struct tls_key_share_entry {
 	/** Named group */
@@ -438,6 +520,18 @@ struct tls_key_share_entry {
 	struct tls_cursor public;
 	/** Next key share */
 	struct tls_cursor next;
+};
+
+/** MaxFragmentLength descriptor */
+struct tls_max_fragment_length {
+	/** Maximum fragment length */
+	uint8_t *max;
+};
+
+/** NamedGroupList descriptor */
+struct tls_named_group_list {
+	/** Named group list */
+	struct tls_cursor list;
 };
 
 /** NewSessionTicket descriptor */
@@ -455,6 +549,12 @@ struct tls_new_session_ticket {
 		/** All extensions */
 		struct tls_cursor all;
 	} ext;
+};
+
+/** PskKeyExchangeModes descriptor */
+struct tls_psk_key_exchange_modes {
+	/** Mode list */
+	struct tls_cursor list;
 };
 
 /** RenegotiationInfo descriptor */
@@ -477,9 +577,9 @@ struct tls_server_hello {
 	/** Second fixed-length portion */
 	struct {
 		/** Selected cipher suite */
-		uint16_t cipher_suite;
+		uint16_t suite;
 		/** Selected compression method */
-		uint8_t compression_method;
+		uint8_t compression;
 	} __attribute__ (( packed )) *b;
 	/** Extensions of interest */
 	struct {
@@ -489,9 +589,9 @@ struct tls_server_hello {
 		struct tls_cursor reneg;
 		/** Extended master secret extension */
 		struct tls_cursor ems;
-		/** Supported version */
+		/** Supported versions extension */
 		struct tls_cursor supver;
-		/** Key share */
+		/** Key share extension */
 		struct tls_cursor key;
 	} ext;
 };
@@ -526,6 +626,26 @@ struct tls_server_key_exchange_ecdhe {
 	struct tls_cursor dsig;
 };
 
+/** ServerName descriptor */
+struct tls_server_name {
+	/** Name type */
+	uint8_t *type;
+	/** Host name */
+	struct tls_cursor name;
+};
+
+/** ServerNameList descriptor */
+struct tls_server_name_list {
+	/** Server name list */
+	struct tls_cursor list;
+};
+
+/** SignatureSchemeList descriptor */
+struct tls_signature_scheme_list {
+	/** Supported signature algorithm list */
+	struct tls_cursor list;
+};
+
 /** SupportedVersions descriptor (in ServerHello) */
 struct tls_supported_version {
 	/** Selected version */
@@ -534,8 +654,8 @@ struct tls_supported_version {
 
 /** SupportedVersions descriptor (in ClientHello) */
 struct tls_supported_versions {
-	/** Supported versions */
-	struct tls_cursor versions;
+	/** Supported version list */
+	struct tls_cursor list;
 };
 
 /**
@@ -633,16 +753,27 @@ extern int tls_size_map ( const uint8_t *map, unsigned int version,
 
 extern TLS_DESCR_MAPPING ( tls_certificate );
 extern TLS_DESCR_MAPPING ( tls_certificate_entry );
+extern TLS_DESCR_MAPPING ( tls_client_hello );
+extern TLS_DESCR_MAPPING ( tls_client_key_exchange_dhe );
+extern TLS_DESCR_MAPPING ( tls_client_key_exchange_ecdhe );
+extern TLS_DESCR_MAPPING ( tls_client_key_exchange_pubkey );
 extern TLS_DESCR_MAPPING ( tls_digitally_signed );
 extern TLS_DESCR_MAPPING ( tls_extension );
 extern TLS_DESCR_MAPPING ( tls_hello_request );
+extern TLS_DESCR_MAPPING ( tls_key_share_client_hello );
 extern TLS_DESCR_MAPPING ( tls_key_share_entry );
+extern TLS_DESCR_MAPPING ( tls_max_fragment_length );
+extern TLS_DESCR_MAPPING ( tls_named_group_list );
 extern TLS_DESCR_MAPPING ( tls_new_session_ticket );
+extern TLS_DESCR_MAPPING ( tls_psk_key_exchange_modes );
 extern TLS_DESCR_MAPPING ( tls_renegotiation_info );
 extern TLS_DESCR_MAPPING ( tls_server_hello );
 extern TLS_DESCR_MAPPING ( tls_server_hello_done );
 extern TLS_DESCR_MAPPING ( tls_server_key_exchange_dhe );
 extern TLS_DESCR_MAPPING ( tls_server_key_exchange_ecdhe );
+extern TLS_DESCR_MAPPING ( tls_server_name );
+extern TLS_DESCR_MAPPING ( tls_server_name_list );
+extern TLS_DESCR_MAPPING ( tls_signature_scheme_list );
 extern TLS_DESCR_MAPPING ( tls_supported_version );
 extern TLS_DESCR_MAPPING ( tls_supported_versions );
 

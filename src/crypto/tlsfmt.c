@@ -48,16 +48,30 @@ static const char * tls_map_name ( const uint8_t *map ) {
 		return "Certificate";
 	} else if ( map == tls_certificate_entry_map ) {
 		return "CertificateEntry";
+	} else if ( map == tls_client_hello_map ) {
+		return "ClientHello";
+	} else if ( ( map == tls_client_key_exchange_dhe_map ) ||
+		    ( map == tls_client_key_exchange_ecdhe_map ) ||
+		    ( map == tls_client_key_exchange_pubkey_map ) ) {
+		return "ClientKeyExchange";
 	} else if ( map == tls_digitally_signed_map ) {
 		return "DigitallySigned";
 	} else if ( map == tls_extension_map ) {
 		return "Extension";
 	} else if ( map == tls_hello_request_map ) {
 		return "HelloRequest";
+	} else if ( map == tls_key_share_client_hello_map ) {
+		return "KeyShareClientHello";
 	} else if ( map == tls_key_share_entry_map ) {
 		return "KeyShareEntry";
+	} else if ( map == tls_max_fragment_length_map ) {
+		return "MaxFragmentLength";
+	} else if ( map == tls_named_group_list_map ) {
+		return "NamedGroupList";
 	} else if ( map == tls_new_session_ticket_map ) {
 		return "NewSessionTicket";
+	} else if ( map == tls_psk_key_exchange_modes_map ) {
+		return "PskKeyExchangeModes";
 	} else if ( map == tls_renegotiation_info_map ) {
 		return "RenegotiationInfo";
 	} else if ( map == tls_server_hello_map ) {
@@ -67,6 +81,12 @@ static const char * tls_map_name ( const uint8_t *map ) {
 	} else if ( ( map == tls_server_key_exchange_dhe_map ) ||
 		    ( map == tls_server_key_exchange_ecdhe_map ) ) {
 		return "ServerKeyExchange";
+	} else if ( map == tls_server_name_map ) {
+		return "ServerName";
+	} else if ( map == tls_server_name_list_map ) {
+		return "ServerNameList";
+	} else if ( map == tls_signature_scheme_list_map ) {
+		return "SignatureSchemeList";
 	} else if ( ( map == tls_supported_versions_map ) ||
 		    ( map == tls_supported_version_map ) ) {
 		return "SupportedVersions";
@@ -661,6 +681,45 @@ TLS_DESCR_MAPPING ( tls_certificate_entry ) = {
 	TLS_EXTRA ( tls_certificate_entry, TLS_VERSION_BASE, next ),
 };
 
+/** ClientHello descriptor mapping */
+TLS_DESCR_MAPPING ( tls_client_hello ) = {
+	TLS_MAPSZ ( tls_client_hello ),
+	TLS_FIXED ( tls_client_hello, TLS_VERSION_BASE, a ),
+	TLS_VAR08 ( tls_client_hello, TLS_VERSION_BASE, session_id ),
+	TLS_VAR16 ( tls_client_hello, TLS_VERSION_BASE, suites ),
+	TLS_VAR08 ( tls_client_hello, TLS_VERSION_BASE, compression ),
+	TLS_EXT16 ( tls_client_hello, TLS_VERSION_BASE, ext ),
+	TLS_EXTND ( tls_client_hello, TLS_EXTENDED_MASTER_SECRET, ext.ems ),
+	TLS_EXTND ( tls_client_hello, TLS_MAX_FRAGMENT_LENGTH, ext.frag ),
+	TLS_EXTND ( tls_client_hello, TLS_NAMED_GROUP, ext.groups ),
+	TLS_EXTND ( tls_client_hello, TLS_KEY_SHARE, ext.keys ),
+	TLS_EXTND ( tls_client_hello, TLS_SERVER_NAME, ext.names ),
+	TLS_EXTND ( tls_client_hello, TLS_PSK_MODES, ext.pskmodes ),
+	TLS_EXTND ( tls_client_hello, TLS_RECORD_SIZE_LIMIT, ext.record ),
+	TLS_EXTND ( tls_client_hello, TLS_RENEGOTIATION_INFO, ext.reneg ),
+	TLS_EXTND ( tls_client_hello, TLS_SIGNATURE_ALGORITHMS, ext.sigs ),
+	TLS_EXTND ( tls_client_hello, TLS_SUPPORTED_VERSIONS, ext.supvers ),
+	TLS_EXTND ( tls_client_hello, TLS_SESSION_TICKET, ext.ticket ),
+};
+
+/** ClientKeyExchange descriptor mapping (for DHE) */
+TLS_DESCR_MAPPING ( tls_client_key_exchange_dhe ) = {
+	TLS_MAPSZ ( tls_client_key_exchange_dhe ),
+	TLS_VAR16 ( tls_client_key_exchange_dhe, TLS_VERSION_BASE, dh_yc ),
+};
+
+/** ClientKeyExchange descriptor mapping (for ECDHE) */
+TLS_DESCR_MAPPING ( tls_client_key_exchange_ecdhe ) = {
+	TLS_MAPSZ ( tls_client_key_exchange_ecdhe ),
+	TLS_VAR08 ( tls_client_key_exchange_ecdhe, TLS_VERSION_BASE, point ),
+};
+
+/** ClientKeyExchange descriptor mapping (for key transport) */
+TLS_DESCR_MAPPING ( tls_client_key_exchange_pubkey ) = {
+	TLS_MAPSZ ( tls_client_key_exchange_pubkey ),
+	TLS_VAR16 ( tls_client_key_exchange_pubkey, TLS_VERSION_BASE, enc ),
+};
+
 /** DigitallySigned descriptor mapping */
 TLS_DESCR_MAPPING ( tls_digitally_signed ) = {
 	TLS_MAPSZ ( tls_digitally_signed ),
@@ -681,12 +740,30 @@ TLS_DESCR_MAPPING ( tls_hello_request ) = {
 	TLS_MAPSZ ( tls_hello_request ),
 };
 
+/** KeyShareClientHello descriptor mapping */
+TLS_DESCR_MAPPING ( tls_key_share_client_hello ) = {
+	TLS_MAPSZ ( tls_key_share_client_hello ),
+	TLS_VAR16 ( tls_key_share_client_hello, TLS_VERSION_BASE, list ),
+};
+
 /** KeyShareEntry descriptor mapping */
 TLS_DESCR_MAPPING ( tls_key_share_entry ) = {
 	TLS_MAPSZ ( tls_key_share_entry ),
 	TLS_FIXED ( tls_key_share_entry, TLS_VERSION_BASE, group ),
 	TLS_VAR16 ( tls_key_share_entry, TLS_VERSION_BASE, public ),
 	TLS_EXTRA ( tls_key_share_entry, TLS_VERSION_BASE, next ),
+};
+
+/** MaxFragmentLength descriptor mapping */
+TLS_DESCR_MAPPING ( tls_max_fragment_length ) = {
+	TLS_MAPSZ ( tls_max_fragment_length ),
+	TLS_FIXED ( tls_max_fragment_length, TLS_VERSION_BASE, max ),
+};
+
+/** NamedGroupList descriptor mapping */
+TLS_DESCR_MAPPING ( tls_named_group_list ) = {
+	TLS_MAPSZ ( tls_named_group_list ),
+	TLS_VAR16 ( tls_named_group_list, TLS_VERSION_BASE, list ),
 };
 
 /** NewSessionTicket descriptor mapping */
@@ -697,6 +774,12 @@ TLS_DESCR_MAPPING ( tls_new_session_ticket ) = {
 	TLS_VAR08 ( tls_new_session_ticket, TLS_VERSION_TLS_1_3, nonce ),
 	TLS_VAR16 ( tls_new_session_ticket, TLS_VERSION_BASE, ticket ),
 	TLS_EXT16 ( tls_new_session_ticket, TLS_VERSION_TLS_1_3, ext ),
+};
+
+/** PskKeyExchangeModes descriptor mapping */
+TLS_DESCR_MAPPING ( tls_psk_key_exchange_modes ) = {
+	TLS_MAPSZ ( tls_psk_key_exchange_modes ),
+	TLS_VAR08 ( tls_psk_key_exchange_modes, TLS_VERSION_TLS_1_3, list ),
 };
 
 /** RenegotiationInfo descriptor mapping */
@@ -732,12 +815,31 @@ TLS_DESCR_MAPPING ( tls_server_key_exchange_dhe ) = {
 	TLS_EXTRA ( tls_server_key_exchange_dhe, TLS_VERSION_BASE, dsig ),
 };
 
-/** ServerKeyExchange descriptor mapping (for EcDHE) */
+/** ServerKeyExchange descriptor mapping (for ECDHE) */
 TLS_DESCR_MAPPING ( tls_server_key_exchange_ecdhe ) = {
 	TLS_MAPSZ ( tls_server_key_exchange_ecdhe ),
 	TLS_FIXED ( tls_server_key_exchange_ecdhe, TLS_VERSION_BASE, curve ),
 	TLS_VAR08 ( tls_server_key_exchange_ecdhe, TLS_VERSION_BASE, point ),
 	TLS_EXTRA ( tls_server_key_exchange_ecdhe, TLS_VERSION_BASE, dsig ),
+};
+
+/** ServerName descriptor mapping */
+TLS_DESCR_MAPPING ( tls_server_name ) = {
+	TLS_MAPSZ ( tls_server_name ),
+	TLS_FIXED ( tls_server_name, TLS_VERSION_BASE, type ),
+	TLS_VAR16 ( tls_server_name, TLS_VERSION_BASE, name ),
+};
+
+/** ServerNameList descriptor mapping */
+TLS_DESCR_MAPPING ( tls_server_name_list ) = {
+	TLS_MAPSZ ( tls_server_name_list ),
+	TLS_VAR16 ( tls_server_name_list, TLS_VERSION_BASE, list ),
+};
+
+/** SignatureSchemeList descriptor mapping */
+TLS_DESCR_MAPPING ( tls_signature_scheme_list ) = {
+	TLS_MAPSZ ( tls_signature_scheme_list ),
+	TLS_VAR16 ( tls_signature_scheme_list, TLS_VERSION_BASE, list ),
 };
 
 /** SupportedVersions descriptor mapping (in ServerHello) */
@@ -749,5 +851,5 @@ TLS_DESCR_MAPPING ( tls_supported_version ) = {
 /** SupportedVersions descriptor mapping (in ClientHello) */
 TLS_DESCR_MAPPING ( tls_supported_versions ) = {
 	TLS_MAPSZ ( tls_supported_versions ),
-	TLS_VAR08 ( tls_supported_versions, TLS_VERSION_BASE, versions ),
+	TLS_VAR08 ( tls_supported_versions, TLS_VERSION_BASE, list ),
 };
