@@ -1971,6 +1971,61 @@ static int tlskey_md5_sha1_apply ( struct tls_key_schedule *tlskey,
 }
 
 /**
+ * Generate signable digest value
+ *
+ * @v tlskey		Key schedule
+ * @v end		Endpoint
+ * @v digest		Signature digest algorithm
+ * @v data		Additional data
+ * @v len		Length of additional data
+ * @v tbs		Signable digest value to fill in
+ * @ret rc		Return status code
+ */
+static int tlskey_md5_sha1_tbshash ( struct tls_key_schedule *tlskey,
+				     const struct tls_endpoint *end,
+				     struct digest_algorithm *digest,
+				     const void *data, size_t len,
+				     void *tbs ) {
+	struct md5_sha1_digest *running = tlskey->transcript.running;
+	const void *hash;
+
+	/* The client CertificateVerify digest value is the raw
+	 * transcript digest.  We retain an MD5+SHA1 transcript
+	 * digest, which is the concatenation of the MD5 and SHA-1
+	 * transcript digests.  We can therefore provide a signable
+	 * digest value for MD5 or SHA-1 as well as for MD5+SHA1.
+	 */
+	if ( ( end->index == TLS_CLIENT ) && ( digest != tlskey->digest ) ) {
+
+		/* Locate MD5 or SHA-1 portion */
+		if ( digest == &md5_algorithm ) {
+			hash = running->md5;
+		} else if ( digest == &sha1_algorithm ) {
+			hash = running->sha1;
+		} else {
+			DBGC ( tlskey, "TLSKEY %p cannot generate %s "
+			       "transcript digest\n", tlskey, digest->name );
+			return -ENOTSUP;
+		}
+
+		/* There is no way to incorporate additional data */
+		if ( len ) {
+			DBGC ( tlskey, "TLSKEY %p cannot generate digest "
+			       "with additional data\n", tlskey );
+			return -ENOTSUP;
+		}
+
+		/* Copy transcript digest value */
+		memcpy ( tbs, hash, digest->digestsize );
+
+		return 0;
+	}
+
+	/* Otherwise, generate MD5+SHA1 signable digest value */
+	return tlskey_hash_tbshash ( tlskey, end, digest, data, len, tbs );
+}
+
+/**
  * Save pre-shared key
  *
  * @v tlskey		Key schedule
@@ -2023,7 +2078,7 @@ const struct tls_key_schedule_operations tlskey_md5_sha1 = {
 	.verify = tlskey_hash_verify,
 	.traffic = tlskey_hash_traffic,
 	.cipher = tlskey_hash_cipher,
-	.tbshash = tlskey_hash_tbshash,
+	.tbshash = tlskey_md5_sha1_tbshash,
 	.save = tlskey_md5_sha1_save,
 	.load = tlskey_hash_load,
 	.bind = tlskey_hash_bind,
