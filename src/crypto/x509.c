@@ -1866,7 +1866,7 @@ struct x509_certificate * x509_find_key ( struct x509_chain *store,
 
 		/* Check public key */
 		cert = link->cert;
-		if ( pubkey_match ( cert->signature_algorithm->pubkey,
+		if ( pubkey_match ( cert->subject.public_key.algorithm->pubkey,
 				    privkey_cursor ( key ),
 				    &cert->subject.public_key.raw ) == 0 )
 			return x509_found ( store, cert );
