@@ -726,7 +726,7 @@ PRIVKEY_INC := $(BIN)/.private_key.der
 
 ifdef PRIVKEY
 $(PRIVKEY_INC) : $(PRIVKEY) $(PRIVKEY_LIST)
-	$(Q)$(OPENSSL) rsa -in $< -outform DER -out $@
+	$(Q)$(OPENSSL) pkey -in $< -outform DER -out $@
 
 privkey_DEPS	+= $(PRIVKEY_INC)
 UNANNOTATED	+= $(PRIVKEY_INC)
