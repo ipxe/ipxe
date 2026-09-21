@@ -457,6 +457,30 @@ static void tls_nonce ( struct tls_connection *tls,
 }
 
 /**
+ * Generate random nonce
+ *
+ * @v tls		TLS connection
+ * @v nonce		Nonce to fill in
+ * @v len		Length of nonce
+ */
+static void tls_random ( struct tls_connection *tls, void *nonce,
+			 size_t len ) {
+	static struct {
+		char label[16];
+		uint64_t counter;
+	} salt = {
+		.label = "tls random nonce",
+	};
+
+	/* Ensure uniqueness */
+	salt.counter++;
+
+	/* Generate nonce as an ephemeral secret */
+	channel_ephemeral ( &tls->channel, &salt, sizeof ( salt ),
+			    nonce, len );
+}
+
+/**
  * Clear key schedule digest algorithm
  *
  * @v tls		TLS connection
@@ -1557,19 +1581,16 @@ static struct secure_channel_operations tls_channel_ops = {
  * Set a random session ID
  *
  * @v tls		TLS connection
- * @v label		Label for ephemeral secret
  *
  * The session ID will be generated deterministically using the
  * per-connection ephemeral secret and will therefore be guaranteed to
  * differ between connections (including restarted connections).
  */
-static void tls_set_session_id ( struct tls_connection *tls,
-				 const char *label ) {
+static void tls_set_session_id ( struct tls_connection *tls ) {
 	struct tls_session *session = tls->session;
 
 	/* Generate session ID */
-	channel_ephemeral_label ( &tls->channel, label, session->id.data,
-				  sizeof ( session->id.data ) );
+	tls_random ( tls, session->id.data, sizeof ( session->id.data ) );
 	session->id.len = sizeof ( session->id.data );
 }
 
@@ -1581,7 +1602,6 @@ static void tls_set_session_id ( struct tls_connection *tls,
  * @ret rc		Return status code
  */
 static int tls_session ( struct tls_connection *tls, const char *name ) {
-	static const char label[] = "tls initial session id";
 	struct tls_session *session;
 	char *name_copy;
 	int rc;
@@ -1619,7 +1639,7 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 
 	/* Generate random initial session ID */
 	tls->session = session;
-	tls_set_session_id ( tls, label );
+	tls_set_session_id ( tls );
 	DBGC ( tls, "TLS %p created session %s:\n", tls, name );
 	DBGC_HDA ( tls, 0, session->id.data, session->id.len );
 
@@ -1637,7 +1657,6 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
  * @ret rc		Return status code
  */
 static int tls_save ( struct tls_connection *tls ) {
-	static const char label[] = "tls reset session id";
 	struct tls_session *session = tls->session;
 	const char *name = session->name;
 	int rc;
@@ -1646,7 +1665,7 @@ static int tls_save ( struct tls_connection *tls ) {
 	assert ( tls->new_id.len || tls->new_ticket.len );
 
 	/* Clear any existing session state */
-	tls_set_session_id ( tls, label );
+	tls_set_session_id ( tls );
 	zfree ( session->ticket.data );
 	session->ticket.data = NULL;
 	session->ticket.len = 0;
@@ -3584,9 +3603,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 				    - sizeof ( authhdr.seq ) ),
 				  &authhdr.seq, sizeof ( authhdr.seq ) );
 		} else {
-			channel_ephemeral ( &tls->channel, &authhdr,
-					    sizeof ( authhdr ), iv.record,
-					    sizeof ( iv.record ) );
+			tls_random ( tls, iv.record, sizeof ( iv.record ) );
 		}
 		if ( ( rc = cipher_setiv ( cipher, pipe->ctx, &iv,
 					   sizeof ( iv ) ) ) != 0 ) {
