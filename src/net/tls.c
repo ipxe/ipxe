@@ -1554,6 +1554,26 @@ static struct secure_channel_operations tls_channel_ops = {
  */
 
 /**
+ * Set a random session ID
+ *
+ * @v tls		TLS connection
+ * @v label		Label for ephemeral secret
+ *
+ * The session ID will be generated deterministically using the
+ * per-connection ephemeral secret and will therefore be guaranteed to
+ * differ between connections (including restarted connections).
+ */
+static void tls_set_session_id ( struct tls_connection *tls,
+				 const char *label ) {
+	struct tls_session *session = tls->session;
+
+	/* Generate session ID */
+	channel_ephemeral_label ( &tls->channel, label, session->id.data,
+				  sizeof ( session->id.data ) );
+	session->id.len = sizeof ( session->id.data );
+}
+
+/**
  * Find or create session for TLS connection
  *
  * @v tls		TLS connection
@@ -1561,7 +1581,7 @@ static struct secure_channel_operations tls_channel_ops = {
  * @ret rc		Return status code
  */
 static int tls_session ( struct tls_connection *tls, const char *name ) {
-	static const char label[] = "tls session id";
+	static const char label[] = "tls initial session id";
 	struct tls_session *session;
 	char *name_copy;
 	int rc;
@@ -1573,7 +1593,10 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 		     ( tls->client.key == session->key ) ) {
 			ref_get ( &session->refcnt );
 			tls->session = session;
-			DBGC ( tls, "TLS %p joining session %s\n", tls, name );
+			DBGC ( tls, "TLS %p joining %s session %s:\n", tls,
+			       ( session->ticket.len ? "stateless" :
+				 "stateful" ), name );
+			DBGC_HDA ( tls, 0, session->id.data, session->id.len );
 			return 0;
 		}
 	}
@@ -1595,14 +1618,11 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 	list_add ( &session->list, &tls_sessions );
 
 	/* Generate random initial session ID */
-	channel_ephemeral_label ( &tls->channel, label, session->id.data,
-				  sizeof ( session->id.data ) );
-	session->id.len = sizeof ( session->id.data );
-
-	/* Record session */
 	tls->session = session;
+	tls_set_session_id ( tls, label );
+	DBGC ( tls, "TLS %p created session %s:\n", tls, name );
+	DBGC_HDA ( tls, 0, session->id.data, session->id.len );
 
-	DBGC ( tls, "TLS %p created session %s\n", tls, name );
 	return 0;
 
 	ref_put ( &session->refcnt );
@@ -1617,8 +1637,19 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
  * @ret rc		Return status code
  */
 static int tls_save ( struct tls_connection *tls ) {
+	static const char label[] = "tls reset session id";
 	struct tls_session *session = tls->session;
+	const char *name = session->name;
 	int rc;
+
+	/* Sanity check */
+	assert ( tls->new_id.len || tls->new_ticket.len );
+
+	/* Clear any existing session state */
+	tls_set_session_id ( tls, label );
+	zfree ( session->ticket.data );
+	session->ticket.data = NULL;
+	session->ticket.len = 0;
 
 	/* Save pre-shared key and peer identity */
 	if ( ( rc = channel_save ( &tls->channel, &session->psid ) ) != 0 ) {
@@ -1628,19 +1659,22 @@ static int tls_save ( struct tls_connection *tls ) {
 	}
 
 	/* Record new session ID, if provided */
-	if ( tls->new_id.len ) {
+	if ( tls->new_id.len )
 		memcpy ( &session->id, &tls->new_id, sizeof ( session->id ) );
-		DBGC ( tls, "TLS %p saved session ID:\n", tls );
-		DBGC_HDA ( tls, 0, session->id.data, session->id.len );
-	}
+	DBGC ( tls, "TLS %p %s session %s:\n",
+	       tls, ( tls->new_id.len ? "saved stateful" : "reset" ), name );
+	DBGC_HDA ( tls, 0, session->id.data, session->id.len );
 
 	/* Record (and consume) new session ticket, if provided */
 	if ( tls->new_ticket.len ) {
-		zfree ( session->ticket.data );
 		session->ticket.data = tls->new_ticket.data;
 		session->ticket.len = tls->new_ticket.len;
 		tls->new_ticket.data = NULL;
 		tls->new_ticket.len = 0;
+		DBGC ( tls, "TLS %p saved stateless session %s:\n",
+		       tls, name );
+		DBGC_HDA ( tls, 0, session->ticket.data,
+			   session->ticket.len );
 	}
 
 	return 0;
@@ -1656,8 +1690,9 @@ static int tls_resume ( struct tls_connection *tls ) {
 	struct tls_session *session = tls->session;
 	int rc;
 
-	DBGC ( tls, "TLS %p resuming session ID:\n", tls );
-	DBGC_HDA ( tls, 0, session->id.data, session->id.len );
+	DBGC ( tls, "TLS %p resuming %s session %s\n",
+	       tls, ( session->ticket.len ? "stateless" : "stateful" ),
+	       session->name );
 
 	/* Load pre-shared key and peer identity */
 	if ( ( rc = channel_load ( &tls->channel, &session->psid ) ) != 0 ) {
@@ -2675,9 +2710,6 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 			tls->new_id.len = hello.session_id.len;
 			memcpy ( tls->new_id.data, hello.session_id.data,
 				 hello.session_id.len );
-			DBGC ( tls, "TLS %p new session ID:\n", tls );
-			DBGC_HDA ( tls, 0, hello.session_id.data,
-				   hello.session_id.len );
 		}
 	}
 
@@ -2746,8 +2778,6 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
 		return -ENOMEM;
 	memcpy ( tls->new_ticket.data, ticket.ticket.data, ticket.ticket.len );
 	tls->new_ticket.len = ticket.ticket.len;
-	DBGC ( tls, "TLS %p new session ticket:\n", tls );
-	DBGC_HDA ( tls, 0, tls->new_ticket.data, tls->new_ticket.len );
 
 	return 0;
 }
