@@ -424,6 +424,10 @@ void tlskey_digest ( struct tls_key_schedule *tlskey, const void *data,
 		uint8_t ctx[ctxsize];
 	} tmp;
 
+	/* Do nothing if key schedule is stopped */
+	if ( ! digestsize )
+		return;
+
 	/* Append to running transcript digest */
 	digest_update ( digest, transcript->ctx, data, len );
 
