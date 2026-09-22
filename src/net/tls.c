@@ -82,6 +82,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EINVAL_INNER						\
 	__einfo_uniqify ( EINFO_EINVAL, 0x10,				\
 			  "Invalid inner plaintext" )
+#define EINVAL_BLOCK __einfo_error ( EINFO_EINVAL_BLOCK )
+#define EINFO_EINVAL_BLOCK						\
+	__einfo_uniqify ( EINFO_EINVAL, 0x11,				\
+			  "Invalid block cipher size" )
 #define EIO_ALERT __einfo_error ( EINFO_EIO_ALERT )
 #define EINFO_EIO_ALERT							\
 	__einfo_uniqify ( EINFO_EIO, 0x01,				\
@@ -3896,6 +3900,14 @@ static int tls_new_ciphertext ( struct tls_connection *tls,
 	iob_unput ( last, cipher->authsize );
 	len -= cipher->authsize;
 	auth = last->tail;
+
+	/* Check that overall length is a multiple of the cipher blocksize */
+	assert ( ( TLS_RX_BUFSIZE % cipher->blocksize ) == 0 );
+	if ( iob_len ( last ) & ( cipher->blocksize - 1 ) ) {
+		DBGC ( tls, "TLS %p invalid received length %zd\n",
+		       tls, len );
+		return -EINVAL_BLOCK;
+	}
 
 	/* Set initialisation vector */
 	if ( ( rc = cipher_setiv ( cipher, pipe->ctx, &iv,

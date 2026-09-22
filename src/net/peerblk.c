@@ -1125,8 +1125,15 @@ static void peerblk_decrypt ( struct peerdist_block *peerblk ) {
 	void *data;
 	int rc;
 
-	/* Sanity check */
+	/* Sanity checks */
 	assert ( ( PEERBLK_DECRYPT_CHUNKSIZE % cipher->blocksize ) == 0 );
+	if ( peerblk->cipher_remaining & ( cipher->blocksize - 1 ) ) {
+		DBGC ( peerblk, "PEERBLK %p %d.%d has invalid length %zd\n",
+		       peerblk, peerblk->segment, peerblk->block,
+		       peerblk->cipher_remaining );
+		rc = -EINVAL;
+		goto err_blocksize;
+	}
 
 	/* Get the underlying data transfer buffer */
 	xferbuf = xfer_buffer ( &peerblk->xfer );
@@ -1197,6 +1204,7 @@ static void peerblk_decrypt ( struct peerdist_block *peerblk ) {
 	free ( data );
  err_alloc_data:
  err_xfer_buffer:
+ err_blocksize:
 	peerblk_done ( peerblk, rc );
 }
 
