@@ -186,20 +186,33 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EPROTO_CIPHER_CHANGE					\
 	__einfo_uniqify ( EINFO_EPROTO, 0x02,				\
 			  "Illegal cipher change" )
-#define EPROTO_KEY_SHARE __einfo_error ( EINFO_EPROTO_KEY_SHARE )
-#define EINFO_EPROTO_KEY_SHARE						\
-	__einfo_uniqify ( EINFO_EPROTO, 0x03,				\
-			  "Multiple key shares offered" )
 #define EPROTO_VALIDATION __einfo_error ( EINFO_EPROTO_VALIDATION )
 #define EINFO_EPROTO_VALIDATION						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x04,				\
 			  "Certificate validation already in progress" )
+#define EPROTO_RETRY __einfo_error ( EINFO_EPROTO_RETRY )
+#define EINFO_EPROTO_RETRY						\
+	__einfo_uniqify ( EINFO_EPROTO, 0x05,				\
+			  "Illegal retry request" )
 
 /* Avoid dragging in RSA support unconditionally */
 struct pubkey_algorithm rsa_algorithm __attribute__ (( weak ));
 
 /** List of TLS session */
 static LIST_HEAD ( tls_sessions );
+
+/** ServerHello downgrade magic value */
+static const uint8_t tls_downgrade_magic[7] = TLS_SERVER_DOWNGRADE_MAGIC;
+
+/** HelloRetryRequest magic value */
+static const struct tls_random tls_hrr_magic = {
+	.bytes = {
+		0xcf, 0x21, 0xad, 0x74, 0xe5, 0x9a, 0x61, 0x11,
+		0xbe, 0x1d, 0x8c, 0x02, 0x1e, 0x65, 0xb8, 0x91,
+		0xc2, 0xa2, 0x11, 0x16, 0x7a, 0xbb, 0x8c, 0x5e,
+		0x07, 0x9e, 0x09, 0xe2, 0xc8, 0xa8, 0x33, 0x9c
+	},
+};
 
 static void tls_tx_resume_all ( struct tls_session *session );
 static struct io_buffer * tls_alloc_iob ( struct tls_connection *tls,
@@ -407,6 +420,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	zfree ( tls->new_ticket.data );
 	tls_clear_digest ( tls );
 	zfree ( tls->verify.dynamic );
+	zfree ( tls->cookie.data );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec );
 	list_for_each_entry_safe ( iobuf, tmp, &tls->rx.data, list ) {
@@ -2058,6 +2072,10 @@ static int tls_client_hello ( struct tls_connection *tls,
 	/* Prepare MaxFragmentLength extension */
 	ext->frag.len = sizeof ( *frag );
 
+	/* Prepare Cookie extension */
+	ext->cookie.data = tls->cookie.data;
+	ext->cookie.len = tls->cookie.len;
+
 	/* Prepare RenegotiationInfo extension */
 	reneg->verify.data = tls->verify.client;
 	reneg->verify.len = tls->verify.len;
@@ -2680,17 +2698,18 @@ static int tls_new_hello_request ( struct tls_connection *tls,
  */
 static int tls_new_server_hello ( struct tls_connection *tls,
 				  const struct tls_cursor *cursor ) {
-	static const uint8_t downgrade_magic[7] = TLS_SERVER_DOWNGRADE_MAGIC;
 	struct tls_session *session = tls->session;
 	struct tls_named_group *group;
 	struct tls_server_hello hello;
 	struct tls_renegotiation_info reneg;
 	struct tls_supported_version supver;
-	struct tls_key_share_entry key;
+	union tls_key_share_server key;
 	union tls_server_random *random;
+	const uint8_t *key_map;
 	uint16_t version;
 	uint16_t suite;
 	size_t verify_len;
+	int retry;
 	int rc;
 
 	/* Parse ServerHello structure */
@@ -2720,16 +2739,22 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	}
 
 	/* Parse KeyShareEntry, if present */
-	if ( ( rc = tls_parse_opt ( tls_key_share_entry, tls->version,
-				    &hello.ext.key, &key ) ) != 0 ) {
-		DBGC ( tls, "TLS %p could not parse KeyShareEntry: %s\n",
-		       tls, strerror ( rc ) );
+	retry = ( memcmp ( random, &tls_hrr_magic,
+			   sizeof ( *random ) ) == 0 );
+	key_map = ( retry ? tls_key_share_hello_retry_request_map :
+		    tls_key_share_server_hello_map );
+	if ( ( rc = tls_parse_opt_map ( key_map, tls->version,
+					&hello.ext.key, key.desc ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not parse KeyShare%s: %s\n",
+		       tls, ( retry ? "HelloRetryRequest" : "ServerHello" ),
+		       strerror ( rc ) );
 		return rc;
 	}
-	if ( key.next.len ) {
-		DBGC ( tls, "TLS %p has multiple KeyShareEntry structures\n",
-		       tls );
-		return -EPROTO_KEY_SHARE;
+
+	/* Refuse repeated retries */
+	if ( retry && ( tls->suite != &tls_cipher_suite_null ) ) {
+		DBGC ( tls, "TLS %p refusing repeated retry request\n", tls );
+		return -EPROTO_RETRY;
 	}
 
 	/* Handle secure renegotiation */
@@ -2767,7 +2792,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	/* Check for downgrade attacks */
 	if ( ( TLS_VERSION_TLS_1_1 < TLS_VERSION_MAX ) &&
 	     ( tls->version < TLS_VERSION_MAX ) &&
-	     ( memcmp ( random->downgrade.magic, downgrade_magic,
+	     ( memcmp ( random->downgrade.magic, tls_downgrade_magic,
 			sizeof ( random->downgrade.magic ) ) == 0 ) &&
 	     ( ( random->downgrade.version + TLS_VERSION_TLS_1_1 ) <
 	       TLS_VERSION_MAX ) ) {
@@ -2823,14 +2848,26 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	}
 
 	/* Agree shared key, if applicable */
-	if ( key.public.data &&
+	if ( ( ! retry ) && key.hello.public.data &&
 	     ( ( rc = tls_key_agree ( tls, tls->group,
-				      &key.public ) ) != 0 ) ) {
+				      &key.hello.public ) ) != 0 ) ) {
 		return rc;
 	}
 
+	/* Record cookie, if any */
+	if ( ( rc = tls_copy ( &hello.ext.cookie, &tls->cookie ) ) != 0 )
+		return rc;
+
+	/* Retry ClientHello , if applicable */
+	if ( is_pending ( &tls->client.negotiation ) && retry ) {
+		tlskey_message ( &tls->key );
+		tls->tx.pending = TLS_TX_CLIENT_HELLO;
+		tls_tx_resume ( tls );
+		DBGC ( tls, "TLS %p retrying hello\n", tls );
+	}
+
 	/* Schedule change to handshake traffic keys, if applicable */
-	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) && ( ! retry ) ) {
 		tls->tx.cipherspec.pending = &tls_handshake;
 		tls->rx.cipherspec.pending = &tls_handshake;
 	}

@@ -188,6 +188,9 @@ union tls_server_random {
 /* TLS supported versions extension */
 #define TLS_SUPPORTED_VERSIONS 43
 
+/* TLS cookie extension */
+#define TLS_COOKIE 44
+
 /* TLS pre-shared key modes extension */
 #define TLS_PSK_MODES 45
 
@@ -504,6 +507,8 @@ struct tls_connection {
 	int extended_master_secret;
 	/** Verification data */
 	struct tls_verify_data verify;
+	/** Cookie */
+	struct tls_cursor cookie;
 
 	/** Secure channel */
 	struct secure_channel channel;

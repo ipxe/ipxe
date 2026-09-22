@@ -428,6 +428,8 @@ struct tls_client_hello {
 	struct {
 		/** All extensions */
 		struct tls_cursor all;
+		/** Cookie extension */
+		struct tls_cursor cookie;
 		/** Extended master secret extension */
 		struct tls_cursor ems;
 		/** Maximum fragment length extension */
@@ -522,6 +524,32 @@ struct tls_key_share_entry {
 	struct tls_cursor next;
 };
 
+/** KeyShareHelloRetryRequest descriptor */
+struct tls_key_share_hello_retry_request {
+	/** Named group */
+	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+};
+
+/** KeyShareServerHello descriptor */
+struct tls_key_share_server_hello {
+	/** Named group */
+	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+	/** Public key */
+	struct tls_cursor public;
+};
+
+/** KeyShareServerHello/KeyShareHelloRetryRequest combined descriptor */
+union tls_key_share_server {
+	/** Named group (present in both) */
+	uint16_t __attribute__ (( aligned ( 1 ) )) *group;
+	/** KeyShareHelloRetryRequest descriptor */
+	struct tls_key_share_hello_retry_request hrr;
+	/** KeyShareServerHello descriptor */
+	struct tls_key_share_server_hello hello;
+	/** Raw pointer/length array */
+	union tls_ptr_len desc[0];
+};
+
 /** MaxFragmentLength descriptor */
 struct tls_max_fragment_length {
 	/** Maximum fragment length */
@@ -593,6 +621,8 @@ struct tls_server_hello {
 		struct tls_cursor supver;
 		/** Key share extension */
 		struct tls_cursor key;
+		/** Cookie extension */
+		struct tls_cursor cookie;
 	} ext;
 };
 
@@ -762,6 +792,8 @@ extern TLS_DESCR_MAPPING ( tls_extension );
 extern TLS_DESCR_MAPPING ( tls_hello_request );
 extern TLS_DESCR_MAPPING ( tls_key_share_client_hello );
 extern TLS_DESCR_MAPPING ( tls_key_share_entry );
+extern TLS_DESCR_MAPPING ( tls_key_share_hello_retry_request );
+extern TLS_DESCR_MAPPING ( tls_key_share_server_hello );
 extern TLS_DESCR_MAPPING ( tls_max_fragment_length );
 extern TLS_DESCR_MAPPING ( tls_named_group_list );
 extern TLS_DESCR_MAPPING ( tls_new_session_ticket );

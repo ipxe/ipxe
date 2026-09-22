@@ -64,6 +64,10 @@ static const char * tls_map_name ( const uint8_t *map ) {
 		return "KeyShareClientHello";
 	} else if ( map == tls_key_share_entry_map ) {
 		return "KeyShareEntry";
+	} else if ( map == tls_key_share_hello_retry_request_map ) {
+		return "KeyShareHelloRetryRequest";
+	} else if ( map == tls_key_share_server_hello_map ) {
+		return "KeyShareServerHello";
 	} else if ( map == tls_max_fragment_length_map ) {
 		return "MaxFragmentLength";
 	} else if ( map == tls_named_group_list_map ) {
@@ -689,6 +693,7 @@ TLS_DESCR_MAPPING ( tls_client_hello ) = {
 	TLS_VAR16 ( tls_client_hello, TLS_VERSION_BASE, suites ),
 	TLS_VAR08 ( tls_client_hello, TLS_VERSION_BASE, compression ),
 	TLS_EXT16 ( tls_client_hello, TLS_VERSION_BASE, ext ),
+	TLS_EXTND ( tls_client_hello, TLS_COOKIE, ext.cookie ),
 	TLS_EXTND ( tls_client_hello, TLS_EXTENDED_MASTER_SECRET, ext.ems ),
 	TLS_EXTND ( tls_client_hello, TLS_MAX_FRAGMENT_LENGTH, ext.frag ),
 	TLS_EXTND ( tls_client_hello, TLS_NAMED_GROUP, ext.groups ),
@@ -754,6 +759,20 @@ TLS_DESCR_MAPPING ( tls_key_share_entry ) = {
 	TLS_EXTRA ( tls_key_share_entry, TLS_VERSION_BASE, next ),
 };
 
+/** KeyShareHelloRetryRequest descriptor mapping */
+TLS_DESCR_MAPPING ( tls_key_share_hello_retry_request ) = {
+	TLS_MAPSZ ( tls_key_share_hello_retry_request ),
+	TLS_FIXED ( tls_key_share_hello_retry_request, TLS_VERSION_BASE,
+		    group ),
+};
+
+/** KeyShareServerHello descriptor mapping */
+TLS_DESCR_MAPPING ( tls_key_share_server_hello ) = {
+	TLS_MAPSZ ( tls_key_share_server_hello ),
+	TLS_FIXED ( tls_key_share_server_hello, TLS_VERSION_BASE, group ),
+	TLS_VAR16 ( tls_key_share_server_hello, TLS_VERSION_BASE, public ),
+};
+
 /** MaxFragmentLength descriptor mapping */
 TLS_DESCR_MAPPING ( tls_max_fragment_length ) = {
 	TLS_MAPSZ ( tls_max_fragment_length ),
@@ -799,6 +818,7 @@ TLS_DESCR_MAPPING ( tls_server_hello ) = {
 	TLS_EXTND ( tls_server_hello, TLS_EXTENDED_MASTER_SECRET, ext.ems ),
 	TLS_EXTND ( tls_server_hello, TLS_SUPPORTED_VERSIONS, ext.supver ),
 	TLS_EXTND ( tls_server_hello, TLS_KEY_SHARE, ext.key ),
+	TLS_EXTND ( tls_server_hello, TLS_COOKIE, ext.cookie ),
 };
 
 /** ServerHello descriptor mapping */
