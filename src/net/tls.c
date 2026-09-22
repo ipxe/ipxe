@@ -296,6 +296,49 @@ tls_has_inner ( struct tls_connection *tls, struct cipher_algorithm *cipher ) {
 }
 
 /**
+ * Duplicate content of a TLS cursor
+ *
+ * @v src		Source cursor
+ * @v dst		Destination cursor
+ *
+ * The content of the source cursor (if any) will be copied.
+ *
+ * If the source cursor is not present (e.g. because it represents an
+ * extension that was not present, rather than being present but
+ * empty) then the destination cursor will also become not present.
+ *
+ * If the source cursor is present but empty (e.g. because it
+ * represents an extension that was present but empty) then the
+ * destination cursor will also become present but empty (with its
+ * pointer being the sentinel value as returned by malloc(0)).
+ *
+ * If the source cursor is either empty or not present, then this
+ * function is guaranteed to succeed.
+ */
+static int tls_copy ( const struct tls_cursor *src, struct tls_cursor *dst ) {
+
+	/* Free any existing content */
+	zfree ( dst->data );
+	dst->data = NULL;
+	dst->len = 0;
+
+	/* Do nothing if source cursor is not present */
+	if ( ! src->data ) {
+		assert ( src->len == 0 );
+		return 0;
+	}
+
+	/* Duplicate cursor */
+	dst->data = malloc ( src->len );
+	if ( ! dst->data )
+		return -ENOMEM;
+	memcpy ( dst->data, src->data, src->len );
+	dst->len = src->len;
+
+	return 0;
+}
+
+/**
  * Get pipe name (for debugging)
  *
  * @v tls		TLS connection
@@ -2782,17 +2825,9 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
 		return 0;
 	}
 
-	/* Free any unapplied new session ticket */
-	zfree ( tls->new_ticket.data );
-	tls->new_ticket.data = NULL;
-	tls->new_ticket.len = 0;
-
 	/* Record ticket */
-	tls->new_ticket.data = malloc ( ticket.ticket.len );
-	if ( ! tls->new_ticket.data )
-		return -ENOMEM;
-	memcpy ( tls->new_ticket.data, ticket.ticket.data, ticket.ticket.len );
-	tls->new_ticket.len = ticket.ticket.len;
+	if ( ( rc = tls_copy ( &ticket.ticket, &tls->new_ticket ) ) != 0 )
+		return rc;
 
 	return 0;
 }

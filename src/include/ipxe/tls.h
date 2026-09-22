@@ -382,14 +382,6 @@ struct tls_session_id {
 	uint8_t len;
 };
 
-/** A TLS session ticket */
-struct tls_session_ticket {
-	/** Ticket data */
-	void *data;
-	/** Length of ticket data */
-	size_t len;
-};
-
 /** A TLS session */
 struct tls_session {
 	/** Reference counter */
@@ -411,7 +403,7 @@ struct tls_session {
 	/** Session ID */
 	struct tls_session_id id;
 	/** Session ticket */
-	struct tls_session_ticket ticket;
+	struct tls_cursor ticket;
 
 	/** List of connections */
 	struct list_head conn;
@@ -489,7 +481,7 @@ struct tls_connection {
 	/** New session ID (if any) */
 	struct tls_session_id new_id;
 	/** New session ticket (if any) */
-	struct tls_session_ticket new_ticket;
+	struct tls_cursor new_ticket;
 
 	/** Plaintext stream */
 	struct interface plainstream;
