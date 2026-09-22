@@ -2171,13 +2171,6 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
 	struct io_buffer *iobuf;
 	int rc;
 
-	/* Fail if we have not selected a named group */
-	if ( ! group ) {
-		DBGC ( tls, "TLS %p has no key exchange group\n", tls );
-		rc = -ENOENT_KEY_EXCHANGE;
-		goto err_group;
-	}
-
 	/* Encrypt (and implicitly bind) shared secret, if applicable */
 	if ( is_key_transport ( exchange ) ) {
 		if ( ( rc = tls_key_encrypt ( tls, group, &builder ) ) != 0 )
@@ -2230,7 +2223,6 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  err_alloc:
  err_size:
  err_encrypt:
- err_group:
 	free ( builder.data );
 	return rc;
 }
