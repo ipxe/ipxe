@@ -449,6 +449,30 @@ void tlskey_digest ( struct tls_key_schedule *tlskey, const void *data,
 	memset ( &tmp, 0, sizeof ( tmp ) );
 }
 
+/**
+ * Replace running transcript digest with a message hash of itself
+ *
+ * @v tlskey		Key schedule
+ */
+void tlskey_message ( struct tls_key_schedule *tlskey ) {
+	struct tls_transcript *transcript = &tlskey->transcript;
+	struct digest_algorithm *digest = tlskey->digest;
+	size_t digestsize = digest->digestsize;
+	struct tls_message_hash msg;
+
+	/* Construct message hash header */
+	msg.type = TLS_MESSAGE_HASH;
+	msg.zero = 0;
+	msg.len = digestsize;
+
+	/* Replace running transcript digest */
+	digest_init ( digest, transcript->ctx );
+	digest_update ( digest, transcript->ctx, &msg, sizeof ( msg ) );
+	digest_update ( digest, transcript->ctx, transcript->running,
+			digestsize );
+	tlskey_digest ( tlskey, NULL, 0 );
+}
+
 /*****************************************************************************
  *
  * Key material

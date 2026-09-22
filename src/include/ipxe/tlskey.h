@@ -38,6 +38,19 @@ struct tls_random {
 	uint8_t bytes[TLS_RANDOM_LEN];
 } __attribute__ (( packed ));
 
+/** A message hash prefix */
+struct tls_message_hash {
+	/** Message type */
+	uint8_t type;
+	/** Must be zero */
+	uint16_t zero;
+	/** Hash length */
+	uint8_t len;
+} __attribute__ (( packed ));
+
+/** A TLS message hash */
+#define TLS_MESSAGE_HASH 254
+
 /** A TLS running handshake transcript digest */
 struct tls_transcript {
 	/** Digest context */
@@ -349,6 +362,7 @@ extern int tlskey_start ( struct tls_key_schedule *tlskey,
 extern void tlskey_stop ( struct tls_key_schedule *tlskey );
 extern void tlskey_digest ( struct tls_key_schedule *tlskey,
 			    const void *data, size_t len );
+extern void tlskey_message ( struct tls_key_schedule *tlskey );
 extern void tlskey_reset ( struct tls_key_schedule *tlskey );
 extern int tlskey_apply ( struct tls_key_schedule *tlskey,
 			  const void *shared, size_t shared_len );
