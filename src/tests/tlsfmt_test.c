@@ -332,6 +332,38 @@ union tlsfmt_test_data {
 };
 
 /**
+ * Report a mapping validity test result
+ *
+ * @v type		Descriptor structure name
+ * @v version		Protocol version
+ */
+#define map_version_ok( type, version ) do {				\
+	struct tls_cursor cursor;					\
+	struct type desc;						\
+	void *empty;							\
+									\
+	memset ( &desc, 0, sizeof ( desc ) );				\
+	ok ( tls_size ( type, version, &desc, &cursor ) == 0 );		\
+	empty = zalloc ( cursor.len );					\
+	ok ( empty != NULL );						\
+	cursor.data = empty;						\
+	ok ( tls_build ( type, version, &desc, &cursor ) == 0 );	\
+	ok ( tls_parse ( type, version, &cursor, &desc ) == 0 );	\
+	free ( empty );							\
+	} while ( 0 )
+
+/**
+ * Report a mapping validity test result
+ *
+ * @v type		Descriptor structure name
+ */
+#define map_ok( type ) do {						\
+	map_version_ok ( type, TLS_VERSION_TLS_1_1 );			\
+	map_version_ok ( type, TLS_VERSION_TLS_1_2 );			\
+	map_version_ok ( type, TLS_VERSION_TLS_1_3 );			\
+	} while ( 0 )
+
+/**
  * Report a cursor comparison test result
  *
  * @v cursor		Cursor
@@ -405,6 +437,33 @@ static void tlsfmt_test_exec ( void ) {
 	uint16_t group;
 	uint16_t record;
 	uint8_t empty[0];
+
+	/* Check validity of all mappings */
+	map_ok ( tls_certificate );
+	map_ok ( tls_certificate_entry );
+	map_ok ( tls_client_hello );
+	map_ok ( tls_client_key_exchange_dhe );
+	map_ok ( tls_client_key_exchange_ecdhe );
+	map_ok ( tls_client_key_exchange_pubkey );
+	map_ok ( tls_digitally_signed );
+	map_ok ( tls_extension );
+	map_ok ( tls_hello_request );
+	map_ok ( tls_key_share_client_hello );
+	map_ok ( tls_key_share_entry );
+	map_ok ( tls_max_fragment_length );
+	map_ok ( tls_named_group_list );
+	map_ok ( tls_new_session_ticket );
+	map_ok ( tls_psk_key_exchange_modes );
+	map_ok ( tls_renegotiation_info );
+	map_ok ( tls_server_hello );
+	map_ok ( tls_server_hello_done );
+	map_ok ( tls_server_key_exchange_dhe );
+	map_ok ( tls_server_key_exchange_ecdhe );
+	map_ok ( tls_server_name );
+	map_ok ( tls_server_name_list );
+	map_ok ( tls_signature_scheme_list );
+	map_ok ( tls_supported_version );
+	map_ok ( tls_supported_versions );
 
 	/* Well-formed TLSv1.3 ServerHello */
 	memset ( u.tls13_server_hello, 0xaa, sizeof ( u.tls13_server_hello ) );
