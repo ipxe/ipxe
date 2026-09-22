@@ -185,7 +185,7 @@ FILE_SECBOOT ( PERMITTED );
 #define EPROTO_CIPHER_CHANGE __einfo_error ( EINFO_EPROTO_CIPHER_CHANGE )
 #define EINFO_EPROTO_CIPHER_CHANGE					\
 	__einfo_uniqify ( EINFO_EPROTO, 0x02,				\
-			  "Illegal cipher change mid-record" )
+			  "Illegal cipher change" )
 #define EPROTO_KEY_SHARE __einfo_error ( EINFO_EPROTO_KEY_SHARE )
 #define EINFO_EPROTO_KEY_SHARE						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x03,				\
@@ -613,6 +613,25 @@ struct tls_cipher_suite tls_cipher_suite_null = {
 #define TLS_NUM_CIPHER_SUITES table_num_entries ( TLS_CIPHER_SUITES )
 
 /**
+ * Get protocol version name (for debugging)
+ *
+ * @v version		Protocol version
+ * @ret name		Protocol version name
+ */
+static const char * tls_version_name ( unsigned int version ) {
+	static char buf[ 7 /* "0xXXXX" + NUL */ ];
+
+	switch ( version ) {
+	case TLS_VERSION_TLS_1_1:	return "TLSv1.1";
+	case TLS_VERSION_TLS_1_2:	return "TLSv1.2";
+	case TLS_VERSION_TLS_1_3:	return "TLSv1.3";
+	default:
+		snprintf ( buf, sizeof ( buf ), "%#04x", version );
+		return buf;
+	}
+}
+
+/**
  * Get cipher suite name (for debugging)
  *
  * @v suite		Cipher suite
@@ -701,17 +720,31 @@ static int tls_set_verify_len ( struct tls_connection *tls,
 }
 
 /**
- * Select cipher suite
+ * Select protocol version and cipher suite
  *
  * @v tls		TLS connection
+ * @v version		Protocol version
  * @v cipher_suite	Cipher suite specification
  * @ret rc		Return status code
  */
 static int tls_select_cipher ( struct tls_connection *tls,
+			       unsigned int version,
 			       unsigned int cipher_suite ) {
 	struct tls_cipher_suite *suite;
 	struct digest_algorithm *digest;
 	int rc;
+
+	/* Check protocol version */
+	if ( version < TLS_VERSION_MIN ) {
+		DBGC ( tls, "TLS %p does not support protocol version %s\n",
+		       tls, tls_version_name ( version ) );
+		return -ENOTSUP_VERSION;
+	}
+	if ( version > tls->version ) {
+		DBGC ( tls, "TLS %p refusing illegal upgrade to protocol "
+		       "version %s\n", tls, tls_version_name ( version ) );
+		return -EPROTO_VERSION;
+	}
 
 	/* Identify cipher suite */
 	suite = tls_find_cipher_suite ( cipher_suite );
@@ -728,6 +761,28 @@ static int tls_select_cipher ( struct tls_connection *tls,
 		       tls, ntohs ( cipher_suite ) );
 		return -ENOTSUP_CIPHER;
 	}
+
+	/* If cipher suite is already active (e.g. due to a valid
+	 * HelloRetryRequest), leave it intact.
+	 */
+	if ( ( version == tls->version ) && ( suite == tls->suite ) )
+		return 0;
+
+	/* Refuse any attempt to change an active cipher suite */
+	if ( tls->suite != &tls_cipher_suite_null ) {
+		DBGC ( tls, "TLS %p refusing to change to %s %s\n",
+		       tls, tls_version_name ( version ),
+		       tls_cipher_name ( suite ) );
+		return -EPROTO_CIPHER_CHANGE;
+	}
+
+	/* Set protocol version */
+	tls->version = version;
+	tls->legacy_version = version;
+	if ( tls->legacy_version > TLS_LEGACY_VERSION_MAX )
+		tls->legacy_version = TLS_LEGACY_VERSION_MAX;
+	DBGC ( tls, "TLS %p using protocol version %s\n",
+	       tls, tls_version_name ( version ) );
 
 	/* Set key schedule digest algorithm */
 	digest = ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ?
@@ -2634,6 +2689,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	struct tls_key_share_entry key;
 	union tls_server_random *random;
 	uint16_t version;
+	uint16_t suite;
 	size_t verify_len;
 	int rc;
 
@@ -2644,6 +2700,8 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		       tls, strerror ( rc ) );
 		return rc;
 	}
+	random = container_of ( &hello.a->random[0], union tls_server_random,
+				random[0] );
 
 	/* Parse RenegotiationInfo structure, if present */
 	if ( ( rc = tls_parse_opt ( tls_renegotiation_info, tls->version,
@@ -2674,42 +2732,6 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		return -EPROTO_KEY_SHARE;
 	}
 
-	/* Check and store protocol version */
-	version = ntohs ( supver.selected ?
-			  *supver.selected : hello.a->version );
-	if ( version < TLS_VERSION_MIN ) {
-		DBGC ( tls, "TLS %p does not support protocol version %d.%d\n",
-		       tls, ( version >> 8 ), ( version & 0xff ) );
-		return -ENOTSUP_VERSION;
-	}
-	if ( version > tls->version ) {
-		DBGC ( tls, "TLS %p server attempted to illegally upgrade to "
-		       "protocol version %d.%d\n",
-		       tls, ( version >> 8 ), ( version & 0xff ) );
-		return -EPROTO_VERSION;
-	}
-	tls->version = version;
-	tls->legacy_version = version;
-	if ( tls->legacy_version > TLS_LEGACY_VERSION_MAX )
-		tls->legacy_version = TLS_LEGACY_VERSION_MAX;
-	DBGC ( tls, "TLS %p using protocol version %d.%d\n",
-	       tls, ( version >> 8 ), ( version & 0xff ) );
-
-	/* Check for downgrade attacks */
-	random = container_of ( &hello.a->random[0], union tls_server_random,
-				random[0] );
-	if ( ( TLS_VERSION_TLS_1_1 < TLS_VERSION_MAX ) &&
-	     ( version < TLS_VERSION_MAX ) &&
-	     ( memcmp ( random->downgrade.magic, downgrade_magic,
-			sizeof ( random->downgrade.magic ) ) == 0 ) &&
-	     ( ( random->downgrade.version + TLS_VERSION_TLS_1_1 ) <
-	       TLS_VERSION_MAX ) ) {
-		DBGC ( tls, "TLS %p detected downgrade attack:\n", tls );
-		DBGC_HDA ( tls, 0, &random->downgrade,
-			   sizeof ( random->downgrade ) );
-		return -EPERM_DOWNGRADE;
-	}
-
 	/* Handle secure renegotiation */
 	if ( tls->secure_renegotiation ) {
 
@@ -2735,9 +2757,25 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		tls->secure_renegotiation = 1;
 	}
 
-	/* Select cipher suite */
-	if ( ( rc = tls_select_cipher ( tls, hello.b->suite ) ) != 0 )
+	/* Select protocol version and cipher suite */
+	version = ntohs ( supver.selected ? *supver.selected :
+			  hello.a->version );
+	suite = hello.b->suite;
+	if ( ( rc = tls_select_cipher ( tls, version, suite ) ) != 0 )
 		return rc;
+
+	/* Check for downgrade attacks */
+	if ( ( TLS_VERSION_TLS_1_1 < TLS_VERSION_MAX ) &&
+	     ( tls->version < TLS_VERSION_MAX ) &&
+	     ( memcmp ( random->downgrade.magic, downgrade_magic,
+			sizeof ( random->downgrade.magic ) ) == 0 ) &&
+	     ( ( random->downgrade.version + TLS_VERSION_TLS_1_1 ) <
+	       TLS_VERSION_MAX ) ) {
+		DBGC ( tls, "TLS %p detected downgrade attack:\n", tls );
+		DBGC_HDA ( tls, 0, &random->downgrade,
+			   sizeof ( random->downgrade ) );
+		return -EPERM_DOWNGRADE;
+	}
 
 	/* Handle extended master secret */
 	tls->extended_master_secret = ( !! hello.ext.ems.data );
