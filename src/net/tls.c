@@ -363,7 +363,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 	/* Free dynamically-allocated resources */
 	zfree ( tls->new_ticket.data );
 	tls_clear_digest ( tls );
-	free ( tls->verify.dynamic );
+	zfree ( tls->verify.dynamic );
 	tls_clear_cipher ( tls, &tls->tx.cipherspec );
 	tls_clear_cipher ( tls, &tls->rx.cipherspec );
 	list_for_each_entry_safe ( iobuf, tmp, &tls->rx.data, list ) {
@@ -638,7 +638,7 @@ static int tls_set_verify_len ( struct tls_connection *tls,
 	void *dynamic;
 
 	/* Free any existing dynamically allocated storage */
-	free ( verify->dynamic );
+	zfree ( verify->dynamic );
 	memset ( verify, 0, sizeof ( *verify ) );
 
 	/* Allocate dynamic storage */
@@ -2227,7 +2227,7 @@ static int tls_send_client_key_exchange ( struct tls_connection *tls ) {
  err_alloc:
  err_size:
  err_encrypt:
-	free ( builder.data );
+	zfree ( builder.data );
 	return rc;
 }
 
@@ -2324,7 +2324,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
  err_sig_hash:
  err_cert:
  err_chain:
-	free ( builder.data );
+	zfree ( builder.data );
 	return rc;
 }
 
