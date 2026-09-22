@@ -417,6 +417,8 @@ struct tls_verify_data {
 	void *client;
 	/** Server verification data */
 	void *server;
+	/** Length of each verification data */
+	size_t len;
 };
 
 /** TLS transmit state */

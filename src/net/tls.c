@@ -689,6 +689,7 @@ static int tls_set_verify_len ( struct tls_connection *tls,
 	dynamic = zalloc ( total );
 	if ( ! dynamic )
 		return -ENOMEM;
+	verify->len = verify_len;
 
 	/* Assign storage */
 	verify->dynamic = dynamic;
@@ -1581,11 +1582,10 @@ static int tls_channel_verify ( struct secure_channel *channel,
 				const void *auth, size_t len ) {
 	struct tls_connection *tls =
 		container_of ( channel, struct tls_connection, channel );
-	struct tls_cipher_suite *suite = tls->suite;
 	int rc;
 
 	/* Sanity checks */
-	if ( ( len == 0 ) || ( len != suite->verify_len ) ) {
+	if ( ( len == 0 ) || ( len != tls->verify.len ) ) {
 		DBGC ( tls, "TLS %p invalid authenticator value:\n", tls );
 		DBGC_HDA ( tls, 0, auth, len );
 		return -EPERM_VERIFY;
@@ -1814,6 +1814,9 @@ static void tls_restart ( struct tls_connection *tls ) {
 	/* Reset secure channel */
 	channel_reopen ( &tls->channel );
 
+	/* Reset cipher suite (leaving ciphers intact) */
+	tls->suite = &tls_cipher_suite_null;
+
 	/* (Re)start negotiation */
 	tls->tx.pending = TLS_TX_CLIENT_HELLO;
 	tls_tx_resume ( tls );
@@ -2002,7 +2005,7 @@ static int tls_client_hello ( struct tls_connection *tls,
 
 	/* Prepare RenegotiationInfo extension */
 	reneg->verify.data = tls->verify.client;
-	reneg->verify.len = tls->suite->verify_len;
+	reneg->verify.len = tls->verify.len;
 	if ( ! tls->secure_renegotiation )
 		reneg->verify.len = 0;
 	tls_size ( tls_renegotiation_info, version, reneg, &ext->reneg );
@@ -2409,8 +2412,7 @@ static int tls_send_change_cipher ( struct tls_connection *tls ) {
  */
 static int tls_send_finished ( struct tls_connection *tls ) {
 	struct tls_cipherspec *cipherspec = &tls->tx.cipherspec;
-	struct tls_cipher_suite *suite = tls->suite;
-	size_t verify_len = suite->verify_len;
+	size_t verify_len = tls->verify.len;
 	struct tls_cursor cursor;
 	struct io_buffer *iobuf;
 	int rc;
@@ -2712,7 +2714,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	if ( tls->secure_renegotiation ) {
 
 		/* Secure renegotiation is expected; verify data */
-		verify_len = ( 2 * tls->suite->verify_len );
+		verify_len = ( 2 * tls->verify.len );
 		if ( ( reneg.verify.data == NULL ) ||
 		     ( reneg.verify.len != verify_len ) ||
 		     ( memcmp ( reneg.verify.data, tls->verify.dynamic,
