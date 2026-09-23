@@ -26,6 +26,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #include <ipxe/infiniband.h>
 #include <ipxe/ib_smc.h>
 #include <ipxe/iobuf.h>
+#include <ipxe/dma.h>
 #include <ipxe/netdevice.h>
 #include "flexboot_nodnic.h"
 #include <ipxe/ethernet.h>
@@ -2523,9 +2524,9 @@ static mlx_status shomron_fill_eth_send_wqe ( struct ib_device *ibdev,
 	MLX_FILL_1 ( &eth_wqe->data[0], 1, l_key,
 			flexboot_nodnic->device_priv.lkey );
 	MLX_FILL_H ( &eth_wqe->data[0], 2,
-		     local_address_h, virt_to_bus ( iobuf->data ) );
+		     local_address_h, iob_dma ( iobuf ) );
 	MLX_FILL_1 ( &eth_wqe->data[0], 3,
-		     local_address_l, virt_to_bus ( iobuf->data ) );
+		     local_address_l, iob_dma ( iobuf ) );
 err:
 	return status;
 }
