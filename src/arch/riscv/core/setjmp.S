@@ -29,7 +29,7 @@
  *
  */
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.text
 
 	/* Must match jmp_buf structure layout */
