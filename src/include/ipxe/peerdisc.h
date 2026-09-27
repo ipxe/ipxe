@@ -72,6 +72,8 @@ struct peerdisc_segment {
 struct peerdisc_peer {
 	/** List of peers */
 	struct list_head list;
+	/** Retrieval protocol */
+	struct peerdist_retrieval *retrieval;
 	/** Peer location */
 	char location[0];
 };

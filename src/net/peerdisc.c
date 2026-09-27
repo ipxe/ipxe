@@ -39,6 +39,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/timer.h>
 #include <ipxe/fault.h>
 #include <ipxe/settings.h>
+#include <ipxe/pccrr.h>
 #include <ipxe/pccrd.h>
 #include <ipxe/peerdisc.h>
 
@@ -80,8 +81,12 @@ static char *peerdisc_recent;
 /** Hosted cache server */
 static char *peerhost;
 
+/** Local cache directory */
+static char *peerpath;
+
 static struct peerdisc_segment * peerdisc_find ( const char *id );
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
+				 struct peerdist_retrieval *retrieval,
 				 const char *location );
 
 /******************************************************************************
@@ -271,8 +276,10 @@ static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
 
 			/* Report discovered peer location */
 			if ( ( rc = peerdisc_discovered ( segment,
-							  location ) ) != 0 )
+							  &peerdist_post,
+							  location ) ) != 0 ) {
 				goto err;
+			}
 		}
 	}
 
@@ -379,10 +386,12 @@ static struct peerdisc_segment * peerdisc_find ( const char *id ) {
  * Add discovered PeerDist peer
  *
  * @v segment		PeerDist discovery segment
+ * @v retrieval		PeerDist retrieval protocol
  * @v location		Peer location
  * @ret rc		Return status code
  */
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
+				 struct peerdist_retrieval *retrieval,
 				 const char *location ) {
 	struct peerdisc_peer *peer;
 	struct peerdisc_client *peerdisc;
@@ -403,13 +412,16 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 	peer = zalloc ( sizeof ( *peer ) + strlen ( location ) + 1 /* NUL */ );
 	if ( ! peer )
 		return -ENOMEM;
+	peer->retrieval = retrieval;
 	strcpy ( peer->location, location );
 
 	/* Add to end of list of peers */
 	list_add_tail ( &peer->list, &segment->peers );
 
-	/* Record as most recently discovered peer */
-	if ( location != peerdisc_recent ) {
+	/* Record as most recently discovered peer, if applicable */
+	if ( ( location != peerdisc_recent ) &&
+	     ( location != peerhost ) &&
+	     ( location != peerpath ) ) {
 		recent = strdup ( location );
 		if ( recent ) {
 			free ( peerdisc_recent );
@@ -489,12 +501,18 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 	INIT_LIST_HEAD ( &segment->clients );
 	timer_init ( &segment->timer, peerdisc_expired, &segment->refcnt );
 
+	/* Add local cache directory, if any */
+	if ( peerpath )
+		peerdisc_discovered ( segment, &peerdist_get, peerpath );
+
 	/* Add hosted cache server or initiate discovery */
 	if ( peerhost ) {
 
 		/* Add hosted cache server to list of peers */
-		if ( ( rc = peerdisc_discovered ( segment, peerhost ) ) != 0 )
+		if ( ( rc = peerdisc_discovered ( segment, &peerdist_post,
+						  peerhost ) ) != 0 ) {
 			goto err_peerhost;
+		}
 
 	} else {
 
@@ -505,8 +523,10 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 		 * a high probability of also having a copy of the
 		 * next block that we attempt to discover.
 		 */
-		if ( peerdisc_recent )
-			peerdisc_discovered ( segment, peerdisc_recent );
+		if ( peerdisc_recent ) {
+			peerdisc_discovered ( segment, &peerdist_post,
+					      peerdisc_recent );
+		}
 
 		/* Start discovery timer */
 		start_timer_nodelay ( &segment->timer );
@@ -639,23 +659,39 @@ const struct setting peerhost_setting __setting ( SETTING_MISC, peerhost ) = {
 	.type = &setting_type_string,
 };
 
+/** PeerDist local cache directory setting */
+const struct setting peerpath_setting __setting ( SETTING_MISC, peerpath ) = {
+	.name = "peerpath",
+	.description = "PeerDist local cache",
+	.type = &setting_type_string,
+};
+
 /**
  * Apply PeerDist discovery settings
  *
  * @ret rc		Return status code
  */
 static int apply_peerdisc_settings ( void ) {
+	char *host;
+	char *path;
 
-	/* Free any existing hosted cache server */
-	free ( peerhost );
-	peerhost = NULL;
-
-	/* Fetch hosted cache server */
-	fetch_string_setting_copy ( NULL, &peerhost_setting, &peerhost );
-	if ( peerhost ) {
-		DBGC ( &peerhost, "PEERDISC using hosted cache %s\n",
-		       peerhost );
+	/* Set hosted cache server, if any */
+	fetch_string_setting_copy ( NULL, &peerhost_setting, &host );
+	if ( host && ! ( peerhost && ( strcmp ( host, peerhost ) == 0 ) ) ) {
+		DBGC ( &peerdisc_segments, "PEERDISC using hosted cache %s\n",
+		       host );
 	}
+	free ( peerhost );
+	peerhost = host;
+
+	/* Set local cache directory, if any */
+	fetch_string_setting_copy ( NULL, &peerpath_setting, &path );
+	if ( path && ! ( peerpath && ( strcmp ( path, peerpath ) == 0 ) ) ) {
+		DBGC ( &peerdisc_segments, "PEERDISC using local cache %s\n",
+		       path );
+	}
+	free ( peerpath );
+	peerpath = path;
 
 	return 0;
 }
