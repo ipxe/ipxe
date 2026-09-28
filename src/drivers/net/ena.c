@@ -136,14 +136,13 @@ static int ena_reset ( struct ena_nic *ena ) {
  * @v address		Base address
  */
 static inline void ena_set_base ( struct ena_nic *ena, unsigned int offset,
-				  void *base ) {
-	physaddr_t phys = virt_to_bus ( base );
+				  physaddr_t base ) {
 
 	/* Program base address registers */
-	writel ( ( phys & 0xffffffffUL ),
+	writel ( ( base & 0xffffffffUL ),
 		 ( ena->regs + offset + ENA_BASE_LO ) );
-	if ( sizeof ( phys ) > sizeof ( uint32_t ) ) {
-		writel ( ( ( ( uint64_t ) phys ) >> 32 ),
+	if ( sizeof ( base ) > sizeof ( uint32_t ) ) {
+		writel ( ( ( ( uint64_t ) base ) >> 32 ),
 			 ( ena->regs + offset + ENA_BASE_HI ) );
 	} else {
 		writel ( 0, ( ena->regs + offset + ENA_BASE_HI ) );
@@ -186,46 +185,48 @@ ena_clear_caps ( struct ena_nic *ena, unsigned int offset ) {
  * @ret rc		Return status code
  */
 static int ena_create_admin ( struct ena_nic *ena ) {
-	size_t aq_len = ( ENA_AQ_COUNT * sizeof ( ena->aq.req[0] ) );
-	size_t acq_len = ( ENA_ACQ_COUNT * sizeof ( ena->acq.rsp[0] ) );
+	struct ena_aq *aq = &ena->aq;
+	struct ena_acq *acq = &ena->acq;
+	size_t aq_len = ( ENA_AQ_COUNT * sizeof ( aq->req[0] ) );
+	size_t acq_len = ( ENA_ACQ_COUNT * sizeof ( acq->rsp[0] ) );
 	int rc;
 
 	/* Allocate admin completion queue */
-	ena->acq.rsp = malloc_phys ( acq_len, acq_len );
-	if ( ! ena->acq.rsp ) {
+	acq->rsp = dma_alloc ( ena->dma, &acq->map, acq_len, acq_len );
+	if ( ! acq->rsp ) {
 		rc = -ENOMEM;
 		goto err_alloc_acq;
 	}
-	memset ( ena->acq.rsp, 0, acq_len );
+	memset ( acq->rsp, 0, acq_len );
 
 	/* Allocate admin queue */
-	ena->aq.req = malloc_phys ( aq_len, aq_len );
-	if ( ! ena->aq.req ) {
+	aq->req = dma_alloc ( ena->dma, &aq->map, aq_len, aq_len );
+	if ( ! aq->req ) {
 		rc = -ENOMEM;
 		goto err_alloc_aq;
 	}
-	memset ( ena->aq.req, 0, aq_len );
+	memset ( aq->req, 0, aq_len );
 
 	/* Program queue addresses and capabilities */
-	ena_set_base ( ena, ENA_ACQ_BASE, ena->acq.rsp );
+	ena_set_base ( ena, ENA_ACQ_BASE, dma ( &acq->map, acq->rsp ) );
 	ena_set_caps ( ena, ENA_ACQ_CAPS, ENA_ACQ_COUNT,
-		       sizeof ( ena->acq.rsp[0] ) );
-	ena_set_base ( ena, ENA_AQ_BASE, ena->aq.req );
+		       sizeof ( acq->rsp[0] ) );
+	ena_set_base ( ena, ENA_AQ_BASE, dma ( &aq->map, aq->req ) );
 	ena_set_caps ( ena, ENA_AQ_CAPS, ENA_AQ_COUNT,
-		       sizeof ( ena->aq.req[0] ) );
+		       sizeof ( aq->req[0] ) );
 
 	DBGC ( ena, "ENA %p AQ [%08lx,%08lx) ACQ [%08lx,%08lx)\n",
-	       ena, virt_to_phys ( ena->aq.req ),
-	       ( virt_to_phys ( ena->aq.req ) + aq_len ),
-	       virt_to_phys ( ena->acq.rsp ),
-	       ( virt_to_phys ( ena->acq.rsp ) + acq_len ) );
+	       ena, virt_to_phys ( aq->req ),
+	       ( virt_to_phys ( aq->req ) + aq_len ),
+	       virt_to_phys ( acq->rsp ),
+	       ( virt_to_phys ( acq->rsp ) + acq_len ) );
 	return 0;
 
 	ena_clear_caps ( ena, ENA_AQ_CAPS );
 	ena_clear_caps ( ena, ENA_ACQ_CAPS );
-	free_phys ( ena->aq.req, aq_len );
+	dma_free ( &aq->map, aq->req, aq_len );
  err_alloc_aq:
-	free_phys ( ena->acq.rsp, acq_len );
+	dma_free ( &acq->map, acq->rsp, acq_len );
  err_alloc_acq:
 	return rc;
 }
@@ -236,8 +237,10 @@ static int ena_create_admin ( struct ena_nic *ena ) {
  * @v ena		ENA device
  */
 static void ena_destroy_admin ( struct ena_nic *ena ) {
-	size_t aq_len = ( ENA_AQ_COUNT * sizeof ( ena->aq.req[0] ) );
-	size_t acq_len = ( ENA_ACQ_COUNT * sizeof ( ena->acq.rsp[0] ) );
+	struct ena_aq *aq = &ena->aq;
+	struct ena_acq *acq = &ena->acq;
+	size_t aq_len = ( ENA_AQ_COUNT * sizeof ( aq->req[0] ) );
+	size_t acq_len = ( ENA_ACQ_COUNT * sizeof ( acq->rsp[0] ) );
 
 	/* Clear queue capabilities */
 	ena_clear_caps ( ena, ENA_AQ_CAPS );
@@ -245,8 +248,8 @@ static void ena_destroy_admin ( struct ena_nic *ena ) {
 	wmb();
 
 	/* Free queues */
-	free_phys ( ena->aq.req, aq_len );
-	free_phys ( ena->acq.rsp, acq_len );
+	dma_free ( &aq->map, aq->req, aq_len );
+	dma_free ( &acq->map, acq->rsp, acq_len );
 	DBGC ( ena, "ENA %p AQ and ACQ destroyed\n", ena );
 }
 
@@ -257,20 +260,21 @@ static void ena_destroy_admin ( struct ena_nic *ena ) {
  * @ret req		Admin queue request
  */
 static union ena_aq_req * ena_admin_req ( struct ena_nic *ena ) {
+	struct ena_aq *aq = &ena->aq;
 	union ena_aq_req *req;
 	unsigned int index;
 
 	/* Get next request */
-	index = ( ena->aq.prod % ENA_AQ_COUNT );
-	req = &ena->aq.req[index];
+	index = ( aq->prod % ENA_AQ_COUNT );
+	req = &aq->req[index];
 
 	/* Initialise request */
 	memset ( ( ( ( void * ) req ) + sizeof ( req->header ) ), 0,
 		 ( sizeof ( *req ) - sizeof ( req->header ) ) );
-	req->header.id = ena->aq.prod;
+	req->header.id = aq->prod;
 
 	/* Increment producer counter */
-	ena->aq.prod++;
+	aq->prod++;
 
 	return req;
 }
@@ -285,13 +289,15 @@ static union ena_aq_req * ena_admin_req ( struct ena_nic *ena ) {
  */
 static int ena_admin ( struct ena_nic *ena, union ena_aq_req *req,
 		       union ena_acq_rsp **rsp ) {
+	struct ena_aq *aq = &ena->aq;
+	struct ena_acq *acq = &ena->acq;
 	unsigned int index;
 	unsigned int i;
 	int rc;
 
 	/* Locate response */
-	index = ( ena->acq.cons % ENA_ACQ_COUNT );
-	*rsp = &ena->acq.rsp[index];
+	index = ( acq->cons % ENA_ACQ_COUNT );
+	*rsp = &acq->rsp[index];
 
 	/* Mark request as ready */
 	req->header.flags ^= ENA_AQ_PHASE;
@@ -301,24 +307,25 @@ static int ena_admin ( struct ena_nic *ena, union ena_aq_req *req,
 	DBGC2_HDA ( ena, virt_to_phys ( req ), req, sizeof ( *req ) );
 
 	/* Ring doorbell */
-	writel ( ena->aq.prod, ( ena->regs + ENA_AQ_DB ) );
+	writel ( aq->prod, ( ena->regs + ENA_AQ_DB ) );
 
 	/* Wait for response */
 	for ( i = 0 ; i < ENA_ADMIN_MAX_WAIT_MS ; i++ ) {
 
 		/* Check for response */
-		if ( ( (*rsp)->header.flags ^ ena->acq.phase ) & ENA_ACQ_PHASE){
+		if ( ( (*rsp)->header.flags ^ acq->phase ) & ENA_ACQ_PHASE ) {
 			mdelay ( 1 );
 			continue;
 		}
 		DBGC2 ( ena, "ENA %p admin response %#x:\n",
 			ena, le16_to_cpu ( (*rsp)->header.id ) );
-		DBGC2_HDA ( ena, virt_to_phys ( *rsp ), *rsp, sizeof ( **rsp ));
+		DBGC2_HDA ( ena, virt_to_phys ( *rsp ), *rsp,
+			    sizeof ( **rsp ) );
 
 		/* Increment consumer counter */
-		ena->acq.cons++;
-		if ( ( ena->acq.cons % ENA_ACQ_COUNT ) == 0 )
-			ena->acq.phase ^= ENA_ACQ_PHASE;
+		acq->cons++;
+		if ( ( acq->cons % ENA_ACQ_COUNT ) == 0 )
+			acq->phase ^= ENA_ACQ_PHASE;
 
 		/* Check command identifier */
 		if ( (*rsp)->header.id != req->header.id ) {
@@ -387,25 +394,26 @@ static int ena_set_aenq_config ( struct ena_nic *ena, uint32_t enabled ) {
  * @ret rc		Return status code
  */
 static int ena_create_async ( struct ena_nic *ena ) {
-	size_t aenq_len = ( ENA_AENQ_COUNT * sizeof ( ena->aenq.evt[0] ) );
+	struct ena_aenq *aenq = &ena->aenq;
+	size_t aenq_len = ( ENA_AENQ_COUNT * sizeof ( aenq->evt[0] ) );
 	int rc;
 
 	/* Allocate async event notification queue */
-	ena->aenq.evt = malloc_phys ( aenq_len, aenq_len );
-	if ( ! ena->aenq.evt ) {
+	aenq->evt = dma_alloc ( ena->dma, &aenq->map, aenq_len, aenq_len );
+	if ( ! aenq->evt ) {
 		rc = -ENOMEM;
 		goto err_alloc_aenq;
 	}
-	memset ( ena->aenq.evt, 0, aenq_len );
+	memset ( aenq->evt, 0, aenq_len );
 
 	/* Program queue address and capabilities */
-	ena_set_base ( ena, ENA_AENQ_BASE, ena->aenq.evt );
+	ena_set_base ( ena, ENA_AENQ_BASE,
+		       dma ( &aenq->map, aenq->evt ) );
 	ena_set_caps ( ena, ENA_AENQ_CAPS, ENA_AENQ_COUNT,
-		       sizeof ( ena->aenq.evt[0] ) );
-
+		       sizeof ( aenq->evt[0] ) );
 	DBGC ( ena, "ENA %p AENQ [%08lx,%08lx)\n",
-	       ena, virt_to_phys ( ena->aenq.evt ),
-	       ( virt_to_phys ( ena->aenq.evt ) + aenq_len ) );
+	       ena, virt_to_phys ( aenq->evt ),
+	       ( virt_to_phys ( aenq->evt ) + aenq_len ) );
 
 	/* Disable all events */
 	if ( ( rc = ena_set_aenq_config ( ena, 0 ) ) != 0 )
@@ -415,7 +423,7 @@ static int ena_create_async ( struct ena_nic *ena ) {
 
  err_set_aenq_config:
 	ena_clear_caps ( ena, ENA_AENQ_CAPS );
-	free_phys ( ena->aenq.evt, aenq_len );
+	dma_free ( &aenq->map, aenq->evt, aenq_len );
  err_alloc_aenq:
 	return rc;
 }
@@ -426,14 +434,15 @@ static int ena_create_async ( struct ena_nic *ena ) {
  * @v ena		ENA device
  */
 static void ena_destroy_async ( struct ena_nic *ena ) {
-	size_t aenq_len = ( ENA_AENQ_COUNT * sizeof ( ena->aenq.evt[0] ) );
+	struct ena_aenq *aenq = &ena->aenq;
+	size_t aenq_len = ( ENA_AENQ_COUNT * sizeof ( aenq->evt[0] ) );
 
 	/* Clear queue capabilities */
 	ena_clear_caps ( ena, ENA_AENQ_CAPS );
 	wmb();
 
 	/* Free queue */
-	free_phys ( ena->aenq.evt, aenq_len );
+	dma_free ( &aenq->map, aenq->evt, aenq_len );
 	DBGC ( ena, "ENA %p AENQ destroyed\n", ena );
 }
 
@@ -454,7 +463,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	int rc;
 
 	/* Allocate submission queue entries */
-	sq->sqe.raw = malloc_phys ( sq->len, ENA_ALIGN );
+	sq->sqe.raw = dma_alloc ( ena->dma, &sq->map, sq->len, ENA_ALIGN );
 	if ( ! sq->sqe.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -470,7 +479,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	req->create_sq.count = cpu_to_le16 ( sq->count );
 	if ( ! ( sq->policy & ENA_SQ_DEVICE_MEMORY ) ) {
 		req->create_sq.address =
-			cpu_to_le64 ( virt_to_bus ( sq->sqe.raw ) );
+			cpu_to_le64 ( dma ( &sq->map, sq->sqe.raw ) );
 	}
 
 	/* Issue request */
@@ -519,7 +528,7 @@ static int ena_create_sq ( struct ena_nic *ena, struct ena_sq *sq,
 	return 0;
 
  err_admin:
-	free_phys ( sq->sqe.raw, sq->len );
+	dma_free ( &sq->map, sq->sqe.raw, sq->len );
  err_alloc:
 	return rc;
 }
@@ -551,7 +560,7 @@ static int ena_destroy_sq ( struct ena_nic *ena, struct ena_sq *sq ) {
 	}
 
 	/* Free submission queue entries */
-	free_phys ( sq->sqe.raw, sq->len );
+	dma_free ( &sq->map, sq->sqe.raw, sq->len );
 
 	DBGC ( ena, "ENA %p %s SQ%d destroyed\n",
 	       ena, ena_direction ( sq->direction ), sq->id );
@@ -571,7 +580,7 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	int rc;
 
 	/* Allocate completion queue entries */
-	cq->cqe.raw = malloc_phys ( cq->len, ENA_ALIGN );
+	cq->cqe.raw = dma_alloc ( ena->dma, &cq->map, cq->len, ENA_ALIGN );
 	if ( ! cq->cqe.raw ) {
 		rc = -ENOMEM;
 		goto err_alloc;
@@ -584,7 +593,8 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	req->create_cq.size = cq->size;
 	req->create_cq.count = cpu_to_le16 ( cq->requested );
 	req->create_cq.vector = cpu_to_le32 ( ENA_MSIX_NONE );
-	req->create_cq.address = cpu_to_le64 ( virt_to_bus ( cq->cqe.raw ) );
+	req->create_cq.address =
+		cpu_to_le64 ( dma ( &cq->map, cq->cqe.raw ) );
 
 	/* Issue request */
 	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
@@ -613,7 +623,7 @@ static int ena_create_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	return 0;
 
  err_admin:
-	free_phys ( cq->cqe.raw, cq->len );
+	dma_free ( &cq->map, cq->cqe.raw, cq->len );
  err_alloc:
 	return rc;
 }
@@ -643,7 +653,7 @@ static int ena_destroy_cq ( struct ena_nic *ena, struct ena_cq *cq ) {
 	}
 
 	/* Free completion queue entries */
-	free_phys ( cq->cqe.raw, cq->len );
+	dma_free ( &cq->map, cq->cqe.raw, cq->len );
 
 	DBGC ( ena, "ENA %p CQ%d destroyed\n", ena, cq->id );
 	return 0;
@@ -749,7 +759,8 @@ static int ena_set_host_attributes ( struct ena_nic *ena ) {
 	req->header.opcode = ENA_SET_FEATURE;
 	req->set_feature.id = ENA_HOST_ATTRIBUTES;
 	feature = &req->set_feature.feature;
-	feature->host.info = cpu_to_le64 ( virt_to_bus ( ena->info ) );
+	feature->host.info =
+		cpu_to_le64 ( dma ( &ena->host.map, ena->host.info ) );
 
 	/* Issue request */
 	if ( ( rc = ena_admin ( ena, req, &rsp ) ) != 0 ) {
@@ -925,7 +936,7 @@ static void ena_refill_rx ( struct net_device *netdev ) {
 	while ( ( ena->rx.sq.prod - ena->rx.cq.cons ) < ena->rx.sq.fill ) {
 
 		/* Allocate I/O buffer */
-		iobuf = alloc_iob ( len );
+		iobuf = alloc_rx_iob ( len, ena->dma );
 		if ( ! iobuf ) {
 			/* Wait for next refill */
 			break;
@@ -937,7 +948,7 @@ static void ena_refill_rx ( struct net_device *netdev ) {
 		id = ena->rx_ids[index];
 
 		/* Construct submission queue entry */
-		address = virt_to_bus ( iobuf->data );
+		address = cpu_to_le64 ( iob_dma ( iobuf ) );
 		sqe->len = cpu_to_le16 ( len );
 		sqe->id = cpu_to_le16 ( id );
 		sqe->address = cpu_to_le64 ( address );
@@ -980,7 +991,7 @@ static void ena_empty_rx ( struct ena_nic *ena ) {
 		iobuf = ena->rx_iobuf[i];
 		ena->rx_iobuf[i] = NULL;
 		if ( iobuf )
-			free_iob ( iobuf );
+			free_rx_iob ( iobuf );
 	}
 }
 
@@ -1063,7 +1074,8 @@ static void ena_close ( struct net_device *netdev ) {
  * @v iobuf		I/O buffer
  * @ret rc		Return status code
  */
-static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
+static int ena_transmit ( struct net_device *netdev,
+			  struct io_buffer *iobuf ) {
 	struct ena_nic *ena = netdev->priv;
 	struct ena_tx_sqe *sqe;
 	struct ena_tx_llqe *llqe;
@@ -1087,7 +1099,7 @@ static int ena_transmit ( struct net_device *netdev, struct io_buffer *iobuf ) {
 	id = ena->tx_ids[index];
 
 	/* Construct submission queue entry values */
-	address = virt_to_bus ( iobuf->data );
+	address = iob_dma ( iobuf );
 	len = iob_len ( iobuf );
 	inlined = ena->tx.sq.inlined;
 	if ( inlined > len )
@@ -1395,13 +1407,18 @@ static int ena_probe ( struct pci_device *pci ) {
 		       ena, ( prefmemsize >> 10 ) );
 	}
 
+	/* Configure DMA */
+	ena->dma = &pci->dma;
+	dma_set_mask_64bit ( ena->dma );
+	netdev->dma = ena->dma;
+
 	/* Allocate and initialise host info */
-	info = malloc_phys ( PAGE_SIZE, PAGE_SIZE );
+	info = dma_alloc ( ena->dma, &ena->host.map, PAGE_SIZE, PAGE_SIZE );
 	if ( ! info ) {
 		rc = -ENOMEM;
 		goto err_info;
 	}
-	ena->info = info;
+	ena->host.info = info;
 	memset ( info, 0, PAGE_SIZE );
 	info->type = cpu_to_le32 ( ENA_HOST_INFO_TYPE_IPXE );
 	snprintf ( info->dist_str, sizeof ( info->dist_str ), "%s",
@@ -1461,7 +1478,7 @@ static int ena_probe ( struct pci_device *pci ) {
  err_create_admin:
 	ena_reset ( ena );
  err_reset:
-	free_phys ( ena->info, PAGE_SIZE );
+	dma_free ( &ena->host.map, ena->host.info, PAGE_SIZE );
  err_info:
 	if ( ena->mem )
 		iounmap ( ena->mem );
@@ -1497,7 +1514,7 @@ static void ena_remove ( struct pci_device *pci ) {
 	ena_reset ( ena );
 
 	/* Free host info */
-	free_phys ( ena->info, PAGE_SIZE );
+	dma_free ( &ena->host.map, ena->host.info, PAGE_SIZE );
 
 	/* Unmap registers and on-device memory */
 	if ( ena->mem )

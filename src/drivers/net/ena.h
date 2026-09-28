@@ -580,6 +580,8 @@ union ena_acq_rsp {
 struct ena_aq {
 	/** Requests */
 	union ena_aq_req *req;
+	/** DMA mapping */
+	struct dma_mapping map;
 	/** Producer counter */
 	unsigned int prod;
 };
@@ -588,6 +590,8 @@ struct ena_aq {
 struct ena_acq {
 	/** Responses */
 	union ena_acq_rsp *rsp;
+	/** DMA mapping */
+	struct dma_mapping map;
 	/** Consumer counter */
 	unsigned int cons;
 	/** Phase */
@@ -614,6 +618,8 @@ struct ena_aenq_event {
 struct ena_aenq {
 	/** Events */
 	struct ena_aenq_event *evt;
+	/** DMA mapping */
+	struct dma_mapping map;
 };
 
 /** Transmit submission queue entry */
@@ -730,6 +736,8 @@ struct ena_sq {
 		/** Raw data */
 		void *raw;
 	} sqe;
+	/** DMA mapping */
+	struct dma_mapping map;
 	/** Buffer IDs */
 	uint8_t *ids;
 	/** Low latency queue base */
@@ -787,6 +795,8 @@ struct ena_cq {
 		/** Raw data */
 		void *raw;
 	} cqe;
+	/** DMA mapping */
+	struct dma_mapping map;
 	/** Doorbell register offset */
 	unsigned int doorbell;
 	/** Total length of entries */
@@ -830,16 +840,26 @@ struct ena_qp {
 	struct ena_cq cq;
 };
 
+/** Host information page */
+struct ena_host_page {
+	/** Host information */
+	struct ena_host_info *info;
+	/** DMA mapping */
+	struct dma_mapping map;
+};
+
 /** An ENA network card */
 struct ena_nic {
 	/** Registers */
 	void *regs;
 	/** On-device memory */
 	void *mem;
+	/** DMA device */
+	struct dma_device *dma;
 	/** Device features */
 	uint32_t features;
-	/** Host info */
-	struct ena_host_info *info;
+	/** Host information page */
+	struct ena_host_page host;
 	/** Admin queue */
 	struct ena_aq aq;
 	/** Admin completion queue */
