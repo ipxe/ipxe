@@ -28,6 +28,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <errno.h>
 #include <ipxe/timer.h>
 #include <ipxe/image.h>
+#include <ipxe/script.h>
 #include <ipxe/netdevice.h>
 #include <ipxe/uri.h>
 #include <ipxe/efi/efi.h>
@@ -200,12 +201,17 @@ int efi_autoexec_load ( void ) {
 		if ( ( rc = loader->load ( handle, &image ) ) != 0 )
 			continue;
 
-		/* Discard zero-length images */
-		if ( ! image->len ) {
-			DBGC ( device, "EFI %s discarding zero-length %s\n",
+		/* Accept only a genuine iPXE script.  Some firmware
+		 * implementations expose a filesystem that returns the
+		 * loaded image itself (rather than the requested file)
+		 * as a "successful" read.  Reject anything that is not a
+		 * script and fall through to the next available loader.
+		 */
+		if ( image->type != &script_image_type ) {
+			DBGC ( device, "EFI %s ignoring non-script %s\n",
 			       efi_handle_name ( device ), image->name );
 			unregister_image ( image );
-			return -ENOENT;
+			continue;
 		}
 
 		DBGC ( device, "EFI %s loaded %s (%zd bytes)\n",
