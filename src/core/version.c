@@ -35,6 +35,8 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/version.h>
 #include <ipxe/sbat.h>
 #include <ipxe/sbom.h>
+#include <ipxe/efi/efi.h>
+#include <ipxe/efi/IndustryStandard/PeImage.h>
 #include <config/general.h>
 #include <config/branding.h>
 
@@ -130,3 +132,28 @@ const char sbat[ sizeof ( SBAT_DATA ) - 1 ] __sbat = SBAT_DATA;
 
 /** SBOM data (without any NUL terminator) */
 const char sbom[ sizeof ( SBOM_DATA ) - 1 ] __sbom = SBOM_DATA;
+
+/** EFI debug directory */
+const struct __attribute__ (( packed )) {
+	char magic[8];
+	EFI_IMAGE_DEBUG_DIRECTORY_ENTRY debug;
+	EFI_IMAGE_DEBUG_CODEVIEW_RSDS_ENTRY rsds;
+	char name[ sizeof ( BUILD_NAME ) ];
+} efi_debugdir __attribute__ (( section ( ".debugdir" ) )) = {
+	.magic = "EFIDEBUG",
+	.debug = {
+		.TimeDateStamp = 0x10d1a884,
+		.Type = EFI_IMAGE_DEBUG_TYPE_CODEVIEW,
+		.SizeOfData = ( sizeof ( efi_debugdir ) -
+				sizeof ( efi_debugdir.debug ) ),
+		/* RVA and FileOffset will be updated by elf2efi */
+		.RVA = ( ( ( const void * ) &efi_debugdir.rsds ) -
+			 ( ( const void * ) &efi_debugdir ) ),
+		.FileOffset = ( ( ( const void * ) &efi_debugdir.rsds ) -
+				( ( const void * ) &efi_debugdir ) ),
+	},
+	.rsds = {
+		.Signature = CODEVIEW_SIGNATURE_RSDS,
+	},
+	.name = BUILD_NAME,
+};

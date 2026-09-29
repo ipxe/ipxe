@@ -33,7 +33,6 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <elf.h>
-#include <libgen.h>
 
 #define EFI_HOSTONLY
 #include <ipxe/efi/Uefi.h>
@@ -1109,83 +1108,17 @@ create_reloc_section ( struct pe_header *pe_header,
 }
 
 /**
- * Create debug section
- *
- * @v pe_header		PE file header
- * @ret section		Debug section
- */
-static struct pe_section *
-create_debug_section ( struct pe_header *pe_header, const char *filename ) {
-	struct pe_section *debug;
-	size_t section_memsz;
-	size_t section_filesz;
-	EFI_IMAGE_DATA_DIRECTORY *debugdir;
-	struct {
-		EFI_IMAGE_DEBUG_DIRECTORY_ENTRY debug;
-		EFI_IMAGE_DEBUG_CODEVIEW_RSDS_ENTRY rsds;
-		char name[32];
-	} *contents;
-
-	/* Allocate PE section */
-	section_filesz = section_memsz = sizeof ( *contents );
-	debug = xmalloc ( sizeof ( *debug ) + section_filesz );
-	memset ( debug, 0, sizeof ( *debug ) + section_filesz );
-	contents = ( void * ) debug->contents;
-
-	/* Place at end of headers */
-	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( *contents );
-	pe_header->nt.OptionalHeader.SizeOfHeaders =
-		efi_file_align ( pe_header->nt.OptionalHeader.SizeOfHeaders );
-	pe_header->nt.OptionalHeader.SizeOfHeaders -= sizeof ( *contents );
-
-	/* Fill in section header details */
-	strncpy ( ( char * ) debug->hdr.Name, ".debug",
-		  sizeof ( debug->hdr.Name ) );
-	debug->hdr.Misc.VirtualSize = section_memsz;
-	debug->hdr.VirtualAddress =
-		pe_header->nt.OptionalHeader.SizeOfHeaders;
-	debug->hdr.SizeOfRawData = section_filesz;
-	debug->hdr.PointerToRawData =
-		pe_header->nt.OptionalHeader.SizeOfHeaders;
-	debug->hidden = 1;
-
-	/* Create section contents */
-	contents->debug.TimeDateStamp = 0x10d1a884;
-	contents->debug.Type = EFI_IMAGE_DEBUG_TYPE_CODEVIEW;
-	contents->debug.SizeOfData =
-		( sizeof ( *contents ) - sizeof ( contents->debug ) );
-	contents->debug.RVA = ( debug->hdr.VirtualAddress +
-				offsetof ( typeof ( *contents ), rsds ) );
-	contents->debug.FileOffset = contents->debug.RVA;
-	contents->rsds.Signature = CODEVIEW_SIGNATURE_RSDS;
-	snprintf ( contents->name, sizeof ( contents->name ), "%s",
-		   filename );
-
-	/* Update file header details */
-	pe_header->nt.OptionalHeader.SizeOfHeaders += sizeof ( *contents );
-	debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
-		     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
-	debugdir->VirtualAddress = debug->hdr.VirtualAddress;
-	debugdir->Size = sizeof ( contents->debug );
-
-	return debug;
-}
-
-/**
- * Write out PE file
+ * Assign file offsets
  *
  * @v pe_header		PE file header
  * @v pe_sections	List of PE sections
- * @v pe		Output file
  */
-static void write_pe_file ( struct pe_header *pe_header,
-			    struct pe_section *pe_sections,
-			    FILE *pe ) {
+static void assign_offsets ( struct pe_header *pe_header,
+			     struct pe_section *pe_sections ) {
 	struct pe_section *section;
 	unsigned long hdrmax;
 	unsigned long fpos;
 	unsigned long fposmax;
-	unsigned int count = 0;
 
 	/* Extend header length to reach first explicitly placed section */
 	hdrmax = -1UL;
@@ -1224,6 +1157,68 @@ static void write_pe_file ( struct pe_header *pe_header,
 		if ( fpos > fposmax )
 			fposmax = fpos;
 	}
+}
+
+/**
+ * Create debug directory
+ *
+ * @v pe_header		PE file header
+ * @v pe_sections	List of PE sections
+ */
+static void create_debug_directory ( struct pe_header *pe_header,
+				     struct pe_section *pe_sections ) {
+	static const char magic[] = "EFIDEBUG";
+	EFI_IMAGE_DATA_DIRECTORY *debugdir;
+	struct {
+		char magic[8];
+		EFI_IMAGE_DEBUG_DIRECTORY_ENTRY dir;
+	} *debug;
+	struct pe_section *section;
+
+	/* Update partially constructed debug directory */
+	for ( section = pe_sections ; section ; section = section->next ) {
+
+		/* Find section starting with magic signature */
+		if ( section->hidden )
+			continue;
+		if ( section->hdr.SizeOfRawData < sizeof ( *debug ) )
+			continue;
+		debug = ( ( void * ) section->contents );
+		if ( memcmp ( debug->magic, magic,
+			      sizeof ( debug->magic ) ) != 0 ) {
+			continue;
+		}
+
+		/* Update RVA and file offset */
+		debug->dir.RVA += section->hdr.VirtualAddress;
+		debug->dir.FileOffset += section->hdr.PointerToRawData;
+
+		/* Update file header */
+		debugdir = &(pe_header->nt.OptionalHeader.DataDirectory
+			     [EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]);
+		debugdir->VirtualAddress =
+			( section->hdr.VirtualAddress +
+			  offsetof ( typeof ( *debug ), dir ) );
+		debugdir->Size = sizeof ( debug->dir );
+		return;
+	}
+
+	eprintf ( "No debug directory found\n" );
+	exit ( 1 );
+}
+
+/**
+ * Write out PE file
+ *
+ * @v pe_header		PE file header
+ * @v pe_sections	List of PE sections
+ * @v pe		Output file
+ */
+static void write_pe_file ( struct pe_header *pe_header,
+			    struct pe_section *pe_sections,
+			    FILE *pe ) {
+	struct pe_section *section;
+	unsigned int count = 0;
 
 	/* Write sections */
 	for ( section = pe_sections ; section ; section = section->next ) {
@@ -1353,10 +1348,11 @@ static void elf2pe ( const char *elf_name, const char *pe_name,
 	*(next_pe_section) = create_reloc_section ( &pe_header, pe_reltab );
 	next_pe_section = &(*next_pe_section)->next;
 
-	/* Create the .debug section */
-	*(next_pe_section) = create_debug_section ( &pe_header,
-						    basename ( pe_name_tmp ) );
-	next_pe_section = &(*next_pe_section)->next;
+	/* Assign file offsets */
+	assign_offsets ( &pe_header, pe_sections );
+
+	/* Create the debug directory */
+	create_debug_directory ( &pe_header, pe_sections );
 
 	/* Write out PE file */
 	pe = fopen ( pe_name, "w" );

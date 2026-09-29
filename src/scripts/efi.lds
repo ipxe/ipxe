@@ -39,6 +39,8 @@ SECTIONS {
     . = ALIGN ( _page_align );
     .rodata : {
 	_rodata = .;
+	KEEP(*(.debugdir))
+	KEEP(*(.debugdir.*))
 	*(.srodata)
 	*(.srodata.*)
 	*(.rodata)
