@@ -191,3 +191,153 @@ void smmu_poll ( void ) {
 		smmu_dump_events ( i );
 	}
 }
+
+/*
+ * Install a single-StreamID bypass entry for the AWS ENA NIC
+ *
+ * The firmware enables the SMMU but never enumerates the ENA, so it
+ * has no stream table entry and its first DMA faults with
+ * C_BAD_STREAMID.  Install a bypass STE for exactly the ENA's
+ * StreamID, using a one-entry level-2 table so that no other StreamID
+ * is affected.  Call once, after ena_membases() and before any DMA.
+ *
+ * Hardcoded for ENA at 0002:04:00.0 (StreamID 0x400, SMMU
+ * 0x807800000).  Not for upstream.
+ */
+
+#include <string.h>
+#include <ipxe/malloc.h>
+
+/** SMMU instance and StreamID serving the ENA (0002:04:00.0) */
+#define SMMU_ENA_BASE 0x807800000UL
+#define SMMU_ENA_SID  0x400
+
+/** STRTAB_BASE_CFG fields */
+#define SMMU_STRTAB_CFG_FMT( x )	( ( (x) >> 16 ) & 0x3 )
+#define SMMU_STRTAB_CFG_SPLIT( x )	( ( (x) >> 6 ) & 0x1f )
+#define SMMU_STRTAB_CFG_LOG2SIZE( x )	( (x) & 0x3f )
+#define SMMU_STRTAB_FMT_2LVL 1
+
+/** Stream table entry (STE) qword 0 */
+#define SMMU_STE_0_V		0x0000000000000001ULL
+#define SMMU_STE_0_CFG_BYPASS	0x0000000000000008ULL /* CFG=0b100 << 1 */
+
+/** Stream table entry (STE) qword 1: SHCFG=Use-incoming (bits 45:44) */
+#define SMMU_STE_1_SHCFG_INCOMING 0x0000100000000000ULL
+
+/** Level-1 stream table descriptor: span for a single-entry L2 table */
+#define SMMU_L1_DESC_SPAN_ONE 1
+
+/**
+ * Install ENA bypass stream table entry
+ *
+ * @ret rc		Return status code
+ */
+int smmu_ena_bypass ( void ) {
+	void *regs;
+	uint32_t cr0;
+	uint32_t cfg;
+	unsigned int split;
+	unsigned int l1idx;
+	unsigned int l2idx;
+	uint64_t strtab;
+	volatile uint64_t *l1desc;
+	uint64_t desc;
+	uint64_t *ste;
+	uint64_t l2phys;
+
+	/* Map SMMU register page */
+	regs = ioremap ( SMMU_ENA_BASE, 0x1000 );
+	if ( ! regs ) {
+		printf ( "SMMU %#lx: could not map registers\n",
+			 SMMU_ENA_BASE );
+		return -1;
+	}
+
+	/* Nothing to do unless the SMMU is enabled */
+	cr0 = readl ( regs + SMMU_CR0 );
+	if ( ! ( cr0 & 1 ) ) {
+		printf ( "SMMU %#lx: not enabled (CR0 %08x); no bypass "
+			 "needed\n", SMMU_ENA_BASE, cr0 );
+		iounmap ( regs );
+		return 0;
+	}
+
+	/* Require a two-level stream table (which is what we observe) */
+	cfg = readl ( regs + SMMU_STRTAB_BASE_CFG );
+	if ( SMMU_STRTAB_CFG_FMT ( cfg ) != SMMU_STRTAB_FMT_2LVL ) {
+		printf ( "SMMU %#lx: not a two-level stream table (CFG "
+			 "%08x)\n", SMMU_ENA_BASE, cfg );
+		iounmap ( regs );
+		return -1;
+	}
+	split = SMMU_STRTAB_CFG_SPLIT ( cfg );
+	strtab = ( ( ( uint64_t ) readl ( regs + SMMU_STRTAB_BASE + 4 ) << 32 )
+		   | readl ( regs + SMMU_STRTAB_BASE ) );
+	strtab &= SMMU_ADDR_MASK;
+
+	/* Locate the level-1 descriptor for our StreamID */
+	l1idx = ( SMMU_ENA_SID >> split );
+	l2idx = ( SMMU_ENA_SID & ( ( 1U << split ) - 1 ) );
+	if ( l2idx != 0 ) {
+		/* A one-entry L2 table only covers L2 index 0 */
+		printf ( "SMMU %#lx: SID %#x has L2 index %#x != 0\n",
+			 SMMU_ENA_BASE, SMMU_ENA_SID, l2idx );
+		iounmap ( regs );
+		return -1;
+	}
+
+	/* Map and inspect the level-1 descriptor */
+	l1desc = ioremap ( ( strtab + ( l1idx * sizeof ( *l1desc ) ) ),
+			   sizeof ( *l1desc ) );
+	if ( ! l1desc ) {
+		printf ( "SMMU %#lx: could not map L1 descriptor\n",
+			 SMMU_ENA_BASE );
+		iounmap ( regs );
+		return -1;
+	}
+	desc = *l1desc;
+	if ( ( desc & 0x1f ) != 0 ) {
+		/* Firmware has already populated this L1 slot: do not
+		 * touch it, since it may cover a real neighbour.
+		 */
+		printf ( "SMMU %#lx: L1[%#x] already has span %d (%016llx); "
+			 "refusing to overwrite\n", SMMU_ENA_BASE, l1idx,
+			 ( int ) ( desc & 0x1f ), ( unsigned long long ) desc );
+		iounmap ( l1desc );
+		iounmap ( regs );
+		return -1;
+	}
+
+	/* Allocate and build a one-entry level-2 table (one STE) */
+	ste = malloc_phys ( 64, 64 );
+	if ( ! ste ) {
+		iounmap ( l1desc );
+		iounmap ( regs );
+		return -1;
+	}
+	memset ( ste, 0, 64 );
+	ste[0] = ( SMMU_STE_0_V | SMMU_STE_0_CFG_BYPASS );
+	ste[1] = SMMU_STE_1_SHCFG_INCOMING;
+	l2phys = virt_to_phys ( ste );
+
+	/* Ensure the STE is visible before the L1 descriptor points at
+	 * it (the SMMU table walker is coherent: IDR0.COHACC=1).
+	 */
+	wmb();
+
+	/* Point the level-1 descriptor at the new L2 table */
+	desc = ( ( l2phys & SMMU_ADDR_MASK ) | SMMU_L1_DESC_SPAN_ONE );
+	writeq ( desc, l1desc );
+	wmb();
+
+	printf ( "SMMU %#lx: installed bypass for SID %#x: L1[%#x]=%016llx "
+		 "STE=%016llx/%016llx @ %#llx\n", SMMU_ENA_BASE, SMMU_ENA_SID,
+		 l1idx, ( unsigned long long ) desc,
+		 ( unsigned long long ) ste[0], ( unsigned long long ) ste[1],
+		 ( unsigned long long ) l2phys );
+
+	iounmap ( l1desc );
+	iounmap ( regs );
+	return 0;
+}

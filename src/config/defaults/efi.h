@@ -13,7 +13,8 @@ FILE_SECBOOT ( PERMITTED );
 #define UACCESS_FLAT
 #define IOMAP_VIRT
 #define PCIAPI_EFI
-#define DMAAPI_OP
+//
+#define DMAAPI_FLAT
 #define TIMER_EFI
 #define UMALLOC_EFI
 #define MEMMAP_NULL

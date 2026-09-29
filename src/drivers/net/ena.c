@@ -1407,6 +1407,14 @@ static int ena_probe ( struct pci_device *pci ) {
 		       ena, ( prefmemsize >> 10 ) );
 	}
 
+	//
+	extern void smmu_dump ( void ) ;
+	extern void smmu_ena_bypass ( void );
+	smmu_dump();
+	smmu_ena_bypass();
+	smmu_dump();
+
+
 	/* Configure DMA */
 	ena->dma = &pci->dma;
 	dma_set_mask_64bit ( ena->dma );
