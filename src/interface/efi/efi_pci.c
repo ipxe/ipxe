@@ -434,7 +434,52 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	return ioremap ( bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( efi, pci_can_probe );
+//
+static int is_ena_nic ( struct pci_device *pci ) {
+
+	if ( // m8g.metal-24xl ENA
+	     ( pci->busdevfn == PCI_BUSDEVFN ( 0x0003, 0x2c, 0x00, 0x0 ) ) ||
+	     // m9g.metal-48xl ENA
+	     ( pci->busdevfn == PCI_BUSDEVFN ( 0x0002, 0x04, 0x00, 0x0 ) ) ) {
+		DBG ( "**** hacking ENA NIC " PCI_FMT "\n",
+		      PCI_ARGS ( pci ) );
+		return 1;
+	}
+
+	return 0;
+}
+
+//
+static int is_ena_bridge ( struct pci_device *pci ) {
+
+	if ( // m8g.metal-24xl bridge
+	     ( pci->busdevfn == PCI_BUSDEVFN ( 0x0003, 0x02, 0x05, 0x1 ) ) ||
+	     // m9g.metal-48xl bridge
+	     ( pci->busdevfn == PCI_BUSDEVFN ( 0x0002, 0x02, 0x01, 0x0 ) ) ) {
+		DBG ( "**** hacking ENA bridge " PCI_FMT "\n",
+		      PCI_ARGS ( pci ) );
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ * Check if PCI bus probing is allowed
+ *
+ * @v pci		PCI device
+ * @ret ok		Bus probing is allowed
+ */
+static int efipci_can_probe ( struct pci_device *pci ) {
+
+	//
+	if ( is_ena_nic ( pci ) )
+		return 1;
+
+	return 0;
+}
+
+PROVIDE_PCIAPI ( efi, pci_can_probe, efipci_can_probe );
 PROVIDE_PCIAPI ( efi, pci_discover, efipci_discover );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
@@ -786,11 +831,14 @@ static int efipci_supported ( EFI_HANDLE device ) {
 
 	/* Do not attempt to drive bridges */
 	hdrtype = efipci.pci.hdrtype;
+	//
+	if ( ! is_ena_bridge ( &efipci.pci ) ) {
 	if ( ( hdrtype & PCI_HEADER_TYPE_MASK ) != PCI_HEADER_TYPE_NORMAL ) {
 		DBGC ( device, "EFIPCI " PCI_FMT " type %02x is not type %02x\n",
 		       PCI_ARGS ( &efipci.pci ), hdrtype,
 		       PCI_HEADER_TYPE_NORMAL );
 		return -ENOTTY;
+	}
 	}
 
 	/* Look for a driver */

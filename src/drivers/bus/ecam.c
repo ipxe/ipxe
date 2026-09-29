@@ -58,8 +58,17 @@ static int ecam_find ( uint32_t busdevfn, struct pci_range *range,
 	range->count = 0;
 
 	/* Locate MCFG table */
+	//
+	if ( 1 ) {
 	mcfg = container_of ( acpi_table ( ECAM_SIGNATURE, 0 ),
 			      struct ecam_table, acpi );
+	} else {
+		// m9g.metal-48xl
+		mcfg = phys_to_virt ( 0x0000040015546A98ULL );
+
+		// m8g.metal-24xl
+		//mcfg = phys_to_virt ( 0x0000010014E1D898ULL );
+	}
 	if ( ! mcfg ) {
 		DBGC ( &ecam, "ECAM found no MCFG table\n" );
 		return -ENOTSUP;

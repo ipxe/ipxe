@@ -34,17 +34,6 @@ extern int efipci_write ( struct pci_device *pci, unsigned long location,
 			  unsigned long value );
 
 /**
- * Check if PCI bus probing is allowed
- *
- * @v pci		PCI device
- * @ret ok		Bus probing is allowed
- */
-static inline __always_inline int
-PCIAPI_INLINE ( efi, pci_can_probe ) ( struct pci_device *pci __unused ) {
-	return 0;
-}
-
-/**
  * Read byte from PCI configuration space via EFI
  *
  * @v pci	PCI device
