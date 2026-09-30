@@ -390,7 +390,7 @@ WORKAROUND_CFLAGS += $(WNUSI_FLAGS)
 # comment markers.  Specifying --divide will work around this problem,
 # but isn't available on older gas versions.
 #
-DIVIDE_TEST = $(AS) --divide /dev/null -o /dev/null 2>/dev/null
+DIVIDE_TEST = $(AS) --divide -o /dev/null </dev/null 2>/dev/null
 DIVIDE_FLAGS := $(shell $(DIVIDE_TEST) && $(ECHO) '--divide')
 WORKAROUND_ASFLAGS += $(DIVIDE_FLAGS)
 
