@@ -92,7 +92,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL )
 #define if64 if 0
 #endif
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 
 /****************************************************************************
  * Global descriptor table

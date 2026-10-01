@@ -29,7 +29,7 @@
  *
  */
 
-	.section ".note.GNU-stack", "", @progbits
+	.section ".note.GNU-stack"
 	.text
 
 #define STACK_ALIGN 16
