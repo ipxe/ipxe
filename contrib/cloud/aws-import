@@ -75,8 +75,8 @@ def delete_images(region, filters, retain):
         resource.Snapshot(snapshot_id).delete()
 
 
-def import_image(region, name, family, architecture, image, public, overwrite,
-                 retain):
+def import_image(region, name, family, commit, architecture, image, public,
+                 overwrite, retain):
     """Import an AMI image"""
     client = boto3.client('ec2', region_name=region)
     resource = boto3.resource('ec2', region_name=region)
@@ -85,6 +85,8 @@ def import_image(region, name, family, architecture, image, public, overwrite,
         {'Key': 'family', 'Value': family},
         {'Key': 'architecture', 'Value': architecture},
     ]
+    if commit:
+        tags.append({'Key': 'commit', 'Value': commit})
     if overwrite:
         filters = [{'Name': 'name', 'Values': [description]}]
         delete_images(region=region, filters=filters, retain=0)
@@ -152,6 +154,7 @@ parser.add_argument('--retain', type=int, metavar='NUM',
                     help="Retain at most <NUM> old images")
 parser.add_argument('--region', '-r', action='append',
                     help="AWS region(s)")
+parser.add_argument('--commit', '-c', help="Commit ID")
 parser.add_argument('--wiki', '-w', metavar='FILE',
                     help="Generate Dokuwiki table")
 parser.add_argument('--bucket', '-b',
@@ -182,6 +185,7 @@ with ThreadPoolExecutor(max_workers=len(imports)) as executor:
                                region=region,
                                name=args.name,
                                family=args.family,
+                               commit=args.commit,
                                architecture=architectures[image],
                                image=image,
                                public=args.public,

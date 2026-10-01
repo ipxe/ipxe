@@ -96,6 +96,7 @@ jobs:
               --retain ${{ env.retain }} \
               --wiki ${{ env.amilist }} \
               --bucket ${{ env.bucket }} \
+              --commit ${{ github.sha }} \
               ${{ env.family }} \
               ${{ env.binaries }}
 
