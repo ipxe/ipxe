@@ -138,21 +138,25 @@ static struct http_transfer_encoding http_transfer_identity;
 /** HTTP HEAD method */
 struct http_method http_head __http_method = {
 	.name = "HEAD",
+	.flags = 0,
 };
 
 /** HTTP GET method */
 struct http_method http_get __http_method = {
 	.name = "GET",
+	.flags = 0,
 };
 
 /** HTTP POST method */
 struct http_method http_post __http_method = {
 	.name = "POST",
+	.flags = HTTP_FL_REQ_BODY,
 };
 
 /** HTTP PUT method */
 struct http_method http_put __http_method = {
 	.name = "PUT",
+	.flags = HTTP_FL_REQ_BODY,
 };
 
 /**
@@ -1095,11 +1099,15 @@ static int http_format_content_length ( struct http_transaction *http,
 					char *buf, size_t len ) {
 
 	/* Construct content length, if applicable */
-	if ( http->request.content.len ) {
+	if ( http->request.method->flags & HTTP_FL_REQ_BODY ) {
 		return snprintf ( buf, len, "%zd", http->request.content.len );
-	} else {
+	} else if ( http->request.content.len == 0 ) {
 		return 0;
 	}
+
+	DBGC ( http, "HTTP %p cannot %s with a request body\n",
+	       http, http->request.method->name );
+	return -ENOTSUP;
 }
 
 /** HTTP "Content-Length" header */

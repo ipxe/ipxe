@@ -100,7 +100,12 @@ struct http_connection {
 struct http_method {
 	/** Method name (e.g. "GET" or "POST") */
 	const char *name;
+	/** Flags */
+	unsigned int flags;
 };
+
+/** HTTP method has a request body */
+#define HTTP_FL_REQ_BODY 0x0001
 
 /** HTTP method table */
 #define HTTP_METHODS __table ( struct http_method, "http_methods" )
