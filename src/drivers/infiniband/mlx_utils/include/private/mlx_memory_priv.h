@@ -48,28 +48,30 @@ mlx_memory_alloc_dma_priv(
 					IN mlx_utils *utils,
 					IN mlx_size size ,
 					IN mlx_size align,
-					OUT mlx_void **ptr
+					OUT mlx_void **ptr,
+					OUT mlx_dma *mapping
 					);
 
 mlx_status
 mlx_memory_free_dma_priv(
 					IN mlx_utils *utils,
 					IN mlx_size size ,
-					IN mlx_void *ptr
+					IN mlx_void *ptr,
+					IN mlx_dma *mapping
 					);
 mlx_status
 mlx_memory_map_dma_priv(
 					IN mlx_utils *utils,
 					IN mlx_void *addr ,
+					IN mlx_dma *mapping,
 					IN mlx_size number_of_bytes,
-					OUT mlx_physical_address *phys_addr,
-					OUT mlx_void **mapping
+					OUT mlx_physical_address *phys_addr
 					);
 
 mlx_status
 mlx_memory_ummap_dma_priv(
 					IN mlx_utils *utils,
-					IN mlx_void *mapping
+					IN mlx_dma *mapping
 					);
 
 mlx_status
