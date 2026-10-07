@@ -52,6 +52,9 @@ FILE_SECBOOT ( PERMITTED );
 /** List of discovery segments */
 static LIST_HEAD ( peerdisc_segments );
 
+/** Maximum random jitter added to discovery attempt times */
+#define PEERDISC_MAX_JITTER ( 32 * TICKS_PER_MS )
+
 /** Number of repeated discovery attempts */
 #define PEERDISC_REPEAT_COUNT 2
 
@@ -443,6 +446,22 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 }
 
 /**
+ * Schedule discovery attempt
+ *
+ * @v segment		PeerDist discovery segment
+ * @v timeout		Minimum timeout
+ */
+static void peerdisc_schedule ( struct peerdisc_segment *segment,
+				unsigned long timeout ) {
+
+	/* Add some random jitter */
+	timeout += ( random() % PEERDISC_MAX_JITTER );
+
+	/* Schedule next transmission */
+	start_timer_fixed ( &segment->timer, timeout );
+}
+
+/**
  * Handle discovery timer expiry
  *
  * @v timer		Discovery timer
@@ -453,11 +472,13 @@ static void peerdisc_expired ( struct retry_timer *timer, int over __unused ) {
 		container_of ( timer, struct peerdisc_segment, timer );
 
 	/* Attempt to transmit discovery requests */
+	DBGC2 ( segment, "PEERDISC %p discovering %s\n",
+		segment, segment->id );
 	peerdisc_socket_tx ( segment->uuid, segment->id );
 
-	/* Schedule next transmission, if applicable */
+	/* Schedule next discovery attempt, if applicable */
 	if ( timer->count < PEERDISC_REPEAT_COUNT )
-		start_timer_fixed ( &segment->timer, PEERDISC_REPEAT_TIMEOUT );
+		peerdisc_schedule ( segment, PEERDISC_REPEAT_TIMEOUT );
 }
 
 /**
@@ -535,10 +556,8 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 					      peerdisc_recent );
 		}
 
-		/* Start discovery timer */
-		start_timer_nodelay ( &segment->timer );
-		DBGC2 ( segment, "PEERDISC %p discovering %s\n",
-			segment, segment->id );
+		/* Schedule initial discovery attempt */
+		peerdisc_schedule ( segment, 0 );
 	}
 
 	/* Add to list of segments, transfer reference to list, and return */
