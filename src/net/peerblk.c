@@ -108,13 +108,21 @@ FILE_SECBOOT ( PERMITTED );
 static struct profiler peerblk_download_profiler __profiler =
 	{ .name = "peerblk.download" };
 
-/** PeerDist block download attempt success profiler */
-static struct profiler peerblk_attempt_success_profiler __profiler =
-	{ .name = "peerblk.attempt.success" };
+/** PeerDist block raw download attempt success profiler */
+static struct profiler peerblk_attempt_raw_success_profiler __profiler =
+	{ .name = "peerblk.attempt.raw.success" };
 
-/** PeerDist block download attempt failure profiler */
-static struct profiler peerblk_attempt_failure_profiler __profiler =
-	{ .name = "peerblk.attempt.failure" };
+/** PeerDist block raw download attempt failure profiler */
+static struct profiler peerblk_attempt_raw_failure_profiler __profiler =
+	{ .name = "peerblk.attempt.raw.failure" };
+
+/** PeerDist block retrieval protocol download attempt success profiler */
+static struct profiler peerblk_attempt_retrieval_success_profiler __profiler =
+	{ .name = "peerblk.attempt.retrieval.success" };
+
+/** PeerDist block retrieval protocol download attempt failure profiler */
+static struct profiler peerblk_attempt_retrieval_failure_profiler __profiler =
+	{ .name = "peerblk.attempt.retrieval.failure" };
 
 /** PeerDist block download attempt timeout profiler */
 static struct profiler peerblk_attempt_timeout_profiler __profiler =
@@ -303,6 +311,10 @@ static void peerblk_done ( struct peerdist_block *peerblk, int rc ) {
 	uint8_t hash[digest->digestsize];
 	unsigned long now = peerblk_timestamp();
 
+	/* Identify peer (if any) */
+	head = list_entry ( &segment->peers, struct peerdisc_peer, list );
+	peer = ( ( peerblk->peer == head ) ? NULL : peerblk->peer );
+
 	/* Check for errors on completion */
 	if ( rc != 0 ) {
 		DBGC ( peerblk, "PEERBLK %p %d.%d attempt failed: %s\n",
@@ -323,12 +335,11 @@ static void peerblk_done ( struct peerdist_block *peerblk, int rc ) {
 	}
 
 	/* Profile successful attempt */
-	profile_custom ( &peerblk_attempt_success_profiler,
+	profile_custom ( ( peer ? &peerblk_attempt_retrieval_success_profiler :
+			   &peerblk_attempt_raw_success_profiler ),
 			 ( now - peerblk->attempted ) );
 
 	/* Report peer statistics */
-	head = list_entry ( &segment->peers, struct peerdisc_peer, list );
-	peer = ( ( peerblk->peer == head ) ? NULL : peerblk->peer );
 	peerdisc_stat ( &peerblk->xfer, peer, &segment->peers );
 
 	/* Close download */
@@ -337,7 +348,8 @@ static void peerblk_done ( struct peerdist_block *peerblk, int rc ) {
 
  err:
 	/* Record failure reason and schedule a retry attempt */
-	profile_custom ( &peerblk_attempt_failure_profiler,
+	profile_custom ( ( peer ? &peerblk_attempt_retrieval_failure_profiler :
+			   &peerblk_attempt_raw_failure_profiler ),
 			 ( now - peerblk->attempted ) );
 	peerblk_reset ( peerblk, rc );
 	peerblk->rc = rc;
