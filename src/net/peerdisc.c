@@ -53,6 +53,63 @@ FILE_SECBOOT ( PERMITTED );
 /** List of discovery segments */
 static LIST_HEAD ( peerdisc_segments );
 
+/**
+ * Time before initial discovery attempt
+ *
+ * In theory, a PeerDist client should perform discovery for each
+ * segment, and then attempt retrieval from any discovered peers.
+ *
+ * In practice, the segment sizes chosen by the origin server are much
+ * too small for this theoretically correct approach to be viable.
+ * With the typically observed PeerDist v2 segment size of around
+ * 64kB, the total time to retrieve a segment from a peer on a gigabit
+ * LAN is around 0.6ms.  This is almost two orders of magnitude less
+ * than the average peer discovery response delay of ~30ms recommended
+ * by the MS-PCCRD specification.  This peer discovery response delay
+ * becomes the dominant limiting factor in the overall download speed.
+ *
+ * If a peer is already known to have one segment of a file, then
+ * there is an extremely high probability that it will have other
+ * segments of the same file.  We therefore optimistically attempt to
+ * retrieve a new segment from whichever peer happens to have most
+ * recently responded to a discovery request for any other segment,
+ * while simultaneously sending out a discovery request for the new
+ * segment.  This allows the overall download to progress without
+ * being limited by the peer discovery response delay.
+ *
+ * This introduces a new problem: we end up sending out a large volume
+ * of discovery requests that will end up being ignored because the
+ * segment has already been fully retrieved before any peer sends a
+ * discovery response.  Each discovery attempt generates around 1-10
+ * network packets (depending on the number of peers): this would be
+ * negligible for sensibly sized segments of around 2MB but represents
+ * an increase in traffic of up to 25% for the absurdly small 64kB
+ * segments typically observed from a PeerDist v2 server.
+ *
+ * Discovery requests are multicast XML documents, and impose a
+ * non-negligible processing burden on each listening peer.  With a
+ * 64kB segment size, the amount of processing required to parse and
+ * respond to a discovery request vastly exceeds the amount of
+ * processing required to just send the segment via the retrieval
+ * protocol.
+ *
+ * We therefore attempt to elide the sending of almost all discovery
+ * requests, by adding a delay before sending the initial discovery
+ * request for each new segment.
+ *
+ * When discovery is redundant (i.e. when we will have optimistically
+ * retrieved the whole segment before any discovery responses might
+ * arrive), this initial delay is long enough to allow the pending
+ * discovery request to be cancelled before it is ever sent.
+ *
+ * When discovery is genuinely valuable (i.e. when our optimistic
+ * assumption that the most recently discovered peer also has the new
+ * segment turns out to be incorrect), this initial delay still allows
+ * plenty of time for discovery to take place before we time out and
+ * attempt an origin server request.
+ */
+#define PEERDISC_INITIAL_TIMEOUT ( 40 * TICKS_PER_MS )
+
 /** Maximum random jitter added to discovery attempt times */
 #define PEERDISC_MAX_JITTER ( 32 * TICKS_PER_MS )
 
@@ -109,6 +166,10 @@ static struct profiler peerdisc_attempt_profiler __profiler =
 /** PeerDist discovery first reply profiler */
 static struct profiler peerdisc_reply_profiler __profiler =
 	{ .name = "peerdisc.reply" };
+
+/** PeerDist discovery elision profiler */
+static struct profiler peerdisc_elided_profiler __profiler =
+	{ .name = "peerdisc.elided" };
 
 /**
  * Get profiling timestamp
@@ -589,7 +650,7 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 		}
 
 		/* Schedule initial discovery attempt */
-		peerdisc_schedule ( segment, 0 );
+		peerdisc_schedule ( segment, PEERDISC_INITIAL_TIMEOUT );
 	}
 
 	/* Add to list of segments, transfer reference to list, and return */
@@ -685,10 +746,18 @@ void peerdisc_close ( struct peerdisc_client *peerdisc ) {
 	profile_custom ( &peerdisc_attempt_profiler,
 			 ( now - segment->started ) );
 
-	/* If no replies were received, reduce the recommended
-	 * discovery timeout to minimise delays on future requests.
+	/* Profile elided discovery attempts */
+	if ( ! segment->timer.count ) {
+		profile_custom ( &peerdisc_elided_profiler,
+				 ( now - segment->started ) );
+	}
+
+	/* If discoveries were sent but no replies were received,
+	 * reduce the recommended discovery timeout to minimise delays
+	 * on future requests.
 	 */
-	if ( ( segment->replies == 0 ) && ( peerdisc_timeout_secs > 0 ) ) {
+	if ( ( segment->timer.count > 0 ) && ( segment->replies == 0 ) &&
+	     ( peerdisc_timeout_secs > 0 ) ) {
 		peerdisc_timeout_secs--;
 		DBGC ( segment, "PEERDISC %p reducing timeout to %d "
 		       "seconds\n", peerdisc, peerdisc_timeout_secs );
