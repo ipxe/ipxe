@@ -38,6 +38,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/netdevice.h>
 #include <ipxe/timer.h>
 #include <ipxe/fault.h>
+#include <ipxe/profile.h>
 #include <ipxe/settings.h>
 #include <ipxe/pccrr.h>
 #include <ipxe/pccrd.h>
@@ -100,6 +101,29 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
  *
  ******************************************************************************
  */
+
+/** PeerDist discovery attempt profiler */
+static struct profiler peerdisc_attempt_profiler __profiler =
+	{ .name = "peerdisc.attempt" };
+
+/** PeerDist discovery first reply profiler */
+static struct profiler peerdisc_reply_profiler __profiler =
+	{ .name = "peerdisc.reply" };
+
+/**
+ * Get profiling timestamp
+ *
+ * @ret timestamp	Timestamp
+ */
+static inline __attribute__ (( always_inline )) unsigned long
+peerdisc_timestamp ( void ) {
+
+	if ( PROFILING ) {
+		return currticks();
+	} else {
+		return 0;
+	}
+}
 
 /**
  * Report peer discovery statistics
@@ -397,10 +421,17 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 				 struct peerdist_discovery_reply *reply,
 				 struct peerdist_retrieval *retrieval,
 				 const char *location ) {
+	unsigned long now = peerdisc_timestamp();
 	struct peerdisc_peer *peer;
 	struct peerdisc_client *peerdisc;
 	struct peerdisc_client *tmp;
 	char *recent;
+
+	/* Profile time to first reply */
+	if ( reply && ( ! segment->replies ) ) {
+		profile_custom ( &peerdisc_reply_profiler,
+				 ( now - segment->started ) );
+	}
 
 	/* Record number of replies received */
 	if ( reply )
@@ -524,6 +555,7 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 	ref_init ( &segment->refcnt, peerdisc_free );
 	segment->id = id_copy;
 	segment->uuid = uuid_copy;
+	segment->started = peerdisc_timestamp();
 	INIT_LIST_HEAD ( &segment->peers );
 	INIT_LIST_HEAD ( &segment->clients );
 	timer_init ( &segment->timer, peerdisc_expired, &segment->refcnt );
@@ -643,10 +675,15 @@ int peerdisc_open ( struct peerdisc_client *peerdisc, const void *id,
  */
 void peerdisc_close ( struct peerdisc_client *peerdisc ) {
 	struct peerdisc_segment *segment = peerdisc->segment;
+	unsigned long now = peerdisc_timestamp();
 
 	/* Ignore if discovery is already closed */
 	if ( ! segment )
 		return;
+
+	/* Profile overall discovery attempt */
+	profile_custom ( &peerdisc_attempt_profiler,
+			 ( now - segment->started ) );
 
 	/* If no replies were received, reduce the recommended
 	 * discovery timeout to minimise delays on future requests.

@@ -53,6 +53,8 @@ struct peerdisc_segment {
 	const char *id;
 	/** Message UUID string */
 	const char *uuid;
+	/** Time at which discovery was started */
+	unsigned long started;
 	/** Number of discovery replies received */
 	unsigned int replies;
 	/** List of discovered peers
