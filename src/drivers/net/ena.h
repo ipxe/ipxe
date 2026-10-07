@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
 #include <ipxe/if_ether.h>
+#include <ipxe/dma.h>
 
 /** Register BAR */
 #define ENA_REGS_BAR PCI_BASE_ADDRESS_0
@@ -580,6 +581,8 @@ union ena_acq_rsp {
 struct ena_aq {
 	/** Requests */
 	union ena_aq_req *req;
+	/** Requests DMA mapping */
+	struct dma_mapping map;
 	/** Producer counter */
 	unsigned int prod;
 };
@@ -588,6 +591,8 @@ struct ena_aq {
 struct ena_acq {
 	/** Responses */
 	union ena_acq_rsp *rsp;
+	/** Responses DMA mapping */
+	struct dma_mapping map;
 	/** Consumer counter */
 	unsigned int cons;
 	/** Phase */
@@ -614,6 +619,8 @@ struct ena_aenq_event {
 struct ena_aenq {
 	/** Events */
 	struct ena_aenq_event *evt;
+	/** Events DMA mapping */
+	struct dma_mapping map;
 };
 
 /** Transmit submission queue entry */
@@ -730,6 +737,8 @@ struct ena_sq {
 		/** Raw data */
 		void *raw;
 	} sqe;
+	/** Entries DMA mapping */
+	struct dma_mapping map;
 	/** Buffer IDs */
 	uint8_t *ids;
 	/** Low latency queue base */
@@ -787,6 +796,8 @@ struct ena_cq {
 		/** Raw data */
 		void *raw;
 	} cqe;
+	/** Entries DMA mapping */
+	struct dma_mapping map;
 	/** Doorbell register offset */
 	unsigned int doorbell;
 	/** Total length of entries */
@@ -832,6 +843,8 @@ struct ena_qp {
 
 /** An ENA network card */
 struct ena_nic {
+	/** DMA device */
+	struct dma_device *dma;
 	/** Registers */
 	void *regs;
 	/** On-device memory */
@@ -840,6 +853,8 @@ struct ena_nic {
 	uint32_t features;
 	/** Host info */
 	struct ena_host_info *info;
+	/** Host info DMA mapping */
+	struct dma_mapping info_map;
 	/** Admin queue */
 	struct ena_aq aq;
 	/** Admin completion queue */
