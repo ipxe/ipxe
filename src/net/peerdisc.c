@@ -61,7 +61,8 @@ static LIST_HEAD ( peerdisc_segments );
 /** Default discovery timeout (in seconds) */
 #define PEERDISC_DEFAULT_TIMEOUT_SECS 2
 
-/** Recommended discovery timeout (in seconds)
+/**
+ * Recommended discovery timeout (in seconds)
  *
  * We reduce the recommended discovery timeout whenever a segment
  * fails to discover any peers, and restore the default value whenever
@@ -86,6 +87,7 @@ static char *peerpath;
 
 static struct peerdisc_segment * peerdisc_find ( const char *id );
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
+				 struct peerdist_discovery_reply *reply,
 				 struct peerdist_retrieval *retrieval,
 				 const char *location );
 
@@ -275,11 +277,8 @@ static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
 		      location += ( strlen ( location ) + 1 /* NUL */ ) ) {
 
 			/* Report discovered peer location */
-			if ( ( rc = peerdisc_discovered ( segment,
-							  &peerdist_post,
-							  location ) ) != 0 ) {
-				goto err;
-			}
+			peerdisc_discovered ( segment, &reply, &peerdist_post,
+					      location );
 		}
 	}
 
@@ -386,17 +385,23 @@ static struct peerdisc_segment * peerdisc_find ( const char *id ) {
  * Add discovered PeerDist peer
  *
  * @v segment		PeerDist discovery segment
+ * @v reply		PeerDist discovery reply (or NULL)
  * @v retrieval		PeerDist retrieval protocol
  * @v location		Peer location
  * @ret rc		Return status code
  */
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
+				 struct peerdist_discovery_reply *reply,
 				 struct peerdist_retrieval *retrieval,
 				 const char *location ) {
 	struct peerdisc_peer *peer;
 	struct peerdisc_client *peerdisc;
 	struct peerdisc_client *tmp;
 	char *recent;
+
+	/* Record number of replies received */
+	if ( reply )
+		segment->replies++;
 
 	/* Ignore duplicate peers */
 	list_for_each_entry ( peer, &segment->peers, list ) {
@@ -406,7 +411,10 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 			return 0;
 		}
 	}
-	DBGC2 ( segment, "PEERDISC %p discovered %s\n", segment, location );
+	if ( reply ) {
+		DBGC2 ( segment, "PEERDISC %p discovered %s\n",
+			segment, location );
+	}
 
 	/* Allocate and initialise structure */
 	peer = zalloc ( sizeof ( *peer ) + strlen ( location ) + 1 /* NUL */ );
@@ -419,9 +427,7 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 	list_add_tail ( &peer->list, &segment->peers );
 
 	/* Record as most recently discovered peer, if applicable */
-	if ( ( location != peerdisc_recent ) &&
-	     ( location != peerhost ) &&
-	     ( location != peerpath ) ) {
+	if ( reply ) {
 		recent = strdup ( location );
 		if ( recent ) {
 			free ( peerdisc_recent );
@@ -503,13 +509,14 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 
 	/* Add local cache directory, if any */
 	if ( peerpath )
-		peerdisc_discovered ( segment, &peerdist_get, peerpath );
+		peerdisc_discovered ( segment, NULL, &peerdist_get, peerpath );
 
 	/* Add hosted cache server or initiate discovery */
 	if ( peerhost ) {
 
 		/* Add hosted cache server to list of peers */
-		if ( ( rc = peerdisc_discovered ( segment, &peerdist_post,
+		if ( ( rc = peerdisc_discovered ( segment, NULL,
+						  &peerdist_post,
 						  peerhost ) ) != 0 ) {
 			goto err_peerhost;
 		}
@@ -524,7 +531,7 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 		 * next block that we attempt to discover.
 		 */
 		if ( peerdisc_recent ) {
-			peerdisc_discovered ( segment, &peerdist_post,
+			peerdisc_discovered ( segment, NULL, &peerdist_post,
 					      peerdisc_recent );
 		}
 
@@ -622,10 +629,10 @@ void peerdisc_close ( struct peerdisc_client *peerdisc ) {
 	if ( ! segment )
 		return;
 
-	/* If no peers were discovered, reduce the recommended
+	/* If no replies were received, reduce the recommended
 	 * discovery timeout to minimise delays on future requests.
 	 */
-	if ( list_empty ( &segment->peers ) && peerdisc_timeout_secs ) {
+	if ( ( segment->replies == 0 ) && ( peerdisc_timeout_secs > 0 ) ) {
 		peerdisc_timeout_secs--;
 		DBGC ( segment, "PEERDISC %p reducing timeout to %d "
 		       "seconds\n", peerdisc, peerdisc_timeout_secs );
