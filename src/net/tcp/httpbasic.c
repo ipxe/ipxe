@@ -94,20 +94,27 @@ static int http_basic_authenticate ( struct http_transaction *http ) {
 static int http_format_basic_auth ( struct http_transaction *http,
 				    char *buf, size_t len ) {
 	struct http_request_auth_basic *req = &http->request.auth.basic;
-	size_t user_pw_len = ( strlen ( req->username ) + 1 /* ":" */ +
-			       strlen ( req->password ) );
-	char user_pw[ user_pw_len + 1 /* NUL */ ];
+	char *user_pw;
+	int user_pw_len;
+	size_t encoded;
 
 	/* Sanity checks */
 	assert ( req->username != NULL );
 	assert ( req->password != NULL );
 
-	/* Construct "user:password" string */
-	snprintf ( user_pw, sizeof ( user_pw ), "%s:%s",
-		   req->username, req->password );
+	/* Construct temporary "user:password" string */
+	user_pw_len = asprintf ( &user_pw, "%s:%s", req->username,
+				 req->password );
+	if ( user_pw_len < 0 )
+		return -ENOMEM;
 
 	/* Construct response */
-	return base64_encode ( user_pw, user_pw_len, buf, len );
+	encoded = base64_encode ( user_pw, user_pw_len, buf, len );
+
+	/* Free temporary string */
+	free ( user_pw );
+
+	return encoded;
 }
 
 /** HTTP Basic authentication scheme */
