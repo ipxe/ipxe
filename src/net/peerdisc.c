@@ -137,9 +137,6 @@ static LIST_HEAD ( peerdisc_segments );
  */
 unsigned int peerdisc_timeout_secs = PEERDISC_DEFAULT_TIMEOUT_SECS;
 
-/** Most recently discovered peer (for any block) */
-static char *peerdisc_recent;
-
 /** Hosted cache server */
 static char *peerhost;
 
@@ -148,7 +145,7 @@ static char *peerpath;
 
 static struct peerdisc_segment * peerdisc_find ( const char *id );
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
-				 struct peerdist_discovery_reply *reply,
+				 struct peerdisc_socket *socket,
 				 struct peerdist_retrieval *retrieval,
 				 const char *location );
 
@@ -365,7 +362,7 @@ static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
 		      location += ( strlen ( location ) + 1 /* NUL */ ) ) {
 
 			/* Report discovered peer location */
-			peerdisc_discovered ( segment, &reply, &peerdist_post,
+			peerdisc_discovered ( segment, socket, &peerdist_post,
 					      location );
 		}
 	}
@@ -384,8 +381,11 @@ static void peerdisc_socket_close ( int rc ) {
 	struct peerdisc_socket *socket;
 
 	/* Close all sockets */
-	for_each_table_entry ( socket, PEERDISC_SOCKETS )
+	for_each_table_entry ( socket, PEERDISC_SOCKETS ) {
 		intf_restart ( &socket->xfer, rc );
+		free ( socket->recent );
+		socket->recent = NULL;
+	}
 }
 
 /** PeerDist discovery socket interface operations */
@@ -398,7 +398,7 @@ static struct interface_descriptor peerdisc_socket_desc =
 	INTF_DESC ( struct peerdisc_socket, xfer, peerdisc_socket_operations );
 
 /** PeerDist discovery IPv4 socket */
-struct peerdisc_socket peerdisc_socket_ipv4 __peerdisc_socket = {
+struct peerdisc_socket peerdisc_socket_ipv4 __peerdisc_socket ( 01 ) = {
 	.name = "IPv4",
 	.address = {
 		.sin = {
@@ -411,7 +411,7 @@ struct peerdisc_socket peerdisc_socket_ipv4 __peerdisc_socket = {
 };
 
 /** PeerDist discovery IPv6 socket */
-struct peerdisc_socket peerdisc_socket_ipv6 __peerdisc_socket = {
+struct peerdisc_socket peerdisc_socket_ipv6 __peerdisc_socket ( 02 ) = {
 	.name = "IPv6",
 	.address = {
 		.sin6 = {
@@ -473,13 +473,13 @@ static struct peerdisc_segment * peerdisc_find ( const char *id ) {
  * Add discovered PeerDist peer
  *
  * @v segment		PeerDist discovery segment
- * @v reply		PeerDist discovery reply (or NULL)
+ * @v socket		PeerDist discovery socket (or NULL)
  * @v retrieval		PeerDist retrieval protocol
  * @v location		Peer location
  * @ret rc		Return status code
  */
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
-				 struct peerdist_discovery_reply *reply,
+				 struct peerdisc_socket *socket,
 				 struct peerdist_retrieval *retrieval,
 				 const char *location ) {
 	unsigned long now = peerdisc_timestamp();
@@ -489,13 +489,13 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 	char *recent;
 
 	/* Profile time to first reply */
-	if ( reply && ( ! segment->replies ) ) {
+	if ( socket && ( ! segment->replies ) ) {
 		profile_custom ( &peerdisc_reply_profiler,
 				 ( now - segment->started ) );
 	}
 
 	/* Record number of replies received */
-	if ( reply )
+	if ( socket )
 		segment->replies++;
 
 	/* Ignore duplicate peers */
@@ -506,7 +506,7 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 			return 0;
 		}
 	}
-	if ( reply ) {
+	if ( socket ) {
 		DBGC2 ( segment, "PEERDISC %p discovered %s\n",
 			segment, location );
 	}
@@ -522,11 +522,11 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 	list_add_tail ( &peer->list, &segment->peers );
 
 	/* Record as most recently discovered peer, if applicable */
-	if ( reply ) {
+	if ( socket ) {
 		recent = strdup ( location );
 		if ( recent ) {
-			free ( peerdisc_recent );
-			peerdisc_recent = recent;
+			free ( socket->recent );
+			socket->recent = recent;
 		}
 	}
 
@@ -581,6 +581,7 @@ static void peerdisc_expired ( struct retry_timer *timer, int over __unused ) {
  */
 static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 	struct peerdisc_segment *segment;
+	struct peerdisc_socket *socket;
 	union {
 		union uuid uuid;
 		uint32_t dword[ sizeof ( union uuid ) / sizeof ( uint32_t ) ];
@@ -643,10 +644,20 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 		 * the most recently discovered peer for any block has
 		 * a high probability of also having a copy of the
 		 * next block that we attempt to discover.
+		 *
+		 * Experiments show that Windows peers will randomly
+		 * and erroneously report blocks as being not present
+		 * when a retrieval protocol request is made using
+		 * IPv6.  We therefore choose to prefer peers that
+		 * were discovered via IPv4, since this substantially
+		 * improves the overall reliability.
 		 */
-		if ( peerdisc_recent ) {
-			peerdisc_discovered ( segment, NULL, &peerdist_post,
-					      peerdisc_recent );
+		for_each_table_entry ( socket, PEERDISC_SOCKETS ) {
+			if ( socket->recent ) {
+				peerdisc_discovered ( segment, NULL,
+						      &peerdist_post,
+						      socket->recent );
+			}
 		}
 
 		/* Schedule initial discovery attempt */
