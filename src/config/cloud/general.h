@@ -10,5 +10,8 @@
  */
 #define POWEROFF_CMD
 
+/* Enable commands useful for automated tests */
+#define DIGEST_CMD
+
 /* Enable MIME image support */
 #define IMAGE_MIME
