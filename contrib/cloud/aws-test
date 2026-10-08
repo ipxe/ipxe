@@ -1,0 +1,437 @@
+#!/usr/bin/env python3
+
+import argparse
+from base64 import b64encode
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
+from hashlib import sha256
+from itertools import chain, groupby
+import logging
+import random
+import sys
+import textwrap
+import time
+
+import boto3
+import botocore.config
+import botocore.exceptions
+
+
+POLL_INTERVAL_SEC = 5
+POLL_MAX_RETRIES = 100
+
+
+logger = logging.getLogger('aws-test')
+tests = {
+    name: '%02d-%s' % (index, name) for index, name in enumerate([
+        'start',
+        'download',
+        'cycle',
+        'finish',
+    ])
+}
+
+
+def get_all(paginator, attr, **kwargs):
+    """Get all paginated results"""
+    return chain.from_iterable(x[attr] for x in paginator.paginate(**kwargs))
+
+
+def find_types(types, region):
+    """Find available instance types"""
+    client = boto3.client('ec2', region_name=region)
+    paginator = client.get_paginator('describe_instance_types')
+    filters = [{'Name': 'instance-type', 'Values': types}]
+    types = {
+        x['InstanceType']: x
+        for x in get_all(paginator, 'InstanceTypes', Filters=filters)
+    }
+    return types
+
+
+def find_images(types, region, family, commit, image_ids):
+    """Find available images for each instance type"""
+    client = boto3.client('ec2', region_name=region)
+    paginator = client.get_paginator('describe_images')
+    filters = []
+    if family:
+        filters.append({'Name': 'tag:family', 'Values': [family]})
+    if commit:
+        filters.append({'Name': 'tag:commit', 'Values': [commit]})
+    if image_ids:
+        filters.append({'Name': 'image-id', 'Values': image_ids})
+    info = get_all(paginator, 'Images', Filters=filters)
+    image_key = lambda x: x['Architecture']
+    type_key = lambda x: x['ProcessorInfo']['SupportedArchitectures'][0]
+    images = {
+        k: sorted(v, key=lambda x: x['CreationDate'])
+        for k, v in groupby(sorted(info, key=image_key), key=image_key)
+    }
+    result = {
+        k: images.get(type_key(v))[-1]['ImageId']
+        for k, v in types.items()
+        if images.get(type_key(v))
+    }
+    return result
+
+
+def define_blob(bucket):
+    """Create pseudorandom data test file"""
+    client = boto3.client('s3')
+    body = random.Random(42).randbytes(1024 * 1024)
+    digest = sha256(body).hexdigest()
+    key = 'test/1mb/%s' % digest
+    try:
+        client.head_object(Bucket=bucket, Key=key)
+        logger.info("test file %s/%s", bucket, key)
+        return digest
+    except botocore.exceptions.ClientError as exc:
+        if exc.response['Error']['Code'] != '404':
+            raise
+    client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch='*')
+    logger.info("create test file %s/%s", bucket, key)
+    return digest
+
+
+def define_userdata(bucket, name, typ, blob, shell):
+    """Create user-data"""
+    client = boto3.client('s3')
+    region = client.head_bucket(Bucket=bucket)['BucketRegion']
+    config = botocore.config.Config(
+        s3={'addressing_style': 'virtual'},
+        signature_version='s3v4',
+    )
+    client = boto3.client('s3', region_name=region, config=config)
+    public = f"http://{bucket}.s3.{region}.amazonaws.com/test"
+    urls = {
+        k: client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': bucket,
+                'Key': 'test/%s/%s/%s' % (name, typ, v)
+            }
+        ).replace('https://', 'http://')
+        for k, v in tests.items()
+    }
+    script = textwrap.dedent(f"""
+    #!ipxe
+
+    echo Automated test for instance type {typ}
+    echo Test ID {name}
+    ifstat
+    route
+
+    # Start test
+    echo Test start
+    params --method PUT
+    imgfetch {urls['start']}##params || goto fail
+
+    # Single download test
+    echo Test download
+    set expected:hexraw {blob}
+    imgfetch -n 1mb {public}/1mb/{blob} || goto fail
+    sha256sum --set actual 1mb
+    iseq ${{expected}} ${{actual}} || goto fail
+    imgfree
+    params --method PUT
+    imgfetch {urls['download']}##params || goto fail
+
+    # Cycled download test
+    set count:int8 0
+    :cycle
+    inc count
+    echo Test cycle iteration ${{count}}
+    ifclose
+    ifopen || goto fail
+    imgfetch -n 1mb {public}/1mb/{blob} || goto fail
+    sha256sum --set actual${{cycle}} 1mb
+    iseq ${{expected}} ${{actual${{cycle}}}} || goto fail
+    imgfree
+    iseq ${{count}} 10 || goto cycle
+    params --method PUT
+    imgfetch {urls['cycle']}##params || goto fail
+
+    # Finish test
+    echo Test finish
+    params --method PUT
+    imgfetch {urls['finish']}##params || goto fail
+
+    # Terminate instance
+    poweroff
+
+    # Handle failure
+    :fail
+    echo Test failed
+    {"shell" if shell else ""}
+    poweroff
+    """).strip()
+    userdata = EmailMessage()
+    userdata.make_mixed()
+    userdata.add_attachment(script, subtype="x-ipxe", cte="8bit")
+    return userdata.as_bytes()
+
+
+def delete_template(typ, region, template_id):
+    """Delete launch template"""
+    client = boto3.client('ec2', region_name=region)
+    logger.info("delete template %s %s %s", typ, region, template_id)
+    client.delete_launch_template(LaunchTemplateId=template_id)
+
+
+def create_template(typ, region, image_id, name, userdata):
+    """Create launch template"""
+    client = boto3.client('ec2', region_name=region)
+    paginator = client.get_paginator('describe_launch_templates')
+    filters = [{'Name': 'tag:ipxetest', 'Values': [typ]}]
+    for template in get_all(paginator, 'LaunchTemplates', Filters=filters):
+        delete_template(typ, region, template['LaunchTemplateId'])
+    info = client.create_launch_template(
+        LaunchTemplateName='%s-%s-%s' % (typ, region, name),
+        LaunchTemplateData={
+            'ImageId': image_id,
+            'InstanceInitiatedShutdownBehavior': 'terminate',
+            'InstanceType': typ,
+            'UserData': b64encode(userdata).decode(),
+            'TagSpecifications': [{
+                'ResourceType': 'instance',
+                'Tags': [{'Key': 'ipxetest', 'Value': typ}],
+            }],
+        },
+        TagSpecifications=[{
+            'ResourceType': 'launch-template',
+            'Tags': [{'Key': 'ipxetest', 'Value': typ}],
+        }],
+    )
+    template = info['LaunchTemplate']
+    template_id = template['LaunchTemplateId']
+    logger.info("create template %s %s %s %s",
+                typ, region, template_id, image_id)
+    return template_id
+
+
+def delete_fleet(typ, region, fleet_id):
+    """Delete single-instance fleet"""
+    client = boto3.client('ec2', region_name=region)
+    logger.info("delete fleet %s %s %s", typ, region, fleet_id)
+    client.delete_fleets(FleetIds=[fleet_id], TerminateInstances=True)
+
+
+def create_fleet(typ, region, template_id):
+    """Create single-instance fleet"""
+    client = boto3.client('ec2', region_name=region)
+    paginator = client.get_paginator('describe_fleets')
+    filters = [{'Name': 'tag:ipxetest', 'Values': [typ]}]
+    for fleet in get_all(paginator, 'Fleets', Filters=filters):
+        if fleet['FleetState'] != 'deleted':
+            delete_fleet(typ, region, fleet['FleetId'])
+    expiry = datetime.now(timezone.utc) + timedelta(minutes=20)
+    fleet = client.create_fleet(
+        LaunchTemplateConfigs=[{
+            'LaunchTemplateSpecification': {
+                'LaunchTemplateId': template_id,
+                'Version': '$Latest',
+            },
+        }],
+        TargetCapacitySpecification={
+            'TotalTargetCapacity': 1,
+            'OnDemandTargetCapacity': 1,
+            'DefaultTargetCapacityType': 'on-demand',
+        },
+        TerminateInstancesWithExpiration=True,
+        Type='request',
+        ValidUntil=expiry,
+        TagSpecifications=[{
+            'ResourceType': 'fleet',
+            'Tags': [{'Key': 'ipxetest', 'Value': typ}],
+        }],
+    )
+    fleet_id = fleet['FleetId']
+    logger.info("create fleet %s %s %s", typ, region, fleet_id)
+    return fleet_id
+
+
+def wait_instance(typ, region, fleet_id):
+    """Wait for instance to exist"""
+    client = boto3.client('ec2', region_name=region)
+    filters = [{'Name': 'tag:ipxetest', 'Values': [typ]},
+               {'Name': 'tag:aws:ec2:fleet-id', 'Values': [fleet_id]}]
+    client.get_waiter('instance_exists').wait(Filters=filters)
+    paginator = client.get_paginator('describe_instances')
+    reservations = get_all(paginator, 'Reservations', Filters=filters)
+    instance = next(reservations)['Instances'][0]
+    instance_id = instance['InstanceId']
+    logger.info("instance %s %s %s", typ, region, instance_id)
+    return instance_id
+
+
+def test_results(bucket, name):
+    """Get reported test results"""
+    client = boto3.client('s3')
+    paginator = client.get_paginator('list_objects_v2')
+    prefix = 'test/%s/' % name
+    objects = get_all(paginator, 'Contents', Bucket=bucket, Prefix=prefix)
+    results = {
+        k: sorted(x[1] for x in v)
+        for k, v in groupby(sorted(x['Key'].split('/')[2:] for x in objects),
+                            key=lambda x: x[0])
+    }
+    return results
+
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Test AWS EC2 instance type")
+parser.add_argument('--verbose', '-v', action='count', default=0)
+parser.add_argument('--name', '-n',
+                    help="Test name")
+parser.add_argument('--family', '-f',
+                    help="Image family name")
+parser.add_argument('--commit', '-c',
+                    help="Image commit ID")
+parser.add_argument('--image', '-i', action='append',
+                    help="Image AMI ID(s)")
+parser.add_argument('--region', '-r', action='append',
+                    help="AWS region(s)")
+parser.add_argument('--bucket', '-b', default="ipxe-ci",
+                    help="Upload test files and results to S3 bucket")
+parser.add_argument('--shell', '-s', action='store_true',
+                    help="Drop to iPXE shell on failure")
+parser.add_argument('type', nargs='+', help="Instance type(s)")
+args = parser.parse_args()
+
+# Configure logging
+loglevels = [logging.WARNING, logging.INFO, logging.DEBUG]
+verbosity = min(args.verbose, (len(loglevels) - 1))
+logging.basicConfig(level=loglevels[verbosity])
+logging.getLogger('botocore.credentials').setLevel(logging.WARNING)
+
+# Construct test name if not specified
+if not args.name:
+    args.name = datetime.now().strftime('%Y%m%d%H%M%S')
+logger.info("test results at %s/test/%s/", args.bucket, args.name)
+
+# Use default family name if nothing else specified
+if not args.family and not args.commit and not args.image:
+    args.family = 'iPXE'
+
+# Use all regions if none specified
+if not args.region:
+    args.region = sorted(x['RegionName'] for x in
+                         boto3.client('ec2').describe_regions()['Regions'])
+
+# Identify available instance types across selected regions
+with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
+    futures = {executor.submit(find_types,
+                               types=args.type,
+                               region=region): region
+               for region in args.region}
+    types = {futures[future]: future.result()
+             for future in as_completed(futures)}
+missing = set(args.type) - set(chain.from_iterable(types.values()))
+if missing:
+    parser.error("No regions support %s" % ",".join(sorted(missing)))
+
+# Identify available images across selected regions
+with ThreadPoolExecutor(max_workers=len(args.region)) as executor:
+    futures = {executor.submit(find_images,
+                               types=types[region],
+                               region=region,
+                               family=args.family,
+                               commit=args.commit,
+                               image_ids=args.image): region
+               for region in args.region}
+    image_ids = {futures[future]: future.result()
+                 for future in as_completed(futures)}
+missing = set(args.type) - set(chain.from_iterable(image_ids.values()))
+if missing:
+    parser.error("No regions have images for %s" % ",".join(sorted(missing)))
+
+# Select region for each test
+regions = {
+    typ: next(x for x in args.region if typ in image_ids[x])
+    for typ in args.type
+}
+
+# Create pseudorandom test file
+blob = define_blob(args.bucket)
+
+# Construct userdata
+userdata = {
+    typ: define_userdata(args.bucket, args.name, typ, blob, args.shell)
+    for typ in args.type
+}
+
+# Create launch templates
+with ThreadPoolExecutor(max_workers=len(args.type)) as executor:
+    futures = {executor.submit(create_template,
+                               typ=typ,
+                               region=regions[typ],
+                               image_id=image_ids[regions[typ]][typ],
+                               name=args.name,
+                               userdata=userdata[typ]): typ
+               for typ in args.type}
+    template_ids = {futures[future]: future.result()
+                    for future in as_completed(futures)}
+
+# Create fleets
+with ThreadPoolExecutor(max_workers=len(args.type)) as executor:
+    futures = {executor.submit(create_fleet,
+                               typ=typ,
+                               region=regions[typ],
+                               template_id=template_ids[typ]): typ
+               for typ in args.type}
+    fleet_ids = {futures[future]: future.result()
+                 for future in as_completed(futures)}
+
+try:
+
+    # Wait for instances to exist
+    with ThreadPoolExecutor(max_workers=len(args.type)) as executor:
+        futures = {executor.submit(wait_instance,
+                                   typ=typ,
+                                   region=regions[typ],
+                                   fleet_id=fleet_ids[typ]): typ
+                   for typ in args.type}
+        instance_ids = {futures[future]: future.result()
+                        for future in as_completed(futures)}
+
+    # Wait for test results
+    pending = args.type
+    for i in range(POLL_MAX_RETRIES):
+        time.sleep(POLL_INTERVAL_SEC)
+        results = test_results(args.bucket, args.name)
+        status = {
+            x: results[x][-1] if x in results else "waiting"
+            for x in args.type
+        }
+        for typ in pending:
+            logger.info("test %s %s %s %s",
+                        typ, regions[typ], instance_ids[typ], status[typ])
+        pending = [x for x in args.type if status[x] != tests['finish']]
+        if not pending:
+            break
+    else:
+        print("Failed: %s" % ",".join(pending))
+        sys.exit(1)
+
+finally:
+
+    # Delete fleets
+    with ThreadPoolExecutor(max_workers=len(args.type)) as executor:
+        futures = {executor.submit(delete_fleet,
+                                   typ=typ,
+                                   region=regions[typ],
+                                   fleet_id=fleet_ids[typ]): typ
+                   for typ in args.type}
+        done = {futures[future]: future.result()
+                for future in as_completed(futures)}
+
+    # Delete launch templates
+    with ThreadPoolExecutor(max_workers=len(args.type)) as executor:
+        futures = {executor.submit(delete_template,
+                                   typ=typ,
+                                   region=regions[typ],
+                                   template_id=template_ids[typ]): typ
+                   for typ in args.type}
+        done = {futures[future]: future.result()
+                for future in as_completed(futures)}
