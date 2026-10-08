@@ -90,11 +90,10 @@ FILE_SECBOOT ( PERMITTED );
 static int peerdist_open_post ( struct interface *xfer, const char *location,
 				size_t digestsize, const uint8_t *id,
 				unsigned int block ) {
-	char uri_string[ 7 /* "http://" */ + strlen ( location ) +
-			 sizeof ( PEERDIST_MAGIC_PATH /* includes NUL */ ) ];
 	peerdist_msg_getblks_t ( digestsize, 1, 0 ) req;
 	struct http_request_content content;
 	struct uri *uri;
+	char *uri_string;
 	int rc;
 
 	/* Construct block fetch request */
@@ -115,8 +114,11 @@ static int peerdist_open_post ( struct interface *xfer, const char *location,
 	content.len = sizeof ( req );
 
 	/* Construct URI string */
-	snprintf ( uri_string, sizeof ( uri_string ),
-		   ( "http://%s" PEERDIST_MAGIC_PATH ), location );
+	if ( asprintf ( &uri_string, "http://%s" PEERDIST_MAGIC_PATH,
+			location ) < 0 ) {
+		rc = -ENOMEM;
+		goto err_string;
+	}
 
 	/* Parse URI */
 	uri = parse_uri ( uri_string );
@@ -136,6 +138,8 @@ static int peerdist_open_post ( struct interface *xfer, const char *location,
  err_open:
 	uri_put ( uri );
  err_uri:
+	free ( uri_string );
+ err_string:
 	return rc;
 }
 
@@ -158,32 +162,31 @@ struct peerdist_retrieval peerdist_post = {
 static int peerdist_open_get ( struct interface *xfer, const char *location,
 			       size_t digestsize, const uint8_t *id,
 			       unsigned int block ) {
-	char uri_string[ strlen ( location ) + 4 /* "/xx/" */ +
-			 ( 2 * PEERDIST_DIGEST_MAX_SIZE ) + 1 /* "-" */ +
-			 10 /* block number */ + 4 /* ".blk" */ +
-			 1 /* NUL */ ];
-	size_t len;
+	char encoded[ base16_encoded_len ( PEERDIST_DIGEST_MAX_SIZE ) +
+		      1 /* NUL */ ];
+	char *uri_string;
 	int rc;
 
 	/* Construct URI string */
 	assert ( digestsize <= PEERDIST_DIGEST_MAX_SIZE );
-	len = snprintf ( uri_string, sizeof ( uri_string ), "%s/%02x/",
-			 location, id[0] );
-	assert ( len < sizeof ( uri_string ) );
-	len += base16_encode ( id, digestsize, ( uri_string + len ),
-			       ( sizeof ( uri_string ) - len ) );
-	assert ( len < sizeof ( uri_string ) );
-	snprintf ( ( uri_string + len ), ( sizeof ( uri_string ) - len ),
-		   "-%d.blk", block );
+	base16_encode ( id, digestsize, encoded, sizeof ( encoded ) );
+	if ( asprintf ( &uri_string, "%s/%02x/%s-%d.blk", location, id[0],
+			encoded, block ) < 0 ) {
+		rc = -ENOMEM;
+		goto err_string;
+	}
 
 	/* Open URI */
 	if ( ( rc = xfer_open_uri_string ( xfer, uri_string ) ) != 0 ) {
 		DBGC ( xfer, "PCCRR %p could not open %s: %s\n",
 		       xfer, uri_string, strerror ( rc ) );
-		return rc;
+		goto err_open;
 	}
 
-	return 0;
+ err_open:
+	free ( uri_string );
+ err_string:
+	return rc;
 }
 
 /** PeerDist retrieval protocol using HTTP GET or local file */
