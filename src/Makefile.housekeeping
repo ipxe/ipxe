@@ -236,7 +236,7 @@ BIN_AP		:= $(BIN_APS)
 BIN_SECUREBOOT	:=
 endif
 ifeq ($(BIN_AP),efi)
-BIN_ARCH	:= i386
+BIN_ARCH	:= x86_64
 BIN_PLATFORM	:= efi
 else
 BIN_ARCH	:= $(word 1,$(BIN_AP))
@@ -244,7 +244,7 @@ BIN_PLATFORM	:= $(word 2,$(BIN_AP))
 endif
 
 # Determine build architecture
-DEFAULT_ARCH	:= i386
+DEFAULT_ARCH	:= x86_64
 ARCH		:= $(firstword $(BIN_ARCH) $(DEFAULT_ARCH))
 CFLAGS		+= -DARCH=$(ARCH)
 arch :

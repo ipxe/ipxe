@@ -22,8 +22,7 @@ jobs:
     container:
       image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
     env:
-      bindir: >-
-        ${{ matrix.arch == 'i386' && 'bin' || 'bin-x86_64-pcbios' }}
+      bindir: bin-${{ matrix.arch }}-pcbios
     steps:
 
       - name: Check out code
@@ -405,9 +404,6 @@ jobs:
       sbbinaries: >-
         bin-${ARCH}-efi-sb/ipxe.efi
       srvbinaries: >-
-        bin/ipxe.pxe
-        bin/ipxe-legacy.pxe
-        bin/undionly.kpxe
         bin-arm32-efi/ipxe.efi
         bin-arm32-efi/ipxe-legacy.efi
         bin-arm32-efi/snponly.efi
@@ -419,6 +415,9 @@ jobs:
         bin-i386-efi/ipxe.efi
         bin-i386-efi/ipxe-legacy.efi
         bin-i386-efi/snponly.efi
+        bin-i386-pcbios/ipxe.pxe
+        bin-i386-pcbios/ipxe-legacy.pxe
+        bin-i386-pcbios/undionly.kpxe
         bin-loong64-efi/ipxe.efi
         bin-loong64-efi/ipxe-legacy.efi
         bin-loong64-efi/snponly.efi
@@ -448,7 +447,7 @@ jobs:
       - name: Download
         uses: actions/download-artifact@v7
         with:
-          pattern: "{bin,bin-x86_64-pcbios,bin-*-efi,bin-*-efi-sb,shim}"
+          pattern: "{bin-*-pcbios,bin-*-efi,bin-*-efi-sb,shim}"
 
       - name: Autoexec
         run: |
