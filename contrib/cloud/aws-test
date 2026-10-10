@@ -18,6 +18,7 @@ import botocore.config
 import botocore.exceptions
 
 
+FEDORA_VERSION = 44
 POLL_INTERVAL_SEC = 5
 POLL_MAX_RETRIES = 100
 
@@ -28,6 +29,7 @@ tests = {
         'start',
         'download',
         'cycle',
+        'linux',
         'finish',
     ])
 }
@@ -35,7 +37,11 @@ tests = {
 
 def get_all(paginator, attr, **kwargs):
     """Get all paginated results"""
-    return chain.from_iterable(x[attr] for x in paginator.paginate(**kwargs))
+    paged = chain.from_iterable(
+        x.get(attr, [])
+        for x in paginator.paginate(**kwargs)
+    )
+    return paged
 
 
 def find_types(types, region):
@@ -94,7 +100,7 @@ def define_blob(bucket):
     return digest
 
 
-def define_userdata(bucket, name, typ, blob, shell):
+def define_userdata(bucket, name, typ, arch, blob, shell):
     """Create user-data"""
     client = boto3.client('s3')
     region = client.head_bucket(Bucket=bucket)['BucketRegion']
@@ -114,7 +120,16 @@ def define_userdata(bucket, name, typ, blob, shell):
         ).replace('https://', 'http://')
         for k, v in tests.items()
     }
-    script = textwrap.dedent(f"""
+    shellscript = textwrap.dedent(f"""
+    curl --retry 5 --retry-all-errors -X PUT --data-binary '' \
+         '{urls['finish']}'
+    poweroff -f
+    """).lstrip()
+    datauri = 'data:;base64,%s' % b64encode(shellscript.encode()).decode()
+    fedarch = {'arm64': 'aarch64'}.get(arch, arch)
+    fedora = ('http://download.fedoraproject.org/pub/fedora/linux/releases/'
+              '%s/Everything/%s/os/images/pxeboot' % (FEDORA_VERSION, fedarch))
+    ipxescript = textwrap.dedent(f"""
     #!ipxe
 
     echo Automated test for instance type {typ}
@@ -125,17 +140,19 @@ def define_userdata(bucket, name, typ, blob, shell):
     # Start test
     echo Test start
     params --method PUT
-    imgfetch {urls['start']}##params || goto fail
+    imgfetch -n flag {urls['start']}##params || goto fail
+    imgfree flag
 
     # Single download test
     echo Test download
     set expected:hexraw {blob}
     imgfetch -n 1mb {public}/1mb/{blob} || goto fail
     sha256sum --set actual 1mb
-    iseq ${{expected}} ${{actual}} || goto fail
     imgfree
+    iseq ${{expected}} ${{actual}} || goto fail
     params --method PUT
-    imgfetch {urls['download']}##params || goto fail
+    imgfetch -n flag {urls['download']}##params || goto fail
+    imgfree flag
 
     # Cycled download test
     set count:int8 0
@@ -146,29 +163,35 @@ def define_userdata(bucket, name, typ, blob, shell):
     ifopen || goto fail
     imgfetch -n 1mb {public}/1mb/{blob} || goto fail
     sha256sum --set actual${{cycle}} 1mb
-    iseq ${{expected}} ${{actual${{cycle}}}} || goto fail
     imgfree
+    iseq ${{expected}} ${{actual${{cycle}}}} || goto fail
     iseq ${{count}} 10 || goto cycle
     params --method PUT
-    imgfetch {urls['cycle']}##params || goto fail
+    imgfetch -n flag {urls['cycle']}##params || goto fail
+    imgfree flag
 
-    # Finish test
-    echo Test finish
+    # Boot Linux
+    echo Boot Linux
+    kernel {fedora}/vmlinuz ip=dhcp console=ttyS0,115200n8 console=tty0 || \
+           goto fail
+    initrd {fedora}/initrd.img || goto fail
+    initrd -q -n ipxe.sh {datauri} \
+           /var/lib/dracut/hooks/initqueue/online/99-ipxe.sh
     params --method PUT
-    imgfetch {urls['finish']}##params || goto fail
-
-    # Terminate instance
-    poweroff
+    imgfetch -n flag {urls['linux']}##params || goto fail
+    imgfree flag
+    imgstat
+    boot || goto fail
 
     # Handle failure
     :fail
     echo Test failed
     {"shell" if shell else ""}
     poweroff
-    """).strip()
+    """).lstrip()
     userdata = EmailMessage()
     userdata.make_mixed()
-    userdata.add_attachment(script, subtype="x-ipxe", cte="8bit")
+    userdata.add_attachment(ipxescript, subtype="x-ipxe", cte="8bit")
     return userdata.as_bytes()
 
 
@@ -352,12 +375,25 @@ regions = {
     for typ in args.type
 }
 
+# Determine CPU architecture for each test
+archs = {
+    typ: types[regions[typ]][typ]['ProcessorInfo']['SupportedArchitectures'][0]
+    for typ in args.type
+}
+
 # Create pseudorandom test file
 blob = define_blob(args.bucket)
 
 # Construct userdata
 userdata = {
-    typ: define_userdata(args.bucket, args.name, typ, blob, args.shell)
+    typ: define_userdata(
+        bucket=args.bucket,
+        name=args.name,
+        typ=typ,
+        arch=archs[typ],
+        blob=blob,
+        shell=args.shell
+    )
     for typ in args.type
 }
 
