@@ -1371,12 +1371,7 @@ static int iscsi_rx_login_response ( struct iscsi_session *iscsi,
 	/* Check for login redirection */
 	if ( response->status_class == ISCSI_STATUS_REDIRECT ) {
 		DBGC ( iscsi, "iSCSI %p redirecting to new server\n", iscsi );
-		iscsi_close_connection ( iscsi, 0 );
-		if ( ( rc = iscsi_open_connection ( iscsi ) ) != 0 ) {
-			DBGC ( iscsi, "iSCSI %p could not redirect: %s\n ",
-			       iscsi, strerror ( rc ) );
-			return rc;
-		}
+		iscsi->status |= ISCSI_STATUS_REDIRECT_REQUIRED;
 		return 0;
 	}
 
@@ -1736,6 +1731,8 @@ static int iscsi_socket_deliver ( struct iscsi_session *iscsi,
 	int rc;
 
 	while ( 1 ) {
+
+		/* Handle current state */
 		switch ( iscsi->rx_state ) {
 		case ISCSI_RX_BHS:
 			rx = iscsi_rx_bhs;
@@ -1763,6 +1760,7 @@ static int iscsi_socket_deliver ( struct iscsi_session *iscsi,
 			goto done;
 		}
 
+		/* Process received data */
 		frag_len = iscsi->rx_len - iscsi->rx_offset;
 		if ( frag_len > iob_len ( iobuf ) )
 			frag_len = iob_len ( iobuf );
@@ -1773,7 +1771,6 @@ static int iscsi_socket_deliver ( struct iscsi_session *iscsi,
 			       "data: %s\n", iscsi, strerror ( rc ) );
 			goto done;
 		}
-
 		iscsi->rx_offset += frag_len;
 		iob_pull ( iobuf, frag_len );
 
@@ -1784,9 +1781,20 @@ static int iscsi_socket_deliver ( struct iscsi_session *iscsi,
 			rc = 0;
 			goto done;
 		}
-
 		iscsi->rx_state = next_state;
 		iscsi->rx_offset = 0;
+
+		/* Check for redirection */
+		if ( ( iscsi->rx_state == ISCSI_RX_BHS ) &&
+		     ( iscsi->status & ISCSI_STATUS_REDIRECT_REQUIRED ) ) {
+			iscsi_close_connection ( iscsi, 0 );
+			if ( ( rc = iscsi_open_connection ( iscsi ) ) != 0 ) {
+				DBGC ( iscsi, "iSCSI %p could not redirect: "
+				       "%s\n ", iscsi, strerror ( rc ) );
+				goto done;
+			}
+			goto done;
+		}
 	}
 
  done:
