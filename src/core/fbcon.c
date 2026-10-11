@@ -603,8 +603,8 @@ int fbcon_init ( struct fbcon *fbcon, void *start,
 		 struct fbcon_colour_map *map,
 		 struct fbcon_font *font,
 		 struct console_configuration *config ) {
-	int width;
-	int height;
+	unsigned int width;
+	unsigned int height;
 	unsigned int xgap;
 	unsigned int ygap;
 	unsigned int left;
@@ -612,6 +612,22 @@ int fbcon_init ( struct fbcon *fbcon, void *start,
 	unsigned int top;
 	unsigned int bottom;
 	int rc;
+
+	/* Validate configuration */
+	if ( ( config->width > pixel->width ) ||
+	     ( config->height > pixel->height ) ||
+	     ( config->depth > ( 8 * pixel->stride ) ) ||
+	     ( config->left > config->width ) ||
+	     ( config->right > ( config->width - config->left ) ) ||
+	     ( config->top > config->height ) ||
+	     ( config->bottom > ( config->height - config->top ) ) ) {
+		DBGC ( fbcon, "FBCON %p has unusable geometry %dx%d %dbpp "
+		       "(%d,%d,%d,%d)\n", fbcon, config->width, config->height,
+		       config->depth, config->left, config->right, config->top,
+		       config->bottom );
+		rc = -EINVAL;
+		goto err_config;
+	}
 
 	/* Initialise data structure */
 	memset ( fbcon, 0, sizeof ( *fbcon ) );
@@ -650,8 +666,7 @@ int fbcon_init ( struct fbcon *fbcon, void *start,
 	/* Expand margin to accommodate whole characters */
 	width = ( pixel->width - fbcon->margin.left - fbcon->margin.right );
 	height = ( pixel->height - fbcon->margin.top - fbcon->margin.bottom );
-	if ( ( width < FBCON_CHAR_WIDTH ) ||
-	     ( height < ( ( int ) font->height ) ) ) {
+	if ( ( width < FBCON_CHAR_WIDTH ) || ( height < font->height ) ) {
 		DBGC ( fbcon, "FBCON %p has unusable character area "
 		       "[%d-%d),[%d-%d)\n", fbcon, fbcon->margin.left,
 		       ( pixel->width - fbcon->margin.right ),
@@ -718,6 +733,7 @@ int fbcon_init ( struct fbcon *fbcon, void *start,
 	ufree ( fbcon->text.cells );
  err_text:
  err_margin:
+ err_config:
 	return rc;
 }
 
