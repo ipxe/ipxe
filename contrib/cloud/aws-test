@@ -21,6 +21,7 @@ import botocore.exceptions
 FEDORA_VERSION = 44
 POLL_INTERVAL_SEC = 5
 POLL_MAX_RETRIES = 100
+SUPPORTED_ARCHS = {'arm64', 'x86_64'}
 
 
 logger = logging.getLogger('aws-test')
@@ -33,6 +34,12 @@ tests = {
         'finish',
     ])
 }
+
+
+def cpu_arch(typ):
+    """Get CPU architecture type"""
+    archs = typ['ProcessorInfo']['SupportedArchitectures']
+    return next(x for x in archs if x in SUPPORTED_ARCHS)
 
 
 def get_all(paginator, attr, **kwargs):
@@ -69,7 +76,7 @@ def find_images(types, region, family, commit, image_ids):
         filters.append({'Name': 'image-id', 'Values': image_ids})
     info = get_all(paginator, 'Images', Filters=filters)
     image_key = lambda x: x['Architecture']
-    type_key = lambda x: x['ProcessorInfo']['SupportedArchitectures'][0]
+    type_key = cpu_arch
     images = {
         k: sorted(v, key=lambda x: x['CreationDate'])
         for k, v in groupby(sorted(info, key=image_key), key=image_key)
@@ -377,7 +384,7 @@ regions = {
 
 # Determine CPU architecture for each test
 archs = {
-    typ: types[regions[typ]][typ]['ProcessorInfo']['SupportedArchitectures'][0]
+    typ: cpu_arch(types[regions[typ]][typ])
     for typ in args.type
 }
 
