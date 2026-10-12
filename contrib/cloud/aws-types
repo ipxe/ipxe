@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import chain, groupby
+import re
+import sys
+
+import boto3
+
+
+SUPPORTED_ARCHS = {'arm64', 'x86_64'}
+
+SRIOV_TYPES = (
+    re.compile(r'^c3[a-z]*\.'),
+    re.compile(r'^c4[a-z]*\.'),
+    re.compile(r'^d2[a-z]*\.'),
+    re.compile(r'^i2[a-z]*\.'),
+    re.compile(r'^m4[a-z]*\.'),
+    re.compile(r'^r3[a-z]*\.'),
+)
+
+IGNORE_TYPES = (
+    re.compile(r'^dl\d+[a-z]*\.'),	# AI
+    re.compile(r'^f\d+[a-z]*\.'),	# FPGA
+    re.compile(r'^inf\d+[a-z]*\.'),	# Inferentia ASIC
+    re.compile(r'^g\d+[a-z]*\.'),	# GPU
+    re.compile(r'^h\d+[a-z]*\.'),	# Large local HDD
+    re.compile(r'^mac(\d+|-)'),		# Apple Mac
+    re.compile(r'^p\d+[a-z]*\.'),	# GPU
+    re.compile(r'^trn\d+[a-z]*\.'),	# Trainium ASIC
+    re.compile(r'^u-?\d+'),		# Ultra-high memory
+    re.compile(r'^vt\d+[a-z]*\.'),	# Video transcoding
+    re.compile(r'^x\d+[a-z]*\.'),	# High memory
+    re.compile(r'^z\d+[a-z]*\.'),	# High CPU frequency
+)
+
+
+def get_all(paginator, attr, **kwargs):
+    """Get all paginated results"""
+    paged = chain.from_iterable(
+        x.get(attr, [])
+        for x in paginator.paginate(**kwargs)
+    )
+    return paged
+
+
+def type_characteristics(typ):
+    """Get relevant instance type characteristics"""
+    m = re.match(r'^[a-z]+(\d+)', typ['InstanceType'])
+    generation = m.group(1)
+    baremetal = typ['BareMetal']
+    hypervisor = typ.get('Hypervisor', '')
+    ena = typ['NetworkInfo']['EnaSupport']
+    sriov = (ena == 'unsupported' and
+             any(x.match(typ['InstanceType']) for x in SRIOV_TYPES))
+    manufacturer = typ['ProcessorInfo']['Manufacturer']
+    archs = tuple(sorted(
+        x for x in typ['ProcessorInfo']['SupportedArchitectures']
+        if x in SUPPORTED_ARCHS
+    ))
+    bootmodes = tuple(sorted(typ['SupportedBootModes']))
+    return (
+        generation,
+        baremetal,
+        hypervisor,
+        ena,
+        sriov,
+        manufacturer,
+        archs,
+        bootmodes,
+    )
+
+
+def find_types(region):
+    """Find available instance types and key characteristics"""
+    client = boto3.client('ec2', region_name=region)
+    paginator = client.get_paginator('describe_instance_types')
+    types = {
+        typ['InstanceType']: type_characteristics(typ)
+        for typ in get_all(paginator, 'InstanceTypes')
+        if not any(x.match(typ['InstanceType']) for x in IGNORE_TYPES)
+    }
+    return types
+
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(
+    description="Check AWS EC2 instance type coverage"
+)
+parser.add_argument('type', nargs='*', help="Instance type(s)")
+args = parser.parse_args()
+
+# Get list of all regions
+regions = sorted(x['RegionName'] for x in
+                 boto3.client('ec2').describe_regions()['Regions'])
+
+# Identify available instance types across selected regions
+with ThreadPoolExecutor(max_workers=len(regions)) as executor:
+    futures = {executor.submit(find_types,
+                               region=region): region
+               for region in regions}
+    types = {futures[future]: future.result()
+             for future in as_completed(futures)}
+
+# Group types by characteristics
+groups = sorted(
+    tuple(sorted(set(x[1] for x in v)))
+    for k, v in groupby(sorted(
+            (chars, typ)
+            for region in regions
+            for typ, chars in types[region].items()
+    ), key=lambda x: x[0])
+)
+
+# Identify coverage for each group
+covered = {
+    g: tuple(x for x in args.type if x in g)
+    for g in groups
+}
+
+# Identify unknown, missing, and redundant instance types
+unknown = [x for x in args.type if not any(x in g for g in groups)]
+missing = [k for k, v in covered.items() if not v]
+redundant = [v for k, v in covered.items() if len(v) > 1]
+if unknown:
+    print("\n".join("Unknown: %s" % x for x in unknown))
+if missing:
+    print("\n".join("Missing: %s" % "/".join(x) for x in missing))
+if redundant:
+    print("\n".join("Redundant: %s" % "/".join(x) for x in redundant))
+if unknown or missing or redundant:
+    sys.exit(1)
