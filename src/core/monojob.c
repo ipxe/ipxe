@@ -156,6 +156,7 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 				clear_len += printf ( " [%s]",
 						      progress.message );
 			}
+			putchar ( US );
 			last_display = now;
 		}
 	}
