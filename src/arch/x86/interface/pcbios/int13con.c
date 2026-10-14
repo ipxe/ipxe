@@ -93,9 +93,17 @@ static int int13con_rw ( unsigned int op, uint64_t lba ) {
 	 * (or another subsequent bootloader) may hook INT13 and remap
 	 * drive numbers.
 	 */
-	__asm__ ( REAL_CODE ( "pushfw\n\t"
+	__asm__ ( REAL_CODE ( /* Preserve registers */
+			      "pushal\n\t"
+			      /* Call original INT13 vector */
+			      "pushfw\n\t"
 			      "cli\n\t"
-			      "lcall *int13con_vector\n\t" )
+			      "lcall *int13con_vector\n\t"
+			      /* Save return value in register dump */
+			      "movw %%sp, %%bp\n\t"
+			      "movw %%ax, 28(%%bp)\n\t"
+			      /* Restore registers */
+			      "popal\n\t" )
 		  : "=a" ( output )
 		  : "0" ( op << 8 ), "d" ( INT13CON_DRIVE ),
 		    "S" ( __from_data16 ( &int13con_address ) ) );
@@ -208,17 +216,24 @@ static int int13con_find ( void ) {
 static void int13con_init ( void ) {
 	uint8_t error;
 	uint16_t check;
-	unsigned int discard_c;
-	unsigned int discard_d;
 	int rc;
 
 	/* Check for INT13 extensions */
-	__asm__ __volatile__ ( REAL_CODE ( "int $0x13\n\t"
-					   "setc %%al\n\t" )
-			       : "=a" ( error ), "=b" ( check ),
-				 "=c" ( discard_c ), "=d" ( discard_d )
-			       : "0" ( INT13_EXTENSION_CHECK << 8 ),
-				 "1" ( 0x55aa ), "3" ( INT13CON_DRIVE ) );
+	__asm__ ( REAL_CODE ( /* Preserve registers */
+			      "pushal\n\t"
+			      /* Call INT13 */
+			      "int $0x13\n\t"
+			      /* Capture carry flag */
+			      "setc %%al\n\t"
+			      /* Save return values in register dump */
+			      "movw %%sp, %%bp\n\t"
+			      "movw %%ax, 28(%%bp)\n\t"
+			      "movw %%bx, 16(%%bp)\n\t"
+			      /* Restore registers */
+			      "popal\n\t" )
+		  : "=a" ( error ), "=b" ( check )
+		  : "0" ( INT13_EXTENSION_CHECK << 8 ),
+		    "1" ( 0x55aa ), "d" ( INT13CON_DRIVE ) );
 	if ( error || ( check != 0xaa55 ) ) {
 		DBG ( "INT13CON missing extensions (%02x,%04x)\n",
 		      error, check );
