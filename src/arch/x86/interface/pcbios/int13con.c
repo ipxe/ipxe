@@ -79,6 +79,7 @@ struct console_driver int13con __console_driver;
  * @ret rc		Return status code
  */
 static int int13con_rw ( unsigned int op, uint64_t lba ) {
+	uint16_t output;
 	uint8_t error;
 
 	/* Construct disk address packet */
@@ -95,9 +96,10 @@ static int int13con_rw ( unsigned int op, uint64_t lba ) {
 	__asm__ ( REAL_CODE ( "pushfw\n\t"
 			      "cli\n\t"
 			      "lcall *int13con_vector\n\t" )
-		  : "=a" ( error )
+		  : "=a" ( output )
 		  : "0" ( op << 8 ), "d" ( INT13CON_DRIVE ),
 		    "S" ( __from_data16 ( &int13con_address ) ) );
+	error = ( output >> 8 );
 	if ( error ) {
 		DBG ( "INT13CON operation %04x failed: %02x\n",
 		      op, error );
