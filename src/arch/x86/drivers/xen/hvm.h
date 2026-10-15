@@ -46,8 +46,10 @@ struct hvm_device {
 	uint32_t cpuid_base;
 	/** Length of hypercall table */
 	size_t hypercall_len;
-	/** MMIO base address */
-	unsigned long mmio;
+	/** MMIO mapped address */
+	void *mmio;
+	/** MMIO physical address */
+	unsigned long mmio_phys;
 	/** Current offset within MMIO address space */
 	size_t mmio_offset;
 	/** Length of MMIO address space */

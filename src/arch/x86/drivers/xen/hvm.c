@@ -115,7 +115,7 @@ static int hvm_map_hypercall ( struct hvm_device *hvm ) {
 		return -ENOMEM;
 	}
 	hypercall_phys = virt_to_phys ( hvm->xen.hypercall );
-	DBGC2 ( hvm, "HVM hypercall page(s) at [%#08lx,%#08lx) via MSR %#08x\n",
+	DBGC2 ( hvm, "HVM hypercall page(s) at [%08lx,%08lx) via MSR %#08x\n",
 		hypercall_phys, ( hypercall_phys + hvm->hypercall_len ), msr );
 
 	/* Write to MSR */
@@ -177,14 +177,8 @@ static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
 	}
 
 	/* Map this space */
-	mmio = pci_ioremap ( hvm->pci, ( hvm->mmio + hvm->mmio_offset ), len );
-	if ( ! mmio ) {
-		DBGC ( hvm, "HVM could not map MMIO space [%08lx,%08lx)\n",
-		       ( hvm->mmio + hvm->mmio_offset ),
-		       ( hvm->mmio + hvm->mmio_offset + len ) );
-		goto err_ioremap;
-	}
-	mmio_phys = virt_to_phys ( mmio );
+	mmio = ( hvm->mmio + hvm->mmio_offset );
+	mmio_phys = ( hvm->mmio_phys + hvm->mmio_offset );
 
 	/* Add to physical address space */
 	for ( i = 0 ; i < pages ; i++ ) {
@@ -206,6 +200,8 @@ static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
 	/* Update offset */
 	hvm->mmio_offset += len;
 
+	DBGC2 ( hvm, "HVM mapped space %d at [%08lx,%08lx)\n", space,
+		mmio_phys, ( mmio_phys + len ) );
 	return mmio;
 
 	i = pages;
@@ -215,8 +211,6 @@ static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
 		remove.gpfn = ( ( mmio_phys / PAGE_SIZE ) + i );
 		xenmem_remove_from_physmap ( &hvm->xen, &remove );
 	}
-	iounmap ( mmio );
- err_ioremap:
  err_no_space:
 	return NULL;
 }
@@ -230,14 +224,11 @@ static void * hvm_ioremap ( struct hvm_device *hvm, unsigned int space,
  */
 static void hvm_iounmap ( struct hvm_device *hvm, void *mmio, size_t len ) {
 	struct xen_remove_from_physmap remove;
-	physaddr_t mmio_phys = virt_to_phys ( mmio );
+	physaddr_t mmio_phys = ( hvm->mmio_phys + ( mmio - hvm->mmio ) );
 	unsigned int pages = ( len / PAGE_SIZE );
 	unsigned int i;
 	int xenrc;
 	int rc;
-
-	/* Unmap this space */
-	iounmap ( mmio );
 
 	/* Remove from physical address space */
 	for ( i = 0 ; i < pages ; i++ ) {
@@ -262,7 +253,6 @@ static void hvm_iounmap ( struct hvm_device *hvm, void *mmio, size_t len ) {
  * @ret rc		Return status code
  */
 static int hvm_map_shared_info ( struct hvm_device *hvm ) {
-	physaddr_t shared_info_phys;
 	int rc;
 
 	/* Map shared info page */
@@ -272,9 +262,6 @@ static int hvm_map_shared_info ( struct hvm_device *hvm ) {
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	shared_info_phys = virt_to_phys ( hvm->xen.shared );
-	DBGC2 ( hvm, "HVM shared info page at [%#08lx,%#08lx)\n",
-		shared_info_phys, ( shared_info_phys + PAGE_SIZE ) );
 
 	/* Sanity check */
 	DBGC2 ( hvm, "HVM wallclock time is %d\n",
@@ -305,7 +292,6 @@ static void hvm_unmap_shared_info ( struct hvm_device *hvm ) {
  * @ret rc		Return status code
  */
 static int hvm_map_grant ( struct hvm_device *hvm ) {
-	physaddr_t grant_phys;
 	int rc;
 
 	/* Initialise grant table */
@@ -321,9 +307,6 @@ static int hvm_map_grant ( struct hvm_device *hvm ) {
 	if ( ! hvm->xen.grant.table )
 		return -ENODEV;
 
-	grant_phys = virt_to_phys ( hvm->xen.grant.table );
-	DBGC2 ( hvm, "HVM mapped grant table at [%08lx,%08lx)\n",
-		grant_phys, ( grant_phys + hvm->xen.grant.len ) );
 	return 0;
 }
 
@@ -424,13 +407,22 @@ static int hvm_probe ( struct pci_device *pci ) {
 		goto err_alloc;
 	}
 	hvm->pci = pci;
-	hvm->mmio = pci_bar_start ( pci, HVM_MMIO_BAR );
+	hvm->mmio_phys = pci_bar_start ( pci, HVM_MMIO_BAR );
 	hvm->mmio_len = pci_bar_size ( pci, HVM_MMIO_BAR );
 	DBGC2 ( hvm, "HVM has MMIO space [%08lx,%08lx)\n",
-		hvm->mmio, ( hvm->mmio + hvm->mmio_len ) );
+		hvm->mmio_phys, ( hvm->mmio_phys + hvm->mmio_len ) );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
+
+	/* Map MMIO BAR (to be used for physical address mappings) */
+	hvm->mmio = pci_ioremap ( pci, hvm->mmio_phys, hvm->mmio_len );
+	if ( ! hvm->mmio ) {
+		DBGC ( hvm, "HVM could not map MMIO space [%08lx,%08lx)\n",
+		       hvm->mmio_phys, ( hvm->mmio_phys + hvm->mmio_len ) );
+		rc = -ENODEV;
+		goto err_ioremap;
+	}
 
 	/* Attach to hypervisor */
 	if ( ( rc = hvm_cpuid_base ( hvm ) ) != 0 )
@@ -465,6 +457,8 @@ static int hvm_probe ( struct pci_device *pci ) {
 	hvm_unmap_hypercall ( hvm );
  err_map_hypercall:
  err_cpuid_base:
+	iounmap ( hvm->mmio );
+ err_ioremap:
 	free ( hvm );
  err_alloc:
 	return rc;
@@ -483,6 +477,7 @@ static void hvm_remove ( struct pci_device *pci ) {
 	hvm_unmap_grant ( hvm );
 	hvm_unmap_shared_info ( hvm );
 	hvm_unmap_hypercall ( hvm );
+	iounmap ( hvm->mmio );
 	free ( hvm );
 }
 
