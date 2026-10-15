@@ -397,9 +397,9 @@ static int intelx_probe ( struct pci_device *pci ) {
 	memset ( intel, 0, sizeof ( *intel ) );
 	intel->port = PCI_FUNC ( pci->busdevfn );
 	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTELX_TD,
-			  intel_describe_tx );
+			  intel_describe_tx, intel_status_tx );
 	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTELX_RD,
-			  intel_describe_rx );
+			  intel_describe_rx, intel_status_rx );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );

@@ -22,14 +22,30 @@ FILE_SECBOOT ( PERMITTED );
 struct intel_descriptor {
 	/** Buffer address */
 	uint64_t address;
-	/** Length */
-	uint16_t length;
-	/** Flags */
-	uint8_t flags;
-	/** Command */
-	uint8_t command;
-	/** Status */
-	uint32_t status;
+	union {
+		/** Unused header address */
+		uint64_t unused;
+		/** Standard ("legacy") descriptor */
+		struct {
+			/** Length */
+			uint16_t length;
+			/** Flags */
+			uint8_t flags;
+			/** Command */
+			uint8_t command;
+			/** Status */
+			uint32_t status;
+		} __attribute__ (( packed )) std;
+		/** Advanced receive descriptor write-back format */
+		struct {
+			/** Status */
+			uint32_t status;
+			/** Length */
+			uint16_t length;
+			/** VLAN tag */
+			uint16_t vlan;
+		} __attribute__ (( packed )) rx_adv;
+	};
 } __attribute__ (( packed ));
 
 /** Descriptor type */
@@ -51,8 +67,14 @@ struct intel_descriptor {
 /** Descriptor done */
 #define INTEL_DESC_STATUS_DD 0x00000001UL
 
+/** End of packet */
+#define INTEL_DESC_STATUS_EOP 0x00000002UL
+
 /** Receive error */
 #define INTEL_DESC_STATUS_RXE 0x00000100UL
+
+/** Receive error (in advanced receive descriptors) */
+#define INTEL_DESC_STATUS_ADV_RXE 0x20000000UL
 
 /** Payload length */
 #define INTEL_DESC_STATUS_PAYLEN( len ) ( (len) << 14 )
@@ -234,7 +256,8 @@ struct intel_ring {
 	/** Length (in bytes) */
 	size_t len;
 
-	/** Populate descriptor
+	/**
+	 * Populate descriptor
 	 *
 	 * @v desc		Descriptor
 	 * @v addr		Data buffer address
@@ -242,6 +265,14 @@ struct intel_ring {
 	 */
 	void ( * describe ) ( struct intel_descriptor *desc, physaddr_t addr,
 			      size_t len );
+	/**
+	 * Get descriptor status
+	 *
+	 * @v desc		Descriptor
+	 * @v len		Completed length to fill in
+	 * @ret status		Descriptor status
+	 */
+	uint32_t ( * status ) ( struct intel_descriptor *desc, size_t *len );
 };
 
 /**
@@ -255,11 +286,14 @@ struct intel_ring {
 static inline __attribute__ (( always_inline)) void
 intel_init_ring ( struct intel_ring *ring, unsigned int count, unsigned int reg,
 		  void ( * describe ) ( struct intel_descriptor *desc,
-					physaddr_t addr, size_t len ) ) {
+					physaddr_t addr, size_t len ),
+		  uint32_t ( * status ) ( struct intel_descriptor *desc,
+					  size_t *len ) ) {
 
 	ring->len = ( count * sizeof ( ring->desc[0] ) );
 	ring->reg = reg;
 	ring->describe = describe;
+	ring->status = status;
 }
 
 /** An Intel virtual function mailbox */
@@ -360,6 +394,10 @@ extern void intel_describe_tx_adv ( struct intel_descriptor *tx,
 				    physaddr_t addr, size_t len );
 extern void intel_describe_rx ( struct intel_descriptor *rx,
 				physaddr_t addr, size_t len );
+extern uint32_t intel_status_tx ( struct intel_descriptor *tx, size_t *len );
+extern uint32_t intel_status_rx ( struct intel_descriptor *tx, size_t *len );
+extern uint32_t intel_status_rx_adv ( struct intel_descriptor *tx,
+				      size_t *len );
 extern void intel_reset_ring ( struct intel_nic *intel, unsigned int reg );
 extern int intel_create_ring ( struct intel_nic *intel,
 			       struct intel_ring *ring );

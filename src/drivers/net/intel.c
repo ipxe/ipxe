@@ -398,11 +398,11 @@ void intel_describe_tx ( struct intel_descriptor *tx, physaddr_t addr,
 
 	/* Populate transmit descriptor */
 	tx->address = cpu_to_le64 ( addr );
-	tx->length = cpu_to_le16 ( len );
-	tx->flags = 0;
-	tx->command = ( INTEL_DESC_CMD_RS | INTEL_DESC_CMD_IFCS |
-			INTEL_DESC_CMD_EOP );
-	tx->status = 0;
+	tx->std.length = cpu_to_le16 ( len );
+	tx->std.flags = 0;
+	tx->std.command = ( INTEL_DESC_CMD_RS | INTEL_DESC_CMD_IFCS |
+			    INTEL_DESC_CMD_EOP );
+	tx->std.status = 0;
 }
 
 /**
@@ -417,11 +417,11 @@ void intel_describe_tx_adv ( struct intel_descriptor *tx, physaddr_t addr,
 
 	/* Populate advanced transmit descriptor */
 	tx->address = cpu_to_le64 ( addr );
-	tx->length = cpu_to_le16 ( len );
-	tx->flags = INTEL_DESC_FL_DTYP_DATA;
-	tx->command = ( INTEL_DESC_CMD_DEXT | INTEL_DESC_CMD_RS |
-			INTEL_DESC_CMD_IFCS | INTEL_DESC_CMD_EOP );
-	tx->status = cpu_to_le32 ( INTEL_DESC_STATUS_PAYLEN ( len ) );
+	tx->std.length = cpu_to_le16 ( len );
+	tx->std.flags = INTEL_DESC_FL_DTYP_DATA;
+	tx->std.command = ( INTEL_DESC_CMD_DEXT | INTEL_DESC_CMD_RS |
+			    INTEL_DESC_CMD_IFCS | INTEL_DESC_CMD_EOP );
+	tx->std.status = cpu_to_le32 ( INTEL_DESC_STATUS_PAYLEN ( len ) );
 }
 
 /**
@@ -434,10 +434,59 @@ void intel_describe_tx_adv ( struct intel_descriptor *tx, physaddr_t addr,
 void intel_describe_rx ( struct intel_descriptor *rx, physaddr_t addr,
 			 size_t len __unused ) {
 
-	/* Populate transmit descriptor */
+	/* Populate receive descriptor */
 	rx->address = cpu_to_le64 ( addr );
-	rx->length = 0;
-	rx->status = 0;
+	rx->unused = 0;
+}
+
+/**
+ * Get transmit descriptor status
+ *
+ * @v tx		Transmit descriptor
+ * @v len		Completed length to fill in
+ * @ret status		Descriptor status
+ */
+uint32_t intel_status_tx ( struct intel_descriptor *tx,
+			   size_t *len __unused ) {
+
+	/* Get transmit descriptor status */
+	return le32_to_cpu ( tx->std.status );
+}
+
+/**
+ * Get receive descriptor status
+ *
+ * @v rx		Receive descriptor
+ * @v len		Completed length to fill in
+ * @ret status		Descriptor status
+ */
+uint32_t intel_status_rx ( struct intel_descriptor *rx, size_t *len ) {
+	uint32_t status;
+
+	/* Get receive descriptor status */
+	*len = le16_to_cpu ( rx->std.length );
+	status = ( le32_to_cpu ( rx->std.status ) &
+		   ( INTEL_DESC_STATUS_DD | INTEL_DESC_STATUS_EOP |
+		     INTEL_DESC_STATUS_RXE ) );
+	return status;
+}
+
+/**
+ * Get advanced receive descriptor status
+ *
+ * @v rx		Receive descriptor
+ * @v len		Completed length to fill in
+ * @ret status		Descriptor status
+ */
+uint32_t intel_status_rx_adv ( struct intel_descriptor *rx, size_t *len ) {
+	uint32_t status;
+
+	/* Get receive descriptor status */
+	*len = le16_to_cpu ( rx->rx_adv.length );
+	status = ( le32_to_cpu ( rx->rx_adv.status ) &
+		   ( INTEL_DESC_STATUS_DD | INTEL_DESC_STATUS_EOP |
+		     INTEL_DESC_STATUS_ADV_RXE ) );
+	return status;
 }
 
 /******************************************************************************
@@ -793,6 +842,8 @@ void intel_poll_tx ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
 	struct intel_descriptor *tx;
 	unsigned int tx_idx;
+	uint32_t status;
+	size_t len;
 
 	/* Check for completed packets */
 	while ( intel->tx.cons != intel->tx.prod ) {
@@ -802,9 +853,9 @@ void intel_poll_tx ( struct net_device *netdev ) {
 		tx = &intel->tx.desc[tx_idx];
 
 		/* Stop if descriptor is still in use */
-		if ( ! ( tx->status & cpu_to_le32 ( INTEL_DESC_STATUS_DD ) ) )
+		status = intel->tx.status ( tx, &len );
+		if ( ! ( status & INTEL_DESC_STATUS_DD ) )
 			return;
-
 		DBGC2 ( intel, "INTEL %p TX %d complete\n", intel, tx_idx );
 
 		/* Complete TX descriptor */
@@ -823,6 +874,7 @@ void intel_poll_rx ( struct net_device *netdev ) {
 	struct intel_descriptor *rx;
 	struct io_buffer *iobuf;
 	unsigned int rx_idx;
+	uint32_t status;
 	size_t len;
 
 	/* Check for received packets */
@@ -833,20 +885,21 @@ void intel_poll_rx ( struct net_device *netdev ) {
 		rx = &intel->rx.desc[rx_idx];
 
 		/* Stop if descriptor is still in use */
-		if ( ! ( rx->status & cpu_to_le32 ( INTEL_DESC_STATUS_DD ) ) )
+		status = intel->rx.status ( rx, &len );
+		if ( ! ( status & INTEL_DESC_STATUS_DD ) )
 			return;
+		status &= ~INTEL_DESC_STATUS_DD;
 
 		/* Populate I/O buffer */
 		iobuf = intel->rx_iobuf[rx_idx];
 		intel->rx_iobuf[rx_idx] = NULL;
-		len = le16_to_cpu ( rx->length );
 		iob_put ( iobuf, len );
 
 		/* Hand off to network stack */
-		if ( rx->status & cpu_to_le32 ( INTEL_DESC_STATUS_RXE ) ) {
-			DBGC ( intel, "INTEL %p RX %d error (length %zd, "
-			       "status %08x)\n", intel, rx_idx, len,
-			       le32_to_cpu ( rx->status ) );
+		if ( status != INTEL_DESC_STATUS_EOP ) {
+			DBGC ( intel, "INTEL %p RX %d error (length %zd):\n",
+			       intel, rx_idx, len );
+			DBGC_HDA ( intel, 0, rx, sizeof ( *rx ) );
 			netdev_rx_err ( netdev, iobuf, -EIO );
 		} else {
 			DBGC2 ( intel, "INTEL %p RX %d complete (length %zd)\n",
@@ -962,9 +1015,9 @@ static int intel_probe ( struct pci_device *pci ) {
 	intel->port = PCI_FUNC ( pci->busdevfn );
 	intel->flags = pci->id->driver_data;
 	intel_init_ring ( &intel->tx, INTEL_NUM_TX_DESC, INTEL_TD,
-			  intel_describe_tx );
+			  intel_describe_tx, intel_status_tx );
 	intel_init_ring ( &intel->rx, INTEL_NUM_RX_DESC, INTEL_RD,
-			  intel_describe_rx );
+			  intel_describe_rx, intel_status_rx );
 
 	/* Fix up PCI device */
 	adjust_pci_device ( pci );
