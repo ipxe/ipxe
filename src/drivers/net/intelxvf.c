@@ -362,16 +362,12 @@ static void intelxvf_poll ( struct net_device *netdev ) {
 
 	/* Check for and acknowledge interrupts */
 	eicr = readl ( intel->regs + INTELXVF_EICR );
-	if ( ! eicr )
-		return;
 
-	/* Poll for TX completions, if applicable */
-	if ( eicr & INTELXVF_EIRQ_TX0 )
-		intel_poll_tx ( netdev );
+	/* Poll for TX completions */
+	intel_poll_tx ( netdev );
 
-	/* Poll for RX completions, if applicable */
-	if ( eicr & INTELXVF_EIRQ_RX0 )
-		intel_poll_rx ( netdev );
+	/* Poll for RX completions */
+	intel_poll_rx ( netdev );
 
 	/* Poll for mailbox messages, if applicable */
 	if ( eicr & INTELXVF_EIRQ_MBOX ) {

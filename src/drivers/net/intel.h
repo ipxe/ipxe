@@ -329,8 +329,6 @@ struct intel_nic {
 	unsigned int port;
 	/** Flags */
 	unsigned int flags;
-	/** Forced interrupts */
-	unsigned int force_icr;
 
 	/** EEPROM */
 	struct nvs_device eeprom;

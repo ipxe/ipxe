@@ -315,16 +315,12 @@ static void intelx_poll ( struct net_device *netdev ) {
 
 	/* Check for and acknowledge interrupts */
 	eicr = readl ( intel->regs + INTELX_EICR );
-	if ( ! eicr )
-		return;
 
-	/* Poll for TX completions, if applicable */
-	if ( eicr & INTELX_EIRQ_TX0 )
-		intel_poll_tx ( netdev );
+	/* Poll for TX completions */
+	intel_poll_tx ( netdev );
 
-	/* Poll for RX completions, if applicable */
-	if ( eicr & ( INTELX_EIRQ_RX0 | INTELX_EIRQ_RXO ) )
-		intel_poll_rx ( netdev );
+	/* Poll for RX completions */
+	intel_poll_rx ( netdev );
 
 	/* Report receive overruns */
 	if ( eicr & INTELX_EIRQ_RXO )

@@ -749,13 +749,6 @@ static int intel_open ( struct net_device *netdev ) {
 	/* Update link state */
 	intel_check_link ( netdev );
 
-	/* Apply required errata */
-	if ( intel->flags & INTEL_VMWARE ) {
-		DBGC ( intel, "INTEL %p applying VMware errata workaround\n",
-		       intel );
-		intel->force_icr = INTEL_IRQ_RXT0;
-	}
-
 	return 0;
 
 	intel_destroy_ring ( intel, &intel->rx );
@@ -924,17 +917,12 @@ static void intel_poll ( struct net_device *netdev ) {
 	icr = readl ( intel->regs + INTEL_ICR );
 	profile_stop ( &intel_vm_poll_profiler );
 	profile_exclude ( &intel_vm_poll_profiler );
-	icr |= intel->force_icr;
-	if ( ! icr )
-		return;
 
-	/* Poll for TX completions, if applicable */
-	if ( icr & INTEL_IRQ_TXDW )
-		intel_poll_tx ( netdev );
+	/* Poll for TX completions */
+	intel_poll_tx ( netdev );
 
-	/* Poll for RX completions, if applicable */
-	if ( icr & ( INTEL_IRQ_RXT0 | INTEL_IRQ_RXO ) )
-		intel_poll_rx ( netdev );
+	/* Poll for RX completions */
+	intel_poll_rx ( netdev );
 
 	/* Report receive overruns */
 	if ( icr & INTEL_IRQ_RXO )
