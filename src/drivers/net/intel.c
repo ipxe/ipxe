@@ -536,6 +536,10 @@ static int intel_disable_ring ( struct intel_nic *intel, unsigned int reg ) {
  */
 void intel_reset_ring ( struct intel_nic *intel, unsigned int reg ) {
 
+	//
+	DBG ( "*** skip reset ring\n" );
+	return;
+
 	/* Disable ring.  Ignore errors and continue to reset the ring anyway */
 	intel_disable_ring ( intel, reg );
 

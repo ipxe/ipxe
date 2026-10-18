@@ -221,8 +221,15 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	int vlan_thing;
 	int rc;
 
+	//
+ again:
+	static int x;
+	DBG ( "*** open iteration %d\n", x );
+
 	/* Reset the function */
 	intelxvf_reset ( intel );
+
+	// ok to loop from here
 
 	/* Notify PF that reset is complete */
 	if ( ( rc = intelvf_mbox_reset ( intel, NULL ) ) != 0 ) {
@@ -239,6 +246,8 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	 * v1.1.
 	 */
 	intelxvf_mbox_version ( intel, INTELXVF_MSG_VERSION_1_1 );
+
+	// ok to loop from here
 
 	/* Set MAC address */
 	if ( ( rc = intelvf_mbox_set_mac ( intel, netdev->ll_addr ) ) != 0 ) {
@@ -276,9 +285,13 @@ static int intelxvf_open ( struct net_device *netdev ) {
 		writel ( rxdctl, intel->regs + INTELXVF_RD(0) + INTEL_xDCTL );
 	}
 
+	// ok to loop from here
+
 	/* Create transmit descriptor ring */
 	if ( ( rc = intel_create_ring ( intel, &intel->tx ) ) != 0 )
 		goto err_create_tx;
+
+	// ok to loop from here (with destroy_ring(tx)
 
 	/* Create receive descriptor ring */
 	if ( ( rc = intel_create_ring ( intel, &intel->rx ) ) != 0 )
@@ -310,11 +323,40 @@ static int intelxvf_open ( struct net_device *netdev ) {
 	dca_rxctrl &= ~INTELXVF_DCA_RXCTRL_MUST_BE_ZERO;
 	writel ( dca_rxctrl, intel->regs + INTELXVF_DCA_RXCTRL );
 
+	//
+	dca_rxctrl = readl ( intel->regs + INTELXVF_DCA_RXCTRL );
+	uint32_t dca_txctrl = readl ( intel->regs + 0x200c );
+	DBG ( "*** DCA RXCTRL=%08x TXCTRL=%08x\n",
+	      dca_rxctrl, dca_txctrl );
+
+	// ok to loop from here (with destroy_ring(tx then rx)
+
 	/* Fill receive ring */
 	intel_refill_rx ( intel );
 
 	/* Update link state */
 	intelxvf_check_link ( netdev );
+
+	// ok to loop from here (destroy rx, empty rx, destroy tx)
+	//
+	// full "ifopen ; ifclose" then "dhcp" also works
+
+	//
+	if ( 0 && ! x++ ) {
+		intel_destroy_ring ( intel, &intel->rx );
+		intel_empty_rx ( intel );
+		intel_destroy_ring ( intel, &intel->tx );
+		DBG ( "*** looping from %d\n", __LINE__ );
+		goto again;
+	}
+
+	// makes no difference
+	if ( 0 ) {
+	uint8_t foo[ETH_ALEN];
+	DBG ( "*** extra reset\n" );
+	intelvf_mbox_reset ( intel, foo );
+	DBG ( "*** extra reset got MAC %s\n", eth_ntoa ( foo ) );
+	}
 
 	return 0;
 
@@ -336,6 +378,25 @@ static int intelxvf_open ( struct net_device *netdev ) {
  */
 static void intelxvf_close ( struct net_device *netdev ) {
 	struct intel_nic *intel = netdev->priv;
+
+	//
+	intel_diag ( intel );
+	intelxvf_stats ( intel );
+	DBG ( "*** TX ring DWBAH=%08x DWBAL=%08x\n",
+	      readl ( intel->regs + intel->tx.reg + 0x3c ),
+	      readl ( intel->regs + intel->tx.reg + 0x38 ) );
+	DBG ( "*** TX ring DBAH=%08x DBAL=%08x DLEN=%08x DCTL=%08x:\n",
+	      readl ( intel->regs + intel->tx.reg + INTEL_xDBAH ),
+	      readl ( intel->regs + intel->tx.reg + INTEL_xDBAL ),
+	      readl ( intel->regs + intel->tx.reg + INTEL_xDLEN ),
+	      readl ( intel->regs + intel->tx.reg + INTEL_xDCTL ) );
+	DBG_HDA ( 0, intel->tx.desc, intel->tx.len );
+	DBG ( "*** RX ring DBAH=%08x DBAL=%08x DLEN=%08x DCTL=%08x:\n",
+	      readl ( intel->regs + intel->rx.reg + INTEL_xDBAH ),
+	      readl ( intel->regs + intel->rx.reg + INTEL_xDBAL ),
+	      readl ( intel->regs + intel->rx.reg + INTEL_xDLEN ),
+	      readl ( intel->regs + intel->rx.reg + INTEL_xDCTL ) );
+	DBG_HDA ( 0, intel->rx.desc, intel->rx.len );
 
 	/* Destroy receive descriptor ring */
 	intel_destroy_ring ( intel, &intel->rx );
