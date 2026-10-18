@@ -545,10 +545,6 @@ void intel_reset_ring ( struct intel_nic *intel, unsigned int reg ) {
 	/* Clear ring address */
 	writel ( 0, ( intel->regs + reg + INTEL_xDBAH ) );
 	writel ( 0, ( intel->regs + reg + INTEL_xDBAL ) );
-
-	/* Reset head and tail pointers */
-	writel ( 0, ( intel->regs + reg + INTEL_xDH ) );
-	writel ( 0, ( intel->regs + reg + INTEL_xDT ) );
 }
 
 /**
