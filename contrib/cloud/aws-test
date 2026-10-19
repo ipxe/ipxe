@@ -89,25 +89,41 @@ def find_images(types, region, family, commit, image_ids):
     return result
 
 
-def define_blob(bucket):
-    """Create pseudorandom data test file"""
+def file_exists(bucket, key):
+    """Check if test file is already present"""
     client = boto3.client('s3')
-    body = random.Random(42).randbytes(1024 * 1024)
-    digest = sha256(body).hexdigest()
-    key = 'test/1mb/%s' % digest
     try:
         client.head_object(Bucket=bucket, Key=key)
         logger.info("test file %s/%s", bucket, key)
-        return digest
+        return True
     except botocore.exceptions.ClientError as exc:
         if exc.response['Error']['Code'] != '404':
             raise
-    client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch='*')
-    logger.info("create test file %s/%s", bucket, key)
+    return False
+
+
+def define_1mb(bucket):
+    """Create pseudorandom 1MB data test file"""
+    client = boto3.client('s3')
+    body = random.Random(42).randbytes(1024 * 1024)
+    digest = sha256(body).hexdigest()
+    key = 'files/%s/1mb' % digest
+    if not file_exists(bucket, key):
+        client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch='*')
+        logger.info("create test file %s/%s", bucket, key)
     return digest
 
 
-def define_userdata(bucket, name, typ, arch, blob, shell):
+def define_files(bucket):
+    """Create test files"""
+    megabyte = define_1mb(bucket)
+    files = {
+        '1mb': megabyte,
+    }
+    return files
+
+
+def define_userdata(bucket, name, typ, arch, files, shell):
     """Create user-data"""
     client = boto3.client('s3')
     region = client.head_bucket(Bucket=bucket)['BucketRegion']
@@ -116,7 +132,7 @@ def define_userdata(bucket, name, typ, arch, blob, shell):
         signature_version='s3v4',
     )
     client = boto3.client('s3', region_name=region, config=config)
-    public = f"http://{bucket}.s3.{region}.amazonaws.com/test"
+    public = f"http://{bucket}.s3.{region}.amazonaws.com/files"
     urls = {
         k: client.generate_presigned_url(
             'put_object',
@@ -152,8 +168,8 @@ def define_userdata(bucket, name, typ, arch, blob, shell):
 
     # Single download test
     echo Test download
-    set expected:hexraw {blob}
-    imgfetch -n 1mb {public}/1mb/{blob} || goto fail
+    set expected:hexraw {files['1mb']}
+    imgfetch {public}/{files['1mb']}/1mb || goto fail
     sha256sum --set actual 1mb
     imgfree
     iseq ${{expected}} ${{actual}} || goto fail
@@ -168,7 +184,7 @@ def define_userdata(bucket, name, typ, arch, blob, shell):
     echo Test cycle iteration ${{count}}
     ifclose
     ifopen || goto fail
-    imgfetch -n 1mb {public}/1mb/{blob} || goto fail
+    imgfetch {public}/{files['1mb']}/1mb || goto fail
     sha256sum --set actual${{cycle}} 1mb
     imgfree
     iseq ${{expected}} ${{actual${{cycle}}}} || goto fail
@@ -388,8 +404,8 @@ archs = {
     for typ in args.type
 }
 
-# Create pseudorandom test file
-blob = define_blob(args.bucket)
+# Create test files
+files = define_files(args.bucket)
 
 # Construct userdata
 userdata = {
@@ -398,7 +414,7 @@ userdata = {
         name=args.name,
         typ=typ,
         arch=archs[typ],
-        blob=blob,
+        files=files,
         shell=args.shell
     )
     for typ in args.type
