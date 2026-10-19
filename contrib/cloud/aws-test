@@ -2,6 +2,7 @@
 
 import argparse
 from base64 import b64encode
+import configparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -16,8 +17,10 @@ import time
 import boto3
 import botocore.config
 import botocore.exceptions
+import requests
 
 
+FEDORA_MIRROR = "https://www.mirrorservice.org/pub/fedora/linux/releases"
 FEDORA_VERSION = 44
 POLL_INTERVAL_SEC = 5
 POLL_MAX_RETRIES = 100
@@ -114,11 +117,35 @@ def define_1mb(bucket):
     return digest
 
 
+def define_linux(bucket, arch):
+    """Create Linux kernel and initrd test files"""
+    client = boto3.client('s3')
+    base = "%s/%s/Everything/%s/os" % (FEDORA_MIRROR, FEDORA_VERSION, arch)
+    treeinfo = requests.get("%s/.treeinfo" % base)
+    treeinfo.raise_for_status()
+    cfg = configparser.ConfigParser()
+    cfg.read_string(treeinfo.text)
+    digests = {}
+    for name in ('vmlinuz', 'initrd.img'):
+        path = 'images/pxeboot/%s' % name
+        digest = cfg['checksums'][path].split(":")[-1]
+        key = 'files/%s/%s' % (digest, name)
+        if not file_exists(bucket, key):
+            data = requests.get("%s/%s" % (base, path))
+            data.raise_for_status()
+            client.put_object(Bucket=bucket, Key=key, Body=data.content,
+                              IfNoneMatch='*')
+            logger.info("create test file %s/%s", bucket, key)
+        digests[name] = digest
+    return digests
+
+
 def define_files(bucket):
     """Create test files"""
-    megabyte = define_1mb(bucket)
     files = {
-        '1mb': megabyte,
+        '1mb': define_1mb(bucket),
+        'arm64': define_linux(bucket, 'aarch64'),
+        'x86_64': define_linux(bucket, 'x86_64'),
     }
     return files
 
@@ -149,9 +176,6 @@ def define_userdata(bucket, name, typ, arch, files, shell):
     poweroff -f
     """).lstrip()
     datauri = 'data:;base64,%s' % b64encode(shellscript.encode()).decode()
-    fedarch = {'arm64': 'aarch64'}.get(arch, arch)
-    fedora = ('http://download.fedoraproject.org/pub/fedora/linux/releases/'
-              '%s/Everything/%s/os/images/pxeboot' % (FEDORA_VERSION, fedarch))
     ipxescript = textwrap.dedent(f"""
     #!ipxe
 
@@ -195,9 +219,10 @@ def define_userdata(bucket, name, typ, arch, files, shell):
 
     # Boot Linux
     echo Boot Linux
-    kernel {fedora}/vmlinuz ip=dhcp console=ttyS0,115200n8 console=tty0 || \
+    kernel {public}/{files[arch]['vmlinuz']}/vmlinuz \
+           ip=dhcp console=ttyS0,115200n8 console=tty0 || \
            goto fail
-    initrd {fedora}/initrd.img || goto fail
+    initrd {public}/{files[arch]['initrd.img']}/initrd.img || goto fail
     initrd -q -n ipxe.sh {datauri} \
            /var/lib/dracut/hooks/initqueue/online/99-ipxe.sh
     params --method PUT
