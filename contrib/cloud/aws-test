@@ -18,6 +18,7 @@ import botocore.config
 import botocore.exceptions
 
 
+FEDORA_MIRROR = "http://www.mirrorservice.org/pub/fedora/linux/releases"
 FEDORA_VERSION = 44
 POLL_INTERVAL_SEC = 5
 POLL_MAX_RETRIES = 100
@@ -134,8 +135,8 @@ def define_userdata(bucket, name, typ, arch, blob, shell):
     """).lstrip()
     datauri = 'data:;base64,%s' % b64encode(shellscript.encode()).decode()
     fedarch = {'arm64': 'aarch64'}.get(arch, arch)
-    fedora = ('http://download.fedoraproject.org/pub/fedora/linux/releases/'
-              '%s/Everything/%s/os/images/pxeboot' % (FEDORA_VERSION, fedarch))
+    fedora = ('%s/%s/Everything/%s/os/images/pxeboot' %
+              (FEDORA_MIRROR, FEDORA_VERSION, fedarch))
     ipxescript = textwrap.dedent(f"""
     #!ipxe
 
