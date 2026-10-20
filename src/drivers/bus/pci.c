@@ -285,6 +285,11 @@ int pci_read_config ( struct pci_device *pci ) {
 	uint8_t hdrtype;
 	uint32_t tmp;
 
+	/* Check for physical device presence */
+	pci_read_config_dword ( pci, PCI_VENDOR_ID, &tmp );
+	if ( ( tmp == 0xffffffff ) || ( tmp == 0 ) )
+		return -ENODEV;
+
 	/* Ignore all but the first function on non-multifunction devices */
 	if ( PCI_FUNC ( pci->busdevfn ) != 0 ) {
 		busdevfn = pci->busdevfn;
@@ -294,11 +299,6 @@ int pci_read_config ( struct pci_device *pci ) {
 		if ( ! ( hdrtype & PCI_HEADER_TYPE_MULTI ) )
 			return -ENODEV;
 	}
-
-	/* Check for physical device presence */
-	pci_read_config_dword ( pci, PCI_VENDOR_ID, &tmp );
-	if ( ( tmp == 0xffffffff ) || ( tmp == 0 ) )
-		return -ENODEV;
 
 	/* Populate struct pci_device */
 	pci->vendor = ( tmp & 0xffff );
