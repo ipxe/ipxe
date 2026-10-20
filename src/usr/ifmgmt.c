@@ -90,7 +90,7 @@ void ifclose ( struct net_device *netdev ) {
  * @v stats		Network device statistics
  * @v prefix		Message prefix
  */
-static void ifstat_errors ( struct net_device_stats *stats,
+static void ifstat_errors ( struct error_statistics *stats,
 			    const char *prefix ) {
 	unsigned int i;
 

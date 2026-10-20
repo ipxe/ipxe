@@ -17,6 +17,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/settings.h>
 #include <ipxe/interface.h>
 #include <ipxe/retry.h>
+#include <ipxe/errstat.h>
 
 struct io_buffer;
 struct net_device;
@@ -277,27 +278,6 @@ struct net_device_operations {
 	void ( * irq ) ( struct net_device *netdev, int enable );
 };
 
-/** Network device error */
-struct net_device_error {
-	/** Error status code */
-	int rc;
-	/** Error count */
-	unsigned int count;
-};
-
-/** Maximum number of unique errors that we will keep track of */
-#define NETDEV_MAX_UNIQUE_ERRORS 4
-
-/** Network device statistics */
-struct net_device_stats {
-	/** Count of successful completions */
-	unsigned int good;
-	/** Count of error completions */
-	unsigned int bad;
-	/** Error breakdowns */
-	struct net_device_error errors[NETDEV_MAX_UNIQUE_ERRORS];
-};
-
 /** A network device configuration */
 struct net_device_configuration {
 	/** Network device */
@@ -421,9 +401,9 @@ struct net_device {
 	/** RX packet queue */
 	struct list_head rx_queue;
 	/** TX statistics */
-	struct net_device_stats tx_stats;
+	struct error_statistics tx_stats;
 	/** RX statistics */
-	struct net_device_stats rx_stats;
+	struct error_statistics rx_stats;
 
 	/** Configuration settings applicable to this device */
 	struct generic_settings settings;
