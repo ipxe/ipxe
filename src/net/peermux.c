@@ -31,6 +31,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/uri.h>
 #include <ipxe/xferbuf.h>
 #include <ipxe/job.h>
+#include <ipxe/peerdist.h>
 #include <ipxe/peerblk.h>
 #include <ipxe/peermux.h>
 
@@ -360,6 +361,9 @@ int peermux_filter ( struct interface *xfer, struct interface *info,
 	struct peerdist_multiplexer *peermux;
 	struct peerdist_multiplexed_block *peermblk;
 	unsigned int i;
+
+	/* Update statistics */
+	peerstats.downloads++;
 
 	/* Allocate and initialise structure */
 	peermux = zalloc ( sizeof ( *peermux ) );

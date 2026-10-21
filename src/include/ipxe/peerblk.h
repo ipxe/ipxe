@@ -127,6 +127,8 @@ struct peerdist_block {
 	unsigned long started;
 	/** Time at which most recent attempt was started */
 	unsigned long attempted;
+	/** Error statistics for this attempt */
+	struct error_statistics *stats;
 };
 
 /** PeerDist block download queue */

@@ -40,8 +40,10 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/fault.h>
 #include <ipxe/profile.h>
 #include <ipxe/settings.h>
+#include <ipxe/errortab.h>
 #include <ipxe/pccrr.h>
 #include <ipxe/pccrd.h>
+#include <ipxe/peerdist.h>
 #include <ipxe/peerdisc.h>
 
 /** @file
@@ -49,6 +51,20 @@ FILE_SECBOOT ( PERMITTED );
  * Peer Content Caching and Retrieval (PeerDist) protocol peer discovery
  *
  */
+
+/* Disambiguate the various error causes */
+#define EEXIST_DUPLICATE __einfo_error ( EINFO_EEXIST_DUPLICATE )
+#define EINFO_EEXIST_DUPLICATE						\
+	__einfo_uniqify ( EINFO_EEXIST, 0x01, "Duplicate peer" )
+#define EPIPE_IGNORED __einfo_error ( EINFO_EPIPE_IGNORED )
+#define EINFO_EPIPE_IGNORED						\
+	__einfo_uniqify ( EINFO_EPIPE, 0x01, "Ignored or late reply" )
+
+/** Human-readable error messages */
+struct errortab peerdisc_errors[] __errortab = {
+	__einfo_errortab ( EINFO_EEXIST_DUPLICATE ),
+	__einfo_errortab ( EINFO_EPIPE_IGNORED ),
+};
 
 /** List of discovery segments */
 static LIST_HEAD ( peerdisc_segments );
@@ -147,6 +163,7 @@ static struct peerdisc_segment * peerdisc_find ( const char *id );
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
 				 struct peerdisc_socket *socket,
 				 struct peerdist_retrieval *retrieval,
+				 struct error_statistics *stats,
 				 const char *location );
 
 /******************************************************************************
@@ -272,6 +289,7 @@ static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
 				DBGC ( socket, "PEERDISC %s could not transmit "
 				       "via %s: %s\n", socket->name,
 				       netdev->name, strerror ( rc ) );
+				record_stat ( &socket->stats, rc );
 				/* Contine to try other net devices/sockets */
 				continue;
 			}
@@ -310,6 +328,7 @@ static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
 		DBGC ( socket, "PEERDISC %s could not parse reply: %s\n",
 		       socket->name, strerror ( rc ) );
 		DBGC_HDA ( socket, 0, iobuf->data, iob_len ( iobuf ) );
+		record_stat ( &socket->stats, rc );
 		goto err;
 	}
 
@@ -329,8 +348,9 @@ static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
 		/* Find corresponding segment */
 		segment = peerdisc_find ( id );
 		if ( ! segment ) {
-			DBGC ( socket, "PEERDISC %s ignoring reply for %s\n",
-			       socket->name, id );
+			DBGC2 ( socket, "PEERDISC %s ignoring reply for %s\n",
+				socket->name, id );
+			record_stat ( &socket->stats, -EPIPE_IGNORED );
 			continue;
 		}
 
@@ -340,7 +360,7 @@ static int peerdisc_socket_rx ( struct peerdisc_socket *socket,
 
 			/* Report discovered peer location */
 			peerdisc_discovered ( segment, socket, &peerdist_post,
-					      location );
+					      &peerstats.disc, location );
 		}
 	}
 
@@ -452,12 +472,14 @@ static struct peerdisc_segment * peerdisc_find ( const char *id ) {
  * @v segment		PeerDist discovery segment
  * @v socket		PeerDist discovery socket (or NULL)
  * @v retrieval		PeerDist retrieval protocol
+ * @v stats		PeerDist statistics
  * @v location		Peer location
  * @ret rc		Return status code
  */
 static int peerdisc_discovered ( struct peerdisc_segment *segment,
 				 struct peerdisc_socket *socket,
 				 struct peerdist_retrieval *retrieval,
+				 struct error_statistics *stats,
 				 const char *location ) {
 	unsigned long now = peerdisc_timestamp();
 	struct peerdisc_peer *peer;
@@ -477,22 +499,27 @@ static int peerdisc_discovered ( struct peerdisc_segment *segment,
 
 	/* Ignore duplicate peers */
 	list_for_each_entry ( peer, &segment->peers, list ) {
-		if ( strcmp ( peer->location, location ) == 0 ) {
-			DBGC2 ( segment, "PEERDISC %p duplicate %s\n",
-				segment, location );
-			return 0;
-		}
+		if ( strcmp ( peer->location, location ) != 0 )
+			continue;
+		DBGC2 ( segment, "PEERDISC %p duplicate %s\n",
+			segment, location );
+		if ( socket && ( socket == peer->socket ) )
+			record_stat ( &socket->stats, -EEXIST_DUPLICATE );
+		return 0;
 	}
 	if ( socket ) {
 		DBGC2 ( segment, "PEERDISC %p discovered %s\n",
 			segment, location );
+		record_stat ( &socket->stats, 0 );
 	}
 
 	/* Allocate and initialise structure */
 	peer = zalloc ( sizeof ( *peer ) + strlen ( location ) + 1 /* NUL */ );
 	if ( ! peer )
 		return -ENOMEM;
+	peer->socket = socket;
 	peer->retrieval = retrieval;
+	peer->stats = stats;
 	strcpy ( peer->location, location );
 
 	/* Add to end of list of peers */
@@ -548,6 +575,13 @@ static void peerdisc_expired ( struct retry_timer *timer, int over __unused ) {
 	/* Schedule next discovery attempt, if applicable */
 	if ( timer->count < PEERDISC_REPEAT_COUNT )
 		peerdisc_schedule ( segment, PEERDISC_REPEAT_TIMEOUT );
+
+	/* Update statistics */
+	if ( timer->count > 1 ) {
+		peerstats.rediscoveries++;
+	} else {
+		peerstats.discoveries++;
+	}
 }
 
 /**
@@ -600,8 +634,10 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 	timer_init ( &segment->timer, peerdisc_expired, &segment->refcnt );
 
 	/* Add local cache directory, if any */
-	if ( peerpath )
-		peerdisc_discovered ( segment, NULL, &peerdist_get, peerpath );
+	if ( peerpath ) {
+		peerdisc_discovered ( segment, NULL, &peerdist_get,
+				      &peerstats.path, peerpath );
+	}
 
 	/* Add hosted cache server or initiate discovery */
 	if ( peerhost ) {
@@ -609,6 +645,7 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 		/* Add hosted cache server to list of peers */
 		if ( ( rc = peerdisc_discovered ( segment, NULL,
 						  &peerdist_post,
+						  &peerstats.host,
 						  peerhost ) ) != 0 ) {
 			goto err_peerhost;
 		}
@@ -633,6 +670,7 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 			if ( socket->recent ) {
 				peerdisc_discovered ( segment, NULL,
 						      &peerdist_post,
+						      &peerstats.prev,
 						      socket->recent );
 			}
 		}
@@ -657,6 +695,23 @@ static struct peerdisc_segment * peerdisc_create ( const char *id ) {
  * @v segment		PeerDist discovery segment
  */
 static void peerdisc_destroy ( struct peerdisc_segment *segment ) {
+	struct peerdisc_socket *socket;
+	struct peerdisc_peer *peer;
+	unsigned int count;
+
+	/* Update statistics */
+	for_each_table_entry ( socket, PEERDISC_SOCKETS ) {
+		count = 0;
+		list_for_each_entry ( peer, &segment->peers, list ) {
+			if ( peer->socket == socket )
+				count++;
+		}
+		if ( count > peerstats.peers ) {
+			DBGC ( socket, "PEERDISC %s discovered %d peers\n",
+			       socket->name, count );
+			peerstats.peers = count;
+		}
+	}
 
 	/* Sanity check */
 	assert ( list_empty ( &segment->clients ) );

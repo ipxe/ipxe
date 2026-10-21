@@ -11,6 +11,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
 #include <stdint.h>
+#include <ipxe/in.h>
 #include <ipxe/refcnt.h>
 #include <ipxe/list.h>
 #include <ipxe/tables.h>
@@ -33,6 +34,8 @@ struct peerdisc_socket {
 	} address;
 	/** Most recently discovered peer via this socket (if any) */
 	char *recent;
+	/** Discovery statistics */
+	struct error_statistics stats;
 };
 
 /** PeerDist discovery socket table */
@@ -78,8 +81,12 @@ struct peerdisc_segment {
 struct peerdisc_peer {
 	/** List of peers */
 	struct list_head list;
+	/** Discovery socket (if any) */
+	struct peerdisc_socket *socket;
 	/** Retrieval protocol */
 	struct peerdist_retrieval *retrieval;
+	/** Statistics */
+	struct error_statistics *stats;
 	/** Peer location */
 	char location[0];
 };

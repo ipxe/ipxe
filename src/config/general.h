@@ -114,6 +114,7 @@ FILE_SECBOOT ( PERMITTED );
 #define NVO_CMD			/* Non-volatile option storage commands */
 #define PARAM_CMD		/* Request parameter commands */
 #define PCI_CMD			/* PCI commands */
+#define PEERMGMT_CMD		/* PeerDist management commands */
 //#define PING_CMD		/* Ping command */
 //#define PROFSTAT_CMD		/* Profiling commands */
 //#define PXE_CMD		/* PXE commands */

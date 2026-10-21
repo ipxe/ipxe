@@ -27,6 +27,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <stdio.h>
 #include <ipxe/http.h>
 #include <ipxe/settings.h>
+#include <ipxe/peerdist.h>
 #include <ipxe/peermux.h>
 
 /** @file
@@ -39,6 +40,9 @@ FILE_SECBOOT ( PERMITTED );
 
 /** PeerDist is globally enabled */
 static long peerdist_enabled = 1;
+
+/** PeerDist statistics */
+struct peerdist_statistics peerstats;
 
 /**
  * Check whether or not to support PeerDist encoding for this request
@@ -182,3 +186,9 @@ static int apply_peerdist_settings ( void ) {
 struct settings_applicator peerdist_applicator __settings_applicator = {
 	.apply = apply_peerdist_settings,
 };
+
+/* Drag in objects via content encoding */
+REQUIRING_SYMBOL ( peerdist_encoding );
+
+/* Drag in configuration */
+REQUIRE_OBJECT ( config_peerdist );
