@@ -361,9 +361,6 @@ static void peerblk_done ( struct peerdist_block *peerblk, int rc ) {
 	/* Profile successful attempt */
 	profile_custom ( success, ( now - peerblk->attempted ) );
 
-	/* Report peer statistics */
-	peerdisc_stat ( &peerblk->xfer, peer, &segment->peers );
-
 	/* Close download */
 	peerblk_close ( peerblk, 0 );
 	return;
