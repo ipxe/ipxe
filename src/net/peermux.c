@@ -80,6 +80,23 @@ static void peermux_close ( struct peerdist_multiplexer *peermux, int rc ) {
 }
 
 /**
+ * Report progress of PeerDist download
+ *
+ * @v peermux		PeerDist download multiplexer
+ * @v progress		Progress report to fill in
+ * @ret ongoing_rc	Ongoing job status code (if known)
+ */
+static int peermux_progress ( struct peerdist_multiplexer *peermux,
+			      struct job_progress *progress ) {
+
+	/* Report segment count as progress */
+	progress->total = peermux->cache.info.segments;
+	progress->completed = peermux->cache.segment.index;
+
+	return 0;
+}
+
+/**
  * Receive content information
  *
  * @v peermux		PeerDist download multiplexer
@@ -308,6 +325,8 @@ static void peermux_block_close ( struct peerdist_multiplexed_block *peermblk,
 
 /** Data transfer interface operations */
 static struct interface_operation peermux_xfer_operations[] = {
+	INTF_OP ( job_progress, struct peerdist_multiplexer *,
+		  peermux_progress ),
 	INTF_OP ( intf_close, struct peerdist_multiplexer *, peermux_close ),
 };
 
