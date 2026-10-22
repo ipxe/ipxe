@@ -238,10 +238,11 @@ static int peerdisc_socket_open ( void ) {
 /**
  * Attempt to transmit PeerDist discovery requests on all sockets
  *
- * @v uuid		Message UUID string
+ * @v msgid		Base message ID
  * @v id		Segment identifier string
  */
-static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
+static void peerdisc_socket_tx ( const union peerdisc_message_id *msgid,
+				 const char *id ) {
 	struct peerdisc_socket *socket;
 	struct net_device *netdev;
 	struct xfer_metadata meta;
@@ -249,19 +250,17 @@ static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
 		struct sockaddr sa;
 		struct sockaddr_tcpip st;
 	} address;
+	union uuid uuid;
 	char *request;
 	size_t len;
 	int rc;
 
-	/* Construct discovery request */
-	request = peerdist_discovery_request ( uuid, id );
-	if ( ! request )
-		goto err_request;
-	len = strlen ( request );
-
 	/* Initialise data transfer metadata */
 	memset ( &meta, 0, sizeof ( meta ) );
 	meta.dest = &address.sa;
+
+	/* Initialise message ID */
+	memcpy ( &uuid, &msgid->uuid, sizeof ( uuid ) );
 
 	/* Send message on each socket */
 	for_each_table_entry ( socket, PEERDISC_SOCKETS ) {
@@ -269,6 +268,16 @@ static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
 		/* Initialise socket address */
 		memcpy ( &address.sa, &socket->address.sa,
 			 sizeof ( address.sa ) );
+
+		/* Use unique message ID per address family */
+		uuid.canonical.e[5]++;
+
+		/* Construct discovery request */
+		request = peerdist_discovery_request ( uuid_ntoa ( &uuid ),
+						       id );
+		if ( ! request )
+			break;
+		len = strlen ( request );
 
 		/* Send message on each open network device */
 		for_each_netdev ( netdev ) {
@@ -294,11 +303,10 @@ static void peerdisc_socket_tx ( const char *uuid, const char *id ) {
 				continue;
 			}
 		}
-	}
 
-	free ( request );
- err_request:
-	return;
+		/* Free discovery request */
+		free ( request );
+	}
 }
 
 /**
@@ -570,7 +578,7 @@ static void peerdisc_expired ( struct retry_timer *timer, int over __unused ) {
 	/* Attempt to transmit discovery requests */
 	DBGC2 ( segment, "PEERDISC %p discovering %s\n",
 		segment, segment->id );
-	peerdisc_socket_tx ( segment->uuid, segment->id );
+	peerdisc_socket_tx ( &segment->msgid, segment->id );
 
 	/* Schedule next discovery attempt, if applicable */
 	if ( timer->count < PEERDISC_REPEAT_COUNT )
@@ -593,45 +601,31 @@ static void peerdisc_expired ( struct retry_timer *timer, int over __unused ) {
 static struct peerdisc_segment * peerdisc_create ( const char *id ) {
 	struct peerdisc_segment *segment;
 	struct peerdisc_socket *socket;
-	union {
-		union uuid uuid;
-		uint32_t dword[ sizeof ( union uuid ) / sizeof ( uint32_t ) ];
-	} random_uuid;
-	size_t uuid_len;
 	size_t id_len;
-	const char *uuid;
-	char *uuid_copy;
 	char *id_copy;
 	unsigned int i;
 	int rc;
 
-	/* Generate a random message UUID.  This does not require high
-	 * quality randomness.
-	 */
-	for ( i = 0 ; i < ( sizeof ( random_uuid.dword ) /
-			    sizeof ( random_uuid.dword[0] ) ) ; i++ )
-		random_uuid.dword[i] = random();
-	uuid = uuid_ntoa ( &random_uuid.uuid );
-
-	/* Calculate string lengths */
-	id_len = ( strlen ( id ) + 1 /* NUL */ );
-	uuid_len = ( strlen ( uuid ) + 1 /* NUL */ );
-
 	/* Allocate and initialise structure */
-	segment = zalloc ( sizeof ( *segment ) + id_len + uuid_len );
+	id_len = ( strlen ( id ) + 1 /* NUL */ );
+	segment = zalloc ( sizeof ( *segment ) + id_len );
 	if ( ! segment )
 		goto err_alloc;
 	id_copy = ( ( ( void * ) segment ) + sizeof ( *segment ) );
 	memcpy ( id_copy, id, id_len );
-	uuid_copy = ( ( ( void * ) id_copy ) + id_len );
-	memcpy ( uuid_copy, uuid, uuid_len );
 	ref_init ( &segment->refcnt, peerdisc_free );
 	segment->id = id_copy;
-	segment->uuid = uuid_copy;
 	segment->started = peerdisc_timestamp();
 	INIT_LIST_HEAD ( &segment->peers );
 	INIT_LIST_HEAD ( &segment->clients );
 	timer_init ( &segment->timer, peerdisc_expired, &segment->refcnt );
+
+	/* Generate a random message UUID.  This does not require high
+	 * quality randomness.
+	 */
+	for ( i = 0 ; i < ( sizeof ( segment->msgid.dword ) /
+			    sizeof ( segment->msgid.dword[0] ) ) ; i++ )
+		segment->msgid.dword[i] = random();
 
 	/* Add local cache directory, if any */
 	if ( peerpath ) {

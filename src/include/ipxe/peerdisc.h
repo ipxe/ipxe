@@ -18,6 +18,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/retry.h>
 #include <ipxe/socket.h>
 #include <ipxe/interface.h>
+#include <ipxe/uuid.h>
 #include <ipxe/pccrc.h>
 
 /** A PeerDist discovery socket */
@@ -44,6 +45,12 @@ struct peerdisc_socket {
 /** Declare a PeerDist discovery socket */
 #define __peerdisc_socket( pref ) __table_entry ( PEERDISC_SOCKETS, pref )
 
+/** A PeerDist base message UUID */
+union peerdisc_message_id {
+	union uuid uuid;
+	uint32_t dword[ sizeof ( union uuid ) / sizeof ( uint32_t ) ];
+};
+
 /** A PeerDist discovery segment */
 struct peerdisc_segment {
 	/** Reference count */
@@ -56,8 +63,8 @@ struct peerdisc_segment {
 	 * Base16-encoded string.
 	 */
 	const char *id;
-	/** Message UUID string */
-	const char *uuid;
+	/** Base message UUID */
+	union peerdisc_message_id msgid;
 	/** Time at which discovery was started */
 	unsigned long started;
 	/** Number of discovery replies received */
