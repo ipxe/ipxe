@@ -9,6 +9,7 @@ from hashlib import sha256
 from itertools import chain, groupby
 import logging
 import random
+from string import Template
 import sys
 import textwrap
 import time
@@ -18,8 +19,8 @@ import botocore.config
 import botocore.exceptions
 
 
-FEDORA_MIRROR = "http://www.mirrorservice.org/pub/fedora/linux/releases"
-FEDORA_VERSION = 44
+FEDORA_MIRROR = ("http://ipxe-${region}.s3.${region}.amazonaws.com/"
+                 "pub/fedora/linux/releases/44")
 POLL_INTERVAL_SEC = 5
 POLL_MAX_RETRIES = 100
 SUPPORTED_ARCHS = {'arm64', 'x86_64'}
@@ -108,7 +109,7 @@ def define_blob(bucket):
     return digest
 
 
-def define_userdata(bucket, name, typ, arch, blob, shell):
+def define_userdata(bucket, name, typ, arch, blob, mirror, shell):
     """Create user-data"""
     client = boto3.client('s3')
     region = client.head_bucket(Bucket=bucket)['BucketRegion']
@@ -135,8 +136,7 @@ def define_userdata(bucket, name, typ, arch, blob, shell):
     """).lstrip()
     datauri = 'data:;base64,%s' % b64encode(shellscript.encode()).decode()
     fedarch = {'arm64': 'aarch64'}.get(arch, arch)
-    fedora = ('%s/%s/Everything/%s/os/images/pxeboot' %
-              (FEDORA_MIRROR, FEDORA_VERSION, fedarch))
+    fedora = ('%s/Everything/%s/os/images/pxeboot' % (mirror, fedarch))
     ipxescript = textwrap.dedent(f"""
     #!ipxe
 
@@ -325,6 +325,8 @@ parser.add_argument('--region', '-r', action='append',
                     help="AWS region(s)")
 parser.add_argument('--bucket', '-b', default="ipxe-ci",
                     help="Upload test files and results to S3 bucket")
+parser.add_argument('--mirror', '-m', default=FEDORA_MIRROR,
+                    help="Fedora mirror (including version)")
 parser.add_argument('--shell', '-s', action='store_true',
                     help="Drop to iPXE shell on failure")
 parser.add_argument('type', nargs='+', help="Instance type(s)")
@@ -400,6 +402,7 @@ userdata = {
         typ=typ,
         arch=archs[typ],
         blob=blob,
+        mirror=Template(args.mirror).substitute(region=regions[typ]),
         shell=args.shell
     )
     for typ in args.type
