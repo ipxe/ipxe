@@ -58,6 +58,9 @@ FILE_SECBOOT ( PERMITTED );
 /** PXE selected menu entry */
 #define CPAIR_PXE 7
 
+/** Menu title text */
+#define CPAIR_TITLE 8
+
 /** @} */
 
 /** An ANSI colour pair definition */
