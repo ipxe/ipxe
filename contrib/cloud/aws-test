@@ -2,13 +2,12 @@
 
 import argparse
 from base64 import b64encode
+import configparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
-from hashlib import sha256
 from itertools import chain, groupby
 import logging
-import random
 from string import Template
 import sys
 import textwrap
@@ -17,10 +16,14 @@ import time
 import boto3
 import botocore.config
 import botocore.exceptions
+import requests
 
 
+FEDORA_UPSTREAM =  ("https://download.fedoraproject.org/"
+                    "pub/fedora/linux/releases")
 FEDORA_MIRROR = ("http://ipxe-${region}.s3.${region}.amazonaws.com/"
-                 "pub/fedora/linux/releases/44")
+                 "pub/fedora/linux/releases")
+FEDORA_VERSION = '44'
 POLL_INTERVAL_SEC = 5
 POLL_MAX_RETRIES = 100
 SUPPORTED_ARCHS = {'arm64', 'x86_64'}
@@ -91,25 +94,18 @@ def find_images(types, region, family, commit, image_ids):
     return result
 
 
-def define_blob(bucket):
-    """Create pseudorandom data test file"""
-    client = boto3.client('s3')
-    body = random.Random(42).randbytes(1024 * 1024)
-    digest = sha256(body).hexdigest()
-    key = 'test/1mb/%s' % digest
-    try:
-        client.head_object(Bucket=bucket, Key=key)
-        logger.info("test file %s/%s", bucket, key)
-        return digest
-    except botocore.exceptions.ClientError as exc:
-        if exc.response['Error']['Code'] != '404':
-            raise
-    client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch='*')
-    logger.info("create test file %s/%s", bucket, key)
-    return digest
+def fetch_treeinfo(version, arch):
+    """Fetch Fedora .treeinfo file"""
+    fedarch = {'arm64': 'aarch64'}.get(arch, arch)
+    req = requests.get("%s/%s/Everything/%s/os/.treeinfo" %
+                       (FEDORA_UPSTREAM, version, fedarch))
+    req.raise_for_status()
+    cfg = configparser.ConfigParser()
+    cfg.read_string(req.text)
+    return cfg
 
 
-def define_userdata(bucket, name, typ, arch, blob, mirror, shell):
+def define_userdata(bucket, name, typ, treeinfo, mirror, shell):
     """Create user-data"""
     client = boto3.client('s3')
     region = client.head_bucket(Bucket=bucket)['BucketRegion']
@@ -118,7 +114,6 @@ def define_userdata(bucket, name, typ, arch, blob, mirror, shell):
         signature_version='s3v4',
     )
     client = boto3.client('s3', region_name=region, config=config)
-    public = f"http://{bucket}.s3.{region}.amazonaws.com/test"
     urls = {
         k: client.generate_presigned_url(
             'put_object',
@@ -135,8 +130,12 @@ def define_userdata(bucket, name, typ, arch, blob, mirror, shell):
     poweroff -f
     """).lstrip()
     datauri = 'data:;base64,%s' % b64encode(shellscript.encode()).decode()
-    fedarch = {'arm64': 'aarch64'}.get(arch, arch)
-    fedora = ('%s/Everything/%s/os/images/pxeboot' % (mirror, fedarch))
+    fedora = '%s/%s/Everything/%s/os/images/pxeboot' % (
+        mirror,
+        treeinfo['release']['version'],
+        treeinfo['tree']['arch'],
+    )
+    (alg, cksum) = treeinfo['checksums']['images/pxeboot/vmlinuz'].split(':')
     ipxescript = textwrap.dedent(f"""
     #!ipxe
 
@@ -153,9 +152,9 @@ def define_userdata(bucket, name, typ, arch, blob, mirror, shell):
 
     # Single download test
     echo Test download
-    set expected:hexraw {blob}
-    imgfetch -n 1mb {public}/1mb/{blob} || goto fail
-    sha256sum --set actual 1mb
+    set expected:hexraw {cksum}
+    imgfetch {fedora}/vmlinuz || goto fail
+    {alg}sum --set actual vmlinuz
     imgfree
     iseq ${{expected}} ${{actual}} || goto fail
     params --method PUT
@@ -169,8 +168,8 @@ def define_userdata(bucket, name, typ, arch, blob, mirror, shell):
     echo Test cycle iteration ${{count}}
     ifclose
     ifopen || goto fail
-    imgfetch -n 1mb {public}/1mb/{blob} || goto fail
-    sha256sum --set actual${{cycle}} 1mb
+    imgfetch {fedora}/vmlinuz || goto fail
+    {alg}sum --set actual${{cycle}} vmlinuz
     imgfree
     iseq ${{expected}} ${{actual${{cycle}}}} || goto fail
     iseq ${{count}} 10 || goto cycle
@@ -326,7 +325,9 @@ parser.add_argument('--region', '-r', action='append',
 parser.add_argument('--bucket', '-b', default="ipxe-ci",
                     help="Upload test files and results to S3 bucket")
 parser.add_argument('--mirror', '-m', default=FEDORA_MIRROR,
-                    help="Fedora mirror (including version)")
+                    help="Fedora mirror (excluding version)")
+parser.add_argument('--fedver', default=FEDORA_VERSION,
+                    help="Fedora version")
 parser.add_argument('--shell', '-s', action='store_true',
                     help="Drop to iPXE shell on failure")
 parser.add_argument('type', nargs='+', help="Instance type(s)")
@@ -390,9 +391,16 @@ archs = {
     typ: cpu_arch(types[regions[typ]][typ])
     for typ in args.type
 }
+archvals = set(archs.values())
 
-# Create pseudorandom test file
-blob = define_blob(args.bucket)
+# Fetch Fedora treeinfo for each architecture
+with ThreadPoolExecutor(max_workers=len(archvals)) as executor:
+    futures = {executor.submit(fetch_treeinfo,
+                               version=args.fedver,
+                               arch=arch): arch
+               for arch in archvals}
+    treeinfos = {futures[future]: future.result()
+                 for future in as_completed(futures)}
 
 # Construct userdata
 userdata = {
@@ -400,8 +408,7 @@ userdata = {
         bucket=args.bucket,
         name=args.name,
         typ=typ,
-        arch=archs[typ],
-        blob=blob,
+        treeinfo=treeinfos[archs[typ]],
         mirror=Template(args.mirror).substitute(region=regions[typ]),
         shell=args.shell
     )
