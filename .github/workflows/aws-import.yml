@@ -107,3 +107,78 @@ jobs:
           if-no-files-found: error
           path: |
             src/${{ env.amilist }}
+
+  types:
+    name: Type coverage
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-cloud
+    env:
+      types: ${{ join ( fromJson ( vars.AWS_TEST ).*.type, ' ' ) }}
+    environment: aws-import
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Log in
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Check type coverage
+        working-directory: src
+        run: |
+          ../contrib/cloud/aws-types ${{ env.types }}
+
+  test:
+    name: >-
+      Test / ${{ matrix.type }}${{ ''
+      }}${{ contains ( fromJson ( vars.AWS_SKIP ).*.type, matrix.type ) &&
+      ' (skipped)' || '' }}
+    runs-on: ubuntu-latest
+    needs:
+      - import
+      - types
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson ( vars.AWS_TEST ) }}
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-cloud
+    env:
+      family: >-
+        ${{ github.ref == 'refs/heads/awstest' && 'ipxetest' || 'iPXE' }}
+      testname: >-
+        gh-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.type }}
+    environment: aws-import
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Log in
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Test
+        if: >-
+          ${{ ! contains ( fromJson ( vars.AWS_SKIP ).*.type, matrix.type ) }}
+        working-directory: src
+        run: |
+          ../contrib/cloud/aws-test \
+              --verbose \
+              --name ${{ env.testname }} \
+              --family ${{ env.family }} \
+              --commit ${{ github.sha }} \
+              --region ${{ matrix.region }} \
+              ${{ matrix.type }}
