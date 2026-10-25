@@ -110,30 +110,10 @@ jobs:
 
   types:
     name: Type coverage
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/ipxe/ipxe-builder-cloud
-    env:
-      types: ${{ join ( fromJson ( vars.AWS_TEST ).*.type, ' ' ) }}
-    environment: aws-import
+    uses: ./.github/workflows/aws-types.yml
     permissions:
       id-token: write
       contents: read
-    steps:
-
-      - name: Check out code
-        uses: actions/checkout@v6
-
-      - name: Log in
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Check type coverage
-        working-directory: src
-        run: |
-          ../contrib/cloud/aws-types ${{ env.types }}
 
   test:
     name: >-
