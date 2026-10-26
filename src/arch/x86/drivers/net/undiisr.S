@@ -56,7 +56,7 @@ undiisr:
 	cmpw	$PXENV_UNDI_ISR_OUT_OURS, funcflag
 	jne	eoi
 	
-trig:	/* Record interrupt occurence */
+trig:	/* Record interrupt occurrence */
 	incb	undiisr_trigger_count
 
 eoi:	/* Send EOI */
