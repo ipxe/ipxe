@@ -87,6 +87,8 @@ struct nfs_lookup_reply {
 	enum nfs_attr_type   ent_type;
 	/** File handle */
 	struct nfs_fh        fh;
+	/** File Size */
+	uint64_t             size;
 };
 
 /**
