@@ -172,6 +172,12 @@ static struct setting test_uristring_setting = {
 	.type = &setting_type_uristring,
 };
 
+/** Test URI base setting */
+static struct setting test_uribase_setting = {
+	.name = "test_uribase",
+	.type = &setting_type_uribase,
+};
+
 /** Test IPv4 address setting type */
 static struct setting test_ipv4_setting = {
 	.name = "test_ipv4",
@@ -286,6 +292,13 @@ static void settings_test_exec ( void ) {
 	fetchf_ok ( &test_settings, &test_uristring_setting,
 		    RAW ( 0, ' ', '%', '/', '#', ':', '@', '?', '=', '&' ),
 		    "%00%20%25%2F%23%3A%40%3F%3D%26" );
+
+        /* "uribase" setting type (no store capability) */
+	fetchf_ok ( &test_settings, &test_uribase_setting,
+		    RAW ( 'h', 't', 't', 'p', ':', '/', '/', 's', 'o', 'm', 'e',
+                          '.', 's', 'e', 'r', 'v', 'e', 'r', ':', '1', '2', '3',
+                          '4', '/', 'p', 'a', 't', 'h', '?', 'q', '#', 'f'),
+                    "http://some.server:1234" );
 
 	/* "ipv4" setting type */
 	storef_ok ( &test_settings, &test_ipv4_setting, "192.168.0.1",
