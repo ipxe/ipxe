@@ -389,9 +389,6 @@ static void free_tls_session ( struct refcnt *refcnt ) {
 	/* Sanity check */
 	assert ( list_empty ( &session->conn ) );
 
-	/* Remove from list of sessions */
-	list_del ( &session->list );
-
 	/* Clear pre-shared identity */
 	channel_clear_preshared ( &session->psid );
 
@@ -1751,13 +1748,16 @@ static int tls_session ( struct tls_connection *tls, const char *name ) {
 	session->root = x509_root_get ( tls->server.root );
 	session->key = privkey_get ( tls->client.key );
 	INIT_LIST_HEAD ( &session->conn );
-	list_add ( &session->list, &tls_sessions );
 
 	/* Generate random initial session ID */
 	tls->session = session;
 	tls_set_session_id ( tls );
 	DBGC ( tls, "TLS %p created session %s:\n", tls, name );
 	DBGC_HDA ( tls, 0, session->id.data, session->id.len );
+
+	/* Add to session cache */
+	ref_get ( &session->refcnt );
+	list_add ( &session->list, &tls_sessions );
 
 	return 0;
 
@@ -1838,6 +1838,39 @@ static int tls_resume ( struct tls_connection *tls ) {
 
 	return 0;
 }
+
+/**
+ * Discard a cached session
+ *
+ * @ret discarded	Number of cached items discarded
+ */
+static unsigned int tls_discard ( void ) {
+	struct tls_session *session;
+
+	/* Discard any session for which the only reference is held by
+	 * the cache itself.
+	 */
+	list_for_each_entry ( session, &tls_sessions, list ) {
+
+		/* Skip sessions for which another reference is held */
+		if ( session->refcnt.count > 0 )
+			continue;
+
+		/* Discard session */
+		DBGC ( &tls_sessions, "TLS discarding session %s\n",
+		       session->name );
+		list_del ( &session->list );
+		ref_put ( &session->refcnt );
+		return 1;
+	}
+
+	return 0;
+}
+
+/** Session cache discarder */
+struct cache_discarder tls_discarder __cache_discarder ( CACHE_NORMAL ) = {
+	.discard = tls_discard,
+};
 
 /******************************************************************************
  *
