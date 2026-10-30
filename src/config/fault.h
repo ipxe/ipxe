@@ -18,6 +18,9 @@ FILE_SECBOOT ( PERMITTED );
 /* Delay transmissions to neighbour-resolved destinations (in ms) */
 #define NEIGHBOUR_DELAY_MS 0
 
+/* Fail to keep alive every N reusable HTTP connections */
+#define HTTP_FAIL_KEEPALIVE_RATE 0
+
 /* Drop every N transmitted or received PeerDist discovery packets */
 #define PEERDISC_DISCARD_RATE 0
 

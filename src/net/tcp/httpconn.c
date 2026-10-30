@@ -42,6 +42,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
 #include <ipxe/pool.h>
+#include <ipxe/fault.h>
 #include <ipxe/http.h>
 
 /** HTTP pooled connection expiry time */
@@ -185,7 +186,8 @@ static void http_conn_xfer_close ( struct http_connection *conn, int rc ) {
 	/* Add to the connection pool if keepalive is enabled and no
 	 * error occurred.
 	 */
-	if ( ( rc == 0 ) && pool_is_recyclable ( &conn->pool ) ) {
+	if ( ( rc == 0 ) && pool_is_recyclable ( &conn->pool ) &&
+	     ( ( rc = inject_fault ( HTTP_FAIL_KEEPALIVE_RATE ) ) == 0 ) ) {
 		intf_restart ( &conn->xfer, rc );
 		pool_add ( &conn->pool, &http_connection_pool,
 			   HTTP_CONN_EXPIRY );
