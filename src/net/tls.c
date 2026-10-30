@@ -39,6 +39,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
+#include <ipxe/timer.h>
 #include <ipxe/x509.h>
 #include <ipxe/privkey.h>
 #include <ipxe/certstore.h>
@@ -415,6 +416,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 
 	/* Free dynamically-allocated resources */
 	zfree ( tls->new_ticket.data );
+	zfree ( tls->new_nonce.data );
 	tls_clear_digest ( tls );
 	zfree ( tls->verify.dynamic );
 	zfree ( tls->cookie.data );
@@ -1586,6 +1588,7 @@ static int tls_channel_save ( struct secure_channel *channel,
 		container_of ( channel, struct tls_connection, channel );
 	struct tls_session *session =
 		container_of ( psid, struct tls_session, psid );
+	struct tls_cursor *nonce = &tls->new_nonce;
 	int rc;
 
 	/* We support saving pre-shared keys only once the secure
@@ -1600,7 +1603,7 @@ static int tls_channel_save ( struct secure_channel *channel,
 	}
 
 	/* Save key material */
-	if ( ( rc = tlskey_save ( &tls->key, NULL, 0,
+	if ( ( rc = tlskey_save ( &tls->key, nonce->data, nonce->len,
 				  &session->psk ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not save key material: %s\n",
 		       tls, strerror ( rc ) );
@@ -1811,6 +1814,14 @@ static int tls_save ( struct tls_connection *tls ) {
 		DBGC_HDA ( tls, 0, session->ticket.data,
 			   session->ticket.len );
 	}
+
+	/* Record new session ticket age addend */
+	session->age_add = tls->new_age_add;
+
+	/* Consume new session nonce, if provided */
+	zfree ( tls->new_nonce.data );
+	tls->new_nonce.data = NULL;
+	tls->new_nonce.len = 0;
 
 	return 0;
 }
@@ -2918,6 +2929,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 static int tls_new_session_ticket ( struct tls_connection *tls,
 				    const struct tls_cursor *cursor ) {
 	struct tls_new_session_ticket ticket;
+	unsigned long now;
 	int rc;
 
 	/* Parse NewSessionTicket structure */
@@ -2928,16 +2940,23 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
 		return rc;
 	}
 
-	/* Ignore as-yet unsupported session tickets */
-	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
-		DBGC ( tls, "TLS %p ignoring unsupported New Session Ticket\n",
-		       tls );
-		return 0;
-	}
+	/* Record age addend */
+	now = ( currticks() / TICKS_PER_MS );
+	tls->new_age_add = ( ticket.age ? ( *ticket.age - now ) : 0 );
+
+	/* Record nonce */
+	if ( ( rc = tls_copy ( &ticket.nonce, &tls->new_nonce ) ) != 0 )
+		return rc;
 
 	/* Record ticket */
 	if ( ( rc = tls_copy ( &ticket.ticket, &tls->new_ticket ) ) != 0 )
 		return rc;
+
+	/* Apply immediately, if applicable */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
+	     ( tls->new_ticket.len != 0 ) && tls_ready ( tls ) ) {
+		tls_save ( tls );
+	}
 
 	return 0;
 }

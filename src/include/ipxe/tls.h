@@ -407,6 +407,8 @@ struct tls_session {
 	struct tls_session_id id;
 	/** Session ticket */
 	struct tls_cursor ticket;
+	/** Session ticket age addend */
+	uint32_t age_add;
 
 	/** List of connections */
 	struct list_head conn;
@@ -487,6 +489,10 @@ struct tls_connection {
 	struct tls_session_id new_id;
 	/** New session ticket (if any) */
 	struct tls_cursor new_ticket;
+	/** New session nonce (if any) */
+	struct tls_cursor new_nonce;
+	/** New session ticket age addend */
+	uint32_t new_age_add;
 
 	/** Plaintext stream */
 	struct interface plainstream;
