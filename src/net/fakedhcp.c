@@ -137,6 +137,8 @@ int create_fakedhcpdiscover ( struct net_device *netdev,
 int create_fakedhcpack ( struct net_device *netdev,
 			 void *data, size_t max_len ) {
 	struct dhcp_packet dhcppkt;
+	struct settings *origin;
+	struct in_addr next_server;
 	int rc;
 
 	/* Create base DHCPACK packet */
@@ -161,6 +163,28 @@ int create_fakedhcpack ( struct net_device *netdev,
 		DBG ( "Could not set DHCPACK netdev settings: %s\n",
 		      strerror ( rc ) );
 		return rc;
+	}
+
+	/* Use the next-server from the same settings block as the
+	 * filename, as fetch_next_server_and_filename() does.  The
+	 * merge above may otherwise pair a ProxyDHCP-supplied filename
+	 * with the siaddr from the DHCP server's own DHCPACK (dnsmasq,
+	 * for example, always fills in siaddr), and an NBP that uses
+	 * only DhcpAck (such as shim) would then fetch its next stage
+	 * from the wrong server.
+	 */
+	if ( fetch_setting ( NULL, &filename_setting, &origin, NULL,
+			     NULL, 0 ) >= 0 ) {
+		if ( fetch_ipv4_setting ( origin, &next_server_setting,
+					  &next_server ) >= 0 ) {
+			if ( ( rc = dhcppkt_store ( &dhcppkt, DHCP_EB_SIADDR,
+						    &next_server,
+						    sizeof ( next_server ) ) ) != 0 ) {
+				DBG ( "Could not set DHCPACK siaddr: %s\n",
+				      strerror ( rc ) );
+				return rc;
+			}
+		}
 	}
 
 	return 0;
