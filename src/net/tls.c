@@ -2838,7 +2838,9 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	}
 
 	/* Handle extended master secret */
-	tls->extended_master_secret = ( !! hello.ext.ems.data );
+	tls->extended_master_secret =
+		( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ||
+		  ( !! hello.ext.ems.data ) );
 
 	/* Check session ID */
 	if ( hello.session_id.len &&
@@ -3234,6 +3236,7 @@ static int tls_new_server_hello_done ( struct tls_connection *tls,
  */
 static int tls_new_finished ( struct tls_connection *tls,
 			      const struct tls_cursor *cursor ) {
+	int ems = tls->extended_master_secret;
 	int rc;
 
 	/* Confirm peer identity */
@@ -3251,7 +3254,7 @@ static int tls_new_finished ( struct tls_connection *tls,
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
 
 		/* Generate master secret */
-		if ( ( rc = tlskey_master ( &tls->key, 1 ) ) != 0 ) {
+		if ( ( rc = tlskey_master ( &tls->key, ems ) ) != 0 ) {
 			DBGC ( tls, "TLS %p could not generate master secret: "
 			       "%s\n", tls, strerror ( rc ) );
 			return rc;
