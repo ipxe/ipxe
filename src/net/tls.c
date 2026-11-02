@@ -39,6 +39,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/iobuf.h>
 #include <ipxe/xfer.h>
 #include <ipxe/open.h>
+#include <ipxe/timer.h>
 #include <ipxe/x509.h>
 #include <ipxe/privkey.h>
 #include <ipxe/certstore.h>
@@ -194,6 +195,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EPROTO_RETRY						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x05,				\
 			  "Illegal retry request" )
+#define EPROTO_PSK __einfo_error ( EINFO_EPROTO_PSK )
+#define EINFO_EPROTO_PSK						\
+	__einfo_uniqify ( EINFO_EPROTO, 0x06,				\
+			  "Invalid selected pre-shared key" )
 
 /* Avoid dragging in RSA support unconditionally */
 struct pubkey_algorithm rsa_algorithm __attribute__ (( weak ));
@@ -415,6 +420,7 @@ static void free_tls ( struct refcnt *refcnt ) {
 
 	/* Free dynamically-allocated resources */
 	zfree ( tls->new_ticket.data );
+	zfree ( tls->new_nonce.data );
 	tls_clear_digest ( tls );
 	zfree ( tls->verify.dynamic );
 	zfree ( tls->cookie.data );
@@ -1586,6 +1592,7 @@ static int tls_channel_save ( struct secure_channel *channel,
 		container_of ( channel, struct tls_connection, channel );
 	struct tls_session *session =
 		container_of ( psid, struct tls_session, psid );
+	struct tls_cursor *nonce = &tls->new_nonce;
 	int rc;
 
 	/* We support saving pre-shared keys only once the secure
@@ -1600,7 +1607,7 @@ static int tls_channel_save ( struct secure_channel *channel,
 	}
 
 	/* Save key material */
-	if ( ( rc = tlskey_save ( &tls->key, NULL, 0,
+	if ( ( rc = tlskey_save ( &tls->key, nonce->data, nonce->len,
 				  &session->psk ) ) != 0 ) {
 		DBGC ( tls, "TLS %p could not save key material: %s\n",
 		       tls, strerror ( rc ) );
@@ -1811,6 +1818,17 @@ static int tls_save ( struct tls_connection *tls ) {
 		DBGC_HDA ( tls, 0, session->ticket.data,
 			   session->ticket.len );
 	}
+
+	/* Record creation time */
+	session->created = currticks();
+
+	/* Record new session ticket age addend */
+	session->age = tls->new_age;
+
+	/* Consume new session nonce, if provided */
+	zfree ( tls->new_nonce.data );
+	tls->new_nonce.data = NULL;
+	tls->new_nonce.len = 0;
 
 	return 0;
 }
@@ -2046,21 +2064,29 @@ static int tls_client_hello ( struct tls_connection *tls,
 	struct tls_named_group *group;
 	struct {
 		struct tls_client_hello hello;
+		struct tls_psk_binder_entry binder;
 		struct tls_named_group_list groups;
+		struct tls_psk_identity identity;
 		struct tls_key_share_entry key;
 		struct tls_key_share_client_hello keys;
 		struct tls_server_name name;
 		struct tls_server_name_list names;
+		struct tls_offered_psks psks;
+		struct tls_psk_key_exchange_modes pskmodes;
 		struct tls_renegotiation_info reneg;
 		struct tls_signature_scheme_list sigs;
 		struct tls_supported_versions supvers;
 	} s;
 	struct tls_client_hello *hello = &s.hello;
+	struct tls_psk_binder_entry *binder = &s.binder;
 	struct tls_named_group_list *groups = &s.groups;
+	struct tls_psk_identity *identity = &s.identity;
 	struct tls_key_share_entry *key = &s.key;
 	struct tls_key_share_client_hello *keys = &s.keys;
 	struct tls_server_name *name = &s.name;
 	struct tls_server_name_list *names = &s.names;
+	struct tls_offered_psks *psks = &s.psks;
+	struct tls_psk_key_exchange_modes *pskmodes = &s.pskmodes;
 	struct tls_renegotiation_info *reneg = &s.reneg;
 	struct tls_signature_scheme_list *sigs = &s.sigs;
 	struct tls_supported_versions *supvers = &s.supvers;
@@ -2069,8 +2095,11 @@ static int tls_client_hello ( struct tls_connection *tls,
 	struct io_buffer *iobuf;
 	uint16_t *code;
 	uint8_t *compression;
+	uint8_t *pskmode;
 	uint8_t *frag;
 	uint8_t empty[0];
+	size_t bind_len;
+	unsigned long elapsed;
 	unsigned int version;
 	unsigned int i;
 	int rc;
@@ -2099,6 +2128,11 @@ static int tls_client_hello ( struct tls_connection *tls,
 	if ( ! groups->list.len )
 		ext->groups.len = 0;
 
+	/* Prepare PskKeyExchangeModes extension */
+	pskmodes->list.len = sizeof ( *pskmode );
+	tls_size ( tls_psk_key_exchange_modes, version, pskmodes,
+		   &ext->pskmodes );
+
 	/* Prepare ExtendedMasterSecret extension */
 	ext->ems.data = empty;
 
@@ -2121,6 +2155,18 @@ static int tls_client_hello ( struct tls_connection *tls,
 	ext->ticket.len = session->ticket.len;
 	if ( ! session->ticket.len )
 		ext->ticket.data = empty;
+
+	/* Prepare PreSharedKey extension */
+	if ( session->psk.binder_len ) {
+		identity->identity.data = session->ticket.data;
+		identity->identity.len = session->ticket.len;
+		tls_size ( tls_psk_identity, version, identity,
+			   &psks->identities );
+		binder->binder.len = session->psk.binder_len;
+		tls_size ( tls_psk_binder_entry, version, binder,
+			   &psks->binders );
+		tls_size ( tls_offered_psks, version, psks, &ext->psks );
+	}
 
 	/* Prepare KeyShareClientHello extension */
 	key->group = &tls->group->code;
@@ -2185,12 +2231,23 @@ static int tls_client_hello ( struct tls_connection *tls,
 		assert ( i == TLS_NUM_NAMED_GROUPS );
 	}
 
+	/* Build PskKeyExchangeModes extension  */
+	tls_build ( tls_psk_key_exchange_modes, version, pskmodes,
+		    &ext->pskmodes );
+	pskmode = pskmodes->list.data;
+	*pskmode = TLS_PSK_MODE_DHE_KE;
+
 	/* Build MaxFragmentLength extension */
 	frag = ext->frag.data;
 	*frag = TLS_MAX_FRAGMENT_LENGTH_VALUE;
 
 	/* Build RenegotiationInfo extension */
 	tls_build ( tls_renegotiation_info, version, reneg, &ext->reneg );
+
+	/* Build PreSharedKey extension */
+	tls_build ( tls_offered_psks, version, psks, &ext->psks );
+	tls_build ( tls_psk_identity, version, identity, &psks->identities );
+	tls_build ( tls_psk_binder_entry, version, binder, &psks->binders );
 
 	/* Build KeyShareClientHello extension */
 	tls_build ( tls_key_share_client_hello, version, keys, &ext->keys );
@@ -2202,10 +2259,26 @@ static int tls_client_hello ( struct tls_connection *tls,
 		}
 	}
 
+	/* Calculate pre-shared key binder, if applicable */
+	if ( binder->binder.len ) {
+		elapsed = ( tls->started - session->created );
+		*identity->age = htonl ( session->age +
+					 ( elapsed / TICKS_PER_MS ) );
+		bind_len = ( ( psks->identities.data - iobuf->data ) +
+			     psks->identities.len );
+		if ( ( rc = tlskey_bind ( &session->psk, iobuf->data, bind_len,
+					  binder->binder.data ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not bind pre-shared key: "
+			       "%s\n", tls, strerror ( rc ) );
+			goto err_bind;
+		}
+	}
+
 	/* Transmit (or digest) record */
 	if ( ( rc = action ( tls, iob_disown ( iobuf ) ) ) != 0 )
 		goto err_action;
 
+ err_bind:
  err_action:
  err_key:
 	free_iob ( iobuf );
@@ -2738,6 +2811,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	struct tls_server_hello hello;
 	struct tls_renegotiation_info reneg;
 	struct tls_supported_version supver;
+	struct tls_pre_shared_key_extension psk;
 	union tls_key_share_server key;
 	union tls_server_random *random;
 	const uint8_t *key_map;
@@ -2773,7 +2847,7 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		return rc;
 	}
 
-	/* Parse KeyShareEntry, if present */
+	/* Parse KeyShareEntry structure, if present */
 	retry = ( memcmp ( random, &tls_hrr_magic,
 			   sizeof ( *random ) ) == 0 );
 	key_map = ( retry ? tls_key_share_hello_retry_request_map :
@@ -2784,6 +2858,19 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 		       tls, ( retry ? "HelloRetryRequest" : "ServerHello" ),
 		       strerror ( rc ) );
 		return rc;
+	}
+
+	/* Parse PreSharedKey structure, if present */
+	if ( ( rc = tls_parse_opt ( tls_pre_shared_key_extension, tls->version,
+				    &hello.ext.psk, &psk ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not parse PreSharedKey: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+	if ( psk.selected && ( *psk.selected != 0 ) ) {
+		DBGC ( tls, "TLS %p invalid selected identity %d\n",
+		       tls, ntohs ( *psk.selected ) );
+		return -EPROTO_PSK;
 	}
 
 	/* Refuse repeated retries */
@@ -2848,10 +2935,11 @@ static int tls_new_server_hello ( struct tls_connection *tls,
 	     ( memcmp ( hello.session_id.data, session->id.data,
 			hello.session_id.len ) == 0 ) ) {
 
-		/* Session ID match: resume session for TLSv1.2 or earlier */
-		if ( ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) &&
-		     ( rc = tls_resume ( tls ) ) != 0 ) {
-			return rc;
+		/* Session ID match: resume session if applicable */
+		if ( psk.selected ||
+		     ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) ) {
+			if ( ( rc = tls_resume ( tls ) ) != 0 )
+				return rc;
 		}
 
 	} else {
@@ -2932,16 +3020,22 @@ static int tls_new_session_ticket ( struct tls_connection *tls,
 		return rc;
 	}
 
-	/* Ignore as-yet unsupported session tickets */
-	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
-		DBGC ( tls, "TLS %p ignoring unsupported New Session Ticket\n",
-		       tls );
-		return 0;
-	}
+	/* Record age addend */
+	tls->new_age = ( ticket.age ? ntohl ( *ticket.age ) : 0 );
+
+	/* Record nonce */
+	if ( ( rc = tls_copy ( &ticket.nonce, &tls->new_nonce ) ) != 0 )
+		return rc;
 
 	/* Record ticket */
 	if ( ( rc = tls_copy ( &ticket.ticket, &tls->new_ticket ) ) != 0 )
 		return rc;
+
+	/* Apply immediately, if applicable */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
+	     ( tls->new_ticket.len != 0 ) && tls_ready ( tls ) ) {
+		tls_save ( tls );
+	}
 
 	return 0;
 }
@@ -4688,6 +4782,7 @@ int add_tls ( struct interface *xfer, const char *name,
 	tls->legacy_version = TLS_LEGACY_VERSION_MAX;
 	tls->suite = &tls_cipher_suite_null;
 	tls->group = table_start ( TLS_NAMED_GROUPS );
+	tls->started = currticks();
 	channel_init ( &tls->channel, &tls_channel_ops );
 	tls_clear_digest ( tls );
 	tls->tx.cipherspec.suite = &tls_cipher_suite_null;

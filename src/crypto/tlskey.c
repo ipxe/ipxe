@@ -917,11 +917,10 @@ int tlskey_load ( struct tls_key_schedule *tlskey, int ems,
  * @v prefix		ClientHello prefix
  * @v prefix_len	Length of ClientHello prefix
  * @v binder		Binder value to fill in
- * @v binder_len	Length of binder value
  * @ret rc		Return status code
  */
 int tlskey_bind ( const struct tls_preshared_key *psk, const void *prefix,
-		  size_t prefix_len, void *binder, size_t binder_len ) {
+		  size_t prefix_len, void *binder ) {
 	const struct tls_key_schedule_operations *op = psk->op;
 	struct digest_algorithm *digest = psk->digest;
 	int rc;
@@ -941,10 +940,10 @@ int tlskey_bind ( const struct tls_preshared_key *psk, const void *prefix,
 		/* Generate binder value */
 		DBGC2 ( psk, "TLSKEY %p generating key binder:\n", psk );
 		DBGC2_HDA ( psk, 0, &psk->key, sizeof ( psk->key ) );
-		if ( ( rc = op->bind ( psk, out, binder, binder_len ) ) != 0 )
+		if ( ( rc = op->bind ( psk, out, binder ) ) != 0 )
 			return rc;
 		DBGC ( psk, "TLSKEY %p generated key binder:\n", psk );
-		DBGC_HDA ( psk, 0, binder, binder_len );
+		DBGC_HDA ( psk, 0, binder, psk->binder_len );
 
 		return 0;
 	}
@@ -1326,6 +1325,9 @@ static int tlskey_hkdf_save ( struct tls_key_schedule *tlskey,
 	tlskey_expand ( tlskey, tmp.master, "resumption", nonce, nonce_len,
 			psk->key.resumption, digestsize );
 
+	/* Set binder length */
+	psk->binder_len = digestsize;
+
 	/* Clear temporary secrets */
 	memset ( &tmp, 0, sizeof ( tmp ) );
 
@@ -1363,12 +1365,10 @@ static int tlskey_hkdf_load ( struct tls_key_schedule *tlskey,
  * @v psk		Pre-shared key
  * @v hash		Partial transcript hash
  * @v binder		Binder value to fill in
- * @v binder_len	Length of binder value
  * @ret rc		Return status code
  */
 static int tlskey_hkdf_bind ( const struct tls_preshared_key *psk,
-			      const void *hash, void *binder,
-			      size_t binder_len ) {
+			      const void *hash, void *binder ) {
 	struct digest_algorithm *digest = psk->digest;
 	size_t digestsize = digest->digestsize;
 	uint8_t empty[digestsize];
@@ -1377,7 +1377,7 @@ static int tlskey_hkdf_bind ( const struct tls_preshared_key *psk,
 	} tmp;
 
 	/* Binder value must be a complete digest output */
-	if ( binder_len != digestsize )
+	if ( psk->binder_len != digestsize )
 		return -EINVAL;
 
 	/* Extract temporary copy of early secret */
@@ -1395,7 +1395,7 @@ static int tlskey_hkdf_bind ( const struct tls_preshared_key *psk,
 	/* Generate binder */
 	tlskey_hkdf_finished ( digest, tmp.key, hash, binder );
 	DBGC2 ( psk, "TLSKEY %p binder:\n", psk );
-	DBGC2_HDA ( psk, 0, binder, binder_len );
+	DBGC2_HDA ( psk, 0, binder, psk->binder_len );
 
 	/* Clear temporary secrets */
 	memset ( &tmp, 0, sizeof ( tmp ) );
@@ -1853,12 +1853,12 @@ static int tlskey_hash_load ( struct tls_key_schedule *tlskey,
  * @v binder_len	Length of binder value
  * @ret rc		Return status code
  */
-static int tlskey_hash_bind ( const struct tls_preshared_key *psk __unused,
+static int tlskey_hash_bind ( const struct tls_preshared_key *psk,
 			      const void *hash __unused,
-			      void *binder __unused, size_t binder_len ) {
+			      void *binder __unused ) {
 
 	/* Binder values are not supported */
-	if ( binder_len )
+	if ( psk->binder_len )
 		return -ENOTSUP;
 
 	return 0;

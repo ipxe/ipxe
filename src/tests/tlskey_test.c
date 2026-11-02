@@ -1118,7 +1118,7 @@ static void rfc8448_resumed_test ( struct tls_key_schedule *tlskey,
 	/* ClientHello */
 	ok ( tlskey_bind ( psk, rfc8448_resumed_clienthello,
 			   rfc8448_resumed_clienthello_prefix_len,
-			   binder, sizeof ( binder ) ) == 0 );
+			   binder ) == 0 );
 	ok ( memcmp ( rfc8448_resumed_psk_binder,
 		      binder, sizeof ( binder ) ) == 0 );
 	tlskey_digest ( tlskey, rfc8448_resumed_clienthello,

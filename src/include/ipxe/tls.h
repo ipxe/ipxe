@@ -412,6 +412,10 @@ struct tls_session {
 	struct tls_session_id id;
 	/** Session ticket */
 	struct tls_cursor ticket;
+	/** Cretion time (in ticks) */
+	unsigned long created;
+	/** Age addend */
+	uint32_t age;
 
 	/** List of connections */
 	struct list_head conn;
@@ -492,6 +496,10 @@ struct tls_connection {
 	struct tls_session_id new_id;
 	/** New session ticket (if any) */
 	struct tls_cursor new_ticket;
+	/** New session nonce (if any) */
+	struct tls_cursor new_nonce;
+	/** New session age addend */
+	uint32_t new_age;
 
 	/** Plaintext stream */
 	struct interface plainstream;
@@ -514,6 +522,8 @@ struct tls_connection {
 	struct tls_verify_data verify;
 	/** Cookie */
 	struct tls_cursor cookie;
+	/** Start time (in ticks) */
+	unsigned long started;
 
 	/** Secure channel */
 	struct secure_channel channel;

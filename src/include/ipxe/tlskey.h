@@ -145,6 +145,8 @@ struct tls_preshared_key {
 	struct digest_algorithm *digest;
 	/** Key flags */
 	unsigned int flags;
+	/** Binder length */
+	size_t binder_len;
 	/** Key material */
 	union {
 		/**
@@ -325,11 +327,10 @@ struct tls_key_schedule_operations {
 	 * @v psk		Pre-shared key
 	 * @v hash		Partial transcript hash
 	 * @v binder		Binder value to fill in
-	 * @v binder_len	Length of binder value
 	 * @ret rc		Return status code
 	 */
 	int ( * bind ) ( const struct tls_preshared_key *psk,
-			 const void *hash, void *binder, size_t binder_len );
+			 const void *hash, void *binder );
 };
 
 /**
@@ -386,7 +387,6 @@ extern int tlskey_save ( struct tls_key_schedule *tlskey, const void *nonce,
 extern int tlskey_load ( struct tls_key_schedule *tlskey, int ems,
 			 const struct tls_preshared_key *psk );
 extern int tlskey_bind ( const struct tls_preshared_key *psk,
-			 const void *prefix, size_t prefix_len,
-			 void *binder, size_t binder_len );
+			 const void *prefix, size_t prefix_len, void *binder );
 
 #endif /* _IPXE_TLSKEY_H */
