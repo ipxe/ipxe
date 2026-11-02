@@ -185,6 +185,9 @@ union tls_server_random {
 /* TLS session ticket extension */
 #define TLS_SESSION_TICKET 35
 
+/* TLS pre-shared key extension */
+#define TLS_PSK 41
+
 /* TLS supported versions extension */
 #define TLS_SUPPORTED_VERSIONS 43
 
@@ -192,7 +195,9 @@ union tls_server_random {
 #define TLS_COOKIE 44
 
 /* TLS pre-shared key modes extension */
-#define TLS_PSK_MODES 45
+#define TLS_PSK_MODE 45
+#define TLS_PSK_MODE_KE 0
+#define TLS_PSK_MODE_DHE_KE 1
 
 /* TLS key share extension */
 #define TLS_KEY_SHARE 51

@@ -74,6 +74,14 @@ static const char * tls_map_name ( const uint8_t *map ) {
 		return "NamedGroupList";
 	} else if ( map == tls_new_session_ticket_map ) {
 		return "NewSessionTicket";
+	} else if ( map == tls_offered_psks_map ) {
+		return "OfferedPsks";
+	} else if ( map == tls_pre_shared_key_extension_map ) {
+		return "PreSharedKeyExtension";
+	} else if ( map == tls_psk_binder_entry_map ) {
+		return "PskBinderEntry";
+	} else if ( map == tls_psk_identity_map ) {
+		return "PskIdentity";
 	} else if ( map == tls_psk_key_exchange_modes_map ) {
 		return "PskKeyExchangeModes";
 	} else if ( map == tls_renegotiation_info_map ) {
@@ -699,7 +707,8 @@ TLS_DESCR_MAPPING ( tls_client_hello ) = {
 	TLS_EXTND ( tls_client_hello, TLS_NAMED_GROUP, ext.groups ),
 	TLS_EXTND ( tls_client_hello, TLS_KEY_SHARE, ext.keys ),
 	TLS_EXTND ( tls_client_hello, TLS_SERVER_NAME, ext.names ),
-	TLS_EXTND ( tls_client_hello, TLS_PSK_MODES, ext.pskmodes ),
+	TLS_EXTND ( tls_client_hello, TLS_PSK, ext.psks ),
+	TLS_EXTND ( tls_client_hello, TLS_PSK_MODE, ext.pskmodes ),
 	TLS_EXTND ( tls_client_hello, TLS_RECORD_SIZE_LIMIT, ext.record ),
 	TLS_EXTND ( tls_client_hello, TLS_RENEGOTIATION_INFO, ext.reneg ),
 	TLS_EXTND ( tls_client_hello, TLS_SIGNATURE_ALGORITHMS, ext.sigs ),
@@ -795,10 +804,36 @@ TLS_DESCR_MAPPING ( tls_new_session_ticket ) = {
 	TLS_EXT16 ( tls_new_session_ticket, TLS_VERSION_TLS_1_3, ext ),
 };
 
+/** OfferedPsks descriptor mapping */
+TLS_DESCR_MAPPING ( tls_offered_psks ) = {
+	TLS_MAPSZ ( tls_offered_psks ),
+	TLS_VAR16 ( tls_offered_psks, TLS_VERSION_BASE, identities ),
+	TLS_VAR16 ( tls_offered_psks, TLS_VERSION_BASE, binders ),
+};
+
+/** PreSharedKeyExtension descriptor mapping */
+TLS_DESCR_MAPPING ( tls_pre_shared_key_extension ) = {
+	TLS_MAPSZ ( tls_pre_shared_key_extension ),
+	TLS_FIXED ( tls_pre_shared_key_extension, TLS_VERSION_BASE, selected ),
+};
+
+/** PskBinderEntry descriptor mapping */
+TLS_DESCR_MAPPING ( tls_psk_binder_entry ) = {
+	TLS_MAPSZ ( tls_psk_binder_entry ),
+	TLS_VAR08 ( tls_psk_binder_entry, TLS_VERSION_BASE, binder ),
+};
+
+/** PskIdentity descriptor mapping */
+TLS_DESCR_MAPPING ( tls_psk_identity ) = {
+	TLS_MAPSZ ( tls_psk_identity ),
+	TLS_VAR16 ( tls_psk_identity, TLS_VERSION_BASE, identity ),
+	TLS_FIXED ( tls_psk_identity, TLS_VERSION_BASE, age ),
+};
+
 /** PskKeyExchangeModes descriptor mapping */
 TLS_DESCR_MAPPING ( tls_psk_key_exchange_modes ) = {
 	TLS_MAPSZ ( tls_psk_key_exchange_modes ),
-	TLS_VAR08 ( tls_psk_key_exchange_modes, TLS_VERSION_TLS_1_3, list ),
+	TLS_VAR08 ( tls_psk_key_exchange_modes, TLS_VERSION_BASE, list ),
 };
 
 /** RenegotiationInfo descriptor mapping */
@@ -819,9 +854,10 @@ TLS_DESCR_MAPPING ( tls_server_hello ) = {
 	TLS_EXTND ( tls_server_hello, TLS_SUPPORTED_VERSIONS, ext.supver ),
 	TLS_EXTND ( tls_server_hello, TLS_KEY_SHARE, ext.key ),
 	TLS_EXTND ( tls_server_hello, TLS_COOKIE, ext.cookie ),
+	TLS_EXTND ( tls_server_hello, TLS_PSK, ext.psk ),
 };
 
-/** ServerHello descriptor mapping */
+/** ServerHelloDone descriptor mapping */
 TLS_DESCR_MAPPING ( tls_server_hello_done ) = {
 	TLS_MAPSZ ( tls_server_hello_done ),
 };

@@ -455,6 +455,10 @@ static void tlsfmt_test_exec ( void ) {
 	map_ok ( tls_max_fragment_length );
 	map_ok ( tls_named_group_list );
 	map_ok ( tls_new_session_ticket );
+	map_ok ( tls_offered_psks );
+	map_ok ( tls_pre_shared_key_extension );
+	map_ok ( tls_psk_binder_entry );
+	map_ok ( tls_psk_identity );
 	map_ok ( tls_psk_key_exchange_modes );
 	map_ok ( tls_renegotiation_info );
 	map_ok ( tls_server_hello );

@@ -452,6 +452,11 @@ struct tls_client_hello {
 		struct tls_cursor supvers;
 		/** Session ticket extension */
 		struct tls_cursor ticket;
+		/** Preshared keys extension
+		 *
+		 * This must be the last extension in the list.
+		 */
+		struct tls_cursor psks;
 	} ext;
 };
 
@@ -579,6 +584,34 @@ struct tls_new_session_ticket {
 	} ext;
 };
 
+/** OfferedPsks descriptor */
+struct tls_offered_psks {
+	/** Identity list */
+	struct tls_cursor identities;
+	/** Binder list */
+	struct tls_cursor binders;
+};
+
+/** PreSharedKeyExtension descriptor (in ServerHello) */
+struct tls_pre_shared_key_extension {
+	/** Selected identity */
+	uint16_t __attribute__ (( aligned ( 1 ) )) *selected;
+};
+
+/** PskBinderEntry descriptor */
+struct tls_psk_binder_entry {
+	/** Binder value */
+	struct tls_cursor binder;
+};
+
+/** PskIdentity descriptor */
+struct tls_psk_identity {
+	/** Identity */
+	struct tls_cursor identity;
+	/** Obfuscated age */
+	uint32_t __attribute__ (( aligned ( 1 ) )) *age;
+};
+
 /** PskKeyExchangeModes descriptor */
 struct tls_psk_key_exchange_modes {
 	/** Mode list */
@@ -623,6 +656,8 @@ struct tls_server_hello {
 		struct tls_cursor key;
 		/** Cookie extension */
 		struct tls_cursor cookie;
+		/** Preshared key extension */
+		struct tls_cursor psk;
 	} ext;
 };
 
@@ -797,6 +832,10 @@ extern TLS_DESCR_MAPPING ( tls_key_share_server_hello );
 extern TLS_DESCR_MAPPING ( tls_max_fragment_length );
 extern TLS_DESCR_MAPPING ( tls_named_group_list );
 extern TLS_DESCR_MAPPING ( tls_new_session_ticket );
+extern TLS_DESCR_MAPPING ( tls_offered_psks );
+extern TLS_DESCR_MAPPING ( tls_pre_shared_key_extension );
+extern TLS_DESCR_MAPPING ( tls_psk_binder_entry );
+extern TLS_DESCR_MAPPING ( tls_psk_identity );
 extern TLS_DESCR_MAPPING ( tls_psk_key_exchange_modes );
 extern TLS_DESCR_MAPPING ( tls_renegotiation_info );
 extern TLS_DESCR_MAPPING ( tls_server_hello );
