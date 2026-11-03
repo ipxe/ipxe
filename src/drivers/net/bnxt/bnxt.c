@@ -320,7 +320,11 @@ static void bnxt_tx_complete ( struct net_device *dev, u16 hw_idx )
 	struct bnxt *bp = dev->priv;
 	struct io_buffer *iob;
 
+	hw_idx &= ( bp->tx.ring_cnt - 1 );
 	iob = bp->tx.iob[hw_idx];
+	if ( !iob )
+		return;
+	bp->tx.iob[hw_idx] = NULL;
 	dbg_tx_done ( iob->data, iob_len ( iob ), hw_idx );
 	netdev_tx_complete ( dev, iob );
 	bp->tx.cons_id = NEXT_IDX ( hw_idx, bp->tx.ring_cnt );
@@ -1034,6 +1038,7 @@ static int bnxt_hwrm_error_recovery_req ( struct bnxt *bp )
 	struct hwrm_error_recovery_qcfg_output *resp;
 	int rc = 0;
 	u8 i = 0;
+	u8 reg_array_cnt;
 	u16 cmd_len = ( u16 ) sizeof ( struct hwrm_error_recovery_qcfg_input );
 
 	DBGP ( "%s\n", __func__ );
@@ -1079,7 +1084,10 @@ static int bnxt_hwrm_error_recovery_req ( struct bnxt *bp )
 	bp->er.rst_inprg_reg        = resp->reset_inprogress_reg;
 
 	bp->er.rst_inprg_reg_mask   = resp->reset_inprogress_reg_mask;
-	bp->er.reg_array_cnt        = resp->reg_array_cnt;
+	reg_array_cnt = resp->reg_array_cnt;
+	if ( reg_array_cnt > ARRAY_SIZE ( bp->er.rst_reg ) )
+		reg_array_cnt = ARRAY_SIZE ( bp->er.rst_reg );
+	bp->er.reg_array_cnt        = reg_array_cnt;
 
 	DBGP ( "flags               = 0x%x\n", resp->flags );
 	DBGP ( "driver_polling_freq = 0x%x\n", resp->driver_polling_freq );
@@ -1089,7 +1097,7 @@ static int bnxt_hwrm_error_recovery_req ( struct bnxt *bp )
 	DBGP ( "bailout_post_reset  = 0x%x\n", resp->max_bailout_time );
 	DBGP ( "reg_array_cnt       = %x\n", resp->reg_array_cnt );
 
-	for ( i = 0; i < resp->reg_array_cnt; i++ ) {
+	for ( i = 0; i < reg_array_cnt; i++ ) {
 		bp->er.rst_reg[i]         = resp->reset_reg[i];
 		bp->er.rst_reg_val[i]     = resp->reset_reg_val[i];
 		bp->er.delay_after_rst[i] = resp->delay_after_reset[i];
@@ -2385,8 +2393,12 @@ void bnxt_rst_er_registers ( struct bnxt *bp )
 {
 	u32 delay_time = 0;
 	u8 i;
+	u8 reg_array_cnt = bp->er.reg_array_cnt;
 
-	for ( i = 0; i < bp->er.reg_array_cnt; i++ ) {
+	if ( reg_array_cnt > ARRAY_SIZE ( bp->er.rst_reg ) )
+		reg_array_cnt = ARRAY_SIZE ( bp->er.rst_reg );
+
+	for ( i = 0; i < reg_array_cnt; i++ ) {
 		bnxt_rst_reg_val ( bp, bp->er.rst_reg[i], bp->er.rst_reg_val[i] );
 
 		delay_time = bp->er.delay_after_rst[i];
@@ -2401,7 +2413,7 @@ void bnxt_er_task ( struct bnxt* bp, u8 hb_task )
 {
 	u32 present_hb_cnt;
 	unsigned short pci_command, new_command;
-	u8 i;
+	u32 i;
 
 	DBGP ( "%s(hb_task: %d)\n", __func__, hb_task );
 	if ( bp->er.er_rst_on ) {
