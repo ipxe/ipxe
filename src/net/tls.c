@@ -199,6 +199,10 @@ FILE_SECBOOT ( PERMITTED );
 #define EINFO_EPROTO_PSK						\
 	__einfo_uniqify ( EINFO_EPROTO, 0x06,				\
 			  "Invalid selected pre-shared key" )
+#define EPROTO_KEY_UPDATE __einfo_error ( EINFO_EPROTO_KEY_UPDATE )
+#define EINFO_EPROTO_KEY_UPDATE						\
+	__einfo_uniqify ( EINFO_EPROTO, 0x07,				\
+			  "Illegal key update" )
 
 /* Avoid dragging in RSA support unconditionally */
 struct pubkey_algorithm rsa_algorithm __attribute__ (( weak ));
@@ -2655,6 +2659,60 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 }
 
 /**
+ * Transmit Key Update record
+ *
+ * @v tls		TLS connection
+ * @ret rc		Return status code
+ */
+static int tls_send_key_update ( struct tls_connection *tls ) {
+	struct {
+		struct tls_key_update update;
+	} s;
+	struct tls_key_update *update = &s.update;
+	struct tls_cursor cursor;
+	struct io_buffer *iobuf;
+	int rc;
+
+	/* Initialise data structures */
+	memset ( &s, 0, sizeof ( s ) );
+
+	/* Prepare KeyUpdate structure */
+	if ( ( rc = tls_size ( tls_key_update, tls->version, update,
+			       &cursor ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not size KeyUpdate: %s\n",
+		       tls, strerror ( rc ) );
+		goto err_size;
+	}
+
+	/* Allocate I/O buffer */
+	iobuf = tls_alloc_handshake ( tls, &cursor, TLS_KEY_UPDATE );
+	if ( ! iobuf ) {
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+
+	/* Build KeyUpdate structure */
+	tls_build ( tls_key_update, tls->version, update, &cursor );
+
+	/* Transmit record */
+	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
+		goto err_send;
+
+	/* Change transmit cipher spec */
+	if ( ( rc = tls_change_cipher ( tls, &tls->tx.cipherspec,
+					&tls_application ) ) != 0 ) {
+		goto err_change;
+	}
+
+ err_change:
+ err_send:
+	free_iob ( iobuf );
+ err_alloc:
+ err_size:
+	return rc;
+}
+
+/**
  * Transmit Alert record
  *
  * @v tls		TLS connection
@@ -3384,6 +3442,44 @@ static int tls_new_finished ( struct tls_connection *tls,
 }
 
 /**
+ * Receive new Key Update handshake record
+ *
+ * @v tls		TLS connection
+ * @v cursor		Plaintext handshake record
+ * @ret rc		Return status code
+ */
+static int tls_new_key_update ( struct tls_connection *tls,
+				const struct tls_cursor *cursor ) {
+	struct tls_key_update update;
+	int rc;
+
+	/* Parse KeyUpdate structure */
+	if ( ( rc = tls_parse ( tls_key_update, tls->version, cursor,
+				&update ) ) != 0 ) {
+		DBGC ( tls, "TLS %p could not parse KeyUpdate: %s\n",
+		       tls, strerror ( rc ) );
+		return rc;
+	}
+
+	/* Fail if we have not yet received the server Finished */
+	if ( is_pending ( &tls->server.negotiation ) ) {
+		DBGC ( tls, "TLS %p received premature KeyUpdate\n", tls );
+		return -EPROTO_KEY_UPDATE;
+	}
+
+	/* Schedule receive key update */
+	tls->rx.cipherspec.pending = &tls_application;
+
+	/* Schedule transmit key update, if applicable */
+	if ( *update.requested == TLS_KEY_UPDATE_REQUESTED ) {
+		tls->tx.pending |= TLS_TX_KEY_UPDATE;
+		tls_tx_resume ( tls );
+	}
+
+	return 0;
+}
+
+/**
  * Receive new Handshake record
  *
  * @v tls		TLS connection
@@ -3471,6 +3567,9 @@ static int tls_new_handshake ( struct tls_connection *tls,
 			break;
 		case TLS_FINISHED:
 			handler = tls_new_finished;
+			break;
+		case TLS_KEY_UPDATE:
+			handler = tls_new_key_update;
 			break;
 		default:
 			DBGC ( tls, "TLS %p ignoring handshake type %d\n",
@@ -4720,6 +4819,14 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 			goto err;
 		}
 		tls->tx.pending &= ~TLS_TX_FINISHED;
+	} else if ( tls->tx.pending & TLS_TX_KEY_UPDATE ) {
+		/* Send Key Update */
+		if ( ( rc = tls_send_key_update ( tls ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not send Key Update: %s\n",
+			       tls, strerror ( rc ) );
+			goto err;
+		}
+		tls->tx.pending &= ~TLS_TX_KEY_UPDATE;
 	}
 
 	/* Reschedule process if pending transmissions remain,

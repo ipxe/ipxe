@@ -232,6 +232,7 @@ enum tls_tx_pending {
 	TLS_TX_CERTIFICATE_VERIFY = 0x0008,
 	TLS_TX_CHANGE_CIPHER = 0x0010,
 	TLS_TX_FINISHED = 0x0020,
+	TLS_TX_KEY_UPDATE = 0x0040,
 };
 
 /** TLS key exchange parameters */
