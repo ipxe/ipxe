@@ -663,6 +663,12 @@ int tlskey_verify ( struct tls_key_schedule *tlskey,
  * @v writer		Writer endpoint
  * @v phase		Traffic phase
  * @ret rc		Return status code
+ *
+ * For key schedules that include a ratchet mechanism, each call with
+ * an unchanged traffic phase consumes the current generation of
+ * traffic secret and replaces it with the next generation.  Repeated
+ * calls may therefore be used to obtain multiple generations of the
+ * traffic secret.
  */
 int tlskey_traffic ( struct tls_key_schedule *tlskey,
 		     const struct tls_endpoint *writer,
@@ -710,11 +716,6 @@ int tlskey_traffic ( struct tls_key_schedule *tlskey,
  * @v mac		MAC secret to fill in
  * @v mac_len		Length of MAC secret
  * @ret rc		Return status code
- *
- * For key schedules that include a ratchet mechanism, each call
- * consumes the current generation of traffic secret and replaces it
- * with the next generation.  Repeated calls may therefore be used to
- * obtain multiple generations of the cipher key material.
  */
 int tlskey_cipher ( struct tls_key_schedule *tlskey,
 		    const struct tls_endpoint *writer,
@@ -1191,14 +1192,24 @@ static int tlskey_hkdf_traffic ( struct tls_key_schedule *tlskey,
 	size_t digestsize = digest->digestsize;
 	char label[ 13 /* "[c|s] [e|hs|ap] traffic" + NUL */ ];
 
-	/* Generate label */
-	snprintf ( label, sizeof ( label ), "%c %s traffic",
-		   writer->name[0], phase->label );
+	/* Generate or update traffic secret */
+	if ( ( phase == traffic->phase ) && ( phase == &tls_application ) ) {
 
-	/* Generate traffic secret */
-	tlskey_expand ( tlskey, tlskey->kdf.secret, label,
-			tlskey->transcript.finishing, digestsize,
-			traffic->secret, digestsize );
+		/* Update application traffic secret */
+		tlskey_expand ( tlskey, traffic->secret, "traffic upd", NULL,
+				0, traffic->secret, digestsize );
+
+	} else {
+
+		/* Generate label */
+		snprintf ( label, sizeof ( label ), "%c %s traffic",
+			   writer->name[0], phase->label );
+
+		/* Generate traffic secret */
+		tlskey_expand ( tlskey, tlskey->kdf.secret, label,
+				tlskey->transcript.finishing, digestsize,
+				traffic->secret, digestsize );
+	}
 
 	return 0;
 }
@@ -1222,8 +1233,6 @@ static int tlskey_hkdf_cipher ( struct tls_key_schedule *tlskey,
 				 size_t iv_len, void *mac __unused,
 				 size_t mac_len ) {
 	struct tls_traffic_secret *traffic = &tlskey->traffic[writer->index];
-	struct digest_algorithm *digest = tlskey->digest;
-	size_t digestsize = digest->digestsize;
 	void *secret = traffic->secret;
 
 	/* The key schedule does not define a way to generate MAC secrets */
@@ -1238,12 +1247,6 @@ static int tlskey_hkdf_cipher ( struct tls_key_schedule *tlskey,
 
 	/* Generate initialisation vector */
 	tlskey_expand ( tlskey, secret, "iv", NULL, 0, iv, iv_len );
-
-	/* Update traffic secret, if applicable */
-	if ( traffic->phase == &tls_application ) {
-		tlskey_expand ( tlskey, secret, "traffic upd", NULL, 0,
-				secret, digestsize );
-	}
 
 	return 0;
 }
