@@ -98,6 +98,7 @@ union tls_server_random {
 #define TLS_CERTIFICATE_VERIFY 15
 #define TLS_CLIENT_KEY_EXCHANGE 16
 #define TLS_FINISHED 20
+#define TLS_KEY_UPDATE 24
 
 /* TLS alert levels */
 #define TLS_ALERT_WARNING 1
@@ -152,6 +153,10 @@ union tls_server_random {
 #define TLS_RSA_PSS_PSS_SHA256_ALGORITHM 0x0809
 #define TLS_RSA_PSS_PSS_SHA384_ALGORITHM 0x080a
 #define TLS_RSA_PSS_PSS_SHA512_ALGORITHM 0x080b
+
+/* TLS key updates */
+#define TLS_KEY_UPDATE_NOT_REQUESTED 0
+#define TLS_KEY_UPDATE_REQUESTED 1
 
 /* TLS server name extension */
 #define TLS_SERVER_NAME 0

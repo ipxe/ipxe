@@ -68,6 +68,8 @@ static const char * tls_map_name ( const uint8_t *map ) {
 		return "KeyShareHelloRetryRequest";
 	} else if ( map == tls_key_share_server_hello_map ) {
 		return "KeyShareServerHello";
+	} else if ( map == tls_key_update_map ) {
+		return "KeyUpdate";
 	} else if ( map == tls_max_fragment_length_map ) {
 		return "MaxFragmentLength";
 	} else if ( map == tls_named_group_list_map ) {
@@ -780,6 +782,12 @@ TLS_DESCR_MAPPING ( tls_key_share_server_hello ) = {
 	TLS_MAPSZ ( tls_key_share_server_hello ),
 	TLS_FIXED ( tls_key_share_server_hello, TLS_VERSION_BASE, group ),
 	TLS_VAR16 ( tls_key_share_server_hello, TLS_VERSION_BASE, public ),
+};
+
+/** KeyUpdate descriptor mapping */
+TLS_DESCR_MAPPING ( tls_key_update ) = {
+	TLS_MAPSZ ( tls_key_update ),
+	TLS_FIXED ( tls_key_update, TLS_VERSION_BASE, requested ),
 };
 
 /** MaxFragmentLength descriptor mapping */

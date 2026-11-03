@@ -555,6 +555,12 @@ union tls_key_share_server {
 	union tls_ptr_len desc[0];
 };
 
+/** KeyUpdate descriptor */
+struct tls_key_update {
+	/** Update requested */
+	uint8_t *requested;
+};
+
 /** MaxFragmentLength descriptor */
 struct tls_max_fragment_length {
 	/** Maximum fragment length */
@@ -829,6 +835,7 @@ extern TLS_DESCR_MAPPING ( tls_key_share_client_hello );
 extern TLS_DESCR_MAPPING ( tls_key_share_entry );
 extern TLS_DESCR_MAPPING ( tls_key_share_hello_retry_request );
 extern TLS_DESCR_MAPPING ( tls_key_share_server_hello );
+extern TLS_DESCR_MAPPING ( tls_key_update );
 extern TLS_DESCR_MAPPING ( tls_max_fragment_length );
 extern TLS_DESCR_MAPPING ( tls_named_group_list );
 extern TLS_DESCR_MAPPING ( tls_new_session_ticket );
