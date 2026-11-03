@@ -51,6 +51,7 @@ static void video_init(void)
 
 		inited=1;
 	}
+	vga_console.disabled &= ~CONSOLE_DISABLED_OUTPUT;
 }
 
 static void video_scroll(void)
