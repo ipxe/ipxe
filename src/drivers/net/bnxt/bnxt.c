@@ -1057,9 +1057,20 @@ static int bnxt_hwrm_error_recovery_req ( struct bnxt *bp )
 	bp->er.flags = resp->flags;
 	bp->er.drv_poll_freq        = resp->driver_polling_freq;
 	bp->er.master_wait_period   = resp->master_wait_period;
+	if ( bp->er.master_wait_period > ER_MAX_WAIT_PERIOD_DSECS )
+		bp->er.master_wait_period = ER_MAX_WAIT_PERIOD_DSECS;
+
 	bp->er.normal_wait_period   = resp->normal_wait_period;
+	if ( bp->er.normal_wait_period > ER_MAX_WAIT_PERIOD_DSECS )
+		bp->er.normal_wait_period = ER_MAX_WAIT_PERIOD_DSECS;
+
 	bp->er.master_wait_post_rst = resp->master_wait_post_reset;
+	if ( bp->er.master_wait_post_rst > ER_MAX_WAIT_PERIOD_DSECS )
+		bp->er.master_wait_post_rst = ER_MAX_WAIT_PERIOD_DSECS;
+
 	bp->er.max_bailout_post_rst = resp->max_bailout_time;
+	if ( bp->er.max_bailout_post_rst > ER_MAX_BAILOUT_POST_RST )
+		bp->er.max_bailout_post_rst = ER_MAX_BAILOUT_POST_RST;
 
 	bp->er.fw_status_reg        = resp->fw_health_status_reg;
 	bp->er.fw_hb_reg            = resp->fw_heartbeat_reg;

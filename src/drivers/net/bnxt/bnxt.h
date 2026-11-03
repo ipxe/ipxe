@@ -940,6 +940,8 @@ struct lm_error_recovery
 #define ER_DFLT_FW_RST_MIN_DSECS    20
 #define ER_DFLT_FW_RST_MAX_DSECS    60
 #define FW_STATUS_REG_CODE_READY    0x8000UL
+#define ER_MAX_BAILOUT_POST_RST     60
+#define ER_MAX_WAIT_PERIOD_DSECS    600
   u8  rst_min_dsecs;
   u8  reg_array_cnt;
   u8  er_initiate;
