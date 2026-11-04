@@ -279,7 +279,7 @@ static void a3c90x_process_tx_packets(struct net_device *netdev)
 
 	DBG2("    tx_cnt: %d\n", p->tx_cnt);
 
-	while (p->tx_tail != p->tx_cur) {
+	while (p->tx_cnt) {
 
 		downlist_ptr = inl(p->IOAddr + regDnListPtr_l);
 
