@@ -1020,29 +1020,6 @@ static int tls_pending_cipher ( struct tls_connection *tls,
 /**
  * Find TLS signature and hash algorithm
  *
- * @v pubkey		Public-key algorithm
- * @v digest		Digest algorithm
- * @ret sig_hash	Signature and hash algorithm, or NULL
- */
-static struct tls_signature_hash_algorithm *
-tls_signature_hash_algorithm ( struct pubkey_algorithm *pubkey,
-			       struct digest_algorithm *digest ) {
-	struct tls_signature_hash_algorithm *sig_hash;
-
-	/* Identify signature and hash algorithm */
-	for_each_table_entry ( sig_hash, TLS_SIG_HASH_ALGORITHMS ) {
-		if ( ( sig_hash->pubkey == pubkey ) &&
-		     ( sig_hash->digest == digest ) ) {
-			return sig_hash;
-		}
-	}
-
-	return NULL;
-}
-
-/**
- * Find TLS signature and hash algorithm
- *
  * @v code		Signature and hash algorithm identifier
  * @ret sig_hash	Signature and hash algorithm, or NULL
  */
@@ -1080,6 +1057,40 @@ tls_signature_hash_applies ( struct tls_connection *tls,
 		 ( ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) ||
 		   ( sig_hash->parameter == NULL ) ||
 		   ( sig_hash->parameter == parameter ) ) );
+}
+
+/**
+ * Select signature and hash algorithm
+ *
+ * @v tls		TLS connection
+ * @v cert		Certificate
+ * @v codes		Signature and hash algorithm identifiers
+ * @ret sig_hash	Signature and hash algorithm, or NULL
+ */
+static struct tls_signature_hash_algorithm *
+tls_select_signature_hash ( struct tls_connection *tls,
+			    struct x509_certificate *cert,
+			    const struct tls_cursor *codes ) {
+	uint16_t __attribute__ (( aligned ( 1 ) )) *code = codes->data;
+	unsigned int count = ( codes->len / sizeof ( *code ) );
+	struct tls_signature_hash_algorithm *sig_hash;
+
+	/* Select first matching signature and hash algorithm */
+	while ( count-- ) {
+
+		/* Identify signature and hash algorithm */
+		sig_hash = tls_find_signature_hash ( *(code++) );
+		if ( ! sig_hash )
+			continue;
+
+		/* Check applicability */
+		if ( ! tls_signature_hash_applies ( tls, sig_hash, cert ) )
+			continue;
+
+		return sig_hash;
+	}
+
+	return NULL;
 }
 
 /******************************************************************************
@@ -2502,8 +2513,6 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	struct tls_signature_hash_algorithm tmp;
 	struct tls_digitally_signed dsig;
 	struct x509_certificate *cert;
-	struct pubkey_algorithm *pubkey;
-	struct digest_algorithm *digest;
 	struct tls_cursor cursor;
 	struct io_buffer *iobuf;
 	int rc;
@@ -2520,18 +2529,18 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 		rc = -ENOENT_CERT;
 		goto err_cert;
 	}
-	pubkey = cert->subject.public_key.algorithm->pubkey;
 
 	/* Identify signature and hash algorithm */
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_2 ) ) {
 
 		/* TLSv1.2 and above use explicit algorithm identifiers */
-		digest = tls->key.digest;
-		sig_hash = tls_signature_hash_algorithm ( pubkey, digest );
+		sig_hash = tls_select_signature_hash ( tls, cert,
+						       &tls->client.sigs );
 		if ( ! sig_hash ) {
-			DBGC ( tls, "TLS %p could not identify (%s,%s) "
-			       "signature and hash algorithm\n", tls,
-			       pubkey->name, digest->name );
+			DBGC ( tls, "TLS %p has no usable signature and "
+			       "hash algorithm:\n", tls );
+			DBGC_HDA ( tls, 0, tls->client.sigs.data,
+				   tls->client.sigs.len );
 			rc = -ENOTSUP_SIG_HASH;
 			goto err_sig_hash;
 		}
@@ -2541,8 +2550,8 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 		/* TLSv1.1 and below use fixed algorithms */
 		sig_hash = &tmp;
 		memset ( sig_hash, 0, sizeof ( *sig_hash ) );
-		sig_hash->pubkey = pubkey;
-		sig_hash->digest = ( ( pubkey == &rsa_algorithm ) ?
+		sig_hash->pubkey = cert->subject.public_key.algorithm->pubkey;
+		sig_hash->digest = ( ( sig_hash->pubkey == &rsa_algorithm ) ?
 				     &md5_sha1_algorithm : &sha1_algorithm );
 	}
 
@@ -2574,6 +2583,11 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
 		goto err_send;
+
+	/* Free requested signature and hash algorithms (if any) */
+	zfree ( tls->client.sigs.data );
+	tls->client.sigs.data = NULL;
+	tls->client.sigs.len = 0;
 
  err_send:
 	free_iob ( iobuf );
