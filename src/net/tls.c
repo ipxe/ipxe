@@ -437,6 +437,8 @@ static void free_tls ( struct refcnt *refcnt ) {
 	free_iob ( tls->rx.handshake );
 	privkey_put ( tls->client.key );
 	x509_chain_put ( tls->client.chain );
+	zfree ( tls->client.context.data );
+	zfree ( tls->client.sigs.data );
 	x509_chain_put ( tls->server.chain );
 	x509_root_put ( tls->server.root );
 
@@ -3302,13 +3304,52 @@ static int tls_new_server_key_exchange ( struct tls_connection *tls,
  */
 static int
 tls_new_certificate_request ( struct tls_connection *tls,
-			      const struct tls_cursor *cursor __unused ) {
+			      const struct tls_cursor *cursor ) {
+	union {
+		struct tls_certificate_request_old old;
+		struct tls_certificate_request_new new;
+	} request;
+	struct tls_cursor *context;
+	struct tls_cursor *sigs;
 	struct x509_certificate *cert;
+	unsigned int version = tls->version;
 	int rc;
 
-	/* We can only send a single certificate, so there is no point
-	 * in parsing the Certificate Request.
-	 */
+	/* Parse CertificateRequest structure */
+	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) {
+
+		/* Parse new-format CertificateRequest structure */
+		if ( ( rc = tls_parse ( tls_certificate_request_new, version,
+					cursor, &request.new ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not parse Certificate"
+			       "Request: %s\n", tls, strerror ( rc ) );
+			return rc;
+		}
+		context = &request.new.context;
+		sigs = &request.new.ext.sigs;
+
+	} else {
+
+		/* Parse old-format CertificateRequest structure */
+		if ( ( rc = tls_parse ( tls_certificate_request_old, version,
+					cursor, &request.old ) ) != 0 ) {
+			DBGC ( tls, "TLS %p could not parse Certificate"
+			       "Request: %s\n", tls, strerror ( rc ) );
+			return rc;
+		}
+		context = NULL;
+		sigs = &request.old.sigs;
+	}
+
+	/* Record request context, if applicable */
+	if ( context &&
+	     ( ( rc = tls_copy ( context, &tls->client.context ) ) != 0 ) ) {
+		return rc;
+	}
+
+	/* Record requested signature and hash algorithms */
+	if ( ( rc = tls_copy ( sigs, &tls->client.sigs ) ) != 0 )
+		return rc;
 
 	/* Free any existing client certificate chain */
 	x509_chain_put ( tls->client.chain );
@@ -3316,10 +3357,8 @@ tls_new_certificate_request ( struct tls_connection *tls,
 
 	/* Create client certificate chain */
 	tls->client.chain = x509_alloc_chain();
-	if ( ! tls->client.chain ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
+	if ( ! tls->client.chain )
+		return -ENOMEM;
 
 	/* Determine client certificate to be sent, if any */
 	cert = x509_find_key ( NULL, tls->client.key );
@@ -3329,12 +3368,14 @@ tls_new_certificate_request ( struct tls_connection *tls,
 
 		/* Append client certificate to chain */
 		if ( ( rc = x509_append ( tls->client.chain, cert ) ) != 0 )
-			goto err_append;
+			return rc;
 
 		/* Append any relevant issuer certificates */
 		if ( ( rc = x509_auto_append ( tls->client.chain,
-					       &certstore ) ) != 0 )
-			goto err_auto_append;
+					       &certstore ) ) != 0 ) {
+			return rc;
+		}
+
 	} else {
 
 		/* Send an empty certificate chain */
@@ -3343,13 +3384,6 @@ tls_new_certificate_request ( struct tls_connection *tls,
 	}
 
 	return 0;
-
- err_auto_append:
- err_append:
-	x509_chain_put ( tls->client.chain );
-	tls->client.chain = NULL;
- err_alloc:
-	return rc;
 }
 
 /**

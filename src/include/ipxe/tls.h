@@ -471,6 +471,10 @@ struct tls_client {
 	struct private_key *key;
 	/** Certificate chain (if any) */
 	struct x509_chain *chain;
+	/** Certificate request context */
+	struct tls_cursor context;
+	/** Requested signature and hash algorithms */
+	struct tls_cursor sigs;
 	/** Security negotiation pending operation */
 	struct pending_operation negotiation;
 };
