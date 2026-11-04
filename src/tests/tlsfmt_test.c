@@ -441,6 +441,8 @@ static void tlsfmt_test_exec ( void ) {
 	/* Check validity of all mappings */
 	map_ok ( tls_certificate );
 	map_ok ( tls_certificate_entry );
+	map_ok ( tls_certificate_request_old );
+	map_ok ( tls_certificate_request_new );
 	map_ok ( tls_client_hello );
 	map_ok ( tls_client_key_exchange_dhe );
 	map_ok ( tls_client_key_exchange_ecdhe );

@@ -48,6 +48,9 @@ static const char * tls_map_name ( const uint8_t *map ) {
 		return "Certificate";
 	} else if ( map == tls_certificate_entry_map ) {
 		return "CertificateEntry";
+	} else if ( ( map == tls_certificate_request_old_map ) ||
+		    ( map == tls_certificate_request_new_map ) ) {
+		return "CertificateRequest";
 	} else if ( map == tls_client_hello_map ) {
 		return "ClientHello";
 	} else if ( ( map == tls_client_key_exchange_dhe_map ) ||
@@ -693,6 +696,23 @@ TLS_DESCR_MAPPING ( tls_certificate_entry ) = {
 	TLS_VAR24 ( tls_certificate_entry, TLS_VERSION_BASE, cert ),
 	TLS_EXT16 ( tls_certificate_entry, TLS_VERSION_TLS_1_3, ext ),
 	TLS_EXTRA ( tls_certificate_entry, TLS_VERSION_BASE, next ),
+};
+
+/** CertificateRequest descriptor mapping (TLSv1.0) */
+TLS_DESCR_MAPPING ( tls_certificate_request_old ) = {
+	TLS_MAPSZ ( tls_certificate_request_old ),
+	TLS_VAR08 ( tls_certificate_request_old, TLS_VERSION_BASE, types ),
+	TLS_VAR16 ( tls_certificate_request_old, TLS_VERSION_TLS_1_2, sigs ),
+	TLS_VAR16 ( tls_certificate_request_old, TLS_VERSION_BASE, auths ),
+};
+
+/** CertificateRequest descriptor mapping (TLSv1.3) */
+TLS_DESCR_MAPPING ( tls_certificate_request_new ) = {
+	TLS_MAPSZ ( tls_certificate_request_new ),
+	TLS_VAR08 ( tls_certificate_request_new, TLS_VERSION_BASE, context ),
+	TLS_EXT16 ( tls_certificate_request_new, TLS_VERSION_BASE, ext ),
+	TLS_EXTND ( tls_certificate_request_new, TLS_SIGNATURE_ALGORITHMS,
+		    ext.sigs ),
 };
 
 /** ClientHello descriptor mapping */

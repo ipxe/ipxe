@@ -409,6 +409,29 @@ struct tls_certificate_entry {
 	struct tls_cursor next;
 };
 
+/** CertificateRequest descriptor (TLSv1.2) */
+struct tls_certificate_request_old {
+	/** Certificate types */
+	struct tls_cursor types;
+	/** Signature algorithms */
+	struct tls_cursor sigs;
+	/** Certificate authorities */
+	struct tls_cursor auths;
+};
+
+/** CertificateRequest descriptor (TLSv1.3) */
+struct tls_certificate_request_new {
+	/** Certificate request context */
+	struct tls_cursor context;
+	/** Extensions of interest */
+	struct {
+		/** All extensions */
+		struct tls_cursor all;
+		/** Signature algorithms extension */
+		struct tls_cursor sigs;
+	} ext;
+};
+
 /** ClientHello descriptor */
 struct tls_client_hello {
 	/** Fixed portion */
@@ -824,6 +847,8 @@ extern int tls_size_map ( const uint8_t *map, unsigned int version,
 
 extern TLS_DESCR_MAPPING ( tls_certificate );
 extern TLS_DESCR_MAPPING ( tls_certificate_entry );
+extern TLS_DESCR_MAPPING ( tls_certificate_request_old );
+extern TLS_DESCR_MAPPING ( tls_certificate_request_new );
 extern TLS_DESCR_MAPPING ( tls_client_hello );
 extern TLS_DESCR_MAPPING ( tls_client_key_exchange_dhe );
 extern TLS_DESCR_MAPPING ( tls_client_key_exchange_ecdhe );
