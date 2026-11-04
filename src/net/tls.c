@@ -2337,6 +2337,8 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	}
 
 	/* Prepare Certificate */
+	certificate->context.data = tls->client.context.data;
+	certificate->context.len = tls->client.context.len;
 	list_for_each_entry ( link, &tls->client.chain->links, list ) {
 		cert = link->cert;
 		DBGC ( tls, "TLS %p sending client certificate %s\n",
@@ -2380,6 +2382,11 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
 		goto err_send;
+
+	/* Free certificate request context (if any) */
+	zfree ( tls->client.context.data );
+	tls->client.context.data = NULL;
+	tls->client.context.len = 0;
 
  err_send:
 	free_iob ( iobuf );
