@@ -484,6 +484,8 @@ extern struct asn1_algorithm oid_sha224_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha512_224_algorithm __asn1_algorithm;
 extern struct asn1_algorithm oid_sha512_256_algorithm __asn1_algorithm;
 extern struct asn1_algorithm ecpubkey_algorithm __asn1_algorithm;
+extern struct asn1_algorithm prime256v1_algorithm __asn1_algorithm;
+extern struct asn1_algorithm secp384r1_algorithm __asn1_algorithm;
 
 /**
  * Invalidate ASN.1 object cursor

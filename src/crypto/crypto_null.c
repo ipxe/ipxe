@@ -141,6 +141,13 @@ int pubkey_null_match ( struct pubkey_algorithm *pubkey __unused,
 	return -ENOTTY;
 }
 
+int pubkey_null_param ( struct pubkey_algorithm *pubkey __unused,
+			const struct asn1_cursor *key __unused,
+			struct asn1_algorithm **parameter ) {
+	*parameter = NULL;
+	return 0;
+}
+
 struct pubkey_algorithm pubkey_null = {
 	.name = "null",
 	.encrypt = pubkey_null_encrypt,
@@ -148,6 +155,7 @@ struct pubkey_algorithm pubkey_null = {
 	.sign = pubkey_null_sign,
 	.verify = pubkey_null_verify,
 	.match = pubkey_null_match,
+	.param = pubkey_null_param,
 };
 
 int exchange_null_share ( struct exchange_algorithm *exchange __unused,

@@ -202,6 +202,16 @@ struct pubkey_algorithm {
 	int ( * match ) ( struct pubkey_algorithm *pubkey,
 			  const struct asn1_cursor *private_key,
 			  const struct asn1_cursor *public_key );
+	/** Identify algorithm parameter (if any)
+	 *
+	 * @v pubkey		Public key algorithm
+	 * @v key		Key
+	 * @v parameter		Algorithm parameter to fill in
+	 * @ret rc		Return status code
+	 */
+	int ( * param ) ( struct pubkey_algorithm *pubkey,
+			  const struct asn1_cursor *key,
+			  struct asn1_algorithm **parameter );
 	/** Algorithm private data */
 	void *priv;
 };
@@ -394,6 +404,12 @@ pubkey_match ( struct pubkey_algorithm *pubkey,
 }
 
 static inline __attribute__ (( always_inline )) int
+pubkey_param ( struct pubkey_algorithm *pubkey, const struct asn1_cursor *key,
+	       struct asn1_algorithm **parameter ) {
+	return pubkey->param ( pubkey, key, parameter );
+}
+
+static inline __attribute__ (( always_inline )) int
 exchange_share ( struct exchange_algorithm *exchange, const void *private,
 		 void *public ) {
 	return exchange->share ( exchange, private, public );
@@ -465,6 +481,9 @@ extern int pubkey_null_verify ( struct pubkey_algorithm *pubkey,
 extern int pubkey_null_match ( struct pubkey_algorithm *pubkey,
 			       const struct asn1_cursor *private_key,
 			       const struct asn1_cursor *public_key );
+extern int pubkey_null_param ( struct pubkey_algorithm *pubkey,
+			       const struct asn1_cursor *key,
+			       struct asn1_algorithm **parameter );
 extern int exchange_null_share ( struct exchange_algorithm *exchange,
 				 const void *private, void *public );
 extern int exchange_null_agree ( struct exchange_algorithm *exchange,

@@ -393,6 +393,7 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 				   const struct asn1_cursor *raw ) {
 	struct x509_public_key *public_key = &cert->subject.public_key;
 	struct asn1_algorithm **algorithm = &public_key->algorithm;
+	struct asn1_algorithm **parameter = &public_key->parameter;
 	struct asn1_cursor *value = &public_key->value;
 	struct asn1_cursor cursor;
 	int rc;
@@ -416,6 +417,18 @@ static int x509_parse_public_key ( struct x509_certificate *cert,
 	DBGC2 ( cert, "X509 %p public key algorithm is %s\n",
 		cert, (*algorithm)->name );
 	asn1_skip_any ( &cursor );
+
+	/* Parse algorithm parameter (if any) */
+	if ( ( rc = pubkey_param ( (*algorithm)->pubkey, &public_key->raw,
+				   parameter ) ) != 0 ) {
+		DBGC ( cert, "X509 %p could not parse %s parameter: %s\n",
+		       cert, (*algorithm)->name, strerror ( rc ) );
+		return rc;
+	}
+	if ( *parameter ) {
+		DBGC2 ( cert, "X509 %p public key algorithm parameter is %s\n",
+			cert, (*parameter)->name );
+	}
 
 	/* Parse subjectPublicKey */
 	memcpy ( value, &cursor, sizeof ( *value ) );

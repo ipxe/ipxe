@@ -1148,6 +1148,29 @@ static void x509_check_name_fail_okx ( struct x509_test_certificate *crt,
 	x509_check_name_fail_okx ( crt, name, __FILE__, __LINE__ )
 
 /**
+ * Report certificate public-key algorithm test result
+ *
+ * @v crt		Test certificate
+ * @v algorithm		Test algorithm
+ * @v parameter		Test algorithm parameter
+ * @v file		Test code file
+ * @v line		Test code line
+ */
+static void x509_check_algorithm_okx ( struct x509_test_certificate *crt,
+				       struct asn1_algorithm *algorithm,
+				       struct asn1_algorithm *parameter,
+				       const char *file, unsigned int line ) {
+
+	okx ( crt->cert->subject.public_key.algorithm == algorithm,
+	      file, line );
+	okx ( crt->cert->subject.public_key.parameter == parameter,
+	      file, line );
+}
+#define x509_check_algorithm_ok( crt, algorithm, parameter )		\
+	x509_check_algorithm_okx ( crt, algorithm, parameter,		\
+				   __FILE__, __LINE__ )
+
+/**
  * Report certificate chain parsing test result
  *
  * @v chn		Test certificate chain
@@ -1311,6 +1334,12 @@ static void x509_test_exec ( void ) {
 	x509_check_name_ok ( &server_crt, "fe80::69ff:fe50:5845" );
 	x509_check_name_ok ( &server_crt, "FE80:0:0:0:0:69FF:FE50:5845" );
 	x509_check_name_fail_ok ( &server_crt, "fe80::69ff:fe50:5846" );
+
+	/* Check certificate algorithms */
+	x509_check_algorithm_ok ( &server_crt, &rsa_encryption_algorithm,
+				  NULL );
+	x509_check_algorithm_ok ( &ecleaf_crt, &ecpubkey_algorithm,
+				  &prime256v1_algorithm );
 
 	/* Parse all certificate chains */
 	x509_chain_ok ( &server_chain );

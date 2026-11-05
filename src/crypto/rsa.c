@@ -870,6 +870,7 @@ struct pubkey_algorithm rsa_algorithm = {
 	.sign		= rsa_sign,
 	.verify		= rsa_verify,
 	.match		= rsa_match,
+	.param		= pubkey_null_param,
 	.priv		= rsa_pkcs1_encode,
 };
 
@@ -881,6 +882,7 @@ struct pubkey_algorithm rsa_pss_algorithm = {
 	.sign		= rsa_sign,
 	.verify		= rsa_verify,
 	.match		= rsa_match,
+	.param		= pubkey_null_param,
 	.priv		= rsa_pss_encode,
 };
 

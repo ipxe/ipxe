@@ -52,6 +52,13 @@ struct x509_public_key {
 	struct asn1_cursor raw;
 	/** Public key algorithm */
 	struct asn1_algorithm *algorithm;
+	/** Public key algorithm parameter (or NULL, if not applicable)
+	 *
+	 * ECDSA certificates have a top-level wrapper algorithm
+	 * "id-ecPublicKey" with the actual elliptic curve specified
+	 * using a separate OID as an algorithm parameter.
+	 */
+	struct asn1_algorithm *parameter;
 	/** Public key value */
 	struct asn1_cursor value;
 };

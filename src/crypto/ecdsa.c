@@ -80,6 +80,8 @@ struct asn1_algorithm ecpubkey_algorithm __asn1_algorithm = {
 
 /** An ECDSA key */
 struct ecdsa_key {
+	/** Elliptic curve algorithm */
+	struct asn1_algorithm *algorithm;
 	/** Elliptic curve */
 	struct elliptic_curve *curve;
 	/** Public curve point */
@@ -140,7 +142,6 @@ struct ecdsa_context {
  */
 static int ecdsa_parse_key ( struct ecdsa_key *key,
 			     const struct asn1_cursor *raw ) {
-	struct asn1_algorithm *algorithm;
 	struct asn1_cursor cursor;
 	struct asn1_cursor curve;
 	struct asn1_cursor private;
@@ -213,15 +214,16 @@ static int ecdsa_parse_key ( struct ecdsa_key *key,
 
 	/* Identify curve */
 	if ( ( rc = asn1_curve_algorithm ( &curve, &ecpubkey_algorithm,
-					   &algorithm ) ) != 0 ) {
+					   &key->algorithm ) ) != 0 ) {
 		DBGC ( key, "ECDSA %p unknown curve: %s\n",
 		       key, strerror ( rc ) );
 		DBGC_HDA ( key, 0, raw->data, raw->len );
 		return rc;
 	}
-	key->curve = algorithm->curve;
-	DBGC ( key, "ECDSA %p is a %s (%s) %s key\n", key, algorithm->name,
-	       key->curve->name, ( is_private ? "private" : "public" ) );
+	key->curve = key->algorithm->curve;
+	DBGC ( key, "ECDSA %p is a %s (%s) %s key\n",
+	       key, key->algorithm->name, key->curve->name,
+	       ( is_private ? "private" : "public" ) );
 
 	/* Check public key length */
 	if ( cursor.len != ( sizeof ( *compression ) +
@@ -930,6 +932,30 @@ static int ecdsa_match ( struct pubkey_algorithm *pubkey __unused,
 	return 0;
 }
 
+/**
+ * Identify ECDSA algorithm parameter
+ *
+ * @v pubkey		Public-key algorithm
+ * @v key		Key
+ * @v parameter		Algorithm parameter to fill in
+ * @ret rc		Return status code
+ */
+static int ecdsa_param ( struct pubkey_algorithm *pubkey __unused,
+			 const struct asn1_cursor *key,
+			 struct asn1_algorithm **parameter ) {
+	struct ecdsa_key parsed;
+	int rc;
+
+	/* Fill in algorithm parameter, if identifiable */
+	if ( ( rc = ecdsa_parse_key ( &parsed, key ) ) == 0 ) {
+		*parameter = parsed.algorithm;
+	} else {
+		*parameter = NULL;
+	}
+
+	return 0;
+}
+
 /** ECDSA public-key algorithm */
 struct pubkey_algorithm ecdsa_algorithm = {
 	.name		= "ecdsa",
@@ -938,4 +964,5 @@ struct pubkey_algorithm ecdsa_algorithm = {
 	.sign		= ecdsa_sign,
 	.verify		= ecdsa_verify,
 	.match		= ecdsa_match,
+	.param		= ecdsa_param,
 };
