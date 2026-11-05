@@ -490,8 +490,11 @@ static void tls_close ( struct tls_connection *tls, int rc ) {
  */
 static void tls_close_alert ( struct tls_connection *tls, int rc ) {
 
-	/* Send closure alert */
-	tls_send_alert ( tls, TLS_ALERT_WARNING, TLS_ALERT_CLOSE_NOTIFY );
+	/* Send closure alert (if not already closed) */
+	if ( ! list_empty ( &tls->list ) ) {
+		tls_send_alert ( tls, TLS_ALERT_WARNING,
+				 TLS_ALERT_CLOSE_NOTIFY );
+	}
 
 	/* Close connection */
 	tls_close ( tls, rc );
