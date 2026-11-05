@@ -111,7 +111,8 @@ static void ocsp_prepare_test ( struct ocsp_test *test ) {
 	x509_invalidate ( cert );
 
 	/* Force-validate issuer certificate */
-	issuer->root = &root_certificates;
+	x509_root_put ( issuer->root );
+	issuer->root = x509_root_get ( &root_certificates );
 	issuer->path_remaining = ( issuer->extensions.basic.path_len + 1 );
 }
 
