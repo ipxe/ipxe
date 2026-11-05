@@ -371,6 +371,8 @@ struct tls_signature_hash_algorithm {
 	struct pubkey_algorithm *pubkey;
 	/** Required certificate OID-identified algorithm, if any */
 	struct asn1_algorithm *algorithm;
+	/** Required certificate OID-identifier parameter, if any */
+	struct asn1_algorithm *parameter;
 	/** Numeric code (in network-endian order) */
 	uint16_t code;
 };

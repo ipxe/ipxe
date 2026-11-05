@@ -1059,6 +1059,29 @@ tls_find_signature_hash ( unsigned int code ) {
 	return NULL;
 }
 
+/**
+ * Check applicability of signature and hash algorithm to certificate
+ *
+ * @v tls		TLS connection
+ * @v sig_hash		Signature and hash algorithm
+ * @v cert		Certificate
+ * @ret applies		Algorithm applies to this certificate
+ */
+static int
+tls_signature_hash_applies ( struct tls_connection *tls,
+			     struct tls_signature_hash_algorithm *sig_hash,
+			     struct x509_certificate *cert ) {
+	struct asn1_algorithm *algorithm = cert->subject.public_key.algorithm;
+	struct asn1_algorithm *parameter = cert->subject.public_key.parameter;
+
+	/* Check applicability */
+	return ( ( ( sig_hash->algorithm == NULL ) ||
+		   ( sig_hash->algorithm == algorithm ) ) &&
+		 ( ( ! tls_version ( tls, TLS_VERSION_TLS_1_3 ) ) ||
+		   ( sig_hash->parameter == NULL ) ||
+		   ( sig_hash->parameter == parameter ) ) );
+}
+
 /******************************************************************************
  *
  * Named key exchange groups
@@ -1440,8 +1463,7 @@ static int tls_hash_sign ( struct tls_connection *tls,
 	int rc;
 
 	/* Identify algorithms */
-	if ( sig_hash->algorithm &&
-	     ( sig_hash->algorithm != cert->subject.public_key.algorithm ) ) {
+	if ( ! tls_signature_hash_applies ( tls, sig_hash, cert ) ) {
 		DBGC ( tls, "TLS %p cannot use %s public key\n",
 		       tls, cert->subject.public_key.algorithm->name );
 		return -EPERM_KEY_EXCHANGE;
@@ -1489,8 +1511,7 @@ static int tls_hash_verify ( struct tls_connection *tls,
 	int rc;
 
 	/* Identify algorithms */
-	if ( sig_hash->algorithm &&
-	     ( sig_hash->algorithm != cert->subject.public_key.algorithm ) ) {
+	if ( ! tls_signature_hash_applies ( tls, sig_hash, cert ) ) {
 		DBGC ( tls, "TLS %p cannot use %s public key\n",
 		       tls, cert->subject.public_key.algorithm->name );
 		return -EPERM_KEY_EXCHANGE;

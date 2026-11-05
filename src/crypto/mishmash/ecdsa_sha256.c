@@ -46,6 +46,7 @@ struct tls_signature_hash_algorithm
 tls_ecdsa_sha256 __tls_sig_hash_algorithm = {
 	.code = htons ( TLS_ECDSA_SHA256_ALGORITHM ),
 	.algorithm = &ecpubkey_algorithm,
+	.parameter = &prime256v1_algorithm,
 	.pubkey = &ecdsa_algorithm,
 	.digest = &sha256_algorithm,
 };

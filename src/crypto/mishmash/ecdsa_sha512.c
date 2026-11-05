@@ -28,7 +28,6 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/ecdsa.h>
 #include <ipxe/sha512.h>
 #include <ipxe/asn1.h>
-#include <ipxe/tls.h>
 
 /** "ecdsa-with-SHA512" object identifier */
 static uint8_t oid_ecdsa_with_sha512[] = { ASN1_OID_ECDSA_WITH_SHA512 };
@@ -39,13 +38,4 @@ struct asn1_algorithm ecdsa_with_sha512_algorithm __asn1_algorithm = {
 	.pubkey = &ecdsa_algorithm,
 	.digest = &sha512_algorithm,
 	.oid = ASN1_CURSOR ( oid_ecdsa_with_sha512 ),
-};
-
-/** ECDSA with SHA-512 signature hash algorithm */
-struct tls_signature_hash_algorithm
-tls_ecdsa_sha512 __tls_sig_hash_algorithm = {
-	.code = htons ( TLS_ECDSA_SHA512_ALGORITHM ),
-	.algorithm = &ecpubkey_algorithm,
-	.pubkey = &ecdsa_algorithm,
-	.digest = &sha512_algorithm,
 };
