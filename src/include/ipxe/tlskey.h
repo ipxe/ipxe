@@ -84,6 +84,9 @@ struct tls_transcript {
 /** Transcript digest includes a Finished record */
 #define TLSKEY_TSF_FINISHED 0x0002
 
+/** Transcript digest is frozen */
+#define TLSKEY_TSF_FROZEN 0x0004
+
 /** A TLS key derivation function secret */
 struct tls_kdf_secret {
 	/** Secret */
@@ -346,6 +349,28 @@ tlskey_is_accumulating ( struct tls_key_schedule *tlskey ) {
 	return ( op && op->accumulates );
 }
 
+/**
+ * Freeze running handshake transcript digest
+ *
+ * @v tlskey		Key schedule
+ */
+static inline __attribute__ (( always_inline )) void
+tlskey_freeze ( struct tls_key_schedule *tlskey ) {
+
+	tlskey->transcript.flags |= TLSKEY_TSF_FROZEN;
+}
+
+/**
+ * Unfreeze running handshake transcript digest
+ *
+ * @v tlskey		Key schedule
+ */
+static inline __attribute__ (( always_inline )) void
+tlskey_unfreeze ( struct tls_key_schedule *tlskey ) {
+
+	tlskey->transcript.flags &= ~TLSKEY_TSF_FROZEN;
+}
+
 extern const struct tls_endpoint tls_client;
 extern const struct tls_endpoint tls_server;
 extern const struct tls_phase tls_early;
@@ -364,6 +389,7 @@ extern void tlskey_stop ( struct tls_key_schedule *tlskey );
 extern void tlskey_digest ( struct tls_key_schedule *tlskey,
 			    const void *data, size_t len );
 extern void tlskey_message ( struct tls_key_schedule *tlskey );
+extern void tlskey_rewind ( struct tls_key_schedule *tlskey );
 extern void tlskey_reset ( struct tls_key_schedule *tlskey );
 extern int tlskey_apply ( struct tls_key_schedule *tlskey,
 			  const void *shared, size_t shared_len );

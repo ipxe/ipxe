@@ -206,9 +206,10 @@ int tlskey_start ( struct tls_key_schedule *tlskey,
 		goto err_secretsize;
 	}
 	total = ( secretsize +	/* secret */
-		  ctxsize +	/* transcript.ctx */
 		  digestsize +	/* transcript.running */
-		  digestsize	/* transcript.finishing */ );
+		  ctxsize +	/* transcript.ctx */
+		  digestsize +	/* transcript.finishing */
+		  ctxsize	/* transcript.finishing (saved context) */ );
 
 	/* Allocate dynamic storage */
 	dynamic = zalloc ( total );
@@ -227,9 +228,10 @@ int tlskey_start ( struct tls_key_schedule *tlskey,
 	/* Assign dynamic storage */
 	tlskey->dynamic = dynamic;
 	tlskey->secret = dynamic;		dynamic += secretsize;
-	tlskey->transcript.ctx = dynamic;	dynamic += ctxsize;
 	tlskey->transcript.running = dynamic;	dynamic += digestsize;
+	tlskey->transcript.ctx = dynamic;	dynamic += ctxsize;
 	tlskey->transcript.finishing = dynamic;	dynamic += digestsize;
+	/* space for saved context */		dynamic += ctxsize;
 	assert ( dynamic == ( tlskey->dynamic + total ) );
 
 	/* Initialise transcript digest */
@@ -428,6 +430,10 @@ void tlskey_digest ( struct tls_key_schedule *tlskey, const void *data,
 	if ( ! digestsize )
 		return;
 
+	/* Do nothing if running transcript digest is frozen */
+	if ( transcript->flags & TLSKEY_TSF_FROZEN )
+		return;
+
 	/* Append to running transcript digest */
 	digest_update ( digest, transcript->ctx, data, len );
 
@@ -439,10 +445,10 @@ void tlskey_digest ( struct tls_key_schedule *tlskey, const void *data,
 	flags = tlskey_handshake ( tlskey, data, len );
 	transcript->flags |= flags;
 
-	/* Update the finishing digest value, if applicable */
+	/* Update the finishing digest, if applicable */
 	if ( ! ( ( transcript->flags ^ flags ) & TLSKEY_TSF_FINISHED ) ) {
 		memcpy ( transcript->finishing, transcript->running,
-			 digestsize );
+			 ( digestsize + ctxsize ) );
 	}
 
 	/* Clear temporary secrets */
@@ -471,6 +477,22 @@ void tlskey_message ( struct tls_key_schedule *tlskey ) {
 	digest_update ( digest, transcript->ctx, transcript->running,
 			digestsize );
 	tlskey_digest ( tlskey, NULL, 0 );
+}
+
+/**
+ * Rewind running transcript digest to the most recent Finished
+ *
+ * @v tlskey		Key schedule
+ */
+void tlskey_rewind ( struct tls_key_schedule *tlskey ) {
+	struct tls_transcript *transcript = &tlskey->transcript;
+	struct digest_algorithm *digest = tlskey->digest;
+	size_t digestsize = digest->digestsize;
+	size_t ctxsize = digest->ctxsize;
+
+	/* Replace the running digest */
+	memcpy ( transcript->running, transcript->finishing,
+		 ( digestsize + ctxsize ) );
 }
 
 /*****************************************************************************
