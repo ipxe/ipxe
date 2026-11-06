@@ -1181,11 +1181,12 @@ static int tlskey_hkdf_verify ( struct tls_key_schedule *tlskey,
 	if ( verify_len != digestsize )
 		return -EINVAL;
 
-	/* Verification data is derived from handshake secrets */
-	if ( traffic->phase != &tls_handshake ) {
+	/* Verification data is derived from handshake or later secrets */
+	if ( ! ( ( traffic->phase == &tls_handshake ) ||
+		 ( traffic->phase == &tls_application ) ) ) {
 		DBGC ( tlskey, "TLSKEY %p cannot generate %s verification "
-		       "data without %s handshake traffic secrets\n",
-		       tlskey, end->name, end->name );
+		       "data with %s traffic secrets\n", tlskey, end->name,
+		       ( traffic->phase ? traffic->phase->name : "no" ) );
 		return -EPROTO;
 	}
 

@@ -2177,6 +2177,9 @@ static int tls_client_hello ( struct tls_connection *tls,
 	/* Prepare ExtendedMasterSecret extension */
 	ext->ems.data = empty;
 
+	/* Prepare PostHandshakeAuth extension */
+	ext->postauth.data = empty;
+
 	/* Prepare MaxFragmentLength extension */
 	ext->frag.len = sizeof ( *frag );
 
@@ -2414,6 +2417,9 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	}
 	assert ( next->data == iobuf->tail );
 
+	/* Allow for use in post-handshake authentication */
+	tlskey_unfreeze ( &tls->key );
+
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
 		goto err_send;
@@ -2583,6 +2589,9 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	/* Build DigitallySigned structure */
 	tls_build ( tls_digitally_signed, tls->version, &dsig, &cursor );
 
+	/* Allow for use in post-handshake authentication */
+	tlskey_unfreeze ( &tls->key );
+
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
 		goto err_send;
@@ -2671,6 +2680,7 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 	 * activated until after sending the record.
 	 */
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
+	     ( ! tls_ready ( tls ) ) &&
 	     ( ( rc = tls_prep_cipher ( tls, cipherspec,
 					&tls_application ) ) != 0 ) ) {
 		goto err_prep;
@@ -2679,6 +2689,10 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
 		goto err_send;
+
+	/* Do nothing more if this is a post-handshake authentication */
+	if ( tls_ready ( tls ) )
+		goto post_handshake_auth;
 
 	/* Change the (already prepared) cipher specification */
 	if ( tls_version ( tls, TLS_VERSION_TLS_1_3 ) &&
@@ -2697,6 +2711,7 @@ static int tls_send_finished ( struct tls_connection *tls ) {
 
  err_establish:
  err_change:
+ post_handshake_auth:
  err_send:
  err_prep:
  err_verify:
@@ -3428,6 +3443,17 @@ tls_new_certificate_request ( struct tls_connection *tls,
 		       "to private key\n", tls );
 	}
 
+	/* Schedule post-handshake authentication, if applicable */
+	if ( tls_ready ( tls ) ) {
+		tlskey_rewind ( &tls->key );
+		tlskey_unfreeze ( &tls->key );
+		tls->tx.pending |= TLS_TX_CERTIFICATE;
+		if ( cert )
+			tls->tx.pending |= TLS_TX_CERTIFICATE_VERIFY;
+		tls->tx.pending |= TLS_TX_FINISHED;
+		tls_tx_resume ( tls );
+	}
+
 	return 0;
 }
 
@@ -3661,11 +3687,15 @@ static int tls_new_handshake ( struct tls_connection *tls,
 		if ( handler && ( ( rc = handler ( tls, &cursor ) ) != 0 ) )
 			return rc;
 
-		/* Add to handshake digest (except for Hello Requests,
+		/* Add to transcript digest (except for Hello Requests,
 		 * which are explicitly excluded).
 		 */
 		if ( handshake->type != TLS_HELLO_REQUEST )
 			tls_add_handshake ( tls, handshake, len );
+
+		/* Freeze transcript digest if handshake has completed */
+		if ( tls_ready ( tls ) )
+			tlskey_freeze ( &tls->key );
 
 		/* Move to next handshake record */
 		iob_pull ( iobuf, len );
@@ -4907,6 +4937,10 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 		}
 		tls->tx.pending &= ~TLS_TX_KEY_UPDATE;
 	}
+
+	/* Freeze transcript digest if handshake has completed */
+	if ( tls_ready ( tls ) )
+		tlskey_freeze ( &tls->key );
 
 	/* Reschedule process if pending transmissions remain,
 	 * otherwise send notification of a window change.

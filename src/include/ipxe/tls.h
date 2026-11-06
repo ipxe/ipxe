@@ -204,6 +204,9 @@ union tls_server_random {
 #define TLS_PSK_MODE_KE 0
 #define TLS_PSK_MODE_DHE_KE 1
 
+/* TLS post-handshake authentication */
+#define TLS_POST_HANDSHAKE_AUTH 49
+
 /* TLS key share extension */
 #define TLS_KEY_SHARE 51
 

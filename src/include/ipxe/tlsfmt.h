@@ -463,6 +463,8 @@ struct tls_client_hello {
 		struct tls_cursor keys;
 		/** Server name indication extension */
 		struct tls_cursor names;
+		/** Post-handshake authentication extension */
+		struct tls_cursor postauth;
 		/** Preshared key modes extension */
 		struct tls_cursor pskmodes;
 		/** Record size limit extension */

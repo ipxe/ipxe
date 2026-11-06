@@ -730,6 +730,7 @@ TLS_DESCR_MAPPING ( tls_client_hello ) = {
 	TLS_EXTND ( tls_client_hello, TLS_KEY_SHARE, ext.keys ),
 	TLS_EXTND ( tls_client_hello, TLS_SERVER_NAME, ext.names ),
 	TLS_EXTND ( tls_client_hello, TLS_PSK, ext.psks ),
+	TLS_EXTND ( tls_client_hello, TLS_POST_HANDSHAKE_AUTH, ext.postauth ),
 	TLS_EXTND ( tls_client_hello, TLS_PSK_MODE, ext.pskmodes ),
 	TLS_EXTND ( tls_client_hello, TLS_RECORD_SIZE_LIMIT, ext.record ),
 	TLS_EXTND ( tls_client_hello, TLS_RENEGOTIATION_INFO, ext.reneg ),
