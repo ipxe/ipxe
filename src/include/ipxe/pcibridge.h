@@ -10,13 +10,12 @@
 FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stdint.h>
-#include <ipxe/list.h>
 #include <ipxe/pci.h>
 
 /** A PCI-to-PCI bridge */
 struct pci_bridge {
 	/** PCI device */
-	struct pci_device *pci;
+	struct pci_device pci;
 	/** Bridge numbers */
 	union {
 		/** Raw dword */
@@ -38,10 +37,9 @@ struct pci_bridge {
 	uint64_t prefmembase;
 	/** Prefetchable memory limit */
 	uint64_t prefmemlimit;
-	/** List of bridges */
-	struct list_head list;
 };
 
-extern struct pci_bridge * pcibridge_find ( struct pci_device *pci );
+extern int pcibridge_find ( struct pci_device *pci,
+			    struct pci_bridge *bridge );
 
 #endif /* _IPXE_PCIBRIDGE_H */

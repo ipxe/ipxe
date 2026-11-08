@@ -25,6 +25,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 #include <byteswap.h>
 #include <ipxe/pci.h>
@@ -36,49 +37,17 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  */
 
-/** List of all PCI bridges */
-static LIST_HEAD ( pcibridges );
-
 /**
- * Find bridge attached to a PCI device
+ * Read PCI bridge configuration
  *
- * @v pci		PCI device
- * @ret bridge		PCI bridge, or NULL
+ * @v bridge		PCI bridge
  */
-struct pci_bridge * pcibridge_find ( struct pci_device *pci ) {
-	unsigned int bus = PCI_BUS ( pci->busdevfn );
-	struct pci_bridge *bridge;
-
-	/* Find matching bridge */
-	list_for_each_entry ( bridge, &pcibridges, list ) {
-		if ( bus == bridge->secondary )
-			return bridge;
-	}
-
-	return NULL;
-}
-
-/**
- * Probe PCI device
- *
- * @v pci		PCI device
- * @ret rc		Return status code
- */
-static int pcibridge_probe ( struct pci_device *pci ) {
-	struct pci_bridge *bridge;
+static void pcibridge_read_config ( struct pci_bridge *bridge ) {
+	struct pci_device *pci = &bridge->pci;
 	uint16_t base;
 	uint16_t limit;
 	uint32_t base_hi;
 	uint32_t limit_hi;
-	int rc;
-
-	/* Allocate and initialise structure */
-	bridge = zalloc ( sizeof ( *bridge ) );
-	if ( ! bridge ) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
-	bridge->pci = pci;
 
 	/* Read bus configuration */
 	pci_read_config_dword ( pci, PCI_PRIMARY, &bridge->buses );
@@ -107,44 +76,47 @@ static int pcibridge_probe ( struct pci_device *pci ) {
 	       "[%08llx,%08llx)\n", PCI_ARGS ( pci ), bridge->membase,
 	       bridge->memlimit, ( ( unsigned long long ) bridge->prefmembase ),
 	       ( ( unsigned long long ) bridge->prefmemlimit ) );
-
-	/* Add to list of PCI bridges */
-	list_add ( &bridge->list, &pcibridges );
-
-	pci_set_drvdata ( pci, bridge );
-	return 0;
-
-	free ( bridge );
- err_alloc:
-	return rc;
 }
 
 /**
- * Remove PCI device
+ * Find bridge attached to a PCI device
  *
  * @v pci		PCI device
+ * @v bridge		PCI bridge to fill in
+ * @ret rc		Return status code
  */
-static void pcibridge_remove ( struct pci_device *pci ) {
-	struct pci_bridge *bridge = pci_get_drvdata ( pci );
+int pcibridge_find ( struct pci_device *pci, struct pci_bridge *bridge ) {
+	unsigned int bus = PCI_BUS ( pci->busdevfn );
+	uint32_t busdevfn = 0;
+	uint8_t hdrtype;
+	int rc;
 
-	/* Remove from list of bridges */
-	list_del ( &bridge->list );
+	/* Find containing bridge */
+	memset ( bridge, 0, sizeof ( *bridge ) );
+	do {
+		/* Find next PCI device */
+		if ( ( rc = pci_find_next ( &bridge->pci, &busdevfn ) ) != 0 )
+			return rc;
 
-	/* Free device */
-	free ( bridge );
+		/* Fail if we have reached the target device's bus */
+		if ( PCI_BUS ( bridge->pci.busdevfn ) >= bus )
+			break;
+
+		/* Ignore non-bridge devices */
+		hdrtype = ( bridge->pci.hdrtype & PCI_HEADER_TYPE_MASK );
+		if ( hdrtype != PCI_HEADER_TYPE_BRIDGE )
+			continue;
+
+		/* Read bridge configuration */
+		pcibridge_read_config ( bridge );
+
+		/* Check for matching bridge */
+		if ( bridge->secondary == bus )
+			return 0;
+
+	} while ( ++busdevfn );
+
+	DBGC ( bridge, "BRIDGE could not find bridge for " PCI_FMT "\n",
+	       PCI_ARGS ( pci ) );
+	return -ENODEV;
 }
-
-/** Bridge PCI device IDs */
-static struct pci_device_id pcibridge_ids[] = {
-	PCI_ROM ( 0xffff, 0xffff, "bridge", "Bridge", 0 ),
-};
-
-/** Bridge PCI driver */
-struct pci_driver pcibridge_driver __pci_driver = {
-	.ids = pcibridge_ids,
-	.id_count = ( sizeof ( pcibridge_ids ) / sizeof ( pcibridge_ids[0] ) ),
-	.class = PCI_CLASS_ID ( PCI_CLASS_BRIDGE, PCI_CLASS_BRIDGE_PCI,
-				PCI_ANY_ID ),
-	.probe = pcibridge_probe,
-	.remove = pcibridge_remove,
-};

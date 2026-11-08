@@ -1288,7 +1288,8 @@ static struct net_device_operations ena_operations = {
 static int ena_membases ( struct ena_nic *ena, struct pci_device *pci,
 			  unsigned long *prefmembase,
 			  unsigned long *prefmemsize ) {
-	struct pci_bridge *bridge;
+	struct pci_bridge bridge;
+	int rc;
 
 	/* Get on-device memory base address and size */
 	*prefmembase = pci_bar_start ( pci, ENA_MEM_BAR );
@@ -1299,13 +1300,12 @@ static int ena_membases ( struct ena_nic *ena, struct pci_device *pci,
 		return 0;
 
 	/* Locate PCI bridge */
-	bridge = pcibridge_find ( pci );
-	if ( ! bridge ) {
+	if ( ( rc = pcibridge_find ( pci, &bridge ) ) != 0 ) {
 		DBGC ( ena, "ENA %p found no PCI bridge\n", ena );
-		return -ENOTCONN;
+		return rc;
 	}
 	DBGC ( ena, "ENA %p at " PCI_FMT " claiming bridge " PCI_FMT "\n",
-	       ena, PCI_ARGS ( pci ), PCI_ARGS ( bridge->pci ) );
+	       ena, PCI_ARGS ( pci ), PCI_ARGS ( &bridge.pci ) );
 
 	/* Sanity check */
 	if ( PCI_SLOT ( pci->busdevfn ) || PCI_FUNC ( pci->busdevfn ) ) {
@@ -1316,16 +1316,16 @@ static int ena_membases ( struct ena_nic *ena, struct pci_device *pci,
 
 	/* Place register BAR at start of memory window, if applicable */
 	if ( ! pci->membase ) {
-		pci_bar_set ( pci, ENA_REGS_BAR, bridge->membase );
-		pci->membase = bridge->membase;
+		pci_bar_set ( pci, ENA_REGS_BAR, bridge.membase );
+		pci->membase = bridge.membase;
 		DBGC ( ena, "ENA %p at " PCI_FMT " claiming mem %08lx\n",
 		       ena, PCI_ARGS ( pci ), pci->membase );
 	}
 
 	/* Place memory BAR at start of prefetchable window, if applicable */
 	if ( *prefmemsize && ( ! *prefmembase ) ) {
-		pci_bar_set ( pci, ENA_MEM_BAR, bridge->prefmembase );
-		*prefmembase = bridge->prefmembase;
+		pci_bar_set ( pci, ENA_MEM_BAR, bridge.prefmembase );
+		*prefmembase = bridge.prefmembase;
 		DBGC ( ena, "ENA %p at " PCI_FMT " claiming prefmem %08lx\n",
 		       ena, PCI_ARGS ( pci ), *prefmembase );
 	}
