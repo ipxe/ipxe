@@ -362,8 +362,7 @@ int pci_find_next ( struct pci_device *pci, uint32_t *busdevfn ) {
 		/* If device is a bridge, expand the PCI bus:dev.fn
 		 * address range as needed.
 		 */
-		pci_read_config_byte ( pci, PCI_HEADER_TYPE, &hdrtype );
-		hdrtype &= PCI_HEADER_TYPE_MASK;
+		hdrtype = ( pci->hdrtype & PCI_HEADER_TYPE_MASK );
 		if ( hdrtype == PCI_HEADER_TYPE_BRIDGE ) {
 			pci_read_config_byte ( pci, PCI_SUBORDINATE, &sub );
 			if ( sub <= PCI_BUS ( *busdevfn ) ) {
