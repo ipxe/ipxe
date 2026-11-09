@@ -216,6 +216,8 @@ VERSION_MAJOR	:= 2
 VERSION_MINOR	:= 0
 VERSION_PATCH	:= 0
 EXTRAVERSION	:= +
+GITVERSION	:= $(shell git rev-parse HEAD 2>/dev/null)
+ifeq ($(GITVERSION),)
 ifneq ($(wildcard ../.git/HEAD),)
 GITVERSION	:= $(shell cat ../.git/HEAD)
 ifeq ($(firstword $(GITVERSION)),ref:)
@@ -225,6 +227,7 @@ GITVERSION	:= $(shell cat ../.git/$(GITREF))
 else
 GITVERSION	:= $(shell awk -v ref="$(GITREF)" '$$2 == ref { print $1 }' \
 			   ../.git/packed-refs)
+endif
 endif
 endif
 ifeq ($(GITVERSION),)
