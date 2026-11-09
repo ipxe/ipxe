@@ -26,6 +26,7 @@ struct efi_pci_device {
 	EFI_PCI_IO_PROTOCOL *io;
 };
 
+extern int efipci_location ( EFI_HANDLE device, uint32_t *busdevfn );
 extern int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci );
 
 #endif /* _IPXE_EFI_PCI_H */

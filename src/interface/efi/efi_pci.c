@@ -246,6 +246,57 @@ static void efipci_discover ( uint32_t busdevfn, struct pci_range *range ) {
 }
 
 /**
+ * Check if PCI bus probing is allowed
+ *
+ * @v pci		PCI device
+ * @ret allowed		Bus probing is allowed
+ *
+ * We allow direct probing if the firmware has failed to create a PCI
+ * I/O protocol instance for the device.
+ */
+static int efipci_can_probe ( struct pci_device *pci ) {
+	EFI_BOOT_SERVICES *bs = efi_systab->BootServices;
+	EFI_GUID *protocol = &efi_pci_io_protocol_guid;
+	EFI_HANDLE *handles;
+	UINTN count;
+	unsigned int i;
+	int allowed;
+	uint32_t busdevfn;
+	EFI_STATUS efirc;
+	int rc;
+
+	/* Assume probing is allowed unless we find a matching handle */
+	allowed = 1;
+
+	/* Locate all PCI I/O protocol handles */
+	if ( ( efirc = bs->LocateHandleBuffer ( ByProtocol, protocol, NULL,
+						&count, &handles ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( pci, "EFIPCI " PCI_FMT " cannot locate protocols: %s\n",
+		       PCI_ARGS ( pci ), strerror ( rc ) );
+		goto err_locate;
+	}
+
+	/* Look for a matching handle */
+	for ( i = 0 ; i < count ; i++ ) {
+		if ( ( rc = efipci_location ( handles[i], &busdevfn ) ) != 0 )
+			continue;
+		if ( busdevfn == pci->busdevfn ) {
+			allowed = 0;
+			break;
+		}
+	}
+
+	bs->FreePool ( handles );
+ err_locate:
+	if ( allowed ) {
+		DBGC ( pci, "EFIPCI " PCI_FMT " allowing direct probing\n",
+		       PCI_ARGS ( pci ) );
+	}
+	return allowed;
+}
+
+/**
  * Open EFI PCI root bridge I/O protocol for ephemeral use
  *
  * @v pci		PCI device
@@ -434,7 +485,7 @@ void * efipci_ioremap ( struct pci_device *pci, unsigned long bus_addr,
 	return ioremap ( bus_addr, len );
 }
 
-PROVIDE_PCIAPI_INLINE ( efi, pci_can_probe );
+PROVIDE_PCIAPI ( efi, pci_can_probe, efipci_can_probe );
 PROVIDE_PCIAPI ( efi, pci_discover, efipci_discover );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_byte );
 PROVIDE_PCIAPI_INLINE ( efi, pci_read_config_word );
@@ -702,6 +753,43 @@ static struct dma_operations efipci_dma_operations = {
  */
 
 /**
+ * Get EFI PCI device location
+ *
+ * @v device		EFI device handle
+ * @v busdevfn		PCI bus:dev.fn address to fill in
+ * @ret rc		Return status code
+ */
+int efipci_location ( EFI_HANDLE device, uint32_t *busdevfn ) {
+	EFI_PCI_IO_PROTOCOL *pci_io;
+	EFI_STATUS efirc;
+	UINTN pci_segment;
+	UINTN pci_bus;
+	UINTN pci_dev;
+	UINTN pci_fn;
+	int rc;
+
+	/* Open PCI I/O protocol */
+	if ( ( rc = efi_open ( device, &efi_pci_io_protocol_guid,
+			       &pci_io ) ) != 0 ) {
+		DBGC ( device, "EFIPCI %s cannot open PCI protocols: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+
+	/* Get PCI bus:dev.fn address */
+	if ( ( efirc = pci_io->GetLocation ( pci_io, &pci_segment, &pci_bus,
+					     &pci_dev, &pci_fn ) ) != 0 ) {
+		rc = -EEFI ( efirc );
+		DBGC ( device, "EFIPCI %s could not get PCI location: %s\n",
+		       efi_handle_name ( device ), strerror ( rc ) );
+		return rc;
+	}
+	*busdevfn = PCI_BUSDEVFN ( pci_segment, pci_bus, pci_dev, pci_fn );
+
+	return 0;
+}
+
+/**
  * Get EFI PCI device information
  *
  * @v device		EFI device handle
@@ -710,9 +798,7 @@ static struct dma_operations efipci_dma_operations = {
  */
 int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
 	EFI_PCI_IO_PROTOCOL *pci_io;
-	UINTN pci_segment, pci_bus, pci_dev, pci_fn;
-	unsigned int busdevfn;
-	EFI_STATUS efirc;
+	uint32_t busdevfn;
 	int rc;
 
 	/* See if device is a PCI device */
@@ -725,14 +811,8 @@ int efipci_info ( EFI_HANDLE device, struct efi_pci_device *efipci ) {
 	efipci->io = pci_io;
 
 	/* Get PCI bus:dev.fn address */
-	if ( ( efirc = pci_io->GetLocation ( pci_io, &pci_segment, &pci_bus,
-					     &pci_dev, &pci_fn ) ) != 0 ) {
-		rc = -EEFI ( efirc );
-		DBGC ( device, "EFIPCI %s could not get PCI location: %s\n",
-		       efi_handle_name ( device ), strerror ( rc ) );
+	if ( ( rc = efipci_location ( device, &busdevfn ) ) != 0 )
 		return rc;
-	}
-	busdevfn = PCI_BUSDEVFN ( pci_segment, pci_bus, pci_dev, pci_fn );
 	pci_init ( &efipci->pci, busdevfn );
 	dma_init ( &efipci->pci.dma, &efipci_dma_operations );
 	DBGCP ( device, "EFIPCI " PCI_FMT " is %s\n",
