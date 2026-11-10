@@ -70,10 +70,25 @@ PROVIDE_DMAAPI_INLINE ( flat, dma );
 static int dma_op_map ( struct dma_device *dma, struct dma_mapping *map,
 			void *addr, size_t len, int flags ) {
 	struct dma_operations *op = dma->op;
+	int rc;
 
+	/* Sanity check */
+	assert ( map->dma == NULL );
+
+	/* Map buffer */
 	if ( ! op )
 		return -ENODEV;
-	return op->map ( dma, map, addr, len, flags );
+	if ( ( rc = op->map ( dma, map, addr, len, flags ) ) != 0 )
+		return rc;
+
+	/* Populate mapping */
+	map->dma = dma;
+
+	/* Increment mapping count (for debugging) */
+	if ( DBG_LOG )
+		dma->mapped++;
+
+	return 0;
 }
 
 /**
@@ -85,9 +100,19 @@ static int dma_op_map ( struct dma_device *dma, struct dma_mapping *map,
 static void dma_op_unmap ( struct dma_mapping *map, size_t len ) {
 	struct dma_device *dma = map->dma;
 
+	/* Sanity check */
 	assert ( dma != NULL );
 	assert ( dma->op != NULL );
+
+	/* Unmap buffer */
 	dma->op->unmap ( dma, map, len );
+
+	/* Clear mapping */
+	map->dma = NULL;
+
+	/* Decrement mapping count (for debugging) */
+	if ( DBG_LOG )
+		dma->mapped--;
 }
 
 /**
@@ -102,10 +127,26 @@ static void dma_op_unmap ( struct dma_mapping *map, size_t len ) {
 static void * dma_op_alloc ( struct dma_device *dma, struct dma_mapping *map,
 			     size_t len, size_t align ) {
 	struct dma_operations *op = dma->op;
+	void *addr;
 
+	/* Sanity check */
+	assert ( map->dma == NULL );
+
+	/* Allocate and map buffer */
 	if ( ! op )
 		return NULL;
-	return op->alloc ( dma, map, len, align );
+	addr = op->alloc ( dma, map, len, align );
+	if ( ! addr )
+		return NULL;
+
+	/* Populate mapping */
+	map->dma = dma;
+
+	/* Increment allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated++;
+
+	return addr;
 }
 
 /**
@@ -118,9 +159,19 @@ static void * dma_op_alloc ( struct dma_device *dma, struct dma_mapping *map,
 static void dma_op_free ( struct dma_mapping *map, void *addr, size_t len ) {
 	struct dma_device *dma = map->dma;
 
+	/* Sanity check */
 	assert ( dma != NULL );
 	assert ( dma->op != NULL );
+
+	/* Unmap and free buffer */
 	dma->op->free ( dma, map, addr, len );
+
+	/* Clear mapping */
+	map->dma = NULL;
+
+	/* Decrement allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated--;
 }
 
 /**
@@ -136,10 +187,26 @@ static void * dma_op_umalloc ( struct dma_device *dma,
 			       struct dma_mapping *map,
 			       size_t len, size_t align ) {
 	struct dma_operations *op = dma->op;
+	void *addr;
 
+	/* Sanity check */
+	assert ( map->dma == NULL );
+
+	/* Allocate and map buffer */
 	if ( ! op )
 		return NULL;
-	return op->umalloc ( dma, map, len, align );
+	addr = op->umalloc ( dma, map, len, align );
+	if ( ! addr )
+		return NULL;
+
+	/* Populate mapping */
+	map->dma = dma;
+
+	/* Increment allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated++;
+
+	return addr;
 }
 
 /**
@@ -152,9 +219,19 @@ static void * dma_op_umalloc ( struct dma_device *dma,
 static void dma_op_ufree ( struct dma_mapping *map, void *addr, size_t len ) {
 	struct dma_device *dma = map->dma;
 
+	/* Sanity check */
 	assert ( dma != NULL );
 	assert ( dma->op != NULL );
+
+	/* Unmap and free buffer */
 	dma->op->ufree ( dma, map, addr, len );
+
+	/* Clear mapping */
+	map->dma = NULL;
+
+	/* Decrement allocation count (for debugging) */
+	if ( DBG_LOG )
+		dma->allocated--;
 }
 
 /**
@@ -166,8 +243,10 @@ static void dma_op_ufree ( struct dma_mapping *map, void *addr, size_t len ) {
 static void dma_op_set_mask ( struct dma_device *dma, physaddr_t mask ) {
 	struct dma_operations *op = dma->op;
 
-	if ( op )
-		op->set_mask ( dma, mask );
+	/* Set mask */
+	if ( ! op )
+		return;
+	op->set_mask ( dma, mask );
 }
 
 PROVIDE_DMAAPI ( op, dma_map, dma_op_map );

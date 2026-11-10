@@ -528,7 +528,6 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
 	int rc;
 
 	/* Sanity check */
-	assert ( map->dma == NULL );
 	assert ( map->offset == 0 );
 	assert ( map->token == NULL );
 
@@ -575,13 +574,8 @@ static int efipci_dma_map ( struct dma_device *dma, struct dma_mapping *map,
 	}
 
 	/* Populate mapping */
-	map->dma = dma;
 	map->offset = ( bus - phys );
 	map->token = mapping;
-
-	/* Increment mapping count (for debugging) */
-	if ( DBG_LOG )
-		dma->mapped++;
 
 	return 0;
 
@@ -609,13 +603,8 @@ static void efipci_dma_unmap ( struct dma_device *dma,
 		pci_io->Unmap ( pci_io, map->token );
 
 	/* Clear mapping */
-	map->dma = NULL;
 	map->offset = 0;
 	map->token = NULL;
-
-	/* Decrement mapping count (for debugging) */
-	if ( DBG_LOG )
-		dma->mapped--;
 }
 
 /**
@@ -660,10 +649,6 @@ static void * efipci_dma_alloc ( struct dma_device *dma,
 				     DMA_BI ) ) != 0 )
 		goto err_map;
 
-	/* Increment allocation count (for debugging) */
-	if ( DBG_LOG )
-		dma->allocated++;
-
 	return addr;
 
 	efipci_dma_unmap ( dma, map, len );
@@ -696,10 +681,6 @@ static void efipci_dma_free ( struct dma_device *dma, struct dma_mapping *map,
 
 	/* Free buffer */
 	pci_io->FreeBuffer ( pci_io, pages, addr );
-
-	/* Decrement allocation count (for debugging) */
-	if ( DBG_LOG )
-		dma->allocated--;
 }
 
 /**
