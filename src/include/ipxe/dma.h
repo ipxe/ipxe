@@ -180,16 +180,12 @@ struct dma_operations {
  * @ret rc		Return status code
  */
 static inline __always_inline int
-DMAAPI_INLINE ( flat, dma_map ) ( struct dma_device *dma,
-				  struct dma_mapping *map, void *addr __unused,
-				  size_t len __unused, int flags __unused ) {
+DMAAPI_INLINE ( flat, dma_map ) ( struct dma_device *dma __unused,
+				  struct dma_mapping *map __unused,
+				  void *addr __unused, size_t len __unused,
+				  int flags __unused ) {
 
-	/* Increment mapping count (for debugging) */
-	if ( DBG_LOG ) {
-		map->dma = dma;
-		dma->mapped++;
-	}
-
+	/* Nothing to do */
 	return 0;
 }
 
@@ -200,15 +196,10 @@ DMAAPI_INLINE ( flat, dma_map ) ( struct dma_device *dma,
  * @v len		Used length
  */
 static inline __always_inline void
-DMAAPI_INLINE ( flat, dma_unmap ) ( struct dma_mapping *map,
+DMAAPI_INLINE ( flat, dma_unmap ) ( struct dma_mapping *map __unused,
 				    size_t len __unused ) {
 
-	/* Decrement mapping count (for debugging) */
-	if ( DBG_LOG ) {
-		assert ( map->dma != NULL );
-		map->dma->mapped--;
-		map->dma = NULL;
-	}
+	/* Nothing to do */
 }
 
 /**
@@ -221,21 +212,12 @@ DMAAPI_INLINE ( flat, dma_unmap ) ( struct dma_mapping *map,
  * @ret addr		Buffer address, or NULL on error
  */
 static inline __always_inline void *
-DMAAPI_INLINE ( flat, dma_alloc ) ( struct dma_device *dma,
-				    struct dma_mapping *map,
+DMAAPI_INLINE ( flat, dma_alloc ) ( struct dma_device *dma __unused,
+				    struct dma_mapping *map __unused,
 				    size_t len, size_t align ) {
-	void *addr;
 
 	/* Allocate buffer */
-	addr = malloc_phys ( len, align );
-
-	/* Increment mapping count (for debugging) */
-	if ( DBG_LOG && addr ) {
-		map->dma = dma;
-		dma->mapped++;
-	}
-
-	return addr;
+	return malloc_phys ( len, align );
 }
 
 /**
@@ -246,18 +228,11 @@ DMAAPI_INLINE ( flat, dma_alloc ) ( struct dma_device *dma,
  * @v len		Length of buffer
  */
 static inline __always_inline void
-DMAAPI_INLINE ( flat, dma_free ) ( struct dma_mapping *map,
+DMAAPI_INLINE ( flat, dma_free ) ( struct dma_mapping *map __unused,
 				   void *addr, size_t len ) {
 
 	/* Free buffer */
 	free_phys ( addr, len );
-
-	/* Decrement mapping count (for debugging) */
-	if ( DBG_LOG ) {
-		assert ( map->dma != NULL );
-		map->dma->mapped--;
-		map->dma = NULL;
-	}
 }
 
 /**
@@ -270,21 +245,12 @@ DMAAPI_INLINE ( flat, dma_free ) ( struct dma_mapping *map,
  * @ret addr		Buffer address, or NULL on error
  */
 static inline __always_inline void *
-DMAAPI_INLINE ( flat, dma_umalloc ) ( struct dma_device *dma,
-				      struct dma_mapping *map,
+DMAAPI_INLINE ( flat, dma_umalloc ) ( struct dma_device *dma __unused,
+				      struct dma_mapping *map __unused,
 				      size_t len, size_t align __unused ) {
-	void *addr;
 
 	/* Allocate buffer */
-	addr = umalloc ( len );
-
-	/* Increment mapping count (for debugging) */
-	if ( DBG_LOG && addr ) {
-		map->dma = dma;
-		dma->mapped++;
-	}
-
-	return addr;
+	return umalloc ( len );
 }
 
 /**
@@ -295,18 +261,11 @@ DMAAPI_INLINE ( flat, dma_umalloc ) ( struct dma_device *dma,
  * @v len		Length of buffer
  */
 static inline __always_inline void
-DMAAPI_INLINE ( flat, dma_ufree ) ( struct dma_mapping *map,
+DMAAPI_INLINE ( flat, dma_ufree ) ( struct dma_mapping *map __unused,
 				    void *addr, size_t len __unused ) {
 
 	/* Free buffer */
 	ufree ( addr );
-
-	/* Decrement mapping count (for debugging) */
-	if ( DBG_LOG ) {
-		assert ( map->dma != NULL );
-		map->dma->mapped--;
-		map->dma = NULL;
-	}
 }
 
 /**
