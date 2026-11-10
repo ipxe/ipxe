@@ -76,9 +76,7 @@ static int dma_op_map ( struct dma_device *dma, struct dma_mapping *map,
 	assert ( map->dma == NULL );
 
 	/* Map buffer */
-	if ( ! op )
-		return -ENODEV;
-	if ( ( rc = op->map ( dma, map, addr, len, flags ) ) != 0 )
+	if ( op && ( ( rc = op->map ( dma, map, addr, len, flags ) ) != 0 ) )
 		return rc;
 
 	/* Populate mapping */
@@ -102,10 +100,10 @@ static void dma_op_unmap ( struct dma_mapping *map, size_t len ) {
 
 	/* Sanity check */
 	assert ( dma != NULL );
-	assert ( dma->op != NULL );
 
 	/* Unmap buffer */
-	dma->op->unmap ( dma, map, len );
+	if ( dma->op )
+		dma->op->unmap ( dma, map, len );
 
 	/* Clear mapping */
 	map->dma = NULL;
@@ -133,9 +131,8 @@ static void * dma_op_alloc ( struct dma_device *dma, struct dma_mapping *map,
 	assert ( map->dma == NULL );
 
 	/* Allocate and map buffer */
-	if ( ! op )
-		return NULL;
-	addr = op->alloc ( dma, map, len, align );
+	addr = ( op ? op->alloc ( dma, map, len, align ) :
+		 malloc_phys ( len, align ) );
 	if ( ! addr )
 		return NULL;
 
@@ -161,10 +158,13 @@ static void dma_op_free ( struct dma_mapping *map, void *addr, size_t len ) {
 
 	/* Sanity check */
 	assert ( dma != NULL );
-	assert ( dma->op != NULL );
 
 	/* Unmap and free buffer */
-	dma->op->free ( dma, map, addr, len );
+	if ( dma->op ) {
+		dma->op->free ( dma, map, addr, len );
+	} else {
+		free_phys ( addr, len );
+	}
 
 	/* Clear mapping */
 	map->dma = NULL;
@@ -193,9 +193,7 @@ static void * dma_op_umalloc ( struct dma_device *dma,
 	assert ( map->dma == NULL );
 
 	/* Allocate and map buffer */
-	if ( ! op )
-		return NULL;
-	addr = op->umalloc ( dma, map, len, align );
+	addr = ( op ? op->umalloc ( dma, map, len, align ) : umalloc ( len ) );
 	if ( ! addr )
 		return NULL;
 
@@ -221,10 +219,13 @@ static void dma_op_ufree ( struct dma_mapping *map, void *addr, size_t len ) {
 
 	/* Sanity check */
 	assert ( dma != NULL );
-	assert ( dma->op != NULL );
 
 	/* Unmap and free buffer */
-	dma->op->ufree ( dma, map, addr, len );
+	if ( dma->op ) {
+		dma->op->ufree ( dma, map, addr, len );
+	} else {
+		ufree ( addr );
+	}
 
 	/* Clear mapping */
 	map->dma = NULL;
