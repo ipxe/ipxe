@@ -246,12 +246,20 @@ struct acpi_rsdp {
 /** Root System Description Table (RSDT) signature */
 #define RSDT_SIGNATURE ACPI_SIGNATURE ( 'R', 'S', 'D', 'T' )
 
+/** Extended System Description Table (XSDT) signature */
+#define XSDT_SIGNATURE ACPI_SIGNATURE ( 'X', 'S', 'D', 'T' )
+
 /** ACPI Root System Description Table (RSDT) */
 struct acpi_rsdt {
 	/** ACPI header */
 	struct acpi_header acpi;
 	/** ACPI table entries */
-	uint32_t entry[0];
+	union {
+		/** 32-bit RSDT entries */
+		uint32_t entry32[0];
+		/** 64-bit XSDT entries */
+		uint64_t entry64[0];
+	};
 } __attribute__ (( packed ));
 
 /** Fixed ACPI Description Table (FADT) signature */

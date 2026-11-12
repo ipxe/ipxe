@@ -97,7 +97,7 @@ const struct acpi_header * acpi_table ( uint32_t signature,
 }
 
 /**
- * Locate ACPI table via RSDT
+ * Locate ACPI table via RSDT/XSDT
  *
  * @v signature		Requested table signature
  * @v index		Requested index of table with this signature
@@ -107,20 +107,29 @@ const struct acpi_header * acpi_find_via_rsdt ( uint32_t signature,
 						unsigned int index ) {
 	const struct acpi_rsdt *rsdt;
 	const struct acpi_header *table;
+	physaddr_t entry;
 	size_t len;
+	int ext;
 	unsigned int count;
 	unsigned int i;
 
-	/* Locate RSDT */
+	/* Locate RSDT/XSDT */
 	rsdt = acpi_find_rsdt();
 	if ( ! rsdt ) {
-		DBG ( "RSDT not found\n" );
+		DBG ( "RSDT/XSDT not found\n" );
 		return NULL;
 	}
 
-	/* Read RSDT header */
-	if ( rsdt->acpi.signature != cpu_to_le32 ( RSDT_SIGNATURE ) ) {
-		DBGC ( colour, "RSDT %#08lx has invalid signature:\n",
+	/* Read RSDT/XSDT header */
+	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
+	     ( rsdt->acpi.signature == cpu_to_le32 ( XSDT_SIGNATURE ) ) ) {
+		/* XSDT with 64-bit entries */
+		ext = 1;
+	} else if ( rsdt->acpi.signature == cpu_to_le32 ( RSDT_SIGNATURE ) ) {
+		/* RSDT with 32-bit entries */
+		ext = 0;
+	} else {
+		DBGC ( colour, "RSDT/XSDT %#08lx has invalid signature:\n",
 		       virt_to_phys ( rsdt ) );
 		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &rsdt->acpi,
 			   sizeof ( rsdt->acpi ) );
@@ -128,8 +137,8 @@ const struct acpi_header * acpi_find_via_rsdt ( uint32_t signature,
 	}
 	len = le32_to_cpu ( rsdt->acpi.length );
 	if ( len < sizeof ( rsdt->acpi ) ) {
-		DBGC ( colour, "RSDT %#08lx has invalid length:\n",
-		       virt_to_phys ( rsdt ) );
+		DBGC ( colour, "%cSDT %#08lx has invalid length:\n",
+		       ( ext ? 'X' : 'R' ), virt_to_phys ( rsdt ) );
 		DBGC_HDA ( colour, virt_to_phys ( rsdt ), &rsdt->acpi,
 			   sizeof ( rsdt->acpi ) );
 		return NULL;
@@ -137,20 +146,22 @@ const struct acpi_header * acpi_find_via_rsdt ( uint32_t signature,
 
 	/* Validate checksum */
 	if ( acpi_checksum ( &rsdt->acpi ) != 0 ) {
-		DBGC ( colour, "RSDT %#08lx has bad checksum\n",
-		       virt_to_phys ( rsdt ) );
+		DBGC ( colour, "%cSDT %#08lx has bad checksum\n",
+		       ( ext ? 'X' : 'R' ), virt_to_phys ( rsdt ) );
 		return NULL;
 	}
 
 	/* Calculate number of entries */
-	count = ( ( len - sizeof ( rsdt->acpi ) ) /
-		  sizeof ( rsdt->entry[0] ) );
+	len -= sizeof ( rsdt->acpi );
+	count = ( ext ? ( len / sizeof ( rsdt->entry64[0] ) ) :
+		  ( len / sizeof ( rsdt->entry32[0] ) ) );
 
 	/* Search through entries */
 	for ( i = 0 ; i < count ; i++ ) {
 
 		/* Read table header */
-		table = phys_to_virt ( rsdt->entry[i] );
+		entry = ( ext ? rsdt->entry64[i] : rsdt->entry32[i] );
+		table = phys_to_virt ( entry );
 
 		/* Check table signature */
 		if ( table->signature != cpu_to_le32 ( signature ) )
@@ -162,20 +173,20 @@ const struct acpi_header * acpi_find_via_rsdt ( uint32_t signature,
 
 		/* Check table integrity */
 		if ( acpi_checksum ( table ) != 0 ) {
-			DBGC ( colour, "RSDT %#08lx found %s with bad "
-			       "checksum at %#08lx\n", virt_to_phys ( rsdt ),
-			       acpi_name ( signature ),
-			       virt_to_phys ( table ) );
+			DBGC ( colour, "%cSDT %#08lx found %s with bad "
+			       "checksum at %#08lx\n", ( ext ? 'X' : 'R' ),
+			       virt_to_phys ( rsdt ), acpi_name ( signature ),
+			       entry );
 			break;
 		}
 
-		DBGC ( colour, "RSDT %#08lx found %s at %#08lx\n",
-		       virt_to_phys ( rsdt ), acpi_name ( signature ),
-		       virt_to_phys ( table ) );
+		DBGC ( colour, "%cSDT %#08lx found %s at %#08lx\n",
+		       ( ext ? 'X' : 'R' ), virt_to_phys ( rsdt ),
+		       acpi_name ( signature ), entry );
 		return table;
 	}
 
-	DBGC ( colour, "RSDT %#08lx could not find %s\n",
+	DBGC ( colour, "%cSDT %#08lx could not find %s\n", ( ext ? 'X' : 'R' ),
 	       virt_to_phys ( rsdt ), acpi_name ( signature ) );
 	return NULL;
 }
