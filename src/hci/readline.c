@@ -28,6 +28,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <ipxe/command.h>
 #include <ipxe/console.h>
 #include <ipxe/keys.h>
 #include <ipxe/editstring.h>
@@ -309,6 +310,38 @@ int readline_history ( const char *prompt, const char *prefill,
 		case KEY_DOWN:
 			move_by = -1;
 			break;
+		case TAB: {
+			int new_line_printed, matches_found;
+			struct command *cmd;
+			new_line_printed = matches_found = 0;
+
+			for_each_table_entry ( cmd, COMMANDS ) {
+				if ( strncmp ( buf, cmd->name, strlen ( buf ) ) == 0 ) {
+					if ( !new_line_printed) {
+						printf("\n");
+						new_line_printed = 1;
+						matches_found = 1;
+					}
+					printf ( "%s ", cmd->name );
+				}
+			}
+
+			if ( matches_found ) {
+				printf ( "\n" );
+
+				/* Printing the prompt and creating a new editstring to print
+				   the already typed command */
+
+				if ( prompt )
+					printf ( "%s", prompt );
+
+				memset ( &string, 0, sizeof ( string ) );
+				init_editstring ( &string, buf, READLINE_MAX );
+				replace_string ( &string, buf );
+				sync_console ( &string );
+			}
+			continue;
+		}
 		default:
 			/* Do nothing for unrecognised keys or edit errors */
 			break;
