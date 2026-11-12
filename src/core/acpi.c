@@ -135,6 +135,13 @@ const struct acpi_header * acpi_find_via_rsdt ( uint32_t signature,
 		return NULL;
 	}
 
+	/* Validate checksum */
+	if ( acpi_checksum ( &rsdt->acpi ) != 0 ) {
+		DBGC ( colour, "RSDT %#08lx has bad checksum\n",
+		       virt_to_phys ( rsdt ) );
+		return NULL;
+	}
+
 	/* Calculate number of entries */
 	count = ( ( len - sizeof ( rsdt->acpi ) ) /
 		  sizeof ( rsdt->entry[0] ) );
