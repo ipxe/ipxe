@@ -41,6 +41,10 @@ FILE_SECBOOT ( PERMITTED );
 static EFI_ACPI_1_0_ROOT_SYSTEM_DESCRIPTION_POINTER *rsdp;
 EFI_USE_TABLE ( ACPI_10_TABLE, &rsdp, 0 );
 
+/** ACPI configuration table (alternative GUID) */
+static EFI_ACPI_2_0_ROOT_SYSTEM_DESCRIPTION_POINTER *rsdp2;
+EFI_USE_TABLE ( EFI_ACPI_20_TABLE, &rsdp2, 0 );
+
 /**
  * Locate ACPI root system description table
  *
@@ -49,8 +53,14 @@ EFI_USE_TABLE ( ACPI_10_TABLE, &rsdp, 0 );
 static const struct acpi_rsdt * efi_find_rsdt ( void ) {
 
 	/* Locate RSDT via ACPI configuration table, if available */
-	if ( rsdp )
+	if ( ( sizeof ( physaddr_t ) > sizeof ( uint32_t ) ) &&
+	     rsdp2 && rsdp2->XsdtAddress ) {
+		return phys_to_virt ( rsdp2->XsdtAddress );
+	} else if ( rsdp2 && rsdp2->RsdtAddress ) {
+		return phys_to_virt ( rsdp2->RsdtAddress );
+	} else if ( rsdp && rsdp->RsdtAddress ) {
 		return phys_to_virt ( rsdp->RsdtAddress );
+	}
 
 	return NULL;
 }
