@@ -521,7 +521,7 @@ struct ath5k_txq_info {
 /*
  * Transmit packet types.
  * used on tx control descriptor
- * TODO: Use them inside base.c corectly
+ * TODO: Use them inside base.c correctly
  */
 enum ath5k_pkt_type {
 	AR5K_PKT_TYPE_NORMAL		= 0,

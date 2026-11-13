@@ -2421,7 +2421,7 @@
 #define TG3_CL45_D7_EEERES_STAT_LP_1000T	0x0004
 
 
-/* Fast Ethernet Tranceiver definitions */
+/* Fast Ethernet Transceiver definitions */
 #define MII_TG3_FET_PTEST		0x17
 #define  MII_TG3_FET_PTEST_FRC_TX_LINK	0x1000
 #define  MII_TG3_FET_PTEST_FRC_TX_LOCK	0x0800

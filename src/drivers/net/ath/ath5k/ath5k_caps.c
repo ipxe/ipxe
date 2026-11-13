@@ -56,7 +56,7 @@ int ath5k_hw_set_capabilities(struct ath5k_hw *ah)
 		ah->ah_capabilities.cap_mode |= AR5K_MODE_BIT_11A_TURBO;
 	} else {
 		/*
-		 * XXX The tranceiver supports frequencies from 4920 to 6100GHz
+		 * XXX The transceiver supports frequencies from 4920 to 6100GHz
 		 * XXX and from 2312 to 2732GHz. There are problems with the
 		 * XXX current ieee80211 implementation because the IEEE
 		 * XXX channel mapping does not support negative channel
