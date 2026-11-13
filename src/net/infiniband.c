@@ -443,10 +443,17 @@ int ib_post_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	if ( ! dest->rate )
 		dest->rate = IB_RATE_2_5;
 
+	if ( ibdev->dma && ! dma_mapped ( &iobuf->map ) ) {
+		if ( ( rc = iob_map_tx ( iobuf, ibdev->dma ) ) != 0 )
+			return rc;
+	}
+
 	/* Post to hardware */
 	if ( ( rc = ibdev->op->post_send ( ibdev, qp, dest, iobuf ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %s QPN %#lx could not post send WQE: "
 		       "%s\n", ibdev->name, qp->qpn, strerror ( rc ) );
+		if ( dma_mapped ( &iobuf->map ) )
+			iob_unmap( iobuf );
 		return rc;
 	}
 
@@ -488,10 +495,16 @@ int ib_post_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		return -ENOBUFS;
 	}
 
+	if ( ibdev->dma && ! dma_mapped ( &iobuf->map ) ) {
+		if ( ( rc = iob_map_rx ( iobuf, ibdev->dma ) ) != 0 )
+			return rc;
+	}
 	/* Post to hardware */
 	if ( ( rc = ibdev->op->post_recv ( ibdev, qp, iobuf ) ) != 0 ) {
 		DBGC ( ibdev, "IBDEV %s QPN %#lx could not post receive WQE: "
 		       "%s\n", ibdev->name, qp->qpn, strerror ( rc ) );
+		if ( dma_mapped ( &iobuf->map ) )
+			iob_unmap( iobuf );
 		return rc;
 	}
 
@@ -518,6 +531,10 @@ void ib_complete_send ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 	if ( qp->send.cq->op->complete_send ) {
 		qp->send.cq->op->complete_send ( ibdev, qp, iobuf, rc );
 	} else {
+		/* Unmap I/O buffer, if applicable */
+		if ( dma_mapped ( &iobuf->map ) )
+			iob_unmap ( iobuf );
+
 		free_iob ( iobuf );
 	}
 	qp->send.fill--;
@@ -542,10 +559,15 @@ void ib_complete_recv ( struct ib_device *ibdev, struct ib_queue_pair *qp,
 		qp->recv.cq->op->complete_recv ( ibdev, qp, dest, source,
 						 iobuf, rc );
 	} else {
+		/* Unmap I/O buffer, if applicable */
+		if ( dma_mapped ( &iobuf->map ) )
+			iob_unmap ( iobuf );
+
 		free_iob ( iobuf );
 	}
 	qp->recv.fill--;
 }
+
 
 /**
  * Refill receive work queue
