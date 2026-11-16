@@ -132,6 +132,7 @@
 #define GRC_BASE_WIN_0                          0x400
 #define GRC_DATA_WIN_0                          0x1000
 #define HWRM_CMD_DEFAULT_TIMEOUT                500 /* in Miliseconds  */
+#define HWRM_CMD_MAX_TIMEOUT                    2000 /* in Miliseconds  */
 #define HWRM_CMD_POLL_WAIT_TIME                 100 /* In MicroeSconds */
 #define HWRM_CMD_DEFAULT_MULTIPLAYER(a)         ((a) * 10)
 #define HWRM_CMD_FLASH_MULTIPLAYER(a)           ((a) * 100)

@@ -755,6 +755,8 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 	bp->hwrm_cmd_timeout = ( u32 ) resp->def_req_timeout;
 	if ( !bp->hwrm_cmd_timeout )
 		bp->hwrm_cmd_timeout = ( u32 ) HWRM_CMD_DEFAULT_TIMEOUT;
+	if ( bp->hwrm_cmd_timeout > ( u32 ) HWRM_CMD_MAX_TIMEOUT )
+		bp->hwrm_cmd_timeout = ( u32 ) HWRM_CMD_MAX_TIMEOUT;
 	if ( resp->hwrm_intf_maj_8b >= 1 )
 		bp->hwrm_max_req_len = resp->max_req_win_len;
 	bp->chip_id = resp->chip_rev << 24 | resp->chip_metal << 16 |
