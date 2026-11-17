@@ -848,6 +848,16 @@ struct ena_host_page {
 	struct dma_mapping map;
 };
 
+/** SMMU bypass hack */
+struct ena_smmu_hack {
+	/** SMMU registers */
+	void *regs;
+	/** Level 1 stream table descriptor */
+	void *l1std;
+	/** Bypass has been installed */
+	int bypassed;
+};
+
 /** An ENA network card */
 struct ena_nic {
 	/** Registers */
@@ -856,6 +866,8 @@ struct ena_nic {
 	void *mem;
 	/** DMA device */
 	struct dma_device *dma;
+	/** SMMU bypass hack */
+	struct ena_smmu_hack smmu;
 	/** Device features */
 	uint32_t features;
 	/** Host information page */

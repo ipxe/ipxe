@@ -36,6 +36,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <ipxe/malloc.h>
 #include <ipxe/pci.h>
 #include <ipxe/pcibridge.h>
+#include <ipxe/iort.h>
+#include <ipxe/smmu.h>
 #include <ipxe/version.h>
 #include "ena.h"
 
@@ -44,6 +46,13 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Amazon ENA network driver
  *
  */
+
+/* Attempt SMMU bypass hack only on ARM64 UEFI */
+#if defined ( __aarch64__ ) && defined ( PLATFORM_efi )
+#define ENA_SMMU_BYPASS 1
+#else
+#define ENA_SMMU_BYPASS 0
+#endif
 
 /**
  * Get direction name (for debugging)
@@ -1346,6 +1355,145 @@ static int ena_membases ( struct ena_nic *ena, struct pci_device *pci,
 }
 
 /**
+ * Install SMMU bypass
+ *
+ * @v ena		ENA device
+ * @v pci		PCI device
+ * @ret rc		Return status code
+ */
+static int ena_smmu_install ( struct ena_nic *ena, struct pci_device *pci ) {
+	static const struct smmu_ste bypass = {
+		.cfg = {
+			[0] = ( SMMU_STE_CFG0_V | SMMU_STE_CFG0_BYPASS ),
+			[1] = SMMU_STE_CFG1_SHCFG_INC,
+		},
+	};
+	const struct iort_node_smmuv3 *smmuv3;
+	struct iort_mapping map;
+	uint64_t base;
+	uint64_t level1;
+	uint64_t l1std;
+	uint32_t cr0;
+	uint32_t cfg;
+	unsigned int split;
+	unsigned int index;
+	int rc;
+
+	/* Identify SMMU */
+	if ( ( rc = iort_map_pci ( pci, &map ) ) != 0 ) {
+		DBGC ( ena, "ENA %p could not identify SMMU: %s\n",
+		       ena, strerror ( rc ) );
+		goto err_map;
+	}
+	if ( map.output->type != IORT_NODE_SMMUV3 ) {
+		DBGC ( ena, "ENA %p not mapped to an SMMU\n", ena );
+		rc = -ENOTTY;
+		goto err_no_smmu;
+	}
+	smmuv3 = container_of ( map.output, struct iort_node_smmuv3, node );
+	base = le64_to_cpu ( smmuv3->base );
+	DBGC ( ena, "ENA %p mapped via SMMU %#08llx with StreamID %#x\n",
+	       ena, ( ( unsigned long long ) base ), map.id );
+
+	/* Map SMMU registers */
+	ena->smmu.regs = ioremap ( base, SMMU_LEN );
+	if ( ! ena->smmu.regs ) {
+		rc = -ENODEV;
+		goto err_regs;
+	}
+
+	/* Check if SMMU is enabled */
+	cr0 = readl ( ena->smmu.regs + SMMU_CR0 );
+	if ( ! ( cr0 & SMMU_CR0_SMMUEN ) ) {
+		DBGC ( ena, "ENA %p SMMU is disabled (CR0 %#08x)\n",
+		       ena, cr0 );
+		rc = -EPIPE;
+		goto err_cr0;
+	}
+
+	/* Check if SMMU is using a two-level table */
+	cfg = readl ( ena->smmu.regs + SMMU_STRTAB_BASE_CFG );
+	if ( ( cfg & SMMU_STRTAB_BASE_CFG_FMT_MASK ) !=
+	     SMMU_STRTAB_BASE_CFG_FMT_L2 ) {
+		DBGC ( ena, "ENA %p SMMU not using L2 (CFG %#08x)\n",
+		       ena, cfg );
+		rc = -ENOTSUP;
+		goto err_cfg;
+	}
+
+	/* Calculate index into level 1 table */
+	split = SMMU_STRTAB_BASE_CFG_SPLIT ( cfg );
+	index = ( map.id >> split );
+	if ( ( index << split ) != map.id ) {
+		DBGC ( ena, "ENA %p SMMU unusable split %d\n",
+		       ena, split );
+		rc = -ENOTSUP;
+		goto err_index;
+	}
+
+	/* Map level 1 stream table descriptor */
+	level1 = ( readq ( ena->smmu.regs + SMMU_STRTAB_BASE ) &
+		   SMMU_STRTAB_BASE_MASK );
+	DBGC ( ena, "ENA %p SMMU L1 at %#08llx\n",
+	       ena, ( ( unsigned long long ) level1 ) );
+	ena->smmu.l1std = ioremap ( ( level1 + ( index * sizeof ( l1std ) ) ),
+				    sizeof ( l1std ) );
+	if ( ! ena->smmu.l1std ) {
+		rc = -ENODEV;
+		goto err_l1std;
+	}
+
+	/* Check that there is no existing level 1 descriptor */
+	l1std = readq ( ena->smmu.l1std );
+	if ( l1std & SMMU_L1STD_SPAN_MASK ) {
+		DBGC ( ena, "ENA %p SMMU L1STD %#04x already in use\n",
+		       ena, index );
+		rc = -EBUSY;
+		goto err_span;
+	}
+
+	/* Install level 1 descriptor */
+	l1std = ( virt_to_phys ( &bypass ) | SMMU_L1STD_SPAN_SINGLE );
+	writeq ( l1std, ena->smmu.l1std );
+	wmb();
+
+	/* Record bypass as installed */
+	DBGC ( ena, "ENA %p SMMU L1STD %#04x configured for bypass\n",
+	       ena, index );
+	ena->smmu.bypassed = 1;
+
+	return 0;
+
+ err_span:
+	iounmap ( ena->smmu.l1std );
+ err_l1std:
+ err_index:
+ err_cfg:
+ err_cr0:
+	iounmap ( ena->smmu.regs );
+ err_regs:
+ err_no_smmu:
+ err_map:
+	return rc;
+}
+
+/**
+ * Uninstall SMMU bypass
+ *
+ * @v ena		ENA device
+ */
+static void ena_smmu_uninstall ( struct ena_nic *ena ) {
+
+	/* Clear level 1 descriptor */
+	writeq ( 0, ena->smmu.l1std );
+	wmb();
+
+	/* Unmap registers */
+	iounmap ( ena->smmu.l1std );
+	iounmap ( ena->smmu.regs );
+}
+
+/**
  * Probe PCI device
  *
  * @v pci		PCI device
@@ -1387,6 +1535,12 @@ static int ena_probe ( struct pci_device *pci ) {
 	if ( ( rc = ena_membases ( ena, pci, &prefmembase,
 				   &prefmemsize ) ) != 0 ) {
 		goto err_membases;
+	}
+
+	/* Install SMMU bypass if required */
+	if ( ENA_SMMU_BYPASS && ( ! pci->dma.op ) &&
+	     ( ( rc = ena_smmu_install ( ena, pci ) ) != 0 ) ) {
+		/* Ignore errors and assume no SMMU mapping is active */
 	}
 
 	/* Map registers */
@@ -1485,6 +1639,8 @@ static int ena_probe ( struct pci_device *pci ) {
  err_mem:
 	iounmap ( ena->regs );
  err_regs:
+	if ( ENA_SMMU_BYPASS && ena->smmu.bypassed )
+		ena_smmu_uninstall ( ena );
  err_membases:
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );
@@ -1520,6 +1676,10 @@ static void ena_remove ( struct pci_device *pci ) {
 	if ( ena->mem )
 		iounmap ( ena->mem );
 	iounmap ( ena->regs );
+
+	/* Uninstall any SMMU bypass */
+	if ( ENA_SMMU_BYPASS && ena->smmu.bypassed )
+		ena_smmu_uninstall ( ena );
 
 	/* Free network device */
 	netdev_nullify ( netdev );
