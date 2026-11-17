@@ -106,7 +106,6 @@ int efi_install_table ( struct efi_table *table, const void *data,
 			rc = -EEFI ( efirc );
 			goto err_allocate;
 		}
-		memcpy ( new, data, new_len );
 	} else {
 		new = NULL;
 	}
@@ -125,6 +124,7 @@ int efi_install_table ( struct efi_table *table, const void *data,
 			       efi_guid_ntoa ( guid ), old, old_len );
 		}
 		if ( new ) {
+			memcpy ( new, data, new_len );
 			DBGC ( table, "EFITAB %s %p+%#zx installed\n",
 			       efi_guid_ntoa ( guid ), new, new_len );
 		}
