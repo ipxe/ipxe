@@ -372,9 +372,7 @@ char __debug_disable(OBJECT) = ( DBGLVL_MAX & ~DBGLVL_DFLT );
 			union {					\
 				unsigned long ul;		\
 				typeof ( dispaddr ) raw;	\
-			} da;					\
-			da.ul = 0;				\
-			da.raw = dispaddr;			\
+			} da = { .raw = dispaddr };		\
 			dbg_hex_dump_da ( da.ul, data, len );	\
 		}						\
 	} while ( 0 )
