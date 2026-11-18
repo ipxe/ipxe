@@ -9,6 +9,7 @@
 #define A_MLXUTILS_INCLUDE_PUBLIC_TYPES_H_
 #include <stdint.h>
 //#include <errno.h>
+#include <ipxe/dma.h>
 #include <ipxe/pci.h>
 
 #define MLX_SUCCESS 0
@@ -46,6 +47,7 @@ typedef struct pci_device	mlx_pci;
 typedef size_t		mlx_size;
 
 typedef void		mlx_void;
+typedef struct dma_mapping	mlx_dma;
 
 #define MAC_ADDR_LEN 6
 typedef unsigned long	mlx_physical_address;

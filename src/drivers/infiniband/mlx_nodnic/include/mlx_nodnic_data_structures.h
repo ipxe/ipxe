@@ -78,15 +78,15 @@ struct nodnic_send_wqbb {
 
 struct nodnic_doorbell {
 	mlx_physical_address doorbell_physical;
-	mlx_void *map;
 	nodnic_qp_db *qp_doorbell_record;
+	mlx_dma mapping;
 };
 struct nodnic_ring {
 	mlx_uint32 offset;
 	/** Work queue entries */
 	/* TODO: add to memory entity */
 	mlx_physical_address wqe_physical;
-	mlx_void *map;
+	mlx_dma mapping;
 	/** Size of work queue */
 	mlx_size wq_size;
 	/** Next work queue entry index
@@ -123,7 +123,7 @@ struct _nodnic_cq{
 	/** cq entries */
 	mlx_void *cq_virt;
 	mlx_physical_address cq_physical;
-	mlx_void *map;
+	mlx_dma cq_mapping;
 	/** cq */
 	mlx_size cq_size;
 	struct nodnic_doorbell arm_cq_doorbell;
@@ -132,7 +132,7 @@ struct _nodnic_cq{
 struct _nodnic_eq{
 	mlx_void *eq_virt;
 	mlx_physical_address eq_physical;
-	mlx_void *map;
+	mlx_dma mapping;
 	mlx_size eq_size;
 };
 struct _nodnic_device_capabilites{
@@ -204,6 +204,7 @@ struct _nodnic_port_priv{
 	nodnic_eq				eq;
 	mlx_mac_address			mac_filters[5];
 	nodnic_arm_cq_db		*arm_cq_doorbell_record;
+	mlx_dma				arm_cq_doorbell_mapping;
 	mlx_status (*send_doorbell)(
 			IN nodnic_port_priv		*port_priv,
 			IN struct nodnic_ring	*ring,
