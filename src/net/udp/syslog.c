@@ -52,6 +52,8 @@ FILE_SECBOOT ( PERMITTED );
 #define CONSOLE_SYSLOG ( CONSOLE_USAGE_ALL & ~CONSOLE_USAGE_TUI )
 #endif
 
+struct console_driver syslog_console __console_driver;
+
 /** The syslog server */
 static union {
 	struct sockaddr sa;
@@ -64,15 +66,102 @@ static union {
 	},
 };
 
-/** Syslog UDP interface operations */
-static struct interface_operation syslogger_operations[] = {};
+/******************************************************************************
+ *
+ * Datagram interface
+ *
+ ******************************************************************************
+ */
 
-/** Syslog UDP interface descriptor */
-static struct interface_descriptor syslogger_desc =
-	INTF_DESC_PURE ( syslogger_operations );
+/** Syslog datagram interface operations */
+static struct interface_operation syslog_datagram_operations[] = {};
 
-/** The syslog UDP interface */
-static struct interface syslogger = INTF_INIT ( syslogger_desc );
+/** Syslog datagram interface descriptor */
+struct interface_descriptor syslog_datagram_desc =
+	INTF_DESC ( struct syslog, xfer, syslog_datagram_operations );
+
+/******************************************************************************
+ *
+ * Stream interface
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Handle syslog stream interface close
+ *
+ * @v syslog		Syslog console
+ * @v rc		Reason for close
+ */
+static void syslog_stream_close ( struct syslog *syslog, int rc ) {
+
+	DBG ( "SYSLOG console disconnected: %s\n", strerror ( rc ) );
+	intf_restart ( &syslog->xfer, rc );
+}
+
+/**
+ * Handle syslog stream interface window change
+ *
+ * @v syslog		Syslog console
+ */
+static void syslog_stream_window_changed ( struct syslog *syslog ) {
+	struct console_driver *console = syslog->console;
+
+	/* Mark console as enabled when window first opens, indicating
+	 * that e.g. TLS negotiation is complete.  (Do not disable
+	 * console when window closes again, since TCP will close the
+	 * window whenever there is unACKed data.)
+	 */
+	if ( xfer_window ( &syslog->xfer ) ) {
+		if ( console->disabled )
+			DBG ( "SYSLOG console connected\n" );
+		console->disabled = 0;
+	}
+}
+
+/** Syslog stream interface operations */
+static struct interface_operation syslog_stream_operations[] = {
+	INTF_OP ( xfer_window_changed, struct syslog *,
+		  syslog_stream_window_changed ),
+	INTF_OP ( intf_close, struct syslog *, syslog_stream_close ),
+};
+
+/** Syslog stream interface descriptor */
+struct interface_descriptor syslog_stream_desc =
+	INTF_DESC ( struct syslog, xfer, syslog_stream_operations );
+
+/******************************************************************************
+ *
+ * ANSI escape sequences
+ *
+ ******************************************************************************
+ */
+
+/**
+ * Handle ANSI set syslog priority (private sequence)
+ *
+ * @v ctx		ANSI escape sequence context
+ * @v count		Parameter count
+ * @v params		List of graphic rendition aspects
+ */
+static void syslog_handle_priority ( struct ansiesc_context *ctx,
+				     unsigned int count __unused,
+				     int params[] ) {
+	struct syslog *syslog = container_of ( ctx, struct syslog, line.ctx );
+
+	/* Record current severity */
+	if ( params[0] >= 0 ) {
+		syslog->severity = params[0];
+	} else {
+		syslog->severity = SYSLOG_DEFAULT_SEVERITY;
+	}
+}
+
+/** Syslog ANSI escape sequence handlers */
+struct ansiesc_handler syslog_handlers[] = {
+	{ ANSIESC_LOG_PRIORITY, syslog_handle_priority },
+	{ 0, NULL }
+};
 
 /******************************************************************************
  *
@@ -88,30 +177,47 @@ static char *syslog_hostname;
 static char *syslog_domain;
 
 /**
- * Transmit formatted syslog message
+ * Print a character to syslog console
  *
- * @v xfer		Data transfer interface
- * @v severity		Severity
- * @v message		Message
- * @v terminator	Message terminator
- * @ret rc		Return status code
+ * @v syslog		Syslog console
+ * @v character		Character to be printed
  */
-int syslog_send ( struct interface *xfer, unsigned int severity,
-		  const char *message, const char *terminator ) {
+void syslog_write ( struct syslog *syslog, int character ) {
 	const char *hostname = ( syslog_hostname ? syslog_hostname : "" );
 	const char *domain = ( ( hostname[0] && syslog_domain ) ?
 			       syslog_domain : "" );
+	int rc;
 
-	return xfer_printf ( xfer, "<%d>%s%s%s%sipxe: %s%s",
-			     SYSLOG_PRIORITY ( SYSLOG_DEFAULT_FACILITY,
-					       severity ), hostname,
-			     ( domain[0] ? "." : "" ), domain,
-			     ( hostname[0] ? " " : "" ), message, terminator );
+	/* Ignore if we are already mid-logging */
+	if ( syslog->entered )
+		return;
+
+	/* Fill line buffer */
+	if ( line_putchar ( &syslog->line, character ) == 0 )
+		return;
+
+	/* Guard against re-entry */
+	syslog->entered = 1;
+
+	/* Send log message */
+	if ( ( rc = xfer_printf ( &syslog->xfer, "<%d>%s%s%s%sipxe: %s%s",
+				  SYSLOG_PRIORITY ( SYSLOG_DEFAULT_FACILITY,
+						    syslog->severity ),
+				  hostname, ( domain[0] ? "." : "" ),
+				  domain, ( hostname[0] ? " " : "" ),
+				  syslog->line.buffer,
+				  syslog->terminator ) ) != 0 ) {
+		DBG ( "SYSLOG could not send log message: %s\n",
+		      strerror ( rc ) );
+	}
+
+	/* Clear re-entry flag */
+	syslog->entered = 0;
 }
 
 /******************************************************************************
  *
- * Console driver
+ * Syslog console
  *
  ******************************************************************************
  */
@@ -119,43 +225,20 @@ int syslog_send ( struct interface *xfer, unsigned int severity,
 /** Syslog line buffer */
 static char syslog_buffer[SYSLOG_BUFSIZE];
 
-/** Syslog severity */
-static unsigned int syslog_severity = SYSLOG_DEFAULT_SEVERITY;
-
-/**
- * Handle ANSI set syslog priority (private sequence)
- *
- * @v ctx		ANSI escape sequence context
- * @v count		Parameter count
- * @v params		List of graphic rendition aspects
- */
-static void syslog_handle_priority ( struct ansiesc_context *ctx __unused,
-				     unsigned int count __unused,
-				     int params[] ) {
-	if ( params[0] >= 0 ) {
-		syslog_severity = params[0];
-	} else {
-		syslog_severity = SYSLOG_DEFAULT_SEVERITY;
-	}
-}
-
-/** Syslog ANSI escape sequence handlers */
-static struct ansiesc_handler syslog_handlers[] = {
-	{ ANSIESC_LOG_PRIORITY, syslog_handle_priority },
-	{ 0, NULL }
-};
-
-/** Syslog line console */
-static struct line_console syslog_line = {
-	.buffer = syslog_buffer,
-	.len = sizeof ( syslog_buffer ),
-	.ctx = {
-		.handlers = syslog_handlers,
+/** Syslog console */
+static struct syslog syslog = {
+	.line = {
+		.buffer = syslog_buffer,
+		.len = sizeof ( syslog_buffer ),
+		.ctx = {
+			.handlers = syslog_handlers,
+		},
 	},
+	.xfer = INTF_INIT ( syslog_datagram_desc ),
+	.console = &syslog_console,
+	.severity = SYSLOG_DEFAULT_SEVERITY,
+	.terminator = "",
 };
-
-/** Syslog recursion marker */
-static int syslog_entered;
 
 /**
  * Print a character to syslog console
@@ -163,28 +246,8 @@ static int syslog_entered;
  * @v character		Character to be printed
  */
 static void syslog_putchar ( int character ) {
-	int rc;
 
-	/* Ignore if we are already mid-logging */
-	if ( syslog_entered )
-		return;
-
-	/* Fill line buffer */
-	if ( line_putchar ( &syslog_line, character ) == 0 )
-		return;
-
-	/* Guard against re-entry */
-	syslog_entered = 1;
-
-	/* Send log message */
-	if ( ( rc = syslog_send ( &syslogger, syslog_severity,
-				  syslog_buffer, "" ) ) != 0 ) {
-		DBG ( "SYSLOG could not send log message: %s\n",
-		      strerror ( rc ) );
-	}
-
-	/* Clear re-entry flag */
-	syslog_entered = 0;
+	syslog_write ( &syslog, character );
 }
 
 /** Syslog console driver */
@@ -279,7 +342,7 @@ static int apply_syslog_settings ( void ) {
 		return 0;
 
 	/* Reset syslog connection */
-	intf_restart ( &syslogger, 0 );
+	intf_restart ( &syslog.xfer, 0 );
 
 	/* Do nothing unless we have a log server */
 	if ( syslog_console.disabled ) {
@@ -288,7 +351,7 @@ static int apply_syslog_settings ( void ) {
 	}
 
 	/* Connect to log server */
-	if ( ( rc = xfer_open_socket ( &syslogger, SOCK_DGRAM,
+	if ( ( rc = xfer_open_socket ( &syslog.xfer, SOCK_DGRAM,
 				       &logserver.sa, NULL ) ) != 0 ) {
 		DBG ( "SYSLOG cannot connect to log server: %s\n",
 		      strerror ( rc ) );
