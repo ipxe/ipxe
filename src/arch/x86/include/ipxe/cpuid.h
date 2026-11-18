@@ -58,6 +58,9 @@ struct x86_features {
 /** FXSAVE and FXRSTOR are supported */
 #define CPUID_FEATURES_INTEL_EDX_FXSR 0x01000000UL
 
+/** Get TSC and core crystal clock information */
+#define CPUID_TSC 0x00000015UL
+
 /** Get largest extended function */
 #define CPUID_AMD_MAX_FN 0x80000000UL
 

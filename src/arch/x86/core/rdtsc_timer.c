@@ -112,6 +112,27 @@ static void rdtsc_udelay ( unsigned long usecs ) {
 }
 
 /**
+ * Get TSC frequency via CPUID
+ *
+ * @ret tsc_per_us	TSC increment per microsecond, or zero if unknown
+ */
+static unsigned long rdtsc_cpuid_per_us ( void ) {
+	uint32_t denominator;
+	uint32_t numerator;
+	uint32_t crystal_hz;
+	uint32_t discard_d;
+
+	if ( cpuid_supported ( CPUID_TSC ) != 0 )
+		return 0;
+	cpuid ( CPUID_TSC, 0, &denominator, &numerator, &crystal_hz,
+		&discard_d );
+	if ( ! ( denominator && numerator && crystal_hz ) )
+		return 0;
+	return ( ( ( uint64_t ) crystal_hz * numerator ) /
+		 ( denominator * 1000000ULL ) );
+}
+
+/**
  * Probe RDTSC timer
  *
  * @ret rc		Return status code
@@ -139,12 +160,18 @@ static int rdtsc_probe ( void ) {
 		return -ENOTTY;
 	}
 
-	/* Calibrate udelay() timer via 8254 PIT */
-	before = rdtsc_raw();
-	pit8254_udelay ( TSC_CALIBRATE_US );
-	after = rdtsc_raw();
-	elapsed = ( after - before );
-	tsc_per_us = ( elapsed / TSC_CALIBRATE_US );
+	/* Use TSC frequency enumerated via CPUID, if available */
+	tsc_per_us = rdtsc_cpuid_per_us();
+	if ( tsc_per_us ) {
+		DBGC ( colour, "RDTSC frequency enumerated via CPUID\n" );
+	} else {
+		/* Otherwise calibrate udelay() timer via 8254 PIT */
+		before = rdtsc_raw();
+		pit8254_udelay ( TSC_CALIBRATE_US );
+		after = rdtsc_raw();
+		elapsed = ( after - before );
+		tsc_per_us = ( elapsed / TSC_CALIBRATE_US );
+	}
 	if ( ! tsc_per_us ) {
 		DBGC ( colour, "RDTSC has zero TSC per microsecond\n" );
 		return -EIO;
