@@ -2617,9 +2617,10 @@ static void bnxt_service_cq ( struct net_device *dev )
 	u16 old_cid = bp->cq.cons_id;
 	int done = SERVICE_NEXT_CQ_BD;
 	u32 cq_type;
+	u32 poll_cnt = BNXT_POLL_CNT;
 	struct hwrm_async_event_cmpl *evt;
 
-	while ( done == SERVICE_NEXT_CQ_BD ) {
+	while ( ( done == SERVICE_NEXT_CQ_BD ) && ( poll_cnt-- ) ) {
 		cmp = ( struct cmpl_base * ) BD_NOW ( CQ_DMA_ADDR ( bp ),
 						      bp->cq.cons_id,
 						      sizeof ( struct cmpl_base ) );
@@ -2693,13 +2694,14 @@ static void bnxt_service_nq ( struct net_device *dev )
 	struct nq_base *nqp;
 	u16 old_cid = bp->nq.cons_id;
 	int done = SERVICE_NEXT_NQ_BD;
+	u32 poll_cnt = BNXT_POLL_CNT;
 	u32 nq_type;
 	struct hwrm_async_event_cmpl *evt;
 
 	if ( ! ( FLAG_TEST ( bp->flags, BNXT_FLAG_IS_CHIP_P5_PLUS ) ) )
 		return;
 
-	while ( done == SERVICE_NEXT_NQ_BD ) {
+	while ( ( done == SERVICE_NEXT_NQ_BD ) && ( poll_cnt-- ) ) {
 		nqp = ( struct nq_base * ) BD_NOW ( NQ_DMA_ADDR ( bp ),
 						    bp->nq.cons_id,
 						    sizeof ( struct nq_base ) );
