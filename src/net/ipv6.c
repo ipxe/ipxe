@@ -101,15 +101,18 @@ static unsigned int ipv6_scope ( const struct in6_addr *addr ) {
 		return IPV6_SCOPE_SITE_LOCAL;
 
 	/* Unique local addresses do not directly map to a defined
-	 * scope.  They effectively have a scope which is wider than
-	 * link-local but narrower than global.  Since the only
-	 * multicast packets that we transmit are link-local, we can
-	 * simply choose an arbitrary scope between link-local and
-	 * global.
+	 * scope.  Per the unicast addressing architecture (RFC
+	 * 4291), only link-local addresses are scope-restricted for
+	 * routing purposes: ULAs are intended to be routable (e.g.
+	 * via a NAT66 gateway) just like global addresses within
+	 * their reachability domain.  We therefore treat them as
+	 * global scope for route selection, so that a route whose
+	 * local address is a ULA is not incorrectly rejected as
+	 * "out of scope" when the destination is a global address.
 	 */
 	if ( IN6_IS_ADDR_ULA ( addr ) )
-		return IPV6_SCOPE_ORGANISATION_LOCAL;
-
+	return IPV6_SCOPE_GLOBAL;
+	
 	/* All other addresses are assumed to be global */
 	return IPV6_SCOPE_GLOBAL;
 }
