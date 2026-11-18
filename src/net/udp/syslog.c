@@ -157,9 +157,31 @@ static void syslog_handle_priority ( struct ansiesc_context *ctx,
 	}
 }
 
+/**
+ * Handle ANSI DECTCEM set (show cursor)
+ *
+ * @v ctx		ANSI escape sequence context
+ * @v count		Parameter count
+ * @v params		List of graphic rendition aspects
+ */
+static void syslog_handle_dectcem_set ( struct ansiesc_context *ctx,
+					unsigned int count __unused,
+					int params[] __unused ) {
+	struct syslog *syslog = container_of ( ctx, struct syslog, line.ctx );
+
+	/* Showing the cursor implies that we have reached a point
+	 * where the user should pay attention to the output.  Treat
+	 * this as an indication to show (but not clear) the current
+	 * buffer contents.
+	 */
+	syslog->line.buffer[syslog->line.index] = '\0';
+	syslog->show = 1;
+}
+
 /** Syslog ANSI escape sequence handlers */
 struct ansiesc_handler syslog_handlers[] = {
 	{ ANSIESC_LOG_PRIORITY, syslog_handle_priority },
+	{ ANSIESC_DECTCEM_SET, syslog_handle_dectcem_set },
 	{ 0, NULL }
 };
 
@@ -193,8 +215,10 @@ void syslog_write ( struct syslog *syslog, int character ) {
 		return;
 
 	/* Fill line buffer */
-	if ( line_putchar ( &syslog->line, character ) == 0 )
+	if ( ( line_putchar ( &syslog->line, character ) == 0 ) &&
+	     ( ! syslog->show ) ) {
 		return;
+	}
 
 	/* Guard against re-entry */
 	syslog->entered = 1;
@@ -210,6 +234,9 @@ void syslog_write ( struct syslog *syslog, int character ) {
 		DBG ( "SYSLOG could not send log message: %s\n",
 		      strerror ( rc ) );
 	}
+
+	/* Clear show contents flag */
+	syslog->show = 0;
 
 	/* Clear re-entry flag */
 	syslog->entered = 0;

@@ -52,6 +52,8 @@ struct syslog {
 	unsigned int severity;
 	/** Recursion guard */
 	int entered;
+	/** Show (but do not reset) buffer contents */
+	int show;
 };
 
 extern struct ansiesc_handler syslog_handlers[];
