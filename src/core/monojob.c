@@ -30,6 +30,7 @@ FILE_SECBOOT ( PERMITTED );
 #include <ipxe/process.h>
 #include <ipxe/console.h>
 #include <ipxe/keys.h>
+#include <ipxe/ansiesc.h>
 #include <ipxe/job.h>
 #include <ipxe/monojob.h>
 #include <ipxe/timer.h>
@@ -140,10 +141,15 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 		/* Display progress, if applicable */
 		elapsed = ( now - last_display );
 		if ( string && ( elapsed >= TICKS_PER_SEC ) ) {
+
+			/* Clear any previous progress string */
 			monojob_clear ( clear_len );
+
 			/* Normalise progress figures to avoid overflow */
 			scaled_completed = ( progress.completed / 128 );
 			scaled_total = ( progress.total / 128 );
+
+			/* Show progress percentage and/or message */
 			if ( scaled_total ) {
 				percentage = ( ( 100 * scaled_completed ) /
 					       scaled_total );
@@ -156,6 +162,11 @@ int monojob_wait ( const char *string, unsigned long timeout ) {
 				clear_len += printf ( " [%s]",
 						      progress.message );
 			}
+
+			/* Show cursor (and flush output) */
+			printf ( CSI "?25h" );
+
+			/* Update most recent display time */
 			last_display = now;
 		}
 	}
