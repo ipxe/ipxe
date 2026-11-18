@@ -609,14 +609,16 @@ static int tls_set_digest ( struct tls_connection *tls,
  * Add handshake record to transcript digest
  *
  * @v tls		TLS connection
+ * @v end		Handshake endpoint
  * @v data		Handshake record
  * @v len		Length of handshake record
  */
 static void tls_add_handshake ( struct tls_connection *tls,
+				const struct tls_endpoint *end,
 				const void *data, size_t len ) {
 
 	/* Record in transcript digest */
-	tlskey_digest ( &tls->key, data, len );
+	tlskey_digest ( &tls->key, end, data, len );
 }
 
 /******************************************************************************
@@ -2081,7 +2083,7 @@ static int tls_replay_handshake ( struct tls_connection *tls,
 				  struct io_buffer *iobuf ) {
 
 	/* Add to transcript digest */
-	tls_add_handshake ( tls, iobuf->data, iob_len ( iobuf ) );
+	tls_add_handshake ( tls, &tls_client, iobuf->data, iob_len ( iobuf ) );
 
 	/* Free I/O buffer */
 	free_iob ( iobuf );
@@ -2418,7 +2420,7 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	assert ( next->data == iobuf->tail );
 
 	/* Allow for use in post-handshake authentication */
-	tlskey_unfreeze ( &tls->key );
+	tlskey_transcriber ( &tls->key, &tls_client );
 
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
@@ -2590,7 +2592,7 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 	tls_build ( tls_digitally_signed, tls->version, &dsig, &cursor );
 
 	/* Allow for use in post-handshake authentication */
-	tlskey_unfreeze ( &tls->key );
+	tlskey_transcriber ( &tls->key, &tls_client );
 
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
@@ -3446,7 +3448,7 @@ tls_new_certificate_request ( struct tls_connection *tls,
 	/* Schedule post-handshake authentication, if applicable */
 	if ( tls_ready ( tls ) ) {
 		tlskey_rewind ( &tls->key );
-		tlskey_unfreeze ( &tls->key );
+		tlskey_transcriber ( &tls->key, &tls_server );
 		tls->tx.pending |= TLS_TX_CERTIFICATE;
 		if ( cert )
 			tls->tx.pending |= TLS_TX_CERTIFICATE_VERIFY;
@@ -3691,11 +3693,11 @@ static int tls_new_handshake ( struct tls_connection *tls,
 		 * which are explicitly excluded).
 		 */
 		if ( handshake->type != TLS_HELLO_REQUEST )
-			tls_add_handshake ( tls, handshake, len );
+			tls_add_handshake ( tls, &tls_server, handshake, len );
 
 		/* Freeze transcript digest if handshake has completed */
 		if ( tls_ready ( tls ) )
-			tlskey_freeze ( &tls->key );
+			tlskey_transcriber ( &tls->key, NULL );
 
 		/* Move to next handshake record */
 		iob_pull ( iobuf, len );
@@ -4015,7 +4017,7 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 
 	/* Add to handshake digest if applicable */
 	if ( type == TLS_TYPE_HANDSHAKE )
-		tls_add_handshake ( tls, plaintext, len );
+		tls_add_handshake ( tls, &tls_client, plaintext, len );
 
 	/* Start constructing ciphertext at start of reserved space */
 	iob_push ( iobuf, tls_iob_reserved ( tls, len ) );
@@ -4940,7 +4942,7 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 
 	/* Freeze transcript digest if handshake has completed */
 	if ( tls_ready ( tls ) )
-		tlskey_freeze ( &tls->key );
+		tlskey_transcriber ( &tls->key, NULL );
 
 	/* Reschedule process if pending transmissions remain,
 	 * otherwise send notification of a window change.

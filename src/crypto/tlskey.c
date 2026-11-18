@@ -236,7 +236,7 @@ int tlskey_start ( struct tls_key_schedule *tlskey,
 
 	/* Initialise transcript digest */
 	digest_init ( digest, tlskey->transcript.ctx );
-	tlskey_digest ( tlskey, NULL, 0 );
+	tlskey_digest ( tlskey, NULL, NULL, 0 );
 	memcpy ( &tlskey->nonce, nonce, sizeof ( tlskey->nonce ) );
 	DBGC ( tlskey, "TLSKEY %p local nonce:\n", tlskey );
 	DBGC_HDA ( tlskey, 0, &tlskey->nonce, sizeof ( tlskey->nonce ) );
@@ -412,11 +412,13 @@ static unsigned int tlskey_handshake ( struct tls_key_schedule *tlskey,
  * Add handshake to running transcript digest
  *
  * @v tlskey		Key schedule
+ * @v end		Handshake endpoint
  * @v data		Handshake record
  * @v len		Length of handshake record
  */
-void tlskey_digest ( struct tls_key_schedule *tlskey, const void *data,
-		     size_t len ) {
+void tlskey_digest ( struct tls_key_schedule *tlskey,
+		     const struct tls_endpoint *end,
+		     const void *data, size_t len ) {
 	struct tls_transcript *transcript = &tlskey->transcript;
 	struct digest_algorithm *digest = tlskey->digest;
 	size_t digestsize = digest->digestsize;
@@ -430,12 +432,9 @@ void tlskey_digest ( struct tls_key_schedule *tlskey, const void *data,
 	if ( ! digestsize )
 		return;
 
-	/* Do nothing if running transcript digest is frozen */
-	if ( transcript->flags & TLSKEY_TSF_FROZEN )
-		return;
-
-	/* Append to running transcript digest */
-	digest_update ( digest, transcript->ctx, data, len );
+	/* Append to running transcript digest, if applicable */
+	if ( end && ( end == transcript->transcriber ) )
+		digest_update ( digest, transcript->ctx, data, len );
 
 	/* Update running transcript digest output */
 	memcpy ( tmp.ctx, transcript->ctx, ctxsize );
@@ -476,7 +475,7 @@ void tlskey_message ( struct tls_key_schedule *tlskey ) {
 	digest_update ( digest, transcript->ctx, &msg, sizeof ( msg ) );
 	digest_update ( digest, transcript->ctx, transcript->running,
 			digestsize );
-	tlskey_digest ( tlskey, NULL, 0 );
+	tlskey_digest ( tlskey, NULL, NULL, 0 );
 }
 
 /**
@@ -556,6 +555,9 @@ void tlskey_reset ( struct tls_key_schedule *tlskey ) {
 	tlskey->kdf.flags = 0;
 	tlskey->traffic[TLS_CLIENT].phase = NULL;
 	tlskey->traffic[TLS_SERVER].phase = NULL;
+
+	/* Initial transcriber is always the client */
+	tlskey_transcriber ( tlskey, &tls_client );
 
 	/* Reset key schedule */
 	op->reset ( tlskey );

@@ -969,11 +969,12 @@ static void rfc8448_simple_test ( struct tls_key_schedule *tlskey,
 		      tlskey->kdf.secret, digestsize ) == 0 );
 
 	/* ClientHello */
-	tlskey_digest ( tlskey, rfc8448_simple_clienthello,
+	tlskey_digest ( tlskey, &tls_client, rfc8448_simple_clienthello,
 			sizeof ( rfc8448_simple_clienthello ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* ServerHello */
-	tlskey_digest ( tlskey, rfc8448_simple_serverhello,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_simple_serverhello,
 			sizeof ( rfc8448_simple_serverhello ) );
 	ok ( exchange_agree ( exchange, rfc8448_simple_x25519_private,
 			      rfc8448_simple_x25519_partner, shared ) == 0 );
@@ -1007,11 +1008,12 @@ static void rfc8448_simple_test ( struct tls_key_schedule *tlskey,
 		      iv, sizeof ( iv ) ) == 0 );
 
 	/* EncryptedExtensions */
-	tlskey_digest ( tlskey, rfc8448_simple_encryptedextensions,
+	tlskey_digest ( tlskey, &tls_server,
+			rfc8448_simple_encryptedextensions,
 			sizeof ( rfc8448_simple_encryptedextensions ) );
 
 	/* Certificate */
-	tlskey_digest ( tlskey, rfc8448_simple_certificate,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_simple_certificate,
 			sizeof ( rfc8448_simple_certificate ) );
 
 	/* CertificateVerify signable digest */
@@ -1021,7 +1023,7 @@ static void rfc8448_simple_test ( struct tls_key_schedule *tlskey,
 		      tbshash, sizeof ( tbshash ) ) == 0 );
 
 	/* CertificateVerify */
-	tlskey_digest ( tlskey, rfc8448_simple_certificateverify,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_simple_certificateverify,
 			sizeof ( rfc8448_simple_certificateverify ) );
 
 	/* Server verification */
@@ -1031,8 +1033,9 @@ static void rfc8448_simple_test ( struct tls_key_schedule *tlskey,
 		      verify, sizeof ( verify ) ) == 0 );
 
 	/* Server Finished */
-	tlskey_digest ( tlskey, rfc8448_simple_server_finished,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_simple_server_finished,
 			sizeof ( rfc8448_simple_server_finished ) );
+	tlskey_transcriber ( tlskey, &tls_client );
 
 	/* Server application traffic secret */
 	ok ( tlskey_traffic ( tlskey, &tls_server, &tls_application ) == 0 );
@@ -1067,8 +1070,9 @@ static void rfc8448_simple_test ( struct tls_key_schedule *tlskey,
 		      tlskey->traffic[TLS_CLIENT].secret, digestsize ) == 0 );
 
 	/* Client Finished */
-	tlskey_digest ( tlskey, rfc8448_simple_client_finished,
+	tlskey_digest ( tlskey, &tls_client, rfc8448_simple_client_finished,
 			sizeof ( rfc8448_simple_client_finished ) );
+	tlskey_transcriber ( tlskey, NULL );
 
 	/* Client application traffic keys */
 	ok ( tlskey_cipher ( tlskey, &tls_client, key, sizeof ( key ),
@@ -1079,7 +1083,7 @@ static void rfc8448_simple_test ( struct tls_key_schedule *tlskey,
 		      iv, sizeof ( iv ) ) == 0 );
 
 	/* NewSessionTicket */
-	tlskey_digest ( tlskey, rfc8448_simple_newsessionticket,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_simple_newsessionticket,
 			sizeof ( rfc8448_simple_newsessionticket ) );
 
 	/* Resumption secret */
@@ -1121,8 +1125,9 @@ static void rfc8448_resumed_test ( struct tls_key_schedule *tlskey,
 			   binder ) == 0 );
 	ok ( memcmp ( rfc8448_resumed_psk_binder,
 		      binder, sizeof ( binder ) ) == 0 );
-	tlskey_digest ( tlskey, rfc8448_resumed_clienthello,
+	tlskey_digest ( tlskey, &tls_client, rfc8448_resumed_clienthello,
 			sizeof ( rfc8448_resumed_clienthello ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* Early secret */
 	ok ( tlskey_load ( tlskey, 1, psk ) == 0 );
@@ -1143,7 +1148,7 @@ static void rfc8448_resumed_test ( struct tls_key_schedule *tlskey,
 		      iv, sizeof ( iv ) ) == 0 );
 
 	/* ServerHello */
-	tlskey_digest ( tlskey, rfc8448_resumed_serverhello,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_resumed_serverhello,
 			sizeof ( rfc8448_resumed_serverhello ) );
 	ok ( exchange_agree ( exchange, rfc8448_resumed_x25519_private,
 			      rfc8448_resumed_x25519_partner, shared ) == 0 );
@@ -1177,7 +1182,8 @@ static void rfc8448_resumed_test ( struct tls_key_schedule *tlskey,
 		      iv, sizeof ( iv ) ) == 0 );
 
 	/* EncryptedExtensions */
-	tlskey_digest ( tlskey, rfc8448_resumed_encryptedextensions,
+	tlskey_digest ( tlskey, &tls_server,
+			rfc8448_resumed_encryptedextensions,
 			sizeof ( rfc8448_resumed_encryptedextensions ) );
 
 	/* Server verification */
@@ -1187,8 +1193,9 @@ static void rfc8448_resumed_test ( struct tls_key_schedule *tlskey,
 		      verify, sizeof ( verify ) ) == 0 );
 
 	/* Server Finished */
-	tlskey_digest ( tlskey, rfc8448_resumed_server_finished,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_resumed_server_finished,
 			sizeof ( rfc8448_resumed_server_finished ) );
+	tlskey_transcriber ( tlskey, &tls_client );
 
 	/* Server application traffic secret */
 	ok ( tlskey_traffic ( tlskey, &tls_server, &tls_application ) == 0 );
@@ -1212,7 +1219,7 @@ static void rfc8448_resumed_test ( struct tls_key_schedule *tlskey,
 		      iv, sizeof ( iv ) ) == 0 );
 
 	/* EndOfEarlyData */
-	tlskey_digest ( tlskey, rfc8448_resumed_endofearlydata,
+	tlskey_digest ( tlskey, &tls_client, rfc8448_resumed_endofearlydata,
 			sizeof ( rfc8448_resumed_endofearlydata ) );
 
 	/* Client verification */
@@ -1227,8 +1234,9 @@ static void rfc8448_resumed_test ( struct tls_key_schedule *tlskey,
 		      tlskey->traffic[TLS_CLIENT].secret, digestsize ) == 0 );
 
 	/* Client Finished */
-	tlskey_digest ( tlskey, rfc8448_resumed_client_finished,
+	tlskey_digest ( tlskey, &tls_client, rfc8448_resumed_client_finished,
 			sizeof ( rfc8448_resumed_client_finished ) );
+	tlskey_transcriber ( tlskey, NULL );
 
 	/* Client application traffic keys */
 	ok ( tlskey_cipher ( tlskey, &tls_client, key, sizeof ( key ),
@@ -1259,22 +1267,25 @@ static void rfc8448_hrr_test ( struct tls_key_schedule *tlskey ) {
 			    &rfc8448_hrr_client_nonce ) == 0 );
 
 	/* ClientHello1 */
-	tlskey_digest ( tlskey, rfc8448_hrr_clienthello1,
+	tlskey_digest ( tlskey, &tls_client, rfc8448_hrr_clienthello1,
 			sizeof ( rfc8448_hrr_clienthello1 ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* Synthesize message hash */
 	tlskey_message ( tlskey );
 
 	/* ServerHello1 */
-	tlskey_digest ( tlskey, rfc8448_hrr_serverhello1,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_hrr_serverhello1,
 			sizeof ( rfc8448_hrr_serverhello1 ) );
+	tlskey_transcriber ( tlskey, &tls_client );
 
 	/* ClientHello2 */
-	tlskey_digest ( tlskey, rfc8448_hrr_clienthello2,
+	tlskey_digest ( tlskey, &tls_client, rfc8448_hrr_clienthello2,
 			sizeof ( rfc8448_hrr_clienthello2 ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* ServerHello2 */
-	tlskey_digest ( tlskey, rfc8448_hrr_serverhello2,
+	tlskey_digest ( tlskey, &tls_server, rfc8448_hrr_serverhello2,
 			sizeof ( rfc8448_hrr_serverhello2 ) );
 	ok ( exchange_agree ( exchange, rfc8448_hrr_p256_private,
 			      rfc8448_hrr_p256_partner, shared ) == 0 );
@@ -1317,11 +1328,12 @@ static void dummy_hash ( struct tls_key_schedule *tlskey,
 			    &dummy_client_nonce ) == 0 );
 
 	/* ClientHello */
-	tlskey_digest ( tlskey, dummy_clienthello,
+	tlskey_digest ( tlskey, &tls_client, dummy_clienthello,
 			sizeof ( dummy_clienthello ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* ServerHello */
-	tlskey_digest ( tlskey, dummy_serverhello,
+	tlskey_digest ( tlskey, &tls_server, dummy_serverhello,
 			sizeof ( dummy_serverhello ) );
 
 	/* Pre-master secret */
@@ -1390,11 +1402,12 @@ static void dummy_hash ( struct tls_key_schedule *tlskey,
 			    &dummy_client_nonce ) == 0 );
 
 	/* ClientHello */
-	tlskey_digest ( tlskey, dummy_clienthello,
+	tlskey_digest ( tlskey, &tls_client, dummy_clienthello,
 			sizeof ( dummy_clienthello ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* ServerHello */
-	tlskey_digest ( tlskey, dummy_serverhello,
+	tlskey_digest ( tlskey, &tls_server, dummy_serverhello,
 			sizeof ( dummy_serverhello ) );
 
 	/* Load resumption secret */
@@ -1430,11 +1443,12 @@ static void dummy_md5_sha1 ( struct tls_key_schedule *tlskey,
 	hkeys = tlskey->kdf.secret;
 
 	/* ClientHello */
-	tlskey_digest ( tlskey, dummy_clienthello,
+	tlskey_digest ( tlskey, &tls_client, dummy_clienthello,
 			sizeof ( dummy_clienthello ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* ServerHello */
-	tlskey_digest ( tlskey, dummy_serverhello,
+	tlskey_digest ( tlskey, &tls_server, dummy_serverhello,
 			sizeof ( dummy_serverhello ) );
 
 	/* Pre-master secret */
@@ -1494,11 +1508,12 @@ static void dummy_md5_sha1 ( struct tls_key_schedule *tlskey,
 	hkeys = tlskey->kdf.secret;
 
 	/* ClientHello */
-	tlskey_digest ( tlskey, dummy_clienthello,
+	tlskey_digest ( tlskey, &tls_client, dummy_clienthello,
 			sizeof ( dummy_clienthello ) );
+	tlskey_transcriber ( tlskey, &tls_server );
 
 	/* ServerHello */
-	tlskey_digest ( tlskey, dummy_serverhello,
+	tlskey_digest ( tlskey, &tls_server, dummy_serverhello,
 			sizeof ( dummy_serverhello ) );
 
 	/* Load resumption secret */
