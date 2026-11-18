@@ -1404,7 +1404,7 @@ void TLan_PhyPowerDown(struct nic *nic)
 
 	/* Wait for 50 ms and powerup
 	 * This is abitrary.  It is intended to make sure the
-	 * tranceiver settles.
+	 * transceiver settles.
 	 */
 	/* TLan_SetTimer( dev, (HZ/20), TLAN_TIMER_PHY_PUP ); */
 	mdelay(50);
@@ -1423,7 +1423,7 @@ void TLan_PhyPowerUp(struct nic *nic)
 	TLan_MiiWriteReg(nic, priv->phy[priv->phyNum], MII_BMCR, value);
 	TLan_MiiSync(BASE);
 	/* Wait for 500 ms and reset the
-	 * tranceiver.  The TLAN docs say both 50 ms and
+	 * transceiver.  The TLAN docs say both 50 ms and
 	 * 500 ms, so do the longer, just in case.
 	 */
 	mdelay(500);
@@ -1543,7 +1543,7 @@ void TLan_PhyStartLink(struct nic *nic)
 		TLan_MiiWriteReg(nic, phy, TLAN_TLPHY_CTL, tctl);
 	}
 
-	/* Wait for 2 sec to give the tranceiver time
+	/* Wait for 2 sec to give the transceiver time
 	 * to establish link.
 	 */
 	/* TLan_SetTimer( dev, (4*HZ), TLAN_TIMER_FINISH_RESET ); */
