@@ -363,6 +363,22 @@ static int realtek_reset ( struct realtek_nic *rtl ) {
 }
 
 /**
+ * Clear RXDV gate
+ *
+ * @v rtl		Realtek device
+ *
+ * MISC.RXDV_GATED_EN clamps the PHY RXDV path into the MAC.  After
+ * Linux r8169, clearing this bit restores RX where ChipCmd soft
+ * reset alone does not.
+ */
+static void realtek_clear_rxdv_gate ( struct realtek_nic *rtl ) {
+	uint32_t misc;
+
+	misc = readl ( rtl->regs + RTL_MISC );
+	writel ( ( misc & ~RTL_MISC_RXDV_GATED_EN ), rtl->regs + RTL_MISC );
+}
+
+/**
  * Configure PHY for Gigabit operation
  *
  * @v rtl		Realtek device
@@ -682,6 +698,10 @@ static int realtek_open ( struct net_device *netdev ) {
 	uint32_t tcr;
 	uint32_t rcr;
 	int rc;
+
+	/* Recover RX after Linux r8169 warm reboot, if required */
+	if ( rtl->clear_rxdv )
+		realtek_clear_rxdv_gate ( rtl );
 
 	/* Create transmit descriptor ring */
 	if ( ( rc = realtek_create_ring ( rtl, &rtl->tx ) ) != 0 )
@@ -1147,6 +1167,10 @@ static int realtek_probe ( struct pci_device *pci ) {
 	/* Detect device type */
 	realtek_detect ( rtl );
 
+	/* Apply per-NIC quirks from PCI ID table */
+	if ( pci->id->driver_data & RTL_CLEAR_RXDV )
+		rtl->clear_rxdv = 1;
+
 	/* Initialise EEPROM */
 	if ( rtl->eeprom.bus &&
 	     ( ( rc = realtek_init_eeprom ( netdev ) ) == 0 ) ) {
@@ -1243,7 +1267,8 @@ static struct pci_device_id realtek_nics[] = {
 	PCI_ROM ( 0x10ec, 0x8138, "rtl8138",	"RT8139 (B/C)", 0 ),
 	PCI_ROM ( 0x10ec, 0x8139, "rtl8139",	"RTL-8139/8139C/8139C+", 0 ),
 	PCI_ROM ( 0x10ec, 0x8167, "rtl8167",	"RTL-8110SC/8169SC", 0 ),
-	PCI_ROM ( 0x10ec, 0x8168, "rtl8168",	"RTL8111/8168B", 0 ),
+	PCI_ROM ( 0x10ec, 0x8168, "rtl8168",	"RTL8111/8168B",
+		  RTL_CLEAR_RXDV ),
 	PCI_ROM ( 0x10ec, 0x8169, "rtl8169",	"RTL-8169", 0 ),
 	PCI_ROM ( 0x1113, 0x1211, "smc1211",	"SMC2-1211TX", 0 ),
 	PCI_ROM ( 0x1186, 0x1300, "dfe538",	"DFE530TX+/DFE538TX", 0 ),

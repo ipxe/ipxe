@@ -18,6 +18,12 @@ FILE_SECBOOT ( PERMITTED );
 /** PCI memory BAR size */
 #define RTL_BAR_SIZE 0x100
 
+/** Driver flags */
+enum realtek_flags {
+	/** Clear RXDV gate on open (RTL8168G+) */
+	RTL_CLEAR_RXDV = 0x0001,
+};
+
 /** A packet descriptor */
 struct realtek_descriptor {
 	/** Buffer size */
@@ -187,6 +193,10 @@ enum realtek_legacy_status {
 #define RTL_CONFIG1 0x52
 #define RTL_CONFIG1_VPD		0x02	/**< Vital Product Data enabled */
 
+/** Miscellaneous Register (dword, 8168e+) */
+#define RTL_MISC 0xf0
+#define RTL_MISC_RXDV_GATED_EN	0x00080000UL /**< Gate RXDV into MAC */
+
 /** Media Status Register (byte, 8139 only) */
 #define RTL_MSR 0x58
 #define RTL_MSR_TXFCE		0x80	/**< TX flow control enabled */
@@ -307,6 +317,8 @@ struct realtek_nic {
 	int legacy;
 	/** PHYAR and PHYSTATUS registers are present */
 	int have_phy_regs;
+	/** Clear RXDV gate on open */
+	int clear_rxdv;
 	/** TPPoll register offset */
 	unsigned int tppoll;
 
