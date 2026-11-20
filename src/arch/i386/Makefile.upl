@@ -1,0 +1,10 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# FIT architecture name
+#
+UPL_FIT_ARCH	:= x86
+
+# Include generic Universal Payload Makefile
+#
+MAKEDEPS	+= arch/x86/Makefile.upl
+include arch/x86/Makefile.upl

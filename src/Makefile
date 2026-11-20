@@ -45,6 +45,7 @@ SYMCHECK	:= ./util/symcheck.pl
 SORTOBJDUMP	:= ./util/sortobjdump.pl
 PADIMG		:= ./util/padimg.pl
 LICENCE		:= ./util/licence.pl
+GENFIT		:= ./util/genfit.pl
 NRV2B		:= ./util/nrv2b
 ZBIN32		:= ./util/zbin32
 ZBIN64		:= ./util/zbin64

@@ -1,0 +1,45 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Universal Payload-specific directories containing source files
+#
+SRCDIRS		+= arch/x86/interface/upl
+
+# Fixed physical link address.  The image copies itself here from
+# wherever the bootloader loaded it (and places a copy of the device
+# tree immediately after itself), so this must lie within RAM that
+# is unused by the bootloader on the target (e.g. QEMU with -m 256M
+# has RAM only below 0x10000000), and should leave room below it for
+# a Linux kernel loaded at 1MB.
+#
+UPL_LOAD_ADDR	?= 0x08000000
+LDFLAGS		+= --defsym _upl_load_addr=$(UPL_LOAD_ADDR)
+
+# Physical address recorded as the FIT image's load address.  Slim
+# Bootloader runs a FIT payload in place, and versions that validate
+# the entry point against the actual load address require the board
+# to be built with PAYLOAD_LOAD_HIGH=0 so that the image is loaded
+# here (at PAYLOAD_EXE_BASE).
+#
+UPL_FIT_ADDR	?= 0x00800000
+
+# The linker script
+#
+LDSCRIPT	= arch/x86/scripts/upl.lds
+
+# Media types
+#
+NON_AUTO_MEDIA	+= fit
+
+# Include PCI and USB drivers in the all-drivers build
+#
+DRIVERS_ipxe	+= $(DRIVERS_pci_net)
+DRIVERS_ipxe	+= $(DRIVERS_pci_infiniband)
+DRIVERS_ipxe	+= $(DRIVERS_usb_net)
+
+# Universal Payloads are FIT images
+#
+$(BIN)/%.fit : $(BIN)/%.fit.tmp $(GENFIT)
+	$(QM)$(ECHO) "  [FINISH] $@"
+	$(Q)$(OBJCOPY) -O binary $< $@.bin
+	$(Q)$(GENFIT) --load=$(UPL_FIT_ADDR) --arch=$(UPL_FIT_ARCH) $@.bin $@
+	$(Q)$(RM) $@.bin
