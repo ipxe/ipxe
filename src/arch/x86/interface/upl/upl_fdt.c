@@ -213,6 +213,83 @@ int upl_fdt_reserved ( const char *compatible, unsigned int index,
 }
 
 /**
+ * Get frame buffer
+ *
+ * @v fb		Frame buffer to fill in
+ * @ret rc		Return status code
+ *
+ * The frame buffer is described by the first "simple-framebuffer"
+ * node, with the pixel format string describing a little-endian
+ * pixel value (as per the device tree binding).
+ */
+int upl_framebuffer ( struct upl_framebuffer *fb ) {
+	const char *format;
+	unsigned int offset;
+	unsigned int len;
+	uint32_t width;
+	uint32_t height;
+	uint32_t stride;
+	int rc;
+
+	/* Locate frame buffer */
+	memset ( fb, 0, sizeof ( *fb ) );
+	if ( ( rc = upl_fdt_find ( NULL, "simple-framebuffer",
+				   &offset ) ) != 0 ) {
+		return rc;
+	}
+
+	/* Get geometry */
+	if ( ( ( rc = upl_fdt_reg ( offset, 0, &fb->base,
+				    &fb->size ) ) != 0 ) ||
+	     ( ( rc = fdt_u32 ( &sysfdt, offset, "width", &width ) ) != 0 ) ||
+	     ( ( rc = fdt_u32 ( &sysfdt, offset, "height",
+				&height ) ) != 0 ) ) {
+		DBGC ( &sysfdt, "UPL FDT malformed frame buffer: %s\n",
+		       strerror ( rc ) );
+		return rc;
+	}
+	fb->width = width;
+	fb->height = height;
+
+	/* Identify pixel format */
+	format = fdt_string ( &sysfdt, offset, "format" );
+	if ( ! format ) {
+		DBGC ( &sysfdt, "UPL FDT frame buffer has no format\n" );
+		return -ENOTSUP;
+	} else if ( ( strcmp ( format, "a8r8g8b8" ) == 0 ) ||
+		    ( strcmp ( format, "x8r8g8b8" ) == 0 ) ) {
+		fb->red_mask = 0x00ff0000UL;
+		fb->green_mask = 0x0000ff00UL;
+		fb->blue_mask = 0x000000ffUL;
+		fb->reserved_mask = 0xff000000UL;
+		len = 4;
+	} else if ( ( strcmp ( format, "a8b8g8r8" ) == 0 ) ||
+		    ( strcmp ( format, "x8b8g8r8" ) == 0 ) ) {
+		fb->red_mask = 0x000000ffUL;
+		fb->green_mask = 0x0000ff00UL;
+		fb->blue_mask = 0x00ff0000UL;
+		fb->reserved_mask = 0xff000000UL;
+		len = 4;
+	} else if ( strcmp ( format, "r5g6b5" ) == 0 ) {
+		fb->red_mask = 0xf800;
+		fb->green_mask = 0x07e0;
+		fb->blue_mask = 0x001f;
+		len = 2;
+	} else {
+		DBGC ( &sysfdt, "UPL FDT unsupported frame buffer format "
+		       "\"%s\"\n", format );
+		return -ENOTSUP;
+	}
+
+	/* Get line length, if specified */
+	if ( fdt_u32 ( &sysfdt, offset, "stride", &stride ) != 0 )
+		stride = ( width * len );
+	fb->stride = stride;
+
+	return 0;
+}
+
+/**
  * Install iPXE as a universal payload
  *
  * @v hdr		Device tree provided by the bootloader

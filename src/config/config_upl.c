@@ -33,3 +33,12 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  */
 
 PROVIDE_REQUIRING_SYMBOL();
+
+/*
+ * Drag in all requested console types
+ *
+ */
+
+#ifdef CONSOLE_FRAMEBUFFER
+REQUIRE_OBJECT ( upl_fbcon );
+#endif
