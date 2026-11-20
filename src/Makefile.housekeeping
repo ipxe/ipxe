@@ -26,8 +26,8 @@ endef
 TAB 			:= $(shell $(PRINTF) '\t')
 ECHO_E_ECHO		:= $(ECHO)
 ECHO_E_ECHO_E		:= $(ECHO) -e
-ECHO_E_BIN_ECHO 	:= /bin/echo
-ECHO_E_BIN_ECHO_E 	:= /bin/echo -e
+ECHO_E_BIN_ECHO 	:= /usr/bin/env echo
+ECHO_E_BIN_ECHO_E 	:= /usr/bin/env echo -e
 ECHO_E_ECHO_TAB		:= $(shell $(ECHO_E_ECHO) '\t' | cat)
 ECHO_E_ECHO_E_TAB	:= $(shell $(ECHO_E_ECHO_E) '\t' | cat)
 ECHO_E_BIN_ECHO_TAB 	:= $(shell $(ECHO_E_BIN_ECHO) '\t')
