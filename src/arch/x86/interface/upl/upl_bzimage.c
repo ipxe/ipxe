@@ -30,9 +30,9 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  *
  * There are no real-mode services available to a universal payload,
  * so the kernel is started via the 32-bit boot protocol (as described
- * in Documentation/arch/x86/boot.rst).  We construct the "zero page"
- * ourselves and jump directly to the protected-mode kernel entry
- * point.
+ * in Documentation/arch/x86/boot.rst), leaving long mode if necessary.
+ * We construct the "zero page" ourselves and jump directly to the
+ * protected-mode kernel entry point.
  *
  */
 

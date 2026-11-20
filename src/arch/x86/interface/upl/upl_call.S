@@ -27,9 +27,17 @@
  *
  * Jumps to 32-bit operating system entry points
  *
+ * A 64-bit payload leaves long mode first, which is possible without
+ * constructing new page tables since we run from an identity map.
+ *
  */
 
 	.section ".note.GNU-stack"
+
+#define CR0_PG		0x80000000
+#define CR4_PAE		0x00000020
+#define MSR_EFER	0xc0000080
+#define EFER_LME	0x00000100
 
 /* Selectors required by the Linux 32-bit boot protocol */
 #define UPL_CS32	0x10
@@ -44,6 +52,52 @@
 	movw	%ax, %gs
 	movw	%ax, %ss
 .endm
+
+#ifdef __x86_64__
+
+/* Disable long mode (from compatibility mode) */
+.macro	disable_long_mode
+	movl	%cr0, %eax
+	andl	$~CR0_PG, %eax
+	movl	%eax, %cr0
+	movl	$MSR_EFER, %ecx
+	rdmsr
+	andl	$~EFER_LME, %eax
+	wrmsr
+	movl	%cr4, %eax
+	andl	$~CR4_PAE, %eax
+	movl	%eax, %cr4
+.endm
+
+/*
+ * Jump to 32-bit operating system entry point
+ *
+ * Declared as __asmcall void upl_jump_ia32 ( uint32_t entry,
+ *					      uint32_t params )
+ *
+ * The parameter is passed in %esi, as required by the Linux 32-bit
+ * boot protocol.
+ */
+	.section ".text.upl_jump_ia32", "ax", @progbits
+	.code64
+	.globl	upl_jump_ia32
+upl_jump_ia32:
+	cli
+	lgdt	upl_gdtr
+	pushq	$UPL_CS32
+	pushq	$1f
+	lretq
+	.code32
+1:	load_flat_data
+	disable_long_mode
+	movl	%edi, %eax
+	xorl	%ebp, %ebp
+	xorl	%edi, %edi
+	xorl	%ebx, %ebx
+	jmp	*%eax
+	.size	upl_jump_ia32, . - upl_jump_ia32
+
+#else /* __x86_64__ */
 
 /*
  * Jump to 32-bit operating system entry point
@@ -70,6 +124,8 @@ upl_jump_ia32:
 	xorl	%ebx, %ebx
 	jmp	*%eax
 	.size	upl_jump_ia32, . - upl_jump_ia32
+
+#endif /* __x86_64__ */
 
 	.section ".data.upl_gdt", "aw", @progbits
 	.balign	16

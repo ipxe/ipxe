@@ -9,7 +9,8 @@ SRCDIRS		+= arch/x86/interface/upl
 # tree immediately after itself), so this must lie within RAM that
 # is unused by the bootloader on the target (e.g. QEMU with -m 256M
 # has RAM only below 0x10000000), and should leave room below it for
-# a Linux kernel loaded at 1MB.
+# a Linux kernel loaded at 1MB.  64-bit builds use the small code
+# model, and so must also be linked below 2GB.
 #
 UPL_LOAD_ADDR	?= 0x08000000
 LDFLAGS		+= --defsym _upl_load_addr=$(UPL_LOAD_ADDR)

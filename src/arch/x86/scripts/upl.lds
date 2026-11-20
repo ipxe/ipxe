@@ -4,9 +4,9 @@
  * Linker script for Universal Payload (UPL) images
  *
  * The image is linked to run at a fixed physical address (defined
- * via --defsym _upl_load_addr) in 32-bit flat protected mode.  The
- * image is wrapped in a FIT image, and copies itself to its link
- * address.
+ * via --defsym _upl_load_addr) in 32-bit flat protected mode or in
+ * identity-mapped long mode.  The image is wrapped in a FIT image,
+ * and copies itself to its link address.
  *
  */
 
