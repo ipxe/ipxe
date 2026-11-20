@@ -214,6 +214,118 @@ int upl_fdt_reserved ( const char *compatible, unsigned int index,
 	return upl_fdt_reg ( search.offset, 0, start, &size );
 }
 
+/** A memory region enumeration */
+struct upl_fdt_regions {
+	/** Region callback */
+	void ( * add ) ( void *ctx, uint64_t start, uint64_t size,
+			 enum upl_memory_type type );
+	/** Callback context */
+	void *ctx;
+};
+
+/**
+ * Describe memory regions for node
+ *
+ * @v offset		Node offset
+ * @v regions		Memory region enumeration
+ * @v type		Memory type
+ */
+static void upl_fdt_regions ( unsigned int offset,
+			      struct upl_fdt_regions *regions,
+			      enum upl_memory_type type ) {
+	unsigned int index;
+	uint64_t start;
+	uint64_t size;
+
+	for ( index = 0 ; upl_fdt_reg ( offset, index, &start,
+					&size ) == 0 ; index++ ) {
+		regions->add ( regions->ctx, start, size, type );
+	}
+}
+
+/**
+ * Describe system memory node
+ *
+ * @v offset		Node offset
+ * @v name		Node name
+ * @v ctx		Memory region enumeration
+ * @ret rc		Return status code
+ */
+static int upl_fdt_memory_node ( unsigned int offset,
+				 const char *name __unused, void *ctx ) {
+	const char *devtype;
+
+	devtype = fdt_string ( &sysfdt, offset, "device_type" );
+	if ( devtype && ( strcmp ( devtype, "memory" ) == 0 ) )
+		upl_fdt_regions ( offset, ctx, UPL_MEM_RAM );
+	return 0;
+}
+
+/**
+ * Describe reserved memory node
+ *
+ * @v offset		Node offset
+ * @v name		Node name
+ * @v ctx		Memory region enumeration
+ * @ret rc		Return status code
+ */
+static int upl_fdt_reserved_node ( unsigned int offset,
+				   const char *name __unused, void *ctx ) {
+	static const char *boot[] = {
+		"LoaderCode", "LoaderData", "boot-code", "boot-data",
+	};
+	enum upl_memory_type type = UPL_MEM_RESERVED;
+	const char *compatible;
+	unsigned int i;
+
+	compatible = fdt_string ( &sysfdt, offset, "compatible" );
+	if ( compatible && ( strcmp ( compatible, "acpi" ) == 0 ) ) {
+		type = UPL_MEM_ACPI;
+	} else if ( compatible && ( strcmp ( compatible, "acpi-nvs" ) == 0 )){
+		type = UPL_MEM_NVS;
+	} else if ( compatible ) {
+		for ( i = 0 ; i < ( sizeof ( boot ) / sizeof ( boot[0] ) ) ;
+		      i++ ) {
+			if ( strcmp ( compatible, boot[i] ) == 0 )
+				type = UPL_MEM_BOOT;
+		}
+	}
+	upl_fdt_regions ( offset, ctx, type );
+	return 0;
+}
+
+/**
+ * Enumerate memory regions
+ *
+ * @v add		Region callback
+ * @v ctx		Callback context
+ *
+ * System memory is described by top-level nodes with device_type
+ * "memory", and reserved memory by the memory reservation block and
+ * by the children of /reserved-memory.
+ */
+void upl_fdt_memory ( void ( * add ) ( void *ctx, uint64_t start,
+				       uint64_t size,
+				       enum upl_memory_type type ),
+		      void *ctx ) {
+	struct upl_fdt_regions regions = {
+		.add = add,
+		.ctx = ctx,
+	};
+	const struct fdt_reservation *rsv;
+	unsigned int offset;
+
+	if ( ! sysfdt.hdr )
+		return;
+	upl_fdt_walk ( 0, 0, upl_fdt_memory_node, &regions );
+	for_each_fdt_reservation ( rsv, &sysfdt ) {
+		add ( ctx, be64_to_cpu ( rsv->start ),
+		      be64_to_cpu ( rsv->size ), UPL_MEM_RESERVED );
+	}
+	if ( fdt_path ( &sysfdt, "/reserved-memory", &offset ) == 0 )
+		upl_fdt_walk ( offset, 0, upl_fdt_reserved_node, &regions );
+}
+
 /**
  * Get frame buffer
  *

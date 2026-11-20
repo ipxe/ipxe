@@ -188,8 +188,8 @@ FILE_SECBOOT ( PERMITTED );
   #define IMAGE_EFISIG		/* EFI signature list image support */
 #endif
 
-/* Image types supported only on RISC-V SBI platforms */
-#if defined ( PLATFORM_sbi )
+/* Image types supported only on RISC-V SBI and Universal Payload platforms */
+#if defined ( PLATFORM_sbi ) || defined ( PLATFORM_upl )
   #define IMAGE_LKRN		/* Linux kernel image support */
 #endif
 

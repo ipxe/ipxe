@@ -20,6 +20,20 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 
 struct fdt_header;
 
+/** Memory region types */
+enum upl_memory_type {
+	/** Usable RAM */
+	UPL_MEM_RAM,
+	/** Reserved */
+	UPL_MEM_RESERVED,
+	/** Used only by the bootloader (and usable by an operating system) */
+	UPL_MEM_BOOT,
+	/** ACPI tables */
+	UPL_MEM_ACPI,
+	/** ACPI non-volatile storage */
+	UPL_MEM_NVS,
+};
+
 /** A linear frame buffer */
 struct upl_framebuffer {
 	/** Physical base address */
@@ -256,7 +270,13 @@ extern int upl_fdt_find ( const char *prefix, const char *compatible,
 			  unsigned int *offset );
 extern int upl_fdt_reserved ( const char *compatible, unsigned int index,
 			      uint64_t *start );
+extern void upl_fdt_memory ( void ( * add ) ( void *ctx, uint64_t start,
+					      uint64_t size,
+					      enum upl_memory_type type ),
+			     void *ctx );
 extern int upl_framebuffer ( struct upl_framebuffer *fb );
 extern physaddr_t upl_acpi_rsdp ( void );
+extern __asmcall __attribute__ (( noreturn )) void
+upl_jump_ia32 ( uint32_t entry, uint32_t params );
 
 #endif /* _IPXE_UPL_H */

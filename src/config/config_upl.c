@@ -42,3 +42,12 @@ PROVIDE_REQUIRING_SYMBOL();
 #ifdef CONSOLE_FRAMEBUFFER
 REQUIRE_OBJECT ( upl_fbcon );
 #endif
+
+/*
+ * Drag in all requested image types
+ *
+ */
+
+#ifdef IMAGE_LKRN
+REQUIRE_OBJECT ( upl_bzimage );
+#endif
