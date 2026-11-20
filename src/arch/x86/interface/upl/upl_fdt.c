@@ -28,7 +28,8 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
  * Universal Payload device tree
  *
  * The bootloader passes a Flattened Device Tree (as done by EDK2 when
- * built with PcdHandOffFdtEnable).  The device tree uses the node
+ * built with PcdHandOffFdtEnable), or a HOB list from which we
+ * construct an equivalent device tree.  The device tree uses the node
  * names and properties consumed by EDK2's FdtParserLib.
  *
  */
@@ -36,6 +37,7 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <byteswap.h>
 #include <ipxe/memmap.h>
 #include <ipxe/fdt.h>
 #include <ipxe/fdtmem.h>
@@ -292,9 +294,18 @@ int upl_framebuffer ( struct upl_framebuffer *fb ) {
 /**
  * Install iPXE as a universal payload
  *
- * @v hdr		Device tree provided by the bootloader
+ * @v param		Device tree (or HOB list) provided by the bootloader
  */
-__asmcall void upl_install ( struct fdt_header *hdr ) {
+__asmcall void upl_install ( void *param ) {
+	struct fdt_header *hdr = param;
+
+	/* Construct device tree from HOB list, if applicable */
+	if ( hdr && ( hdr->magic != cpu_to_be32 ( FDT_MAGIC ) ) )
+		hdr = upl_hob_fdt ( param );
+	if ( ! hdr ) {
+		DBGC ( &sysfdt, "UPL has no device tree\n" );
+		return;
+	}
 
 	/* Copy and register system device tree */
 	fdtmem_register ( hdr, ( upl_mapped - 1 ) );

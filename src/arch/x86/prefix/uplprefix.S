@@ -28,7 +28,7 @@
  * Universal Payload (UPL) prefix
  *
  * The bootloader invokes a 32-bit universal payload in flat protected
- * mode with a device tree pointer at ESP+4:
+ * mode with a device tree (or HOB list) pointer at ESP+4:
  *
  *   VOID PayloadEntry ( VOID *BootloaderParameter );
  *
