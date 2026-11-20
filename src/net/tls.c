@@ -2061,6 +2061,9 @@ static int tls_send_handshake ( struct tls_connection *tls,
 				struct io_buffer *iobuf ) {
 	int rc;
 
+	/* Add to transcript digest */
+	tls_add_handshake ( tls, iobuf->data, iob_len ( iobuf ) );
+
 	/* Send record */
 	if ( ( rc = tls_send_record ( tls, TLS_TYPE_HANDSHAKE,
 				      iob_disown ( iobuf ) ) ) != 0 ) {
@@ -4012,10 +4015,6 @@ static int tls_send_record ( struct tls_connection *tls, unsigned int type,
 	/* Record plaintext pointer and length */
 	plaintext = iobuf->data;
 	len = iob_len ( iobuf );
-
-	/* Add to handshake digest if applicable */
-	if ( type == TLS_TYPE_HANDSHAKE )
-		tls_add_handshake ( tls, plaintext, len );
 
 	/* Start constructing ciphertext at start of reserved space */
 	iob_push ( iobuf, tls_iob_reserved ( tls, len ) );
