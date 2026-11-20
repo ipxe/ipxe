@@ -430,10 +430,6 @@ void tlskey_digest ( struct tls_key_schedule *tlskey, const void *data,
 	if ( ! digestsize )
 		return;
 
-	/* Do nothing if running transcript digest is frozen */
-	if ( transcript->flags & TLSKEY_TSF_FROZEN )
-		return;
-
 	/* Append to running transcript digest */
 	digest_update ( digest, transcript->ctx, data, len );
 

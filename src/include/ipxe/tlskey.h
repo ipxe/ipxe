@@ -84,9 +84,6 @@ struct tls_transcript {
 /** Transcript digest includes a Finished record */
 #define TLSKEY_TSF_FINISHED 0x0002
 
-/** Transcript digest is frozen */
-#define TLSKEY_TSF_FROZEN 0x0004
-
 /** A TLS key derivation function secret */
 struct tls_kdf_secret {
 	/** Secret */
@@ -347,28 +344,6 @@ tlskey_is_accumulating ( struct tls_key_schedule *tlskey ) {
 	const struct tls_key_schedule_operations *op = tlskey->op;
 
 	return ( op && op->accumulates );
-}
-
-/**
- * Freeze running handshake transcript digest
- *
- * @v tlskey		Key schedule
- */
-static inline __attribute__ (( always_inline )) void
-tlskey_freeze ( struct tls_key_schedule *tlskey ) {
-
-	tlskey->transcript.flags |= TLSKEY_TSF_FROZEN;
-}
-
-/**
- * Unfreeze running handshake transcript digest
- *
- * @v tlskey		Key schedule
- */
-static inline __attribute__ (( always_inline )) void
-tlskey_unfreeze ( struct tls_key_schedule *tlskey ) {
-
-	tlskey->transcript.flags &= ~TLSKEY_TSF_FROZEN;
 }
 
 extern const struct tls_endpoint tls_client;

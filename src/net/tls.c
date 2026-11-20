@@ -2059,10 +2059,26 @@ static struct io_buffer * tls_alloc_handshake ( struct tls_connection *tls,
  */
 static int tls_send_handshake ( struct tls_connection *tls,
 				struct io_buffer *iobuf ) {
+	const union tls_handshake_header *handshake;
 	int rc;
 
-	/* Add to transcript digest */
-	tls_add_handshake ( tls, iobuf->data, iob_len ( iobuf ) );
+	/* Sanity check */
+	assert ( iob_len ( iobuf ) >= sizeof ( *handshake ) );
+	handshake = iobuf->data;
+
+	/* Add to transcript digest if this handshake contributes to
+	 * the client negotiation (i.e. if client negotiation is still
+	 * pending).
+	 *
+	 * Always add Certificate and Certificate Verify handshakes
+	 * (which may be used for post-handshake authentication after
+	 * both ends have completed negotiation).
+	 */
+	if ( is_pending ( &tls->client.negotiation ) ||
+	     ( handshake->type == TLS_CERTIFICATE ) ||
+	     ( handshake->type == TLS_CERTIFICATE_VERIFY ) ) {
+		tls_add_handshake ( tls, iobuf->data, iob_len ( iobuf ) );
+	}
 
 	/* Send record */
 	if ( ( rc = tls_send_record ( tls, TLS_TYPE_HANDSHAKE,
@@ -2084,6 +2100,7 @@ static int tls_replay_handshake ( struct tls_connection *tls,
 				  struct io_buffer *iobuf ) {
 
 	/* Add to transcript digest */
+	assert ( is_pending ( &tls->client.negotiation ) );
 	tls_add_handshake ( tls, iobuf->data, iob_len ( iobuf ) );
 
 	/* Free I/O buffer */
@@ -2420,9 +2437,6 @@ static int tls_send_certificate ( struct tls_connection *tls ) {
 	}
 	assert ( next->data == iobuf->tail );
 
-	/* Allow for use in post-handshake authentication */
-	tlskey_unfreeze ( &tls->key );
-
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
 		goto err_send;
@@ -2591,9 +2605,6 @@ static int tls_send_certificate_verify ( struct tls_connection *tls ) {
 
 	/* Build DigitallySigned structure */
 	tls_build ( tls_digitally_signed, tls->version, &dsig, &cursor );
-
-	/* Allow for use in post-handshake authentication */
-	tlskey_unfreeze ( &tls->key );
 
 	/* Transmit record */
 	if ( ( rc = tls_send_handshake ( tls, iob_disown ( iobuf ) ) ) != 0 )
@@ -3449,7 +3460,6 @@ tls_new_certificate_request ( struct tls_connection *tls,
 	/* Schedule post-handshake authentication, if applicable */
 	if ( tls_ready ( tls ) ) {
 		tlskey_rewind ( &tls->key );
-		tlskey_unfreeze ( &tls->key );
 		tls->tx.pending |= TLS_TX_CERTIFICATE;
 		if ( cert )
 			tls->tx.pending |= TLS_TX_CERTIFICATE_VERIFY;
@@ -3623,6 +3633,7 @@ static int tls_new_handshake ( struct tls_connection *tls,
 	struct tls_cursor cursor;
 	size_t remaining;
 	size_t len;
+	int pending;
 	int rc;
 
 	while ( ( remaining = iob_len ( iobuf ) ) ) {
@@ -3646,6 +3657,9 @@ static int tls_new_handshake ( struct tls_connection *tls,
 			/* Leave remaining fragment unconsumed */
 			break;
 		}
+
+		/* Record pre-handshake state of server negotiation */
+		pending = is_pending ( &tls->server.negotiation );
 
 		/* Identify handshake type */
 		switch ( handshake->type ) {
@@ -3690,15 +3704,23 @@ static int tls_new_handshake ( struct tls_connection *tls,
 		if ( handler && ( ( rc = handler ( tls, &cursor ) ) != 0 ) )
 			return rc;
 
-		/* Add to transcript digest (except for Hello Requests,
-		 * which are explicitly excluded).
+		/* Add to transcript digest if this handshake
+		 * contributed to the server negotiation (i.e. if
+		 * negotiation was pending before the handshake was
+		 * handled).
+		 *
+		 * Exclude Hello Request handshakes (which are defined
+		 * to be explicitly excluded from the transcript even
+		 * if encountered mid-negotiation).
+		 *
+		 * Always add Certificate Request handshakes (which
+		 * may be used for post-handshake authentication after
+		 * both ends have completed negotiation).
 		 */
-		if ( handshake->type != TLS_HELLO_REQUEST )
+		if ( ( pending && ( handshake->type != TLS_HELLO_REQUEST ) ) ||
+		     ( handshake->type == TLS_CERTIFICATE_REQUEST ) ) {
 			tls_add_handshake ( tls, handshake, len );
-
-		/* Freeze transcript digest if handshake has completed */
-		if ( tls_ready ( tls ) )
-			tlskey_freeze ( &tls->key );
+		}
 
 		/* Move to next handshake record */
 		iob_pull ( iobuf, len );
@@ -4936,10 +4958,6 @@ static void tls_tx_step ( struct tls_connection *tls ) {
 		}
 		tls->tx.pending &= ~TLS_TX_KEY_UPDATE;
 	}
-
-	/* Freeze transcript digest if handshake has completed */
-	if ( tls_ready ( tls ) )
-		tlskey_freeze ( &tls->key );
 
 	/* Reschedule process if pending transmissions remain,
 	 * otherwise send notification of a window change.
