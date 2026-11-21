@@ -261,6 +261,20 @@ static int efi_image_exec ( struct image *image ) {
 	DBGC ( image, "EFIIMAGE %s device is %s\n",
 	       image->name, efi_handle_name ( device ) );
 
+	/* Install duplicate SNP protocols, if applicable */
+	if ( ( snpdev != NULL ) &&
+	     ( ( efirc = bs->InstallMultipleProtocolInterfaces (
+			&device,
+			&efi_simple_network_protocol_guid, &snpdev->snp,
+			&efi_nii_protocol_guid, &snpdev->nii,
+			&efi_nii31_protocol_guid, &snpdev->nii,
+			NULL ) ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( image, "EFIIMAGE %s could not duplicate %s: %s\n",
+		       image->name, netdev->name, strerror ( rc ) );
+		goto err_snp_install;
+	}
+
 	/* Add as a child of the parent device */
 	if ( ( parent != NULL ) &&
 	     ( rc = efi_child_add ( parent, device ) ) != 0 ) {
@@ -461,6 +475,15 @@ static int efi_image_exec ( struct image *image ) {
 	if ( parent )
 		efi_child_del ( parent, device );
  err_child_add:
+	if ( snpdev ) {
+		bs->UninstallMultipleProtocolInterfaces (
+			device,
+			&efi_simple_network_protocol_guid, &snpdev->snp,
+			&efi_nii_protocol_guid, &snpdev->nii,
+			&efi_nii31_protocol_guid, &snpdev->nii,
+			NULL );
+	}
+ err_snp_install:
 	bs->UninstallMultipleProtocolInterfaces (
 			device,
 			&efi_device_path_protocol_guid, devpath,
