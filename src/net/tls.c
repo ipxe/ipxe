@@ -3588,8 +3588,12 @@ static int tls_new_key_update ( struct tls_connection *tls,
 	/* Schedule receive key update */
 	tls->rx.cipherspec.pending = &tls_application;
 
-	/* Schedule transmit key update, if applicable */
-	if ( *update.requested == TLS_KEY_UPDATE_REQUESTED ) {
+	/* Schedule transmit key update, if requested.  Ignore update
+	 * requests if we have not yet completed negotiation and
+	 * started using our own application traffic secret.
+	 */
+	if ( ( *update.requested == TLS_KEY_UPDATE_REQUESTED ) &&
+	     ( ! is_pending ( &tls->client.negotiation ) ) ) {
 		tls->tx.pending |= TLS_TX_KEY_UPDATE;
 		tls_tx_resume ( tls );
 	}
