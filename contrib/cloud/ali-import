@@ -267,6 +267,15 @@ def all_clients(region, account):
     )
     return clients
 
+def check_region(clients):
+    """Check that region is basically working"""
+    req = ecs.models.DescribeZonesRequest(region_id=clients.region)
+    rsp = clients.ecs.describe_zones_with_options(req, RUNTIME_OPTS)
+    working = bool(rsp.body.zones.zone)
+    if not working:
+        logger.info("skip broken region %s" % clients.region)
+    return working
+
 def delete_temp_function(clients, func):
     """Remove temporary function"""
     logger.info("delete function %s %s" % (clients.region, func))
@@ -608,6 +617,19 @@ if not args.name:
 # Use all regions if none specified
 regions = args.region or all_regions()
 
+# Construct per-region clients
+account = account_id()
+clients = {region: all_clients(region, account) for region in regions}
+
+# Filter out broken regions (if not explicitly specified)
+if not args.region:
+    with ThreadPoolExecutor(max_workers=len(regions)) as executor:
+        futures = {executor.submit(check_region,
+                                   clients=clients[region]): region
+                   for region in regions}
+        broken = [futures[x] for x in as_completed(futures) if not x.result()]
+    regions = [x for x in regions if x not in broken]
+
 # Construct image list
 images = [image(x, args.family, args.name, args.public) for x in args.image]
 imports = [(region, image) for region in regions for image in images]
@@ -615,10 +637,6 @@ workers = len(imports)
 
 # Look up resource names
 fcrole = role_arn(args.role)
-
-# Construct per-region clients
-account = account_id()
-clients = {region: all_clients(region, account) for region in regions}
 
 # Delete existing images from all regions, if applicable
 if args.overwrite:
