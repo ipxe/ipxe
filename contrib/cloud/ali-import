@@ -110,6 +110,11 @@ RUNTIME_OPTS = util.models.RuntimeOptions(
     connect_timeout=10000,
     read_timeout=120000,
 )
+OSS_OPTS = dict(
+    retry_max_attempts=5,
+    connect_timeout=10,
+    readwrite_timeout=120,
+)
 
 # Non-transient API call exceptions may be reported as either
 # UnretryableException (if no response is received, e.g. due to a
@@ -248,7 +253,11 @@ def all_clients(region, account):
     fcep = '%s.%s.fc.aliyuncs.com' % (account, region)
     fcconf = openapi.models.Config(credential=cred, endpoint=fcep)
     osscred = oss.credentials.EnvironmentVariableCredentialsProvider()
-    ossconf = oss.config.Config(credentials_provider=osscred, region=region)
+    ossconf = oss.config.Config(
+        region=region,
+        credentials_provider=osscred,
+        **OSS_OPTS
+    )
     clients = Clients(
         region=region,
         censored=region.startswith('cn-'),
