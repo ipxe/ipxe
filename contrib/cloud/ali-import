@@ -456,6 +456,7 @@ def delete_snapshots(clients):
 def wait_for_task(clients, task_id):
     """Wait for task to complete"""
     status = 'Unknowable'
+    last_exc = None
     for i in range(POLL_MAX_RETRIES):
         time.sleep(POLL_INTERVAL_SEC)
         req = ecs.models.DescribeTasksRequest(
@@ -464,7 +465,8 @@ def wait_for_task(clients, task_id):
         )
         try:
             rsp = clients.ecs.describe_tasks_with_options(req, RUNTIME_OPTS)
-        except API_EXCEPTIONS:
+        except API_EXCEPTIONS as exc:
+            last_exc = exc
             continue
         assert len(rsp.body.task_set.task) == 1
         assert rsp.body.task_set.task[0].task_id == task_id
@@ -472,11 +474,12 @@ def wait_for_task(clients, task_id):
         if status not in ('Waiting', 'Processing'):
             break
     if status != 'Finished':
-        raise RuntimeError(status)
+        raise RuntimeError(status) from last_exc
 
 def wait_for_image(clients, image_id):
     """Wait for image to become available"""
     status = 'Unknowable'
+    last_exc = None
     for i in range(POLL_MAX_RETRIES):
         time.sleep(POLL_INTERVAL_SEC)
         req = ecs.models.DescribeImagesRequest(
@@ -485,7 +488,8 @@ def wait_for_image(clients, image_id):
         )
         try:
             rsp = clients.ecs.describe_images_with_options(req, RUNTIME_OPTS)
-        except API_EXCEPTIONS:
+        except API_EXCEPTIONS as exc:
+            last_exc = exc
             continue
         if len(rsp.body.images.image):
             assert len(rsp.body.images.image) == 1
@@ -494,7 +498,7 @@ def wait_for_image(clients, image_id):
             if status != 'Creating':
                 break
     if status != 'Available':
-        raise RuntimeError(status)
+        raise RuntimeError(status) from last_exc
 
 def import_image(clients, image, bucket):
     """Import image"""
