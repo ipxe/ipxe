@@ -153,7 +153,14 @@ static int bnxt_get_pci_info ( struct bnxt *bp )
 	/* Get Bar Address */
 	bp->bar0 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_0 );
 	bp->bar1 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_2 );
-	bp->bar2 = bnxt_pci_base ( bp->pdev, PCI_BASE_ADDRESS_4 );
+	bp->bar2 = NULL;
+
+	if ( ( ! bp->bar0 ) || ( ! bp->bar1 ) ) {
+		DBGP ( "- %s (  ): BAR ioremap failed (bar0 %p bar1 %p)\n",
+		       __func__, bp->bar0, bp->bar1 );
+		bnxt_down_pci ( bp );
+		return STATUS_FAILURE;
+	}
 
 	/* Virtual function */
 	bp->vf = bnxt_is_pci_vf ( bp->pdev );
@@ -262,10 +269,14 @@ static void bnxt_db_tx ( struct bnxt *bp, u32 idx )
 		writel ( TX_DOORBELL_KEY_TX | idx, ( bp->bar1 + 0 ) );
 }
 
-void bnxt_add_vlan ( struct io_buffer *iob, u16 vlan )
+u8 bnxt_add_vlan ( struct io_buffer *iob, u16 vlan )
 {
 	char *src = ( char * )iob->data;
 	u16 len = iob_len ( iob );
+
+	if ( ( len < MAC_HDR_SIZE ) ||
+	     ( iob_tailroom ( iob ) < VLAN_HDR_SIZE ) )
+		return 1;
 
 	memmove ( ( char * ) &src[MAC_HDR_SIZE + VLAN_HDR_SIZE],
 		  ( char * ) &src[MAC_HDR_SIZE],
@@ -274,10 +285,23 @@ void bnxt_add_vlan ( struct io_buffer *iob, u16 vlan )
 	* ( u16 * ) ( &src[MAC_HDR_SIZE] ) = BYTE_SWAP_S ( ETHERTYPE_VLAN );
 	* ( u16 * ) ( &src[MAC_HDR_SIZE + 2] ) = BYTE_SWAP_S ( vlan );
 	iob_put ( iob, VLAN_HDR_SIZE );
+	return 0;
 }
 
-static u16 bnxt_get_pkt_vlan ( char *src )
+static inline u16 bnxt_rx_dump_len ( struct io_buffer *iob, u16 rx_len )
 {
+	size_t avail = iob_len ( iob ) + iob_tailroom ( iob );
+
+	if ( ( size_t ) rx_len > avail )
+		return ( u16 ) avail;
+	return rx_len;
+}
+
+static u16 bnxt_get_pkt_vlan ( char *src, size_t len )
+{
+	if ( len < ( MAC_HDR_SIZE + 4 ) )
+		return 0;
+
 	if ( * ( ( u16 * ) &src[MAC_HDR_SIZE] ) == BYTE_SWAP_S ( ETHERTYPE_VLAN ) )
 		return BYTE_SWAP_S ( * ( ( u16 * ) &src[MAC_HDR_SIZE + 2] ) );
 	return 0;
@@ -386,20 +410,23 @@ int bnxt_post_rx_buffers ( struct bnxt *bp )
 {
 	u16 cons_id = ( bp->rx.cons_id % bp->rx.ring_cnt );
 	u16 iob_idx;
+	u16 attempts = 0;
 
-	while ( bp->rx.iob_cnt < bp->rx.buf_cnt ) {
+	while ( ( bp->rx.iob_cnt < bp->rx.buf_cnt ) &&
+		( attempts < bp->rx.ring_cnt ) ) {
+		attempts++;
 		iob_idx = ( cons_id % bp->rx.buf_cnt );
 		if ( !bp->rx.iob[iob_idx] ) {
 			if ( bnxt_alloc_rx_iob ( bp, cons_id, iob_idx ) < 0 ) {
 				dbg_alloc_rx_iob_fail ( iob_idx, cons_id );
 				break;
 			}
+			bp->rx.iob_cnt++;
 		}
 		cons_id = NEXT_IDX ( cons_id, bp->rx.ring_cnt );
 		/* If the ring has wrapped, flip the epoch bit */
 		if ( iob_idx > cons_id )
 		        bp->rx.epoch ^= 1;
-		bp->rx.iob_cnt++;
 	}
 
 	if ( cons_id != bp->rx.cons_id ) {
@@ -422,6 +449,15 @@ u8 bnxt_rx_drop ( struct bnxt *bp, struct io_buffer *iob,
 	u16 err_flags;
 	u8  ignore_chksum_err = 0;
 	int i;
+
+	if ( ( rx_len > MAX_ETHERNET_PACKET_BUFFER_SIZE ) ||
+	     ( ( size_t ) rx_len > iob_tailroom ( iob ) ) ||
+	     ( rx_len < MAC_HDR_SIZE ) ) {
+		DBGP ( "- %s (  ): bad rx len %d, dropping\n",
+		       __func__, rx_len );
+		bp->rx.drop_len++;
+		return 3;
+	}
 
 	if ( ( rx_cmp_v3->flags_type & RX_PKT_V3_CMPL_TYPE_MASK ) ==
 	     RX_PKT_V3_CMPL_TYPE_RX_L2_V3 ) {
@@ -478,7 +514,7 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 	dump_rx_bd ( rx_cmp, rx_cmp_hi, desc_idx );
 	assert ( iob );
 	drop = bnxt_rx_drop ( bp, iob, rx_cmp, rx_cmp_hi, rx_cmp->len );
-	dbg_rxp ( iob->data, rx_cmp->len, drop );
+	dbg_rxp ( iob->data, bnxt_rx_dump_len ( iob, rx_cmp->len ), drop );
 	if ( drop )
 		netdev_rx_err ( dev, iob, -EINVAL );
 	else
@@ -486,7 +522,10 @@ void bnxt_rx_process ( struct net_device *dev, struct bnxt *bp,
 
 	bp->rx.cnt++;
 	bp->rx.iob[desc_idx] = NULL;
-	bp->rx.iob_cnt--;
+
+	if ( bp->rx.iob_cnt )
+		bp->rx.iob_cnt--;
+
 	bnxt_post_rx_buffers ( bp );
 	bnxt_adv_cq_index ( bp, 2 ); /* Rx completion is 2 entries. */
 	dbg_rx_stat ( bp );
@@ -684,6 +723,11 @@ static void short_hwrm_cmd_req ( struct bnxt *bp, u16 len, u16 req_type )
 {
 	struct hwrm_short_input sreq;
 
+	if ( ( size_t ) len > ( size_t ) REQ_BUFFER_SIZE )
+		len = ( u16 ) REQ_BUFFER_SIZE;
+	if ( bp->hwrm_max_ext_req_len && ( len > bp->hwrm_max_ext_req_len ) )
+		len = bp->hwrm_max_ext_req_len;
+
 	memset ( &sreq, 0, sizeof ( struct hwrm_short_input ) );
 	sreq.req_type  = req_type;
 	sreq.signature = SHORT_REQ_SIGNATURE_SHORT_CMD;
@@ -752,13 +796,20 @@ static int bnxt_hwrm_ver_get ( struct bnxt *bp )
 	bp->hwrm_spec_code = resp->hwrm_intf_maj_8b << 16 |
 			     resp->hwrm_intf_min_8b << 8 |
 			     resp->hwrm_intf_upd_8b;
+
 	bp->hwrm_cmd_timeout = ( u32 ) resp->def_req_timeout;
 	if ( !bp->hwrm_cmd_timeout )
 		bp->hwrm_cmd_timeout = ( u32 ) HWRM_CMD_DEFAULT_TIMEOUT;
 	if ( bp->hwrm_cmd_timeout > ( u32 ) HWRM_CMD_MAX_TIMEOUT )
 		bp->hwrm_cmd_timeout = ( u32 ) HWRM_CMD_MAX_TIMEOUT;
-	if ( resp->hwrm_intf_maj_8b >= 1 )
-		bp->hwrm_max_req_len = resp->max_req_win_len;
+	if ( resp->hwrm_intf_maj_8b >= 1 ) {
+		if ( ( resp->max_req_win_len >= HWRM_MAX_REQ_LEN_MIN ) &&
+		     ( resp->max_req_win_len <= HWRM_MAX_REQ_LEN ) )
+			bp->hwrm_max_req_len = resp->max_req_win_len;
+		else
+			DBGP ( "- %s (  ): ignoring max_req_win_len %d\n",
+			       __func__, ( int ) resp->max_req_win_len );
+	}
 	bp->chip_id = resp->chip_rev << 24 | resp->chip_metal << 16 |
 		      resp->chip_bond_id << 8 | resp->chip_platform_type;
 	bp->chip_num = resp->chip_num;
@@ -1063,6 +1114,11 @@ static int bnxt_hwrm_error_recovery_req ( struct bnxt *bp )
 
 	bp->er.flags = resp->flags;
 	bp->er.drv_poll_freq        = resp->driver_polling_freq;
+	if ( bp->er.drv_poll_freq < ER_MIN_POLL_FREQ )
+		bp->er.drv_poll_freq = ER_MIN_POLL_FREQ;
+	if ( bp->er.drv_poll_freq > ER_MAX_POLL_FREQ )
+		bp->er.drv_poll_freq = ER_MAX_POLL_FREQ;
+
 	bp->er.master_wait_period   = resp->master_wait_period;
 	if ( bp->er.master_wait_period > ER_MAX_WAIT_PERIOD_DSECS )
 		bp->er.master_wait_period = ER_MAX_WAIT_PERIOD_DSECS;
@@ -2237,14 +2293,16 @@ static void bnxt_tx_adjust_pkt ( struct bnxt *bp, struct io_buffer *iob )
 {
 	u16 prev_len = iob_len ( iob );
 
-	bp->vlan_tx = bnxt_get_pkt_vlan ( ( char * )iob->data );
-	if ( !bp->vlan_tx && bp->vlan_id )
-		bnxt_add_vlan ( iob, bp->vlan_id );
+	bp->vlan_tx = bnxt_get_pkt_vlan ( ( char * )iob->data, prev_len );
+	if ( !bp->vlan_tx && bp->vlan_id ) {
+		if ( bnxt_add_vlan ( iob, bp->vlan_id ) ) {
+			DBGP ( "- %s (  ): no room for VLAN tag, "
+			       "sending untagged\n", __func__ );
+			bp->tx.vlan_skip++;
+		}
+	}
 
 	dbg_tx_vlan ( bp, ( char * )iob->data, prev_len, iob_len ( iob ) );
-	if ( iob_len ( iob ) != prev_len )
-		prev_len = iob_len ( iob );
-
 }
 
 static int bnxt_tx ( struct net_device *dev, struct io_buffer *iob )
@@ -2556,6 +2614,9 @@ void bnxt_process_reset_notify_event ( struct bnxt *bp,
 		if ( bp->er.rst_min_dsecs == 0 )
 			bp->er.rst_min_dsecs = ER_DFLT_FW_RST_MIN_DSECS;
 
+		if ( bp->er.rst_min_dsecs > ER_MAX_RST_MIN_DSECS )
+			bp->er.rst_min_dsecs = ER_MAX_RST_MIN_DSECS;
+
 		if ( bp->er.rst_max_dsecs == 0 )
 			bp->er.rst_max_dsecs =  ER_DFLT_FW_RST_MAX_DSECS;
 
@@ -2856,7 +2917,11 @@ static int bnxt_init_one ( struct pci_device *pci )
 	adjust_pci_device ( pci );
 
 	/* Get PCI Information */
-	bnxt_get_pci_info ( bp );
+	if ( bnxt_get_pci_info ( bp ) != STATUS_SUCCESS ) {
+		DBGP ( "- %s (  ): bnxt_get_pci_info Failed\n", __func__ );
+		err = -EIO;
+		goto err_pci_info;
+	}
 
 	/* Allocate HWRM memory */
 	if ( ( err = bnxt_alloc_hwrm_mem ( bp ) ) != 0 )
@@ -2878,11 +2943,11 @@ static int bnxt_init_one ( struct pci_device *pci )
 
 	return 0;
 
-	unregister_netdev ( netdev );
 err_register_netdev:
 err_up_init:
 	bnxt_free_hwrm_mem ( bp );
 err_alloc_hwrm:
+err_pci_info:
 	bnxt_down_pci ( bp );
 	netdev_nullify ( netdev );
 	netdev_put ( netdev );

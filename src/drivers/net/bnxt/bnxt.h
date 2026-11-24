@@ -133,6 +133,7 @@
 #define GRC_DATA_WIN_0                          0x1000
 #define HWRM_CMD_DEFAULT_TIMEOUT                500 /* in Miliseconds  */
 #define HWRM_CMD_MAX_TIMEOUT                    2000 /* in Miliseconds  */
+#define HWRM_MAX_REQ_LEN_MIN                    16
 #define BNXT_POLL_CNT                           64
 #define HWRM_CMD_POLL_WAIT_TIME                 100 /* In MicroeSconds */
 #define HWRM_CMD_DEFAULT_MULTIPLAYER(a)         ((a) * 10)
@@ -188,6 +189,7 @@
 #define SERVICE_NEXT_NQ_BD               0
 #define NO_MORE_CQ_BD_TO_SERVICE         1
 #define SERVICE_NEXT_CQ_BD               0
+
 #define MAC_HDR_SIZE     12
 #define VLAN_HDR_SIZE    4
 #define ETHERTYPE_VLAN   0x8100
@@ -513,6 +515,7 @@ struct tx_info {
 	u16              ring_cnt;
 	u32              cnt;   /* Tx statistics. */
 	u32              cnt_req;
+	u32              vlan_skip;
 	u8               epoch;
 	u8               res[3];
 };
@@ -894,6 +897,7 @@ struct rx_info {
 	u32               good;
 	u32               drop_err;
 	u32               drop_lb;
+	u32               drop_len;
 	u8                epoch;
 	u8                res[3];
 };
@@ -944,6 +948,10 @@ struct lm_error_recovery
 #define FW_STATUS_REG_CODE_READY    0x8000UL
 #define ER_MAX_BAILOUT_POST_RST     60
 #define ER_MAX_WAIT_PERIOD_DSECS    600
+#define ER_MAX_RST_MIN_DSECS        100
+#define ER_MIN_POLL_FREQ            1
+#define ER_MAX_POLL_FREQ            600
+#define ER_MAX_RST_ATTEMPTS         3
   u8  rst_min_dsecs;
   u8  reg_array_cnt;
   u8  er_initiate;
