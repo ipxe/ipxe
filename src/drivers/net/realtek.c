@@ -341,6 +341,7 @@ static struct mii_operations realtek_mii_operations = {
  * @ret rc		Return status code
  */
 static int realtek_reset ( struct realtek_nic *rtl ) {
+	uint32_t misc;
 	unsigned int i;
 
 	/* Issue reset */
@@ -354,6 +355,23 @@ static int realtek_reset ( struct realtek_nic *rtl ) {
 			mdelay ( 1 );
 			continue;
 		}
+
+		/* Some models (e.g. RTL8168E+) have the ability to
+		 * disable the receive data valid (RXDV) signal from
+		 * the PHY to the MAC, and some operating systems may
+		 * leave it in a disabled state when performing a warm
+		 * reboot.  This state is left unaltered by a normal
+		 * reset, and must be cleared separately.
+		 *
+		 * This register is completely undocumented: the only
+		 * source of information is the Linux driver.
+		 *
+		 * Some other models have the Function Event register
+		 * at this offset.  Clearing bits in the Function
+		 * Event register should have no effect.
+		 */
+		misc = readl ( rtl->regs + RTL_MISC );
+		writel ( ( misc & ~RTL_MISC_RXDV_DIS ), rtl->regs + RTL_MISC );
 
 		return 0;
 	}

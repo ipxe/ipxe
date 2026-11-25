@@ -187,6 +187,10 @@ enum realtek_legacy_status {
 #define RTL_CONFIG1 0x52
 #define RTL_CONFIG1_VPD		0x02	/**< Vital Product Data enabled */
 
+/** Miscellaneous Register (dword, 8168e+) */
+#define RTL_MISC 0xf0
+#define RTL_MISC_RXDV_DIS	0x00080000UL /**< Disable RX data valid */
+
 /** Media Status Register (byte, 8139 only) */
 #define RTL_MSR 0x58
 #define RTL_MSR_TXFCE		0x80	/**< TX flow control enabled */
