@@ -389,6 +389,15 @@ void efi_raise_tpl ( struct efi_saved_tpl *tpl ) {
 	/* Raise TPL and record previous TPL as new external TPL */
 	tpl->current = bs->RaiseTPL ( efi_internal_tpl );
 	efi_external_tpl = tpl->current;
+
+	/* Clamp external TPL to TPL_APPLICATION: some older Apple
+	 * EFI implementations enter the application above
+	 * TPL_APPLICATION, and trusting that entry TPL freezes the
+	 * timer tick (and console input) for the lifetime of the
+	 * process.
+	 */
+	if ( efi_external_tpl > TPL_APPLICATION )
+		efi_external_tpl = TPL_APPLICATION;
 }
 
 /**
@@ -418,8 +427,17 @@ void efi_drop_tpl ( struct efi_dropped_tpl *tpl ) {
 	tpl->current = bs->RaiseTPL ( TPL_HIGH_LEVEL );
 	bs->RestoreTPL ( tpl->current );
 
-	/* Drop to external TPL */
-	bs->RestoreTPL ( efi_external_tpl );
+	/* Drop to external TPL, floored at TPL_CALLBACK: on some
+	 * older Apple EFI implementations, RestoreTPL(TPL_APPLICATION)
+	 * hangs once startup has completed (observed: MacBookPro10,1).
+	 * The timer tick event notifies at TPL_NOTIFY and so still
+	 * dispatches at TPL_CALLBACK.
+	 */
+	if ( efi_external_tpl < TPL_CALLBACK ) {
+		bs->RestoreTPL ( TPL_CALLBACK );
+	} else {
+		bs->RestoreTPL ( efi_external_tpl );
+	}
 }
 
 /**
