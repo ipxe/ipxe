@@ -62,7 +62,7 @@ FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
 #define EEFI_START( efirc ) EPLATFORM ( EINFO_EEFI_START, efirc )
 
 /**
- * Create a URI device path for image
+ * Create a device path for image
  *
  * @v image		EFI image
  * @v parent		Parent device path
@@ -71,20 +71,41 @@ FEATURE ( FEATURE_IMAGE, "EFI", DHCP_EB_FEATURE_EFI, 1 );
  * The caller must eventually free() the device path.
  */
 static EFI_DEVICE_PATH_PROTOCOL *
-efi_image_uripath ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
+efi_image_devpath ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
 	EFI_DEVICE_PATH_PROTOCOL *path;
+	EFI_DEVICE_PATH_PROTOCOL *subpath;
 	URI_DEVICE_PATH *uripath;
+	IPv4_DEVICE_PATH *ipv4path;
+	IPv6_DEVICE_PATH *ipv6path;
 	EFI_DEVICE_PATH_PROTOCOL *end;
+	struct sockaddr sa;
+	struct uri *uri;
 	size_t uri_len;
 	size_t prefix_len;
+	size_t subpath_len;
 	size_t uripath_len;
 	size_t len;
 
+	/* Check for numeric TFTP host addresses */
+	uri = image->uri;
+	if ( ! ( uri->scheme && uri->host &&
+		 ( strcmp ( uri->scheme, "tftp" ) == 0 ) &&
+		 ( sock_aton ( uri->host, &sa ) == 0 ) ) ) {
+		sa.sa_family = 0;
+	}
+
 	/* Calculate device path lengths */
 	prefix_len = efi_path_len ( parent );
-	uri_len = format_uri ( image->uri, NULL, 0 );
+	uri_len = format_uri ( uri, NULL, 0 );
 	uripath_len = ( sizeof ( *uripath ) + uri_len + 1 /* NUL */ );
-	len = ( prefix_len + uripath_len + sizeof ( *end ) );
+	if ( sa.sa_family == AF_INET ) {
+		subpath_len = sizeof ( *ipv4path );
+	} else if ( sa.sa_family == AF_INET6 ) {
+		subpath_len = sizeof ( *ipv6path );
+	} else {
+		subpath_len = uripath_len;
+	}
+	len = ( prefix_len + subpath_len + sizeof ( *end ) );
 
 	/* Allocate device path */
 	path = zalloc ( len );
@@ -93,20 +114,27 @@ efi_image_uripath ( struct image *image, EFI_DEVICE_PATH_PROTOCOL *parent ) {
 
 	/* Construct device path */
 	memcpy ( path, parent, prefix_len );
-	uripath = ( ( ( void * ) path ) + prefix_len );
-	uripath->Header.Type = MESSAGING_DEVICE_PATH;
-	uripath->Header.SubType = MSG_URI_DP;
-	uripath->Header.Length[0] = ( uripath_len & 0xff );
-	uripath->Header.Length[1] = ( uripath_len >> 8 );
-	format_uri ( image->uri, uripath->Uri, ( uri_len + 1 /* NUL */ ) );
-	end = ( ( ( void * ) uripath ) + uripath_len );
+	subpath = ( ( ( void * ) path ) + prefix_len );
+	subpath->Type = MESSAGING_DEVICE_PATH;
+	subpath->Length[0] = ( subpath_len & 0xff );
+	subpath->Length[1] = ( subpath_len >> 8 );
+	if ( sa.sa_family == AF_INET ) {
+		subpath->SubType = MSG_IPv4_DP;
+	} else if ( sa.sa_family == AF_INET6 ) {
+		subpath->SubType = MSG_IPv6_DP;
+	} else {
+		subpath->SubType = MSG_URI_DP;
+		uripath = container_of ( subpath, URI_DEVICE_PATH, Header );
+		format_uri ( uri, uripath->Uri, ( uri_len + 1 /* NUL */ ) );
+	}
+	end = ( ( ( void * ) subpath ) + subpath_len );
 	efi_path_terminate ( end );
 
 	return path;
 }
 
 /**
- * Create a file device path for image
+ * Create a file path for image
  *
  * @v image		EFI image
  * @v parent		Parent device path
@@ -237,10 +265,10 @@ static int efi_image_exec ( struct image *image ) {
 		       ( parent ? "" : " (removed)" ) );
 	}
 
-	/* Construct URI device path */
-	devpath = efi_image_uripath ( image, basepath );
+	/* Construct device path */
+	devpath = efi_image_devpath ( image, basepath );
 	if ( ! devpath ) {
-		DBGC ( image, "EFIIMAGE %s could not create URI device path\n",
+		DBGC ( image, "EFIIMAGE %s could not create device path\n",
 		       image->name );
 		rc = -ENOMEM;
 		goto err_device_path;
@@ -260,6 +288,20 @@ static int efi_image_exec ( struct image *image ) {
 	}
 	DBGC ( image, "EFIIMAGE %s device is %s\n",
 	       image->name, efi_handle_name ( device ) );
+
+	/* Install duplicate SNP protocols, if applicable */
+	if ( ( snpdev != NULL ) &&
+	     ( ( efirc = bs->InstallMultipleProtocolInterfaces (
+			&device,
+			&efi_simple_network_protocol_guid, &snpdev->snp,
+			&efi_nii_protocol_guid, &snpdev->nii,
+			&efi_nii31_protocol_guid, &snpdev->nii,
+			NULL ) ) != 0 ) ) {
+		rc = -EEFI ( efirc );
+		DBGC ( image, "EFIIMAGE %s could not duplicate %s: %s\n",
+		       image->name, netdev->name, strerror ( rc ) );
+		goto err_snp_install;
+	}
 
 	/* Add as a child of the parent device */
 	if ( ( parent != NULL ) &&
@@ -317,8 +359,8 @@ static int efi_image_exec ( struct image *image ) {
 	/* Create file device path for image */
 	imgpath = efi_image_filepath ( exec, devpath );
 	if ( ! imgpath ) {
-		DBGC ( image, "EFIIMAGE %s could not create file device "
-		       "path\n", image->name );
+		DBGC ( image, "EFIIMAGE %s could not create file path\n",
+		       image->name );
 		rc = -ENOMEM;
 		goto err_image_path;
 	}
@@ -461,6 +503,15 @@ static int efi_image_exec ( struct image *image ) {
 	if ( parent )
 		efi_child_del ( parent, device );
  err_child_add:
+	if ( snpdev ) {
+		bs->UninstallMultipleProtocolInterfaces (
+			device,
+			&efi_simple_network_protocol_guid, &snpdev->snp,
+			&efi_nii_protocol_guid, &snpdev->nii,
+			&efi_nii31_protocol_guid, &snpdev->nii,
+			NULL );
+	}
+ err_snp_install:
 	bs->UninstallMultipleProtocolInterfaces (
 			device,
 			&efi_device_path_protocol_guid, devpath,
