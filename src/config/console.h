@@ -62,7 +62,7 @@ FILE_SECBOOT ( PERMITTED );
 #endif
 
 /* Enable serial console on platforms that are typically headless */
-#if defined ( CONSOLE_SBI )
+#if defined ( CONSOLE_SBI ) || defined ( PLATFORM_upl )
   #define CONSOLE_SERIAL
 #endif
 

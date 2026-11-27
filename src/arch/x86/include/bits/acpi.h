@@ -11,5 +11,6 @@ FILE_LICENCE ( GPL2_OR_LATER_OR_UBDL );
 FILE_SECBOOT ( PERMITTED );
 
 #include <ipxe/rsdp.h>
+#include <ipxe/upl_acpi.h>
 
 #endif /* _BITS_ACPI_H */

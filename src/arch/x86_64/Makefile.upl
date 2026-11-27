@@ -1,0 +1,14 @@
+# -*- makefile -*- : Force emacs to use Makefile mode
+
+# Assembly code does not respect a red zone.
+#
+CFLAGS		+= -mno-red-zone
+
+# FIT architecture name
+#
+UPL_FIT_ARCH	:= x86_64
+
+# Include generic Universal Payload Makefile
+#
+MAKEDEPS	+= arch/x86/Makefile.upl
+include arch/x86/Makefile.upl

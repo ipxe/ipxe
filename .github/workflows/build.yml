@@ -101,6 +101,39 @@ jobs:
             src/${{ env.bindir }}/ipxe.sbi
             src/${{ env.bindir }}/errors
 
+  upl:
+    name: UPL / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - i386
+          - x86_64
+    container:
+      image: ghcr.io/ipxe/ipxe-builder-${{ matrix.arch }}
+    env:
+      bindir: bin-${{ matrix.arch }}-upl
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Build
+        working-directory: src
+        run: |
+          make ${{ env.bindir }}/ipxe.fit \
+               ${{ env.bindir }}/errors
+
+      - name: Upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.bindir }}
+          if-no-files-found: error
+          path: |
+            src/${{ env.bindir }}/ipxe.fit
+            src/${{ env.bindir }}/errors
+
   uefi:
     name: UEFI / ${{ matrix.arch }}
     runs-on: ubuntu-latest
